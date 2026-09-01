@@ -121,6 +121,15 @@ npm run deploy
 
 # ── 4. Verificacion ──────────────────────────────────────────────────────────
 echo ""
+# Respaldo despues de publicar. Corre aqui porque el despliegue es justo
+# cuando acaba de quedar algo funcionando, y porque desde la terminal si hay
+# permiso para leer la carpeta del proyecto (un agente en segundo plano no).
+# No detiene nada si falla: el despliegue ya salio bien.
+if [ -d "$HOME/Google Drive" ]; then
+  bash "$(dirname "$0")/respaldar.sh" 2>&1 | sed 's/^/     /' || \
+    echo "     Aviso: el respaldo a Drive no se pudo hacer. Corra: npm run respaldar"
+fi
+
 echo "4/4  Verificando..."
 URL=$(gcloud run services describe maintrack-cmms --region us-central1 --format="value(status.url)")
 CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL/login")

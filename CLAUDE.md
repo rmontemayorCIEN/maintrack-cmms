@@ -127,6 +127,19 @@ terminal.
 4. Fichas de ayuda faltantes (avisa, no bloquea)
 5. Esquemas de IA compatibles con la API (**bloquea**)
 
+### El guardian de secretos
+
+`scripts/git-hooks/pre-commit` revisa el contenido de cada commit y lo detiene
+si encuentra una llave de Anthropic o de Google, una llave privada, o una
+cadena de conexion con contrasena literal. Se activa con:
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
+Esa configuracion es local y **no viaja en el respaldo**: hay que correrla otra
+vez despues de restaurar en otra computadora.
+
 Las pruebas viven en `scripts/prueba-*.ts` y se corren con `npx tsx`.
 `prueba-procedimiento-real.ts` llama al modelo de verdad: cuesta centavos y no
 va en el despliegue.

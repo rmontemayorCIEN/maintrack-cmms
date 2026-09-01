@@ -1,0 +1,43 @@
+#!/bin/sh
+# Ultima defensa contra confirmar un secreto.
+#
+# El .gitignore ya cubre .env y las llaves, pero un "git add -f" o un archivo
+# con nombre nuevo se lo brinca. Esto revisa el CONTENIDO de lo que se va a
+# confirmar. Un secreto en la historia de git no se borra: se rota.
+#
+# Cuidado al editar: el patron es ERE (grep -E). Nada de \{n,\} ni \(...\),
+# que son de grep basico y hacen que NUNCA empate — ya paso, y el guardian
+# dejo pasar justo lo que debia detener.
+
+archivos=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$archivos" ] && exit 0
+
+# La parte de la contrasena excluye $ \ ( ) * | y comillas: eso descarta las
+# variables de shell ($CLAVE) y los patrones de sed, que no son secretos.
+patron='sk-ant-[a-zA-Z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}|BEGIN [A-Z ]*PRIVATE KEY|postgres(ql)?://[^:@ "]+:[^$@ "\\()*|]{6,}@'
+
+
+encontrados=$(echo "$archivos" | tr '\n' '\0' | xargs -0 grep -lIE "$patron" 2>/dev/null \
+  | grep -v -e '^\.env\.example$' -e '^DESPLIEGUE\.md$')
+
+if [ -n "$encontrados" ]; then
+  echo ""
+  echo "  COMMIT DETENIDO: parece haber un secreto en:"
+  echo "$encontrados" | sed 's/^/     /'
+  echo ""
+  echo "  Revise esos archivos. Si es un marcador y no un secreto real,"
+  echo "  repita el commit con:  git commit --no-verify"
+  echo ""
+  exit 1
+fi
+
+# Los duplicados de iCloud rompieron una compilacion antes de ahora.
+dups=$(echo "$archivos" | grep -E ' [0-9]\.[a-zA-Z]+$')
+if [ -n "$dups" ]; then
+  echo ""
+  echo "  COMMIT DETENIDO: duplicados de iCloud:"
+  echo "$dups" | sed 's/^/     /'
+  echo ""
+  exit 1
+fi
+exit 0
