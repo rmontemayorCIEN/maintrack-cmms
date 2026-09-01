@@ -1,0 +1,166 @@
+"use client";
+
+import { Badge } from "@/components/ui";
+import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
+import {
+  MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS,
+} from "@/lib/constants";
+import { dueLabel, formatCurrency, formatNumber } from "@/lib/utils";
+import { EnlacesPlan } from "./enlaces-plan";
+import { PlanDialog } from "./plan-dialog";
+import { PlanRowActions } from "./plan-actions";
+
+type Enlace = { id: string; title: string; url: string; note: string | null; createdAt: string };
+
+export type FilaPlan = {
+  id: string; name: string; description: string | null;
+  activo: string | null; activoCodigo: string | null;
+  maintenanceType: string; triggerType: string; priority: string;
+  frecuencia: string; medidorActual: string | null;
+  nextDueDate: string | null; lastCompletedAt: string | null; lastGeneratedAt: string | null;
+  actividades: number; costoEstimado: number; horasEstimadas: number; otGeneradas: number;
+  requiereParo: boolean; active: boolean;
+  toleranciaDias: number; anticipacionDias: number;
+  moneda: string;
+  enlaces: Enlace[];
+  /** Ya con la forma que espera el dialogo de edicion. */
+  paraEditar: React.ComponentProps<typeof PlanDialog>["plan"];
+};
+
+const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
+
+const TRIGGER: Record<string, string> = { CALENDAR: "Calendario", METER: "Medidor", CONDITION: "Condicion" };
+
+export function TablaPlanes({
+  planes, vistaInicial, editable, assets, meters, technicians,
+  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos,
+}: {
+  planes: FilaPlan[];
+  vistaInicial: Vista;
+  editable: boolean;
+  assets: React.ComponentProps<typeof PlanDialog>["assets"];
+  meters: React.ComponentProps<typeof PlanDialog>["meters"];
+  technicians: React.ComponentProps<typeof PlanDialog>["technicians"];
+  especialidades: React.ComponentProps<typeof PlanDialog>["especialidades"];
+  refacciones: React.ComponentProps<typeof PlanDialog>["refacciones"];
+  servicios: React.ComponentProps<typeof PlanDialog>["servicios"];
+  moneda: string;
+  puedeCrearCatalogos: boolean;
+}) {
+  const FIJAS: Columna<FilaPlan>[] = [
+    {
+      id: "plan", etiqueta: "Plan",
+      texto: (p) => `${p.name} ${p.description ?? ""}`,
+      pinta: (p) => (
+        <div className={`max-w-64 ${p.active ? "" : "opacity-50"}`}>
+          <p className="truncate font-medium text-slate-800">{p.name}</p>
+          {p.description ? <p className="truncate text-xs text-slate-500">{p.description}</p> : null}
+          <div className="mt-1">
+            <EnlacesPlan planId={p.id} nombre={p.name} editable={editable} enlaces={p.enlaces} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "activo", etiqueta: "Activo",
+      texto: (p) => (p.activoCodigo ? `${p.activoCodigo} ${p.activo}` : "—"),
+      pinta: (p) => (
+        <span className="text-xs text-slate-600">
+          {p.activoCodigo ? `${p.activoCodigo} · ${p.activo}` : "—"}
+        </span>
+      ),
+    },
+  ];
+
+  const COLUMNAS: Columna<FilaPlan>[] = [
+    {
+      id: "tipo", etiqueta: "Tipo", agrupable: true,
+      texto: (p) => MAINTENANCE_TYPE_LABELS[p.maintenanceType] ?? p.maintenanceType,
+      pinta: (p) => <Badge className={MAINTENANCE_TYPE_COLORS[p.maintenanceType]}>{MAINTENANCE_TYPE_LABELS[p.maintenanceType]}</Badge>,
+    },
+    { id: "disparo", etiqueta: "Disparo", agrupable: true, texto: (p) => TRIGGER[p.triggerType] ?? p.triggerType },
+    {
+      id: "frecuencia", etiqueta: "Frecuencia", agrupable: true,
+      texto: (p) => p.frecuencia,
+      pinta: (p) => (
+        <div className="text-xs text-slate-600">
+          {p.frecuencia}
+          {p.medidorActual ? <p className="text-[0.6875rem] text-slate-400">{p.medidorActual}</p> : null}
+        </div>
+      ),
+    },
+    {
+      id: "prioridad", etiqueta: "Prioridad", agrupable: true,
+      texto: (p) => PRIORITY_LABELS[p.priority] ?? p.priority,
+      pinta: (p) => <Badge className={PRIORITY_COLORS[p.priority]}>{PRIORITY_LABELS[p.priority]}</Badge>,
+    },
+    {
+      id: "proximo", etiqueta: "Proximo",
+      texto: (p) => (p.nextDueDate ? dueLabel(new Date(p.nextDueDate)).text : "—"),
+      pinta: (p) => {
+        if (!p.nextDueDate) return "—";
+        const d = dueLabel(new Date(p.nextDueDate));
+        return <Badge tone={d.tone === "muted" ? "muted" : d.tone}>{d.text}</Badge>;
+      },
+    },
+    { id: "actividades", etiqueta: "Actividades", alineaDerecha: true, texto: (p) => String(p.actividades) },
+    {
+      id: "costo", etiqueta: "Costo est.", alineaDerecha: true,
+      texto: (p) => (p.costoEstimado > 0 || p.horasEstimadas > 0 ? formatCurrency(p.costoEstimado, p.moneda) : "—"),
+      pinta: (p) =>
+        p.costoEstimado > 0 || p.horasEstimadas > 0 ? (
+          <>
+            {formatCurrency(p.costoEstimado, p.moneda)}
+            <p className="text-[0.6875rem] text-slate-400">{formatNumber(p.horasEstimadas, 1)} h estimadas</p>
+          </>
+        ) : <span className="text-slate-300">—</span>,
+    },
+    { id: "otGeneradas", etiqueta: "OT generadas", alineaDerecha: true, texto: (p) => String(p.otGeneradas) },
+    {
+      id: "estado", etiqueta: "Situacion", agrupable: true,
+      texto: (p) => (p.active ? "Activo" : "Pausado"),
+      pinta: (p) => (p.active ? <Badge tone="success">Activo</Badge> : <Badge tone="muted">Pausado</Badge>),
+    },
+    {
+      id: "paro", etiqueta: "Requiere paro", agrupable: true,
+      texto: (p) => (p.requiereParo ? "Si" : "No"),
+    },
+    { id: "ultimoCierre", etiqueta: "Ultimo cierre", texto: (p) => (p.lastCompletedAt ? new Date(p.lastCompletedAt).toLocaleDateString("es-MX") : "—") },
+    { id: "ultimaGeneracion", etiqueta: "Ultima generacion", texto: (p) => (p.lastGeneratedAt ? new Date(p.lastGeneratedAt).toLocaleDateString("es-MX") : "—") },
+    { id: "tolerancia", etiqueta: "Tolerancia (dias)", alineaDerecha: true, texto: (p) => String(p.toleranciaDias) },
+    { id: "anticipacion", etiqueta: "Anticipacion (dias)", alineaDerecha: true, texto: (p) => String(p.anticipacionDias) },
+    { id: "enlaces", etiqueta: "Referencias", alineaDerecha: true, texto: (p) => String(p.enlaces.length) },
+  ];
+
+  /** La vista de fabrica: lo que se necesita para saber que toca y cuanto cuesta. */
+  const DE_FABRICA = ["tipo", "disparo", "frecuencia", "prioridad", "proximo", "actividades", "costo", "otGeneradas"];
+
+  return (
+    <TablaConfigurable
+      filas={planes}
+      fijas={FIJAS}
+      columnas={COLUMNAS}
+      deFabrica={DE_FABRICA}
+      vistaInicial={vistaInicial}
+      clave="planes"
+      sustantivo="planes"
+      ejemploFiltro='Filtrar: "bomba", "mensual", "pausado"…'
+      acciones={editable ? (p) => (
+        <div className="flex justify-end gap-1">
+          <PlanDialog
+            plan={p.paraEditar}
+            assets={assets}
+            meters={meters}
+            technicians={technicians}
+            especialidades={especialidades}
+            refacciones={refacciones}
+            servicios={servicios}
+            moneda={moneda}
+            puedeCrearCatalogos={puedeCrearCatalogos}
+          />
+          <PlanRowActions planId={p.id} active={p.active} />
+        </div>
+      ) : undefined}
+    />
+  );
+}

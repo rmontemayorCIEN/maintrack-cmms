@@ -1,0 +1,3 @@
+# MainTrack CMMS es una herramienta interna: no debe aparecer en buscadores.
+User-agent: *
+Disallow: /

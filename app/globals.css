@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dae4ff;
+  --color-brand-200: #bcd0ff;
+  --color-brand-300: #8eb0ff;
+  --color-brand-400: #5985fd;
+  --color-brand-500: #345df9;
+  --color-brand-600: #1f3eee;
+  --color-brand-700: #1a2fd8;
+  --color-brand-800: #1c2aae;
+  --color-brand-900: #1c2a89;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+:root {
+  /* Densidad: la fija el usuario desde Configuracion → Apariencia. */
+  --celda: 0.7rem 0.9rem;
+  --tarjeta: 1.25rem;
+  --surface: #f6f7fb;
+  --panel: #ffffff;
+  --border: #e6e8ef;
+  --ink: #0f172a;
+  --muted: #64748b;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.card-padded {
+  padding: var(--tarjeta);
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:focus {
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 3px rgba(52, 93, 249, 0.12);
+}
+.field:disabled {
+  background: #f8fafc;
+  color: var(--muted);
+}
+
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+table.data th {
+  text-align: left;
+  font-size: 0.7rem;
+  padding: var(--celda);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: #fbfcfe;
+}
+table.data td {
+  padding: var(--celda);
+  border-bottom: 1px solid #f1f3f8;
+  vertical-align: middle;
+}
+table.data tbody tr:hover {
+  background: #fafbff;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}

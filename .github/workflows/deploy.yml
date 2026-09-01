@@ -1,0 +1,109 @@
+# Despliegue automatico de MainTrack CMMS a Google Cloud Run.
+# Se dispara con cada push a la rama main.
+#
+# Secretos que debe tener el repositorio en GitHub:
+#   GCP_CREDENCIALES  JSON de la cuenta de servicio
+#   GCP_PROYECTO      Identificador del proyecto (ej. maintrack-cmms)
+#   CLOUDSQL_INSTANCIA  PROYECTO:REGION:INSTANCIA
+name: Desplegar MainTrack CMMS a Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:      # permite lanzarlo a mano desde la pestaña Actions
+
+env:
+  SERVICIO: maintrack-cmms
+  REGION: us-central1
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Traer el codigo
+        uses: actions/checkout@v4
+
+      - name: Revision previa
+        run: |
+          set -euo pipefail
+          fallo=0
+
+          # En produccion el esquema debe apuntar a PostgreSQL. Si se subio
+          # apuntando a SQLite, el contenedor arranca pero no encuentra datos.
+          motor="$(grep -E '^[[:space:]]+provider[[:space:]]*=[[:space:]]*"(sqlite|postgresql)"' \
+                   prisma/schema.prisma | head -1 | sed -E 's/.*"(.*)".*/\1/')"
+          if [ "$motor" != "postgresql" ]; then
+            echo "FALTA: prisma/schema.prisma apunta a '$motor', no a postgresql."
+            echo "       Ejecute ./scripts/use-postgres.sh y vuelva a subir los cambios."
+            fallo=1
+          fi
+
+          # Sin la migracion inicial, 'prisma migrate deploy' no crea las tablas.
+          if [ ! -f prisma/migrations/00000000000000_init/migration.sql ]; then
+            echo "FALTA: no hay migracion inicial en prisma/migrations/."
+            echo "       La genera ./scripts/use-postgres.sh"
+            fallo=1
+          elif ! grep -q 'TIMESTAMP(3)' prisma/migrations/00000000000000_init/migration.sql; then
+            echo "ROTO: la migracion inicial no es de PostgreSQL (parece de SQLite)."
+            echo "      Borre prisma/migrations y ejecute ./scripts/use-postgres.sh"
+            fallo=1
+          fi
+
+          for archivo in Dockerfile package-lock.json next.config.ts; do
+            if [ ! -f "$archivo" ]; then
+              echo "FALTA: el archivo $archivo no esta en el repositorio."
+              fallo=1
+            fi
+          done
+
+          # La base de datos de desarrollo nunca debe viajar al repositorio.
+          if git ls-files | grep -qE '\.db$'; then
+            echo "PELIGRO: hay un archivo .db versionado. Agreguelo a .gitignore."
+            fallo=1
+          fi
+
+          if [ "$fallo" = "1" ]; then
+            echo ""
+            echo "Corrija lo anterior antes de desplegar."
+            exit 1
+          fi
+          echo "Revision previa correcta."
+
+      - name: Autenticarse en Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENCIALES }}
+
+      - name: Preparar gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROYECTO }}
+
+      - name: Construir y desplegar
+        run: |
+          set -euo pipefail
+
+          if ! gcloud run deploy "$SERVICIO" \
+            --source . \
+            --region "$REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 10 \
+            --add-cloudsql-instances="${{ secrets.CLOUDSQL_INSTANCIA }}" \
+            --set-secrets="DATABASE_URL=cmms-database-url:latest,AUTH_SECRET=cmms-auth-secret:latest,CRON_SECRET=cmms-cron-secret:latest"; then
+
+            echo ""
+            echo "═════════ EL DESPLIEGUE FALLO ═════════"
+            echo "El registro de la construccion es donde esta la causa real:"
+            gcloud builds list --limit=1 --format="value(id)" | while read -r ID; do
+              [ -n "$ID" ] && gcloud builds log "$ID" 2>/dev/null | tail -60
+            done
+            exit 1
+          fi
+
+          echo ""
+          echo "Publicado en:"
+          gcloud run services describe "$SERVICIO" --region "$REGION" --format="value(status.url)"

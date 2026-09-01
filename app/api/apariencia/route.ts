@@ -1,0 +1,43 @@
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { ok, withAuth } from "@/lib/api";
+
+/**
+ * Preferencias de apariencia.
+ *
+ * La escala y la densidad se guardan en el usuario; el color y el logo en la
+ * organizacion, y esos si piden permiso de configuracion. Nadie deberia poder
+ * cambiarle el tamaño de letra a otro, ni un tecnico cambiar la identidad
+ * visual de la empresa.
+ */
+const personal = z.object({
+  escalaUi: z.enum(["NORMAL", "GRANDE", "MAYOR"]).optional(),
+  densidadUi: z.enum(["COMPACTA", "COMODA", "AMPLIA"]).optional(),
+});
+
+const empresa = z.object({
+  colorAcento: z.enum(["AZUL", "INDIGO", "TEAL", "VERDE", "AMBAR", "GRAFITO"]).optional(),
+  logoUrl: z.string().trim().max(500).nullable().optional(),
+});
+
+export async function PATCH(request: Request) {
+  return withAuth(null, async ({ user, orgId }) => {
+    const cuerpo = await request.json();
+    const mias = personal.parse(cuerpo);
+
+    if (Object.keys(mias).length) {
+      await prisma.user.update({ where: { id: user.id }, data: mias });
+    }
+
+    const deLaEmpresa = empresa.parse(cuerpo);
+    if (Object.keys(deLaEmpresa).length) {
+      const { can } = await import("@/lib/rbac");
+      if (!can(user.role, "settings:write")) {
+        return ok({ error: "Solo quien administra la cuenta puede cambiar el logo y el color" }, 403);
+      }
+      await prisma.organization.update({ where: { id: orgId }, data: deLaEmpresa });
+    }
+
+    return ok({ success: true });
+  });
+}

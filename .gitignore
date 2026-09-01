@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+.env
+*.db
+*.db-journal
+.DS_Store
+next-env.d.ts
+.vercel
+
+# Credenciales de cuentas de servicio: nunca deben viajar al repositorio
+clave-github.json
+*-service-account*.json
+gcp-*.json
+
+.almacen
+
+# Duplicados que crea la sincronizacion de iCloud ("archivo 2.ts", "archivo 3.ts").
+# Ya rompieron una compilacion; el despliegue los limpia de .next y aqui se
+# evita que lleguen al repositorio.
+* [0-9].*

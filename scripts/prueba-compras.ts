@@ -1,0 +1,126 @@
+/**
+ * Prueba del circuito de compra: solicitar -> autorizar -> colocar -> recibir.
+ * Verifica lo que cuesta caro: que lo recibido entre al almacen con su costo,
+ * que el estado siga a lo recibido, y que rechazar deje motivo.
+ */
+import { PrismaClient } from "@prisma/client";
+import { ErrorDeCompra, autorizar, crearRequisicionDeCompra, enCompra, recibir, requiereAutorizacion } from "../lib/compras";
+
+const prisma = new PrismaClient();
+let fallas = 0;
+function revisar(e: string, real: unknown, esp: unknown) {
+  const bien = JSON.stringify(real) === JSON.stringify(esp);
+  if (!bien) fallas++;
+  console.log(`  ${bien ? "ok   " : "FALLA"} ${e.padEnd(52)} ${JSON.stringify(real)}${bien ? "" : ` (esperado ${JSON.stringify(esp)})`}`);
+}
+async function intentar(fn: () => Promise<unknown>) {
+  try { await fn(); return "paso"; } catch (e) { return e instanceof ErrorDeCompra ? "rechazado" : `error: ${(e as Error).message}`; }
+}
+
+async function main() {
+  const org = await prisma.organization.create({ data: { name: "Prueba RC", slug: `rc-${Date.now()}`, montoAutorizacion: 5000 } });
+  const alm = await prisma.warehouse.create({ data: { organizationId: org.id, code: "GEN", name: "General", esGeneral: true } });
+  const pide = await prisma.user.create({ data: { organizationId: org.id, email: `p${Date.now()}@x.com`, name: "Almacenista", passwordHash: "x", role: "TECHNICIAN" } });
+  const firma = await prisma.user.create({ data: { organizationId: org.id, email: `f${Date.now()}@x.com`, name: "Gerente", passwordHash: "x", role: "ADMIN" } });
+  const part = await prisma.part.create({ data: { organizationId: org.id, code: "BAL", name: "Balero", unit: "pza", unitCost: 200 } });
+  await prisma.partStock.create({ data: { organizationId: org.id, partId: part.id, warehouseId: alm.id, quantity: 2 } });
+  await prisma.part.update({ where: { id: part.id }, data: { quantityOnHand: 2 } });
+
+  const saldo = async () => (await prisma.partStock.findFirst({ where: { partId: part.id }, select: { quantity: true } }))!.quantity;
+
+  console.log("\nUMBRAL\n");
+  revisar("2,000 con umbral 5,000 no requiere firma", requiereAutorizacion(2000, 5000), false);
+  revisar("8,000 con umbral 5,000 si requiere firma", requiereAutorizacion(8000, 5000), true);
+
+  console.log("\nSOLICITUD\n");
+  const rc = await crearRequisicionDeCompra({
+    organizationId: org.id, userId: pide.id, warehouseId: alm.id, urgencia: "PARO",
+    renglones: [{ partId: part.id, descripcion: "Balero 6205", cantidadSolicitada: 10, costoEstimado: 250 }],
+  });
+  revisar("monto estimado calculado", rc.montoEstimado, 2500);
+  revisar("avisó a quien compra", await prisma.notification.count({ where: { organizationId: org.id } }), 1);
+  revisar("el aviso es critico por el paro",
+    (await prisma.notification.findFirst({ where: { organizationId: org.id }, select: { kind: true } }))!.kind, "CRITICAL");
+
+  console.log("\nAUTORIZACION\n");
+  const rechazada = await crearRequisicionDeCompra({
+    organizationId: org.id, userId: pide.id, warehouseId: alm.id, urgencia: "NORMAL",
+    renglones: [{ partId: part.id, descripcion: "De prueba", cantidadSolicitada: 1, costoEstimado: 10 }],
+  });
+  revisar("rechazar sin motivo se rechaza",
+    await intentar(() => autorizar({ organizationId: org.id, requestId: rechazada.id, userId: firma.id, aprueba: false, motivo: "" })),
+    "rechazado");
+  await autorizar({ organizationId: org.id, requestId: rechazada.id, userId: firma.id, aprueba: false, motivo: "Ya hay en el otro almacen" });
+  const r2 = await prisma.purchaseRequest.findUnique({ where: { id: rechazada.id }, select: { estado: true, motivoRechazo: true } });
+  revisar("queda rechazada con motivo", `${r2!.estado}:${r2!.motivoRechazo}`, "RECHAZADA:Ya hay en el otro almacen");
+  revisar("autorizar dos veces se rechaza",
+    await intentar(() => autorizar({ organizationId: org.id, requestId: rechazada.id, userId: firma.id, aprueba: true })),
+    "rechazado");
+
+  await autorizar({ organizationId: org.id, requestId: rc.id, userId: firma.id, aprueba: true });
+  revisar("la principal queda autorizada",
+    (await prisma.purchaseRequest.findUnique({ where: { id: rc.id }, select: { estado: true } }))!.estado, "AUTORIZADA");
+  // Quien pidio recibe aviso de las dos: la que le rechazaron y la que le
+  // autorizaron. Se verifica el tono y que el rechazo traiga el motivo, que es
+  // lo que evita tener que ir a preguntar por que.
+  const avisos = await prisma.notification.findMany({
+    where: { userId: pide.id }, orderBy: { createdAt: "asc" },
+    select: { kind: true, body: true },
+  });
+  revisar("se aviso a quien pidio, con su tono", avisos.map((a) => a.kind).join(","), "WARNING,SUCCESS");
+  revisar("el rechazo lleva el motivo", avisos[0].body, "Ya hay en el otro almacen");
+
+  console.log("\nCOMPRA EXTERNA\n");
+  revisar("colocar sin folio se rechaza",
+    await intentar(() => enCompra({ organizationId: org.id, requestId: rc.id, ordenCompra: "  " })), "rechazado");
+  await enCompra({ organizationId: org.id, requestId: rc.id, ordenCompra: "OC-SAP-99231" });
+  revisar("queda en compra con la orden externa",
+    (await prisma.purchaseRequest.findUnique({ where: { id: rc.id }, select: { estado: true, ordenCompra: true } }))!.ordenCompra,
+    "OC-SAP-99231");
+
+  console.log("\nRECEPCION\n");
+  const linea = (await prisma.purchaseRequestLine.findFirst({ where: { requestId: rc.id } }))!;
+  await recibir({
+    organizationId: org.id, userId: firma.id, purchaseRequestId: rc.id, warehouseId: alm.id,
+    remision: "R-4471",
+    renglones: [{ requestLineId: linea.id, partId: part.id, cantidad: 6, costoUnitario: 260, conforme: true }],
+  });
+  revisar("el almacen subio de 2 a 8", await saldo(), 8);
+  revisar("estado tras recepcion parcial",
+    (await prisma.purchaseRequest.findUnique({ where: { id: rc.id }, select: { estado: true } }))!.estado, "RECIBIDA_PARCIAL");
+  // 2 a 200 mas 6 a 260 = (400 + 1560) / 8 = 245
+  revisar("costo promedio ponderado tras recibir",
+    (await prisma.part.findUnique({ where: { id: part.id }, select: { unitCost: true } }))!.unitCost, 245);
+
+  await recibir({
+    organizationId: org.id, userId: firma.id, purchaseRequestId: rc.id, warehouseId: alm.id,
+    remision: "R-4488",
+    renglones: [{ requestLineId: linea.id, partId: part.id, cantidad: 4, costoUnitario: 260, conforme: false, observacion: "Empaque golpeado" }],
+  });
+  revisar("estado tras completar", (await prisma.purchaseRequest.findUnique({ where: { id: rc.id }, select: { estado: true } }))!.estado, "RECIBIDA");
+  revisar("el almacen quedo en 12", await saldo(), 12);
+  revisar("lo no conforme se recibio y quedo senalado",
+    await prisma.goodsReceiptLine.count({ where: { conforme: false } }), 1);
+  revisar("dos recepciones con su remision",
+    (await prisma.goodsReceipt.findMany({ where: { organizationId: org.id }, select: { remision: true }, orderBy: { folio: "asc" } })).map((r) => r.remision).join(","),
+    "R-4471,R-4488");
+  revisar("las entradas quedaron en el kardex",
+    await prisma.stockMovement.count({ where: { organizationId: org.id, movementType: "IN" } }), 2);
+
+  await prisma.$transaction([
+    prisma.stockMovement.deleteMany({ where: { organizationId: org.id } }),
+    prisma.goodsReceiptLine.deleteMany({ where: { receipt: { organizationId: org.id } } }),
+    prisma.goodsReceipt.deleteMany({ where: { organizationId: org.id } }),
+    prisma.purchaseRequestLine.deleteMany({ where: { request: { organizationId: org.id } } }),
+    prisma.purchaseRequest.deleteMany({ where: { organizationId: org.id } }),
+    prisma.notification.deleteMany({ where: { organizationId: org.id } }),
+    prisma.partStock.deleteMany({ where: { organizationId: org.id } }),
+    prisma.part.deleteMany({ where: { organizationId: org.id } }),
+    prisma.warehouse.deleteMany({ where: { organizationId: org.id } }),
+    prisma.user.deleteMany({ where: { organizationId: org.id } }),
+    prisma.organization.delete({ where: { id: org.id } }),
+  ]);
+  console.log(fallas ? `\n${fallas} revisiones fallaron\n` : "\nTodas las revisiones cuadran\n");
+  process.exitCode = fallas ? 1 : 0;
+}
+main().catch((e) => { console.error("\nERROR:", e); process.exitCode = 1; }).finally(() => prisma.$disconnect());
