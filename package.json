@@ -20,7 +20,8 @@
     "super-admin": "tsx scripts/super-admin.ts",
     "almacen:configurar": "bash scripts/configurar-almacen.sh",
     "demo:sembrar": "tsx scripts/sembrar-demo.ts",
-    "actualizar": "bash scripts/actualizar.sh"
+    "actualizar": "bash scripts/actualizar.sh",
+    "respaldar": "bash scripts/respaldar.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
