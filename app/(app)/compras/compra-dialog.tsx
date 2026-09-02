@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { URGENCIAS } from "@/lib/requisiciones";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type RefaccionCompra = { id: string; code: string; name: string; unit: string; costo: number };
 type Renglon = { partId: string; descripcion: string; cantidad: string; costo: string };
@@ -110,11 +111,14 @@ export function CompraDialog({
               </div>
               <div>
                 <label className="text-[0.6875rem] font-medium text-slate-600">Proveedor sugerido</label>
-                <select value={proveedorSugeridoId} onChange={(e) => setProveedor(e.target.value)}
-                  className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                  <option value="">Sin sugerir</option>
-                  {proveedores.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                <SelectorBuscable
+                  className="mt-0.5"
+                  valor={proveedorSugeridoId}
+                  onCambio={setProveedor}
+                  vacio="Sin sugerir"
+                  marcador="Busque por nombre del proveedor"
+                  opciones={proveedores.map((p) => ({ id: p.id, etiqueta: p.name }))}
+                />
               </div>
             </div>
 
@@ -123,16 +127,17 @@ export function CompraDialog({
               {renglones.map((r, i) => (
                 <div key={i} className="grid gap-1.5 sm:grid-cols-[1fr_auto_auto_auto]">
                   <div className="grid gap-1">
-                    <select value={r.partId}
-                      onChange={(e) => actualizar(i, {
-                        partId: e.target.value,
+                    <SelectorBuscable
+                      valor={r.partId}
+                      onCambio={(id) => actualizar(i, {
+                        partId: id,
                         descripcion: "",
-                        costo: e.target.value ? String(porId.get(e.target.value)?.costo ?? 0) : r.costo,
+                        costo: id ? String(porId.get(id)?.costo ?? 0) : r.costo,
                       })}
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                      <option value="">Del catálogo…</option>
-                      {refacciones.map((d) => <option key={d.id} value={d.id}>{d.code} — {d.name}</option>)}
-                    </select>
+                      vacio="Del catálogo…"
+                      marcador="Busque por clave o descripcion"
+                      opciones={refacciones.map((d) => ({ id: d.id, etiqueta: `${d.code} — ${d.name}` }))}
+                    />
                     {!r.partId ? (
                       <input value={r.descripcion} onChange={(e) => actualizar(i, { descripcion: e.target.value })}
                         placeholder="…o descríbalo: todavía no está en el catálogo"

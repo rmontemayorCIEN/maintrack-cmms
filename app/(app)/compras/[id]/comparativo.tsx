@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, FileText, Loader2, Plus, Trophy } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type RenglonPedido = {
   id: string; partId: string | null; descripcion: string; cantidad: number; unidad: string;
@@ -246,10 +247,14 @@ export function Comparativo({
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             <div>
               <label className="text-[0.625rem] font-medium text-slate-600">Proveedor</label>
-              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}
-                className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                {proveedores.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <SelectorBuscable
+                className="mt-0.5"
+                valor={supplierId}
+                onCambio={setSupplierId}
+                vacio={null}
+                marcador="Busque por nombre del proveedor"
+                opciones={proveedores.map((p) => ({ id: p.id, etiqueta: p.name }))}
+              />
             </div>
             <div>
               <label className="text-[0.625rem] font-medium text-slate-600">Folio del proveedor</label>

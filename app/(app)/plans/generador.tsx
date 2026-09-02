@@ -5,6 +5,7 @@ import { Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { PlanDialog, type Task } from "./plan-dialog";
 import type { Opcion } from "./recursos-tarea";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 type Borrador = {
   name: string; description: string; maintenanceType: string; triggerType: string;
@@ -128,11 +129,13 @@ export function GeneradorPlan({
         <div className="grid gap-4">
           <div>
             <label className="label">Equipo</label>
-            <select className="field" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-              {assets.map((a) => (
-                <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-              ))}
-            </select>
+            <SelectorBuscable
+              valor={assetId}
+              onCambio={setAssetId}
+              vacio={null}
+              marcador="Busque por clave o nombre del equipo"
+              opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+            />
           </div>
           <div>
             <label className="label">Lo que usted sabe y el sistema no (opcional)</label>

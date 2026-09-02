@@ -6,6 +6,7 @@ import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { Adjuntos } from "@/components/adjuntos";
 import { PRIORITY_LABELS } from "@/lib/constants";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export function RequestDialog({ assets }: { assets: Array<{ id: string; code: string; name: string }> }) {
   const router = useRouter();
@@ -119,12 +120,13 @@ export function RequestDialog({ assets }: { assets: Array<{ id: string; code: st
           </div>
           <div>
             <label className="label">Activo afectado</label>
-            <select className="field" value={form.assetId} onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}>
-              <option value="">No identificado</option>
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>{asset.code} — {asset.name}</option>
-              ))}
-            </select>
+            <SelectorBuscable
+              valor={form.assetId}
+              onCambio={(id) => setForm((f) => ({ ...f, assetId: id }))}
+              vacio="No identificado"
+              marcador="Busque por clave o nombre del equipo"
+              opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+            />
           </div>
           <div>
             <label className="label">Urgencia</label>

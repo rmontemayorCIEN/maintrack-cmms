@@ -37,12 +37,30 @@ export type FichaAyuda = {
    * despues se desincronizan.
    */
   tablaConfigurable?: boolean;
+  /**
+   * Si la pantalla tiene campos que despliegan un catalogo largo. Se explican
+   * una sola vez, en CAMPO_BUSCABLE, en vez de repetirse en dieciseis fichas.
+   */
+  camposBuscables?: boolean;
   noPuedo?: Array<{ sintoma: string; porque: string }>;
   /** Preguntas que el usuario suele hacer aqui. Se contestan sin llamar al modelo. */
   preguntas?: Array<{ pregunta: string; respuesta: string }>;
 };
 
 /** Los controles que comparten todas las listas configurables. */
+/**
+ * Los campos que despliegan un catalogo largo —equipos, refacciones,
+ * proveedores— se explican una sola vez, igual que los controles de tabla.
+ */
+export const CAMPO_BUSCABLE = {
+  titulo: "Los campos con lista larga",
+  explica:
+    "Equipos, refacciones y proveedores no se eligen recorriendo la lista: al abrirlos aparece un buscador. " +
+    "Escriba la clave o cualquier palabra del nombre y la lista se reduce sola. " +
+    "Puede escribir varias palabras en cualquier orden —«bomba 001» encuentra «BOM-001 — Bomba hidroneumática»— " +
+    "y no hace falta poner acentos: «climatizacion» encuentra «climatización».",
+} as const;
+
 export const CONTROLES_TABLA: Array<{ nombre: string; explica: string }> = [
   { nombre: "Filtrar", explica: "Busca en TODAS las columnas, incluidas las que tiene ocultas. Esconder una columna es decision de presentacion, no de que se puede encontrar." },
   { nombre: "Agrupar por…", explica: "Junta los renglones por el criterio que elija. Cada grupo trae su conteo y se pliega con un clic." },
@@ -56,6 +74,7 @@ export const CONTROLES_TABLA: Array<{ nombre: string; explica: string }> = [
 export const AYUDA: Record<string, FichaAyuda> = {
   "/requests/puntos": {
     titulo: "Puntos de reporte QR",
+    camposBuscables: true,
     que: "Códigos QR para pegar en máquinas y áreas. Quien los escanea reporta una falla sin cuenta ni contraseña.",
     hacer: [
       "Crear un punto para un lugar sin equipo registrado: un salón, un baño, un pasillo",
@@ -131,6 +150,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/inventory/analisis": {
     titulo: "Análisis de almacén",
+    camposBuscables: true,
     que: "Qué comprar, qué sobra y qué está a punto de detener un trabajo. Es la pantalla de decisiones, no de consulta.",
     hacer: ["Revisar cada lista y actuar sobre lo que aparece"],
     flujo: [
@@ -141,6 +161,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/work-orders/new": {
     titulo: "Nueva orden de trabajo",
+    camposBuscables: true,
     que: "Dar de alta una orden correctiva a mano.",
     hacer: ["Capturar el trabajo, el equipo, la prioridad y a quién se asigna"],
     flujo: [
@@ -233,6 +254,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/work-orders": {
     titulo: "Órdenes de trabajo",
+    camposBuscables: true,
     que: "Todo el trabajo de mantenimiento: lo que se planeó, lo que salió mal y lo que ya se hizo.",
     hacer: [
       "Crear una orden correctiva a mano",
@@ -280,6 +302,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/plans": {
     titulo: "Planes preventivos",
+    camposBuscables: true,
     que: "Las rutinas que se repiten: qué se le hace a cada equipo, cada cuánto, con qué refacciones y cuánto cuesta.",
     hacer: [
       "Dar de alta un plan con sus actividades, refacciones, mano de obra y servicios",
@@ -425,6 +448,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/inventory/kardex": {
     titulo: "Kardex de almacén",
+    camposBuscables: true,
     que: "El libro del almacén: cada entrada, salida, devolución y traspaso, con el saldo que dejó.",
     hacer: [
       "Filtrar por refacción, almacén, tipo de movimiento y rango de fechas",
@@ -484,6 +508,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/requisiciones": {
     titulo: "Requisiciones de material",
+    camposBuscables: true,
     que: "Lo que mantenimiento le pide al almacén, y el vale con el que se entrega.",
     hacer: [
       "Pedir material contra una orden de trabajo o un activo",
@@ -524,6 +549,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/compras": {
     titulo: "Requisiciones de compra",
+    camposBuscables: true,
     que: "Lo que el almacén no tuvo y hay que adquirir, con quién lo autorizó y qué llegó.",
     hacer: [
       "Solicitar una compra, casi siempre desde una requisición que no se pudo surtir",
@@ -586,6 +612,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/requests": {
     titulo: "Solicitudes de servicio",
+    camposBuscables: true,
     que: "Lo que reporta quien no es de mantenimiento: se revisa y se convierte en orden, o se descarta.",
     hacer: [
       "Levantar una solicitud a mano",
@@ -689,6 +716,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/predictive": {
     titulo: "Predictivo",
+    camposBuscables: true,
     que: "Sensores y tendencias que avisan antes de que algo falle.",
     hacer: ["Registrar sensores y sus lecturas", "Ver qué variables se están saliendo de rango"],
     flujo: ["Cuando una tendencia cruza el umbral, se genera una alerta; de la alerta puede nacer una orden."],

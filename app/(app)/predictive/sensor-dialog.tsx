@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import { SENSOR_TYPE_LABELS } from "@/lib/constants";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 const DEFAULT_UNITS: Record<string, string> = {
   VIBRATION: "mm/s",
@@ -91,11 +92,14 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="label">Activo</label>
-            <select className="field" value={form.assetId} onChange={(e) => set("assetId", e.target.value)} required>
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>{asset.code} — {asset.name}</option>
-              ))}
-            </select>
+            <SelectorBuscable
+              valor={form.assetId}
+              onCambio={(id) => set("assetId", id)}
+              vacio={null}
+              requerido
+              marcador="Busque por clave o nombre del equipo"
+              opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+            />
           </div>
           <div className="sm:col-span-2">
             <label className="label">Nombre del punto</label>

@@ -7,6 +7,7 @@ import { Check, PackageX, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { MOTIVOS_LIBERACION } from "@/lib/backlog";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 type Task = {
   id: string;
@@ -254,12 +255,13 @@ export function TaskList({
                 {motivo === "SIN_REFACCION" && refacciones.length ? (
                   <>
                     <label className="label mt-3 block">Cual refaccion falto</label>
-                    <select className="field" value={partId} onChange={(e) => setPartId(e.target.value)}>
-                      <option value="">Sin especificar</option>
-                      {refacciones.map((r) => (
-                        <option key={r.id} value={r.id}>{r.code} — {r.name}</option>
-                      ))}
-                    </select>
+                    <SelectorBuscable
+                      valor={partId}
+                      onCambio={setPartId}
+                      vacio="Sin especificar"
+                      marcador="Busque por clave o descripcion"
+                      opciones={refacciones.map((r) => ({ id: r.id, etiqueta: `${r.code} — ${r.name}` }))}
+                    />
                     <p className="mt-1 text-xs text-slate-400">
                       Si la indica, el backlog le avisara cuando ya haya existencia.
                     </p>

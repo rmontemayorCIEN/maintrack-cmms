@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Sparkles, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader } from "@/components/ui";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 type Sugerencia = {
   codigoSugerido: string;
@@ -110,14 +111,17 @@ export function SugerenciasIa({
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <div>
           <label className="label">Equipo</label>
-          <select className="field" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
-            {activos.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code} — {a.name}
-                {a.conRefacciones === 0 ? " (sin refacciones ligadas)" : ""}
-              </option>
-            ))}
-          </select>
+          <SelectorBuscable
+            valor={assetId}
+            onCambio={setAssetId}
+            vacio={null}
+            marcador="Busque por clave o nombre del equipo"
+            opciones={activos.map((a) => ({
+              id: a.id,
+              etiqueta: `${a.code} — ${a.name}`,
+              detalle: a.conRefacciones === 0 ? "sin refacciones ligadas" : null,
+            }))}
+          />
         </div>
         <div>
           <label className="label">Contexto (opcional)</label>

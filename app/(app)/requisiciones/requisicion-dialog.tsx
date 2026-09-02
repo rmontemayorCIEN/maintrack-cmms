@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MOTIVOS, URGENCIAS } from "@/lib/requisiciones";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type Opcion = { id: string; etiqueta: string };
 export type OpcionOrden = Opcion & { activo: string | null };
@@ -144,11 +145,14 @@ export function RequisicionDialog({
                     {ordenFija.etiqueta}
                   </div>
                 ) : (
-                  <select value={workOrderId} onChange={(e) => { setWorkOrderId(e.target.value); setAssetId(""); setError(null); }}
-                    className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                    <option value="">Sin orden</option>
-                    {ordenes.map((o) => <option key={o.id} value={o.id}>{o.etiqueta}</option>)}
-                  </select>
+                  <SelectorBuscable
+                    className="mt-0.5"
+                    valor={workOrderId}
+                    onCambio={(id) => { setWorkOrderId(id); setAssetId(""); setError(null); }}
+                    vacio="Sin orden"
+                    marcador="Busque por folio o titulo"
+                    opciones={ordenes.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
+                  />
                 )}
               </div>
               <div>
@@ -164,11 +168,14 @@ export function RequisicionDialog({
                     </span>
                   </div>
                 ) : (
-                  <select value={assetId} onChange={(e) => { setAssetId(e.target.value); setError(null); }}
-                    className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                    <option value="">Sin activo</option>
-                    {activos.map((a) => <option key={a.id} value={a.id}>{a.etiqueta}</option>)}
-                  </select>
+                  <SelectorBuscable
+                    className="mt-0.5"
+                    valor={assetId}
+                    onCambio={(id) => { setAssetId(id); setError(null); }}
+                    vacio="Sin activo"
+                    marcador="Busque por clave o nombre del equipo"
+                    opciones={activos.map((a) => ({ id: a.id, etiqueta: a.etiqueta }))}
+                  />
                 )}
               </div>
               <div className="sm:col-span-2">
@@ -197,18 +204,17 @@ export function RequisicionDialog({
                 return (
                   <div key={i} className="grid gap-1.5 sm:grid-cols-[1fr_auto_auto]">
                     <div className="grid gap-1">
-                      <select
-                        value={r.partId}
-                        onChange={(e) => actualizar(i, { partId: e.target.value, descripcion: "" })}
-                        className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                      >
-                        <option value="">Del catálogo…</option>
-                        {refacciones.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.code} — {d.name} (hay {hay(d.id)} {d.unit})
-                          </option>
-                        ))}
-                      </select>
+                      <SelectorBuscable
+                        valor={r.partId}
+                        onCambio={(id) => actualizar(i, { partId: id, descripcion: "" })}
+                        vacio="Del catálogo…"
+                        marcador="Busque por clave o descripcion"
+                        opciones={refacciones.map((d) => ({
+                          id: d.id,
+                          etiqueta: `${d.code} — ${d.name}`,
+                          detalle: `hay ${hay(d.id)} ${d.unit}`,
+                        }))}
+                      />
                       {estado ? <p className={`text-[0.625rem] ${estado.clase}`}>{estado.texto}</p> : null}
                       {!r.partId ? (
                         // Se puede pedir lo que no esta en el catalogo: es como

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { RecursosTarea, type LineaMO, type LineaRef, type LineaSrv, type Opcion } from "./recursos-tarea";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type Task = {
   title: string;
@@ -325,11 +326,14 @@ export function PlanDialog({
           </div>
           <div>
             <label className="label">Activo</label>
-            <select className="field" value={form.assetId} onChange={(e) => set("assetId", e.target.value)} required>
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>{asset.code} — {asset.name}</option>
-              ))}
-            </select>
+            <SelectorBuscable
+              valor={form.assetId}
+              onCambio={(id) => set("assetId", id)}
+              vacio={null}
+              requerido
+              marcador="Busque por clave o nombre del equipo"
+              opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+            />
           </div>
           <div>
             <label className="label">Tipo</label>

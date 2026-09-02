@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export function NuevoPunto({
   sitios, ubicaciones, activos,
@@ -82,11 +83,14 @@ export function NuevoPunto({
               </div>
               <div>
                 <label className="text-[0.6875rem] font-medium text-slate-600">Equipo</label>
-                <select value={assetId} onChange={(e) => setAssetId(e.target.value)}
-                  className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                  <option value="">Sin especificar</option>
-                  {activos.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                <SelectorBuscable
+                  className="mt-0.5"
+                  valor={assetId}
+                  onCambio={setAssetId}
+                  vacio="Sin especificar"
+                  marcador="Busque por clave o nombre del equipo"
+                  opciones={activos.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+                />
                 <p className="mt-0.5 text-[0.625rem] text-slate-400">
                   Solo si quiere un segundo código para ese equipo. El suyo propio ya existe en
                   su ficha.

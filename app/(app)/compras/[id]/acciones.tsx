@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, PackagePlus, ShoppingCart, X } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type RenglonCompra = {
   id: string; partId: string | null; descripcion: string;
@@ -211,11 +212,14 @@ export function AccionesCompra({
             </div>
             <div>
               <label className="text-[0.6875rem] font-medium text-slate-600">Proveedor</label>
-              <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}
-                className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                <option value="">Sin indicar</option>
-                {proveedores.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <SelectorBuscable
+                className="mt-0.5"
+                valor={supplierId}
+                onCambio={setSupplierId}
+                vacio="Sin indicar"
+                marcador="Busque por nombre del proveedor"
+                opciones={proveedores.map((p) => ({ id: p.id, etiqueta: p.name }))}
+              />
             </div>
             <div>
               <label className="text-[0.6875rem] font-medium text-slate-600">Nota</label>

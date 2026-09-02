@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { CircleHelp, X } from "lucide-react";
-import { CONTROLES_TABLA, ayudaDe } from "@/lib/ayuda";
+import { CAMPO_BUSCABLE, CONTROLES_TABLA, ayudaDe } from "@/lib/ayuda";
 import { AyudaConIa } from "./ayuda-ia";
 
 /**
@@ -157,6 +157,17 @@ export function BotonAyuda() {
                         </div>
                       ))}
                     </dl>
+                  </section>
+                ) : null}
+
+                {ficha.camposBuscables ? (
+                  <section className="mt-6 border-t border-slate-100 pt-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {CAMPO_BUSCABLE.titulo}
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                      {CAMPO_BUSCABLE.explica}
+                    </p>
                   </section>
                 ) : null}
 

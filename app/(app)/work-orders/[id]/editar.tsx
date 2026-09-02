@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/constants";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type OrdenEditable = {
   id: string;
@@ -149,11 +150,14 @@ export function EditarOrden({
 
               <div className="sm:col-span-2">
                 <label className="text-[0.6875rem] font-medium text-slate-600">Activo</label>
-                <select value={v.assetId} onChange={(e) => set({ assetId: e.target.value })}
-                  className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                  <option value="">Sin activo</option>
-                  {activos.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
-                </select>
+                <SelectorBuscable
+                  className="mt-0.5"
+                  valor={v.assetId}
+                  onCambio={(id) => set({ assetId: id })}
+                  vacio="Sin activo"
+                  marcador="Busque por clave o nombre del equipo"
+                  opciones={activos.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+                />
                 <p className="mt-0.5 text-[0.625rem] text-slate-400">
                   Cambiarlo arrastra también el sitio y la ubicación del equipo.
                 </p>

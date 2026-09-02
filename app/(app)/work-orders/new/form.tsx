@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button, Card, CardHeader } from "@/components/ui";
+import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/constants";
 
@@ -108,14 +109,17 @@ export function NewWorkOrderForm({
             </div>
             <div>
               <label className="label">Activo</label>
-              <select className="field" value={form.assetId} onChange={(e) => set("assetId", e.target.value)}>
-                <option value="">Sin activo asociado</option>
-                {assets.map((asset) => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.code} — {asset.name} (Criticidad {asset.criticality})
-                  </option>
-                ))}
-              </select>
+              <SelectorBuscable
+                valor={form.assetId}
+                onCambio={(id) => set("assetId", id)}
+                vacio="Sin activo asociado"
+                marcador="Busque por clave o nombre del equipo"
+                opciones={assets.map((asset) => ({
+                  id: asset.id,
+                  etiqueta: `${asset.code} — ${asset.name}`,
+                  detalle: `Criticidad ${asset.criticality}`,
+                }))}
+              />
             </div>
           </div>
         </Card>

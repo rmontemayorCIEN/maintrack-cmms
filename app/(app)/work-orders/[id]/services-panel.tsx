@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 type Linea = {
   id: string;
@@ -132,14 +133,17 @@ export function ServicesPanel({
 
       {editable ? (
         <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-          <select className="field" value={serviceId} onChange={(e) => elegirServicio(e.target.value)}>
-            <option value="">Servicio no catalogado…</option>
-            {catalogo.map((srv) => (
-              <option key={srv.id} value={srv.id}>
-                {srv.code} — {srv.name} ({formatCurrency(srv.unitCost, currency)}/{srv.unit})
-              </option>
-            ))}
-          </select>
+          <SelectorBuscable
+            valor={serviceId}
+            onCambio={elegirServicio}
+            vacio="Servicio no catalogado…"
+            marcador="Busque por clave o nombre del servicio"
+            opciones={catalogo.map((srv) => ({
+              id: srv.id,
+              etiqueta: `${srv.code} — ${srv.name}`,
+              detalle: `${formatCurrency(srv.unitCost, currency)}/${srv.unit}`,
+            }))}
+          />
           {!serviceId ? (
             <input
               className="field"
@@ -148,12 +152,13 @@ export function ServicesPanel({
               onChange={(e) => setDescripcion(e.target.value)}
             />
           ) : null}
-          <select className="field" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-            <option value="">Sin proveedor</option>
-            {proveedores.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <SelectorBuscable
+            valor={supplierId}
+            onCambio={setSupplierId}
+            vacio="Sin proveedor"
+            marcador="Busque por nombre del proveedor"
+            opciones={proveedores.map((p) => ({ id: p.id, etiqueta: p.name }))}
+          />
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">Cantidad</label>

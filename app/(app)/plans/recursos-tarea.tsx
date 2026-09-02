@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Loader2, Plus, Trash2, X } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type Opcion = { id: string; etiqueta: string; costo: number; unidad?: string };
 export type LineaMO = { specialtyId: string; personas: string; hours: string };
@@ -117,16 +118,13 @@ export function RecursosTarea({
           const ref = refacciones.find((r) => r.id === linea.partId);
           return (
             <div key={i} className="grid gap-1.5 md:grid-cols-[1fr_80px_190px_28px]">
-              <select
-                className="field"
-                value={linea.partId}
-                onChange={(e) => onParts(parts.map((p, j) => (j === i ? { ...p, partId: e.target.value } : p)))}
-              >
-                <option value="">Seleccione…</option>
-                {refacciones.map((o) => (
-                  <option key={o.id} value={o.id}>{o.etiqueta}</option>
-                ))}
-              </select>
+              <SelectorBuscable
+                valor={linea.partId}
+                onCambio={(id) => onParts(parts.map((p, j) => (j === i ? { ...p, partId: id } : p)))}
+                vacio="Seleccione…"
+                marcador="Busque por clave o descripcion"
+                opciones={refacciones.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
+              />
               <input
                 className="field" type="number" min="0" step="0.5" title="Cantidad"
                 value={linea.quantity}

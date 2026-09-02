@@ -6,6 +6,7 @@ import { EmptyState, PageHeader, Stat } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import { vistaGuardada } from "@/lib/vistas";
 import { TablaKardex, TIPOS, type FilaKardex } from "./tabla-kardex";
+import { FiltroRefaccion } from "./filtro-refaccion";
 
 export const metadata = { title: "Kardex de almacen" };
 export const dynamic = "force-dynamic";
@@ -122,10 +123,10 @@ export default async function KardexPage({
       <form method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3">
         <div>
           <label className="text-[0.6875rem] font-medium text-slate-600">Refacción</label>
-          <select name="parte" defaultValue={params.parte ?? ""} className="mt-0.5 w-56 rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-            <option value="">Todas</option>
-            {refacciones.map((r) => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
-          </select>
+          <FiltroRefaccion
+            valor={params.parte ?? ""}
+            refacciones={refacciones.map((r) => ({ id: r.id, etiqueta: `${r.code} — ${r.name}` }))}
+          />
         </div>
         <div>
           <label className="text-[0.6875rem] font-medium text-slate-600">Almacén</label>
