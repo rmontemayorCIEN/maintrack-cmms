@@ -210,6 +210,52 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/equipo": {
+    titulo: "Equipo de mantenimiento",
+    que: "Cómo está repartido el trabajo, en qué se va el tiempo y qué está trabando la operación.",
+    hacer: [
+      "Ver qué trae asignado cada quien y su carga de los próximos 15 días",
+      "Comparar el tiempo estimado contra el realmente aplicado",
+      "Ver en qué equipos trabaja cada persona",
+      "Pedirle a la IA que revise cómo está trabajando el equipo",
+    ],
+    flujo: [
+      "El propósito es entender la operación a través de las personas, no evaluar a las personas. Por eso aquí no hay calificaciones ni listas ordenadas por productividad.",
+      "Cada quien ve lo suyo. Supervisores y arriba ven al equipo completo.",
+      "Los indicadores que no tienen suficientes casos aparecen en blanco a propósito: un porcentaje sacado de dos órdenes no dice nada de nadie.",
+      "El periodo son los últimos 90 días, igual que los demás indicadores.",
+    ],
+    campos: [
+      { nombre: "Comprometidas", explica: "Las horas estimadas de lo que trae abierto. Es lo que debe, no lo que ha hecho." },
+      { nombre: "Aplicadas", explica: "Las horas que de verdad capturó en el periodo. La diferencia con lo comprometido no es buena ni mala por sí sola: depende de qué tan bien esté estimado el trabajo." },
+      { nombre: "Barras de los 15 días", explica: "Su carga por día. En ámbar cuando ese día no le cabe lo asignado; en gris los días no laborables." },
+      { nombre: "Estimado contra real", explica: "Solo se calcula sobre órdenes donde esa persona fue la única que capturó horas. Si dos trabajaron la misma orden, el estimado es del trabajo completo y repartirlo sería inventar." },
+      { nombre: "% correctivo", explica: "Cuánto de su tiempo se fue en fallas. Arriba de 70% significa que está apagando incendios más que haciendo mantenimiento, y eso es un dato de la operación, no de la persona." },
+    ],
+    noPuedo: [
+      { sintoma: "Un indicador aparece vacío", porque: "No hay suficientes casos para calcularlo. Se deja en blanco a propósito en vez de mostrar un número que engañaría." },
+      { sintoma: "No veo a mis compañeros", porque: "Solo supervisores y arriba ven al equipo completo. Cada técnico ve sus propios números." },
+      { sintoma: "Alguien tiene muchas horas comprometidas y pocas aplicadas", porque: "Puede ser que no esté capturando sus horas, o que el trabajo apenas vaya empezando. Revise sus órdenes antes de sacar conclusiones." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Esto sirve para evaluar a mi personal?",
+        respuesta:
+          "No está hecho para eso, y usarlo así lo echa a perder. El día que la gente sienta que las horas que captura se usan para calificarla, empieza a inflarlas, y ahí se muere el dato y todo lo que depende de él. Sirve para entender la operación: dónde está mal repartido el trabajo, qué estimaciones no sirven, y qué trabas vienen de almacén y no de las personas.",
+      },
+      {
+        pregunta: "¿Por qué la IA no me dice quién es el mejor técnico?",
+        respuesta:
+          "Porque ese número no existe y fabricarlo sería mentirle. El mismo dato admite varias explicaciones: alguien que tarda más puede estar recibiendo siempre los equipos peores, o trabajando con estimaciones mal hechas. Distinguir entre esas lecturas es lo que la IA sí puede hacer, y es más útil que un ranking.",
+      },
+      {
+        pregunta: "¿Por qué las órdenes compartidas no cuentan para el estimado contra real?",
+        respuesta:
+          "Porque el tiempo estimado es del trabajo completo, no de cada persona. Si dos técnicos trabajaron la misma orden, repartir ese estimado entre ellos sería inventar un dato. Se dice con cuántas órdenes se calculó justamente para que se vea qué tan sólida es la cifra.",
+      },
+    ],
+  },
+
   "/backlog": {
     titulo: "Trabajo pendiente",
     que: "Las actividades que se liberaron de una orden porque no se pudieron hacer, y siguen esperando.",

@@ -98,6 +98,10 @@ npx tsx scripts/prueba-equivalencias.ts >/dev/null 2>&1 \
   && echo "     Equivalencias de refacciones correctas." \
   || { echo "     ERROR: la prueba de equivalencias fallo."; npx tsx scripts/prueba-equivalencias.ts; exit 1; }
 
+npx tsx scripts/prueba-personal.ts >/dev/null 2>&1 \
+  && echo "     Carga del equipo correcta." \
+  || { echo "     ERROR: la prueba de carga del equipo fallo."; npx tsx scripts/prueba-personal.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""
