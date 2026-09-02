@@ -71,6 +71,15 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
   // Lo que el plan pide para esta orden, y con que se puede cubrir. Solo tiene
   // sentido en preventivas: una correctiva no nace de un plan.
+  // Catalogo ligero para el dialogo de "no se pudo hacer". El catalogo grande
+  // de mas abajo solo se carga en preventivas, y una correctiva tambien se
+  // puede trabar por falta de refaccion.
+  const refaccionesLiberar = await prisma.part.findMany({
+    where: { organizationId: user.organizationId, active: true },
+    orderBy: { code: "asc" },
+    select: { id: true, code: true, name: true },
+  });
+
   const delPlan = await refaccionesDelPlan(user.organizationId, wo.id);
   const [almacenesWo, catalogoWo, existenciasWo, requisicionesWo] = delPlan
     ? await Promise.all([
@@ -239,7 +248,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 status={wo.status}
                 failureCodes={failureCodes}
                 causasRaiz={causasRaiz}
-                pendingRequired={wo.tasks.filter((t) => t.required && !t.done).length}
+                pendingRequired={wo.tasks.filter((t) => !t.done && !t.liberadaAt).length}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
               />
             ) : null}
@@ -271,6 +280,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             />
             <TaskList
               workOrderId={wo.id}
+              refacciones={refaccionesLiberar}
               tasks={wo.tasks.map((t) => ({
                 id: t.id,
                 title: t.title,
@@ -280,6 +290,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 minValue: t.minValue,
                 maxValue: t.maxValue,
                 required: t.required,
+                liberadaAt: t.liberadaAt,
+                motivoLiberacion: t.motivoLiberacion,
+                motivoDetalle: t.motivoDetalle,
+                bloqueadaPorPartId: t.bloqueadaPorPartId,
                 done: t.done,
                 resultNumber: t.resultNumber,
                 resultText: t.resultText,

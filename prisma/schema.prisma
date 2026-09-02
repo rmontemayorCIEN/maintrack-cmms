@@ -8,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -178,6 +178,7 @@ model User {
   reportPoints        ReportPoint[]
 
   @@index([organizationId])
+  tareasLiberadas  WorkOrderTask[] @relation("TareaLiberadaPor")
 }
 
 model Invitation {
@@ -580,10 +581,39 @@ model WorkOrderTask {
   completedById String?
   completedAt   DateTime?
 
+  /// Cuando el tecnico libero esta actividad en vez de ejecutarla.
+  ///
+  /// La actividad NO se borra de la OT: se queda marcada como liberada. Asi la
+  /// orden cuenta lo que de verdad paso ese dia —tres hechas, una liberada por
+  /// falta de refaccion— en vez de que el trabajo pendiente desaparezca del
+  /// registro. El backlog es una consulta sobre estas, no una tabla aparte.
+  liberadaAt    DateTime?
+  liberadaPorId String?
+  /// SIN_REFACCION | SIN_MANO_DE_OBRA | SERVICIO_EXTERNO | SIN_ACCESO | OTRO
+  ///
+  /// Estructurado y no texto libre porque de aqui salen las decisiones: con
+  /// SIN_REFACCION y la refaccion identificada, el backlog puede decir cuales
+  /// actividades ya se pueden hacer con lo que hay hoy en el almacen.
+  motivoLiberacion String?
+  motivoDetalle    String?
+  /// La refaccion que trabo la actividad, cuando el motivo es SIN_REFACCION.
+  bloqueadaPorPartId String?
+  /// La actividad liberada que esta continua, cuando se retomo del backlog.
+  ///
+  /// Encadena el historial: liberada en una OT, retomada en otra, hecha. Saber
+  /// cuantas veces se ha trabado algo es recorrer la cadena, no llevar un
+  /// contador que se desincroniza.
+  retomaDeTaskId String? @unique
+
   workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   completedBy User?     @relation(fields: [completedById], references: [id])
+  liberadaPor User?     @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
+  bloqueadaPor Part?    @relation(fields: [bloqueadaPorPartId], references: [id])
+  retomaDe    WorkOrderTask?  @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
+  retomadaPor WorkOrderTask?  @relation("CadenaDeRetoma")
 
   @@index([workOrderId])
+  @@index([liberadaAt])
 }
 
 model WorkOrderLabor {
@@ -819,6 +849,7 @@ model Part {
 
   @@unique([organizationId, code])
   @@index([organizationId])
+  tareasBloqueadas WorkOrderTask[]
 }
 
 model StockMovement {

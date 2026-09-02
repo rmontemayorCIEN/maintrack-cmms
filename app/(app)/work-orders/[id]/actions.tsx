@@ -172,7 +172,8 @@ export function WorkOrderActions({
 
             {pendingRequired > 0 ? (
               <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Faltan {pendingRequired} tarea(s) obligatoria(s) de la lista de verificacion.
+                Quedan {pendingRequired} actividad(es) sin resolver. Marque cada una como hecha, o
+                use «No se pudo hacer» para liberarla al backlog indicando por que.
               </p>
             ) : null}
 

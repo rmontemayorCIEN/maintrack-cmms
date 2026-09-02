@@ -82,6 +82,10 @@ npx tsx scripts/prueba-esquemas-ia.ts >/dev/null 2>&1 \
   && echo "     Esquemas de IA compatibles con la API." \
   || { echo "     ERROR: los esquemas de IA tienen restricciones que la API rechaza."; npx tsx scripts/prueba-esquemas-ia.ts; exit 1; }
 
+npx tsx scripts/prueba-backlog.ts >/dev/null 2>&1 \
+  && echo "     Liberacion de actividades y backlog correctos." \
+  || { echo "     ERROR: la prueba de backlog fallo."; npx tsx scripts/prueba-backlog.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

@@ -67,9 +67,17 @@ export async function transitionWorkOrder(params: {
   }
 
   if (params.to === "COMPLETED") {
-    const pending = wo.tasks.filter((t) => t.required && !t.done);
-    if (pending.length) {
-      throw new Error(`Faltan ${pending.length} tarea(s) obligatoria(s) por completar`);
+    // Una OT completa no deja actividades en el aire. Cada una tiene que estar
+    // hecha o liberada con motivo; la liberada se va al backlog y se retoma
+    // despues. Antes solo se revisaban las obligatorias, asi que una actividad
+    // opcional sin capturar se quedaba en `done: false` para siempre dentro de
+    // una orden cerrada: ni hecha, ni pendiente para nadie, ni visible.
+    const abiertas = wo.tasks.filter((t) => !t.done && !t.liberadaAt);
+    if (abiertas.length) {
+      throw new Error(
+        `Quedan ${abiertas.length} actividad(es) sin resolver. ` +
+          `Marque cada una como hecha, o liberela indicando por que no se pudo hacer.`,
+      );
     }
   }
 

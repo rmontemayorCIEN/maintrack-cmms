@@ -189,6 +189,48 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/backlog": {
+    titulo: "Trabajo pendiente",
+    que: "Las actividades que se liberaron de una orden porque no se pudieron hacer, y siguen esperando.",
+    hacer: [
+      "Ver qué quedó pendiente en cada equipo y por qué",
+      "Saber cuáles ya se pueden hacer porque la refacción que faltaba ya llegó",
+      "Ver cuánto lleva esperando cada actividad",
+    ],
+    flujo: [
+      "Cuando una actividad de una orden no se puede hacer —no hay refacción, no hay quien, no se pudo parar el equipo— el técnico la libera indicando el motivo.",
+      "La actividad se queda marcada en su orden, para que esa orden cuente lo que de verdad pasó, y aparece aquí.",
+      "Al armar una orden nueva para ese equipo, el trabajo pendiente se puede retomar.",
+      "Si se liberó por falta de una refacción y se indicó cuál, esta pantalla marca «Ya se puede hacer» en cuanto hay existencia.",
+    ],
+    campos: [
+      { nombre: "Ya se puede hacer", explica: "Se liberó por falta de una refacción y hoy sí hay en el almacén. Es la señal de que ese trabajo ya no tiene por qué seguir esperando." },
+      { nombre: "De un plan / De una solicitud", explica: "De dónde venía la actividad. Una que viene de un plan es trabajo preventivo que se dejó de hacer, y eso importa más que un pendiente suelto." },
+      { nombre: "Liberada hace N días", explica: "Cuánto lleva esperando. Un número que crece sin parar es una refacción que nadie pidió o un servicio que nadie contrató." },
+    ],
+    noPuedo: [
+      { sintoma: "Una actividad no aparece aquí aunque no se hizo", porque: "Solo entran las que se liberaron con motivo. Si la orden sigue abierta, la actividad sigue en ella; el backlog es para lo que ya se decidió posponer." },
+      { sintoma: "Desapareció una que estaba aquí", porque: "Otra orden ya la retomó. Se puede seguir la cadena desde la orden nueva hasta la que la liberó." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Por qué una actividad liberada sigue apareciendo en su orden original?",
+        respuesta:
+          "A propósito. Si desapareciera, esa orden diría que se hizo todo, y no fue así. La actividad se queda marcada como liberada, con su motivo, para que la orden cuente lo que de verdad pasó ese día. Aquí aparece además como trabajo que sigue esperando.",
+      },
+      {
+        pregunta: "¿Cómo se retoma una actividad pendiente?",
+        respuesta:
+          "Al crear una orden nueva para ese equipo. El trabajo pendiente aparece disponible para incluirlo. Al retomarlo, la actividad nueva queda ligada a la que se liberó, así que se puede seguir la historia completa.",
+      },
+      {
+        pregunta: "¿Qué significa que una actividad se haya liberado varias veces?",
+        respuesta:
+          "Que se intentó y se volvió a trabar. Una vez es un contratiempo; tres veces es una señal de que algo no se está resolviendo: una refacción que nadie pidió, un servicio que nadie contrató o un equipo que nunca se puede parar.",
+      },
+    ],
+  },
+
   "/work-orders": {
     titulo: "Órdenes de trabajo",
     que: "Todo el trabajo de mantenimiento: lo que se planeó, lo que salió mal y lo que ya se hizo.",
