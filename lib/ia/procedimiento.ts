@@ -177,7 +177,7 @@ export async function aplicarProcedimiento(params: {
 }) {
   const orden = await prisma.workOrder.findFirst({
     where: { id: params.workOrderId, organizationId: params.organizationId },
-    select: { id: true, status: true, procedure: true, safetyNotes: true, _count: { select: { tasks: true } } },
+    select: { id: true, status: true, maintenanceType: true, procedure: true, safetyNotes: true, _count: { select: { tasks: true } } },
   });
   if (!orden) throw new Error("Orden de trabajo no encontrada");
   if (["CLOSED", "CANCELLED"].includes(orden.status)) throw new Error("La orden ya esta cerrada");
@@ -197,6 +197,8 @@ export async function aplicarProcedimiento(params: {
         minValue: paso.tipo === "MEASURE" ? paso.minimo : null,
         maxValue: paso.tipo === "MEASURE" ? paso.maximo : null,
         required: true,
+        origen: "MANUAL",
+        maintenanceType: orden.maintenanceType,
       })),
     }),
     prisma.workOrder.update({

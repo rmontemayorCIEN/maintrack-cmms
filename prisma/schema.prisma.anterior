@@ -53,6 +53,17 @@ model Organization {
   /// Arriba de este monto la requisicion de compra necesita autorizacion.
   /// Cero significa que todas la necesitan; un monto muy alto, ninguna.
   montoAutorizacion Float @default(0)
+  /// Si una OT puede juntar actividades de varios origenes (preventivo del
+  /// plan + un correctivo + una mejora) en un solo esfuerzo.
+  ///
+  /// Encendido por omision porque es como trabaja la gente en campo: se
+  /// aprovecha la vuelta. Quien prefiera una OT por origen lo apaga y los
+  /// selectores desaparecen del formulario.
+  otMultiOrigen Boolean @default(true)
+  /// Dias hacia adelante que se ofrecen al elegir actividades programadas para
+  /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
+  otHorizonteDias Int   @default(15)
+
   /// Complemento "IA Avanzada" contratado sobre el plan.
   iaComplemento Boolean @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
@@ -537,6 +548,24 @@ model WorkOrderTask {
   id            String    @id @default(cuid())
   workOrderId   String
   position      Int       @default(0)
+  /// De donde salio esta actividad: PLAN | SOLICITUD | BACKLOG | ALERTA | MANUAL.
+  ///
+  /// Una OT puede juntar actividades de varios origenes —el tecnico va a la
+  /// bomba por el preventivo del mes y de paso atiende la fuga reportada— y
+  /// sin este campo no habria forma de saber cual actividad cumplio que
+  /// compromiso, ni de avanzar el plan correcto al cerrar.
+  origen        String    @default("MANUAL")
+  /// El plan que aporto esta actividad, si vino de uno. No se usa el planId de
+  /// la OT: esa es una sola referencia y una OT mezclada puede traer
+  /// actividades de dos planes distintos.
+  planTaskId    String?
+  origenPlanId  String?
+  /// La solicitud de servicio que dio origen a esta actividad, si aplica.
+  origenRequestId String?
+  /// Tipo de mantenimiento de ESTA actividad, que puede diferir del de la OT.
+  /// De aqui sale la clasificacion de paro planeado o no planeado: tomarla del
+  /// encabezado contaria un correctivo colado en un preventivo como planeado.
+  maintenanceType String?
   title         String
   description   String?
   taskType      String    @default("CHECK")

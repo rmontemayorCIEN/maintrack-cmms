@@ -58,7 +58,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const input = createSchema.parse(await request.json());
     const count = await prisma.workOrderTask.count({ where: { workOrderId: id } });
     const task = await prisma.workOrderTask.create({
-      data: { workOrderId: id, position: count, ...input },
+      // Hereda el tipo de la OT salvo que se indique otro: una actividad
+      // agregada a mano suele ser del mismo trabajo que se esta haciendo.
+      data: {
+        workOrderId: id,
+        position: count,
+        origen: "MANUAL",
+        maintenanceType: wo.maintenanceType,
+        ...input,
+      },
     });
     return ok({ task }, 201);
   });

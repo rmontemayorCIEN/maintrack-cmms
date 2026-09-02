@@ -114,6 +114,13 @@ export async function generateScheduledWorkOrders(
             minValue: task.minValue,
             maxValue: task.maxValue,
             required: task.required,
+            // De que plan salio cada actividad. Al cerrar, esto es lo que
+            // decide cual plan avanza: una OT mezclada puede traer actividades
+            // de dos planes y el planId del encabezado solo alcanza para uno.
+            origen: "PLAN",
+            origenPlanId: plan.id,
+            planTaskId: task.id,
+            maintenanceType: plan.maintenanceType,
           })),
         },
       },

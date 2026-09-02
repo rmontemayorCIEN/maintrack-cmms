@@ -89,6 +89,8 @@ export async function POST(request: Request) {
                 title: task.title,
                 taskType: task.taskType,
                 required: task.required,
+                origen: "MANUAL",
+                maintenanceType: input.maintenanceType,
               })),
             }
           : undefined,
