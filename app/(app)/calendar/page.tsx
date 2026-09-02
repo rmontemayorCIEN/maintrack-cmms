@@ -5,6 +5,7 @@ import { cargaPorDia, jornada } from "@/lib/agenda";
 import { PageHeader } from "@/components/ui";
 import { OPEN_STATUSES } from "@/lib/constants";
 import { RunSchedulerButton } from "./run-scheduler";
+import { RevisarSemana } from "./revisar-semana";
 import { Calendario } from "./calendario";
 
 export const metadata = { title: "Calendario" };
@@ -99,6 +100,12 @@ export default async function CalendarPage({
         description="Lo programado, lo proyectado y si de verdad cabe en los dias que quedan."
         actions={<RunSchedulerButton />}
       />
+
+      {/* Fuera del encabezado: el resultado es una tarjeta completa y dentro
+          del area de acciones romperia la maquetacion. */}
+      <div className="mb-4">
+        <RevisarSemana semana={first.toISOString().slice(0, 10)} />
+      </div>
       <Calendario
         vista={vista}
         mes={`${year}-${String(month + 1).padStart(2, "0")}`}

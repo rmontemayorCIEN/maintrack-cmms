@@ -623,6 +623,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Filtrar por técnico, tipo de mantenimiento o solo lo abierto",
       "Ver la carga de cada persona y qué días no alcanzan",
       "Generar las órdenes de los planes que ya vencen",
+      "Pedirle a la IA que revise la semana y proponga qué mover",
     ],
     flujo: [
       "Las órdenes se pintan en su fecha compromiso, con el color de su tipo y un punto del color del responsable.",
@@ -631,6 +632,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Un día en ámbar es un día donde a alguien no le cabe el trabajo asignado.",
       "La vista de semana pone a cada persona en su renglón: ahí se ve si alguien trae tres días saturados mientras otro está libre. En el mes eso queda escondido porque todo se mezcla por día.",
       "El botón «Ejecutar programador» crea las órdenes de los planes que ya vencieron, y dice por qué saltó las que no generó.",
+      "«Revisar la semana» le pide a la IA que lea la carga real y proponga qué mover, qué juntar en una sola visita y qué no tocar. Es una propuesta: no cambia nada, usted decide qué aplicar.",
     ],
     campos: [
       { nombre: "Las horas de la esquina del día", explica: "La suma de horas estimadas de lo asignado ese día. En ámbar cuando alguien pasa de su jornada." },
@@ -653,6 +655,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
         pregunta: "¿Por qué un día puede verse sobrecargado si el equipo tiene gente libre?",
         respuesta:
           "Porque la carga se mide por persona, no por equipo. Si a un técnico le tocan diez horas y a otro ninguna, el día está sobrecargado aunque en total sobre capacidad. El problema no es que falte gente, es cómo está repartido.",
+      },
+      {
+        pregunta: "¿La IA mueve las órdenes por mí?",
+        respuesta:
+          "No. Solo propone. Nada se mueve hasta que usted lo haga en cada orden. Y las fechas que sugiere se verifican contra sus días laborables antes de mostrárselas: no le va a proponer programar en domingo.",
       },
       {
         pregunta: "¿Qué pasa si un preventivo cae en domingo o en un festivo?",

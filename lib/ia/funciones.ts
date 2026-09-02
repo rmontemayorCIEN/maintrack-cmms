@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -81,6 +81,13 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     nombre: "Procedimiento de correctiva",
     descripcion:
       "Prepara el trabajo de una falla: como asegurar el equipo, los pasos en orden, que medir y contra que, y que refacciones del catalogo llevar.",
+    operaciones: 2,
+    disponible: true,
+  },
+  AGENDA: {
+    nombre: "Revisar la semana",
+    descripcion:
+      "Lee la carga real de la semana y propone que mover y en que orden: quien esta saturado, que se puede juntar en una sola visita y que no debe recorrerse.",
     operaciones: 2,
     disponible: true,
   },
