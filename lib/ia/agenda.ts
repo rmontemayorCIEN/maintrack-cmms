@@ -75,7 +75,7 @@ export async function revisarSemana(
   finSiguiente.setDate(lunes.getDate() + 13);
   finSiguiente.setHours(23, 59, 59);
 
-  const [ordenes, vencidas, j] = await Promise.all([
+  const [ordenes, vencidas, j, equipo] = await Promise.all([
     prisma.workOrder.findMany({
       where: {
         organizationId: org.id,
@@ -94,6 +94,17 @@ export async function revisarSemana(
       where: { organizationId: org.id, status: { in: [...OPEN_STATUSES] }, dueDate: { lt: lunes } },
     }),
     jornada(org.id, lunes, finSiguiente),
+    // Quien puede ejecutar trabajo. Sirve para decir cuanta capacidad tiene el
+    // equipo un dia, que no es lo mismo que la capacidad de quienes ya traen
+    // algo asignado: un dia vacio tiene todo el equipo disponible, no cero.
+    prisma.user.findMany({
+      where: {
+        organizationId: org.id,
+        active: true,
+        role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] },
+      },
+      select: { name: true, horasDisponibles: true },
+    }),
   ]);
 
   if (!ordenes.length) {
@@ -148,8 +159,15 @@ export async function revisarSemana(
       })),
     }));
 
+  const capacidadEquipo = equipo.reduce((sum, p) => sum + (p.horasDisponibles ?? j.horasJornada), 0);
+
   const contexto = {
     semana: { del: iso(lunes), al: iso(domingo) },
+    equipo: {
+      personas: equipo.length,
+      capacidadPorDiaLaborable: Number(capacidadEquipo.toFixed(1)),
+      nota: "capacidadDelEquipo es lo que rinde el equipo completo ese dia. horasLibres es lo que queda sin usar. Un dia sin ordenes tiene el equipo entero disponible, no cero.",
+    },
     diasLaborablesDisponibles: disponibles,
     ordenesVencidasDeAntes: vencidas,
     dias: carga.map((c) => ({
@@ -157,7 +175,11 @@ export async function revisarSemana(
       laborable: c.habil,
       festivo: c.festivo,
       horasAsignadas: Number(c.horas.toFixed(1)),
-      capacidadTotal: Number(c.capacidad.toFixed(1)),
+      // La del equipo completo si el dia se trabaja. Antes se enviaba la de
+      // quienes ya tenian algo asignado, asi que un dia libre viajaba como
+      // "capacidad cero" y el modelo lo leia como que no habia con quien.
+      capacidadDelEquipo: c.habil ? Number(capacidadEquipo.toFixed(1)) : 0,
+      horasLibres: c.habil ? Number((capacidadEquipo - c.horas).toFixed(1)) : 0,
       noCabe: c.sobrecargado,
       porPersona: c.personas.map((p) => ({
         persona: p.nombre,
