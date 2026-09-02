@@ -739,9 +739,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Cambiar tamaño de letra y densidad —eso es suyo, no de la empresa—",
       "Configurar logotipo, color, proceso de compras y umbral de autorización",
+      "Definir la jornada, los días laborables y los días que la empresa no trabaja",
       "Dar de alta usuarios y revisar la bitácora",
     ],
-    flujo: ["Los permisos van por rol. Cambiar el rol de alguien cambia lo que puede hacer en todas las pantallas."],
+    flujo: [
+      "Los permisos van por rol. Cambiar el rol de alguien cambia lo que puede hacer en todas las pantallas.",
+      "En «Jornada y calendario» se define de cuántas horas es un día de trabajo. De ahí sale si un día del calendario cabe y en qué fechas puede programar el programador.",
+      "La capacidad se define por excepción: la organización fija el número general y solo quien trabaje distinto lleva el suyo.",
+    ],
   },
 
   "/glossary": {

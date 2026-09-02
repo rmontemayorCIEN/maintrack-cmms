@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users } from "lucide-react";
+import { Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -23,17 +23,19 @@ import { UserDialog } from "./user-dialog";
 import { UserRowActions } from "./user-actions";
 import { Pestanas, type Pestana } from "./pestanas";
 import { ConfiguracionCompras } from "./compras";
+import { ConfiguracionJornada } from "./jornada";
 
 export const metadata = { title: "Configuracion" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
   cuenta: "Sus datos de acceso al sistema.",
   apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
+  jornada: "Horas de trabajo, dias laborables y capacidad de cada persona. De aqui sale si un dia del calendario cabe.",
   suscripcion: "Plan contratado, consumo y carga inicial de informacion.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
   usuarios: "Quien entra al sistema, con que rol y a que tarifa.",
@@ -59,6 +61,7 @@ export default async function SettingsPage({
     { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organizacion", icono: <Building2 className="h-4 w-4" /> },
+    { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "suscripcion", titulo: "Suscripcion", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
@@ -68,6 +71,27 @@ export default async function SettingsPage({
 
   // Cada pestaña consulta solo lo suyo. Antes la pantalla lanzaba ocho
   // consultas en cada visita aunque se mirara una sola tarjeta.
+  // Solo se consulta lo de la pestaña abierta: es el motivo de que la
+  // navegacion viva en la URL y no en estado del cliente.
+  const jornadaDatos =
+    activa === "jornada"
+      ? await (async () => {
+          const [festivos, personas] = await Promise.all([
+            prisma.diaFestivo.findMany({
+              where: { organizationId: org.id, fecha: { gte: new Date(new Date().getFullYear(), 0, 1) } },
+              orderBy: { fecha: "asc" },
+              select: { id: true, fecha: true, nombre: true, deLey: true },
+            }),
+            prisma.user.findMany({
+              where: { organizationId: org.id, active: true },
+              orderBy: { name: "asc" },
+              select: { id: true, name: true, role: true, horasDisponibles: true },
+            }),
+          ]);
+          return { festivos, personas };
+        })()
+      : null;
+
   const [uso, consumo, solicitudPlan, cobranza, usuarios, sitios, ubicaciones, bitacora] = await Promise.all([
     consumoIa(user.organizationId),
     activa === "suscripcion" ? consumoDe(org.id, org.plan) : Promise.resolve(null),
@@ -121,6 +145,18 @@ export default async function SettingsPage({
           acento={(org.colorAcento ?? "AZUL") as ClaveAcento}
           logoUrl={org.logoUrl}
           puedeEditarMarca={can(user.role, "settings:write")}
+        />
+      ) : null}
+
+      {activa === "jornada" && jornadaDatos ? (
+        <ConfiguracionJornada
+          horasJornada={org.horasJornada}
+          diasHabiles={org.diasHabiles.split(",").map(Number).filter((n) => n >= 1 && n <= 7)}
+          festivos={jornadaDatos.festivos.map((f) => ({
+            id: f.id, nombre: f.nombre, deLey: f.deLey, fecha: f.fecha.toISOString(),
+          }))}
+          personas={jornadaDatos.personas}
+          editable={can(user.role, "settings:write")}
         />
       ) : null}
 
