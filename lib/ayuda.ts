@@ -618,7 +618,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Calendario de mantenimiento",
     que: "Lo que está programado, lo que se proyecta y si de verdad cabe en los días que quedan.",
     hacer: [
-      "Ver el mes completo y abrir cualquier día para ver todo lo que cae ahí",
+      "Ver el mes completo, o la semana con el trabajo de cada persona",
+      "Abrir cualquier día para ver todo lo que cae ahí",
       "Filtrar por técnico, tipo de mantenimiento o solo lo abierto",
       "Ver la carga de cada persona y qué días no alcanzan",
       "Generar las órdenes de los planes que ya vencen",
@@ -628,6 +629,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Las proyecciones con línea punteada son planes que todavía no generan orden: aparecen para que se vea lo que viene.",
       "Lo vencido y sin cerrar sale arriba siempre, sin importar el mes que esté viendo. Se quedaba escondido en el mes en que venció.",
       "Un día en ámbar es un día donde a alguien no le cabe el trabajo asignado.",
+      "La vista de semana pone a cada persona en su renglón: ahí se ve si alguien trae tres días saturados mientras otro está libre. En el mes eso queda escondido porque todo se mezcla por día.",
       "El botón «Ejecutar programador» crea las órdenes de los planes que ya vencieron, y dice por qué saltó las que no generó.",
     ],
     campos: [

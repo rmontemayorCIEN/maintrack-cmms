@@ -25,9 +25,11 @@ type Proyeccion = { id: string; title: string; asset: string; date: string };
 const mismoDia = (a: string, b: string) => a.slice(0, 10) === b.slice(0, 10);
 
 export function Calendario({
-  mes, dias, carga, ordenes, vencidas, proyecciones, tecnicos, horasJornada,
+  vista, mes, semana, dias, carga, ordenes, vencidas, proyecciones, tecnicos, horasJornada,
 }: {
+  vista: "mes" | "semana";
   mes: string;
+  semana: string;
   dias: string[];
   carga: Dia[];
   ordenes: Orden[];
@@ -63,11 +65,28 @@ export function Calendario({
   while (celdas.length % 7 !== 0) celdas.push(null);
 
   const [anio, mesNum] = mes.split("-").map(Number);
-  const anterior = new Date(anio, mesNum - 2, 1).toISOString().slice(0, 7);
-  const siguiente = new Date(anio, mesNum, 1).toISOString().slice(0, 7);
-  const etiquetaMes = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" })
-    .format(new Date(anio, mesNum - 1, 1));
   const hoy = new Date().toISOString().slice(0, 10);
+
+  const corrimiento = (dias_: number) => {
+    const d = new Date(semana);
+    d.setDate(d.getDate() + dias_);
+    return d.toISOString().slice(0, 10);
+  };
+  const irA = (destino: string) => router.push(destino);
+  const rutaAnterior =
+    vista === "semana"
+      ? `/calendar?vista=semana&semana=${corrimiento(-7)}`
+      : `/calendar?month=${new Date(anio, mesNum - 2, 1).toISOString().slice(0, 7)}`;
+  const rutaSiguiente =
+    vista === "semana"
+      ? `/calendar?vista=semana&semana=${corrimiento(7)}`
+      : `/calendar?month=${new Date(anio, mesNum, 1).toISOString().slice(0, 7)}`;
+  const rutaHoy = vista === "semana" ? "/calendar?vista=semana" : "/calendar";
+
+  const etiquetaMes =
+    vista === "semana"
+      ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dias[dias.length - 1]))}`
+      : new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(anio, mesNum - 1, 1));
 
   const delDia = (fecha: string) => visibles.filter((o) => o.dueDate && mismoDia(o.dueDate, fecha));
   const proyeccionesDe = (fecha: string) => proyecciones.filter((p) => mismoDia(p.date, fecha));
@@ -136,12 +155,37 @@ export function Calendario({
               </button>
             ) : null}
             <span className="mx-1 h-4 w-px bg-slate-200" />
-            <button onClick={() => router.push(`/calendar?month=${anterior}`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Anterior</button>
-            <button onClick={() => router.push("/calendar")} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Hoy</button>
-            <button onClick={() => router.push(`/calendar?month=${siguiente}`)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Siguiente</button>
+            <div className="flex overflow-hidden rounded-lg border border-slate-200">
+              <button
+                onClick={() => irA("/calendar")}
+                className={cn("px-2.5 py-1 text-xs", vista === "mes" ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50")}
+              >
+                Mes
+              </button>
+              <button
+                onClick={() => irA("/calendar?vista=semana")}
+                className={cn("border-l border-slate-200 px-2.5 py-1 text-xs", vista === "semana" ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50")}
+              >
+                Semana
+              </button>
+            </div>
+            <button onClick={() => irA(rutaAnterior)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Anterior</button>
+            <button onClick={() => irA(rutaHoy)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Hoy</button>
+            <button onClick={() => irA(rutaSiguiente)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Siguiente</button>
           </div>
         </div>
 
+        {vista === "semana" ? (
+          <RejillaSemana
+            dias={dias}
+            carga={carga}
+            ordenes={visibles}
+            proyecciones={proyecciones}
+            hoy={hoy}
+            onAbrirDia={setDiaAbierto}
+          />
+        ) : (
+        <>
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/60">
           {DIAS.map((d) => (
             <div key={d} className="px-2 py-2 text-center text-[0.625rem] font-semibold uppercase tracking-wide text-slate-500">{d}</div>
@@ -224,6 +268,8 @@ export function Calendario({
             );
           })}
         </div>
+        </>
+        )}
       </Card>
 
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -328,5 +374,175 @@ function DetalleDia({
         ))}
       </ul>
     </Card>
+  );
+}
+
+/**
+ * La semana con las personas en las filas.
+ *
+ * En el mes uno ve QUE hay; aqui ve DE QUIEN es. Es la vista donde se nota que
+ * un tecnico trae tres dias saturados mientras otro esta libre —eso en la
+ * cuadricula del mes queda escondido, porque ahi todo se mezcla por dia.
+ */
+function RejillaSemana({
+  dias, carga, ordenes, proyecciones, hoy, onAbrirDia,
+}: {
+  dias: string[];
+  carga: Dia[];
+  ordenes: Orden[];
+  proyecciones: Proyeccion[];
+  hoy: string;
+  onAbrirDia: (fecha: string) => void;
+}) {
+  // Las filas: quien tiene trabajo esta semana, y al final lo que no tiene
+  // responsable —que es justo lo que hay que repartir.
+  const personas = new Map<string, { id: string | null; nombre: string; color: string | null }>();
+  for (const o of ordenes) {
+    const clave = o.assignedTo?.id ?? "__sin";
+    if (!personas.has(clave)) {
+      personas.set(clave, {
+        id: o.assignedTo?.id ?? null,
+        nombre: o.assignedTo?.name ?? "Sin responsable",
+        color: o.assignedTo?.color ?? null,
+      });
+    }
+  }
+  const filas = [...personas.values()].sort((a, b) => {
+    if (a.id === null) return 1;
+    if (b.id === null) return -1;
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  const cargaDe = (fecha: string) => carga.find((c) => mismoDia(c.fecha, fecha));
+  const deDia = (fecha: string, personaId: string | null) =>
+    ordenes.filter(
+      (o) => o.dueDate && mismoDia(o.dueDate, fecha) && (o.assignedTo?.id ?? null) === personaId,
+    );
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[52rem]">
+        <div className="grid border-b border-slate-200 bg-slate-50/60" style={{ gridTemplateColumns: "10rem repeat(7, 1fr)" }}>
+          <div className="px-3 py-2 text-[0.625rem] font-semibold uppercase tracking-wide text-slate-400">
+            Responsable
+          </div>
+          {dias.map((fecha) => {
+            const c = cargaDe(fecha);
+            const esHoy = fecha.slice(0, 10) === hoy;
+            const d = new Date(fecha);
+            return (
+              <button
+                key={fecha}
+                type="button"
+                onClick={() => onAbrirDia(fecha)}
+                className={cn(
+                  "border-l border-slate-200 px-2 py-2 text-center transition-colors hover:bg-slate-100",
+                  !c?.habil && "bg-slate-100/70",
+                  c?.sobrecargado && "bg-amber-100/70",
+                )}
+                title={c?.festivo ?? undefined}
+              >
+                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-slate-500">
+                  {DIAS[(d.getDay() + 6) % 7]}
+                </p>
+                <p className={cn("text-sm font-medium", esHoy ? "text-brand-600" : "text-slate-700")}>
+                  {d.getDate()}
+                </p>
+                {c?.festivo ? (
+                  <p className="truncate text-[9px] text-slate-400">{c.festivo}</p>
+                ) : c && c.horas > 0 ? (
+                  <p className={cn("text-[9px] tabular-nums", c.sobrecargado ? "font-semibold text-amber-800" : "text-slate-400")}>
+                    {c.horas}h
+                  </p>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {filas.length === 0 ? (
+          <p className="px-4 py-10 text-center text-xs text-slate-400">
+            No hay trabajo programado esta semana.
+          </p>
+        ) : (
+          filas.map((persona) => (
+            <div
+              key={persona.id ?? "sin"}
+              className="grid border-b border-slate-100"
+              style={{ gridTemplateColumns: "10rem repeat(7, 1fr)" }}
+            >
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: persona.color ?? "#cbd5e1" }} />
+                <span className={cn("truncate text-xs", persona.id ? "text-slate-700" : "font-medium text-amber-700")}>
+                  {persona.nombre}
+                </span>
+              </div>
+
+              {dias.map((fecha) => {
+                const suyas = deDia(fecha, persona.id);
+                const c = cargaDe(fecha);
+                const suCarga = c?.personas.find((p) => p.userId === persona.id);
+                const excedido = (suCarga?.ocupacion ?? 0) > 1;
+
+                return (
+                  <div
+                    key={fecha}
+                    className={cn(
+                      "min-h-16 border-l border-slate-100 p-1",
+                      !c?.habil && "bg-slate-50/60",
+                      excedido && "bg-amber-50",
+                    )}
+                  >
+                    {suyas.map((o) => (
+                      <Link
+                        key={o.id}
+                        href={`/work-orders/${o.id}`}
+                        className={cn(
+                          "mb-1 block truncate rounded border px-1 py-0.5 text-[0.625rem] font-medium",
+                          MAINTENANCE_TYPE_COLORS[o.maintenanceType],
+                          !OPEN_STATUSES.includes(o.status) && "opacity-50 line-through",
+                        )}
+                        title={`${o.number} — ${o.title} · ${o.estimatedHours}h · ${o.asset?.code ?? "sin activo"}`}
+                      >
+                        {o.title}
+                      </Link>
+                    ))}
+                    {suCarga && suCarga.horas > 0 ? (
+                      <p className={cn(
+                        "px-1 text-[9px] tabular-nums",
+                        excedido ? "font-semibold text-amber-800" : "text-slate-400",
+                      )}>
+                        {suCarga.horas}h{suCarga.capacidad > 0 ? ` / ${suCarga.capacidad}h` : " · no laborable"}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+
+        {proyecciones.length > 0 ? (
+          <div className="grid border-t border-slate-200 bg-slate-50/40" style={{ gridTemplateColumns: "10rem repeat(7, 1fr)" }}>
+            <div className="px-3 py-2 text-[0.625rem] font-medium uppercase tracking-wide text-slate-400">
+              Proyectado
+            </div>
+            {dias.map((fecha) => (
+              <div key={fecha} className="min-h-12 border-l border-slate-100 p-1">
+                {proyecciones.filter((p) => mismoDia(p.date, fecha)).map((p) => (
+                  <span
+                    key={p.id}
+                    className="mb-1 block truncate rounded border border-dashed border-slate-300 bg-white px-1 py-0.5 text-[0.625rem] text-slate-500"
+                    title={`${p.title} — ${p.asset}`}
+                  >
+                    ◇ {p.title}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

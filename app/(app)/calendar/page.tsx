@@ -13,16 +13,32 @@ export const dynamic = "force-dynamic";
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; vista?: string }>;
+  searchParams: Promise<{ month?: string; vista?: string; semana?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
+  const vista = params.vista === "semana" ? "semana" : "mes";
 
-  const base = params.month ? new Date(`${params.month}-01T00:00:00`) : new Date();
-  const year = base.getFullYear();
-  const month = base.getMonth();
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0, 23, 59, 59);
+  // El rango depende de la vista, pero de ahi en adelante todo es igual: los
+  // mismos datos, la misma carga calculada. La vista solo cambia como se pinta.
+  let first: Date;
+  let last: Date;
+  if (vista === "semana") {
+    const refe = params.semana ? new Date(`${params.semana}T00:00:00`) : new Date();
+    const lunes = new Date(refe);
+    lunes.setDate(refe.getDate() - ((refe.getDay() + 6) % 7));
+    lunes.setHours(0, 0, 0, 0);
+    first = lunes;
+    last = new Date(lunes);
+    last.setDate(lunes.getDate() + 6);
+    last.setHours(23, 59, 59);
+  } else {
+    const base = params.month ? new Date(`${params.month}-01T00:00:00`) : new Date();
+    first = new Date(base.getFullYear(), base.getMonth(), 1);
+    last = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
+  }
+  const year = first.getFullYear();
+  const month = first.getMonth();
 
   const incluir = {
     asset: { select: { id: true, code: true, name: true } },
@@ -67,7 +83,13 @@ export default async function CalendarPage({
     return d >= first && d <= last && !generados.has(e.planId);
   });
 
-  const dias = Array.from({ length: last.getDate() }, (_, i) => new Date(year, month, i + 1));
+  const cuantos =
+    Math.round((new Date(last).setHours(0, 0, 0, 0) - first.getTime()) / 86_400_000) + 1;
+  const dias = Array.from({ length: cuantos }, (_, i) => {
+    const d = new Date(first);
+    d.setDate(first.getDate() + i);
+    return d;
+  });
   const carga = cargaPorDia(dias, ordenes, j);
 
   return (
@@ -78,7 +100,9 @@ export default async function CalendarPage({
         actions={<RunSchedulerButton />}
       />
       <Calendario
+        vista={vista}
         mes={`${year}-${String(month + 1).padStart(2, "0")}`}
+        semana={first.toISOString().slice(0, 10)}
         dias={dias.map((d) => d.toISOString())}
         carga={carga.map((c) => ({ ...c, fecha: c.fecha.toISOString() }))}
         ordenes={ordenes.map((o) => ({
