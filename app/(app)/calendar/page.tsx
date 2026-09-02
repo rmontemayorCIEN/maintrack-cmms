@@ -14,17 +14,24 @@ export const dynamic = "force-dynamic";
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; vista?: string; semana?: string }>;
+  searchParams: Promise<{ month?: string; vista?: string; semana?: string; dia?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const vista = params.vista === "semana" ? "semana" : "mes";
+  const vista =
+    params.vista === "semana" ? "semana" : params.vista === "dia" ? "dia" : "mes";
 
   // El rango depende de la vista, pero de ahi en adelante todo es igual: los
   // mismos datos, la misma carga calculada. La vista solo cambia como se pinta.
   let first: Date;
   let last: Date;
-  if (vista === "semana") {
+  if (vista === "dia") {
+    const d = params.dia ? new Date(`${params.dia}T00:00:00`) : new Date();
+    d.setHours(0, 0, 0, 0);
+    first = d;
+    last = new Date(d);
+    last.setHours(23, 59, 59);
+  } else if (vista === "semana") {
     const refe = params.semana ? new Date(`${params.semana}T00:00:00`) : new Date();
     const lunes = new Date(refe);
     lunes.setDate(refe.getDate() - ((refe.getDay() + 6) % 7));
@@ -110,6 +117,7 @@ export default async function CalendarPage({
         vista={vista}
         mes={`${year}-${String(month + 1).padStart(2, "0")}`}
         semana={first.toISOString().slice(0, 10)}
+        dia={first.toISOString().slice(0, 10)}
         dias={dias.map((d) => d.toISOString())}
         carga={carga.map((c) => ({ ...c, fecha: c.fecha.toISOString() }))}
         ordenes={ordenes.map((o) => ({

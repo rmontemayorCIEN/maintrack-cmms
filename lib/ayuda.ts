@@ -618,7 +618,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Calendario de mantenimiento",
     que: "Lo que está programado, lo que se proyecta y si de verdad cabe en los días que quedan.",
     hacer: [
-      "Ver el mes completo, o la semana con el trabajo de cada persona",
+      "Ver el mes, la semana con el trabajo de cada persona, o un solo día a detalle",
       "Abrir cualquier día para ver todo lo que cae ahí",
       "Filtrar por técnico, tipo de mantenimiento o solo lo abierto",
       "Ver la carga de cada persona y qué días no alcanzan",
@@ -631,6 +631,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo vencido y sin cerrar sale arriba siempre, sin importar el mes que esté viendo. Se quedaba escondido en el mes en que venció.",
       "Un día en ámbar es un día donde a alguien no le cabe el trabajo asignado.",
       "La vista de semana pone a cada persona en su renglón: ahí se ve si alguien trae tres días saturados mientras otro está libre. En el mes eso queda escondido porque todo se mezcla por día.",
+      "La vista de día muestra una sola jornada completa: la carga de cada quien y todas sus órdenes con sus horas. Es la vista para arrancar la mañana.",
       "El botón «Ejecutar programador» crea las órdenes de los planes que ya vencieron, y dice por qué saltó las que no generó.",
       "«Revisar la semana» le pide a la IA que lea la carga real y proponga qué mover, qué juntar en una sola visita y qué no tocar. Es una propuesta: no cambia nada, usted decide qué aplicar.",
     ],

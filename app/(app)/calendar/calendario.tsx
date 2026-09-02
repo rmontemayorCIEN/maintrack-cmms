@@ -25,11 +25,12 @@ type Proyeccion = { id: string; title: string; asset: string; date: string };
 const mismoDia = (a: string, b: string) => a.slice(0, 10) === b.slice(0, 10);
 
 export function Calendario({
-  vista, mes, semana, dias, carga, ordenes, vencidas, proyecciones, tecnicos, horasJornada,
+  vista, mes, semana, dia, dias, carga, ordenes, vencidas, proyecciones, tecnicos, horasJornada,
 }: {
-  vista: "mes" | "semana";
+  vista: "mes" | "semana" | "dia";
   mes: string;
   semana: string;
+  dia: string;
   dias: string[];
   carga: Dia[];
   ordenes: Orden[];
@@ -73,20 +74,33 @@ export function Calendario({
     return d.toISOString().slice(0, 10);
   };
   const irA = (destino: string) => router.push(destino);
+  const corrimientoDia = (n: number) => {
+    const d = new Date(`${dia}T12:00:00`);
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
   const rutaAnterior =
-    vista === "semana"
-      ? `/calendar?vista=semana&semana=${corrimiento(-7)}`
-      : `/calendar?month=${new Date(anio, mesNum - 2, 1).toISOString().slice(0, 7)}`;
+    vista === "dia"
+      ? `/calendar?vista=dia&dia=${corrimientoDia(-1)}`
+      : vista === "semana"
+        ? `/calendar?vista=semana&semana=${corrimiento(-7)}`
+        : `/calendar?month=${new Date(anio, mesNum - 2, 1).toISOString().slice(0, 7)}`;
   const rutaSiguiente =
-    vista === "semana"
-      ? `/calendar?vista=semana&semana=${corrimiento(7)}`
-      : `/calendar?month=${new Date(anio, mesNum, 1).toISOString().slice(0, 7)}`;
-  const rutaHoy = vista === "semana" ? "/calendar?vista=semana" : "/calendar";
+    vista === "dia"
+      ? `/calendar?vista=dia&dia=${corrimientoDia(1)}`
+      : vista === "semana"
+        ? `/calendar?vista=semana&semana=${corrimiento(7)}`
+        : `/calendar?month=${new Date(anio, mesNum, 1).toISOString().slice(0, 7)}`;
+  const rutaHoy =
+    vista === "dia" ? "/calendar?vista=dia" : vista === "semana" ? "/calendar?vista=semana" : "/calendar";
 
   const etiquetaMes =
-    vista === "semana"
-      ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dias[dias.length - 1]))}`
-      : new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(anio, mesNum - 1, 1));
+    vista === "dia"
+      ? new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dia}T12:00:00`))
+      : vista === "semana"
+        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dias[dias.length - 1]))}`
+        : new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(anio, mesNum - 1, 1));
 
   const delDia = (fecha: string) => visibles.filter((o) => o.dueDate && mismoDia(o.dueDate, fecha));
   const proyeccionesDe = (fecha: string) => proyecciones.filter((p) => mismoDia(p.date, fecha));
@@ -156,18 +170,23 @@ export function Calendario({
             ) : null}
             <span className="mx-1 h-4 w-px bg-slate-200" />
             <div className="flex overflow-hidden rounded-lg border border-slate-200">
-              <button
-                onClick={() => irA("/calendar")}
-                className={cn("px-2.5 py-1 text-xs", vista === "mes" ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50")}
-              >
-                Mes
-              </button>
-              <button
-                onClick={() => irA("/calendar?vista=semana")}
-                className={cn("border-l border-slate-200 px-2.5 py-1 text-xs", vista === "semana" ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50")}
-              >
-                Semana
-              </button>
+              {([
+                ["mes", "Mes", "/calendar"],
+                ["semana", "Semana", "/calendar?vista=semana"],
+                ["dia", "Dia", "/calendar?vista=dia"],
+              ] as const).map(([clave, texto, destino], i) => (
+                <button
+                  key={clave}
+                  onClick={() => irA(destino)}
+                  className={cn(
+                    "px-2.5 py-1 text-xs",
+                    i > 0 && "border-l border-slate-200",
+                    vista === clave ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50",
+                  )}
+                >
+                  {texto}
+                </button>
+              ))}
             </div>
             <button onClick={() => irA(rutaAnterior)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Anterior</button>
             <button onClick={() => irA(rutaHoy)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Hoy</button>
@@ -175,7 +194,18 @@ export function Calendario({
           </div>
         </div>
 
-        {vista === "semana" ? (
+        {vista === "dia" ? (
+          <div className="p-4">
+            {(() => {
+              const c = cargaDe(dia);
+              return c ? (
+                <DetalleDia dia={c} ordenes={delDia(dia)} proyecciones={proyeccionesDe(dia)} sinMarco />
+              ) : (
+                <p className="py-10 text-center text-xs text-slate-400">Sin informacion para ese dia.</p>
+              );
+            })()}
+          </div>
+        ) : vista === "semana" ? (
           <RejillaSemana
             dias={dias}
             carga={carga}
@@ -296,18 +326,24 @@ export function Calendario({
 
 /** El dia completo: lo que la celda del mes no alcanza a mostrar. */
 function DetalleDia({
-  dia, ordenes, proyecciones, onCerrar,
+  dia, ordenes, proyecciones, onCerrar, sinMarco,
 }: {
   dia: Dia;
   ordenes: Orden[];
   proyecciones: Proyeccion[];
-  onCerrar: () => void;
+  onCerrar?: () => void;
+  /** En la vista de dia ya vive dentro de la tarjeta del calendario. */
+  sinMarco?: boolean;
 }) {
   const fecha = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" })
     .format(new Date(dia.fecha));
 
+  const Marco = sinMarco
+    ? ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+    : Card;
+
   return (
-    <Card>
+    <Marco>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold capitalize text-slate-900">{fecha}</h3>
@@ -317,9 +353,11 @@ function DetalleDia({
             {!dia.habil ? ` · ${dia.festivo ?? "dia no laborable"}` : ""}
           </p>
         </div>
-        <button type="button" onClick={onCerrar} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar">
-          <X className="h-4 w-4" />
-        </button>
+        {onCerrar ? (
+          <button type="button" onClick={onCerrar} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar">
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
       {dia.personas.length > 0 ? (
@@ -373,7 +411,10 @@ function DetalleDia({
           </li>
         ))}
       </ul>
-    </Card>
+      {ordenes.length === 0 && proyecciones.length === 0 ? (
+        <p className="py-8 text-center text-xs text-slate-400">No hay trabajo programado este dia.</p>
+      ) : null}
+    </Marco>
   );
 }
 

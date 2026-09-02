@@ -54,11 +54,16 @@ export function Badge({
     danger: "bg-red-100 text-red-700 border-red-200",
     muted: "bg-slate-100 text-slate-600 border-slate-200",
   };
+  // El gris por omision solo cuando no llega ningun color. `cn` concatena y no
+  // resuelve conflictos de Tailwind, asi que emitir las dos series de clases
+  // dejaba que ganara la que el CSS generado pusiera al final —resultado
+  // impredecible, y por eso la leyenda del calendario salia sin color.
+  const propio = tone ? tones[tone] : className ? "" : tones.muted;
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium",
-        tone ? tones[tone] : "bg-slate-100 text-slate-600 border-slate-200",
+        propio,
         className,
       )}
     >
