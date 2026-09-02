@@ -169,3 +169,75 @@ export function cargaPorDia(
     };
   });
 }
+
+export class ErrorDeAgenda extends Error {
+  constructor(mensaje: string, readonly codigo: number = 422) {
+    super(mensaje);
+    this.name = "ErrorDeAgenda";
+  }
+}
+
+/**
+ * Reprograma una orden a otra fecha, y opcionalmente a otra persona.
+ *
+ * Es lo que aplica un movimiento propuesto por la revision de la semana, pero
+ * no confia en esa propuesta: resuelve la orden por su numero, verifica que la
+ * fecha sea laborable y comprueba que la persona exista. La sugerencia viene
+ * de un modelo y pasa por el navegador; ninguno de los dos es fuente de verdad
+ * para escribir en la base.
+ *
+ * El responsable llega como nombre, que es lo unico que el modelo maneja. Si
+ * no resuelve a una sola persona se mueve la fecha y se avisa: vale mas
+ * aplicar la mitad util que rechazar todo.
+ */
+export async function reprogramar(params: {
+  organizationId: string;
+  numeroOrden: string;
+  fecha: string;
+  responsableNombre?: string | null;
+  estadosAbiertos: readonly string[];
+}): Promise<{ numero: string; aviso: string | null }> {
+  const wo = await prisma.workOrder.findFirst({
+    where: { organizationId: params.organizationId, number: params.numeroOrden },
+    select: { id: true, number: true, status: true, dueDate: true },
+  });
+  if (!wo) throw new ErrorDeAgenda(`No se encontro la orden ${params.numeroOrden}`, 404);
+  if (!params.estadosAbiertos.includes(wo.status)) {
+    throw new ErrorDeAgenda(`La orden ${wo.number} ya no esta abierta.`, 409);
+  }
+
+  const [a, m, d] = params.fecha.split("-").map(Number);
+  const nueva = new Date(a, m - 1, d);
+  if (Number.isNaN(nueva.getTime())) throw new ErrorDeAgenda("Fecha invalida");
+
+  const j = await jornada(params.organizationId, nueva, nueva);
+  if (!esHabil(nueva, j)) {
+    throw new ErrorDeAgenda("Esa fecha no es un dia laborable en su calendario.");
+  }
+
+  let responsableId: string | undefined;
+  let aviso: string | null = null;
+  if (params.responsableNombre) {
+    const candidatos = await prisma.user.findMany({
+      where: {
+        organizationId: params.organizationId,
+        active: true,
+        name: { contains: params.responsableNombre },
+      },
+      select: { id: true },
+    });
+    if (candidatos.length === 1) responsableId = candidatos[0].id;
+    else
+      aviso =
+        candidatos.length === 0
+          ? `No se encontro a «${params.responsableNombre}»; solo se cambio la fecha.`
+          : `«${params.responsableNombre}» coincide con varias personas; solo se cambio la fecha.`;
+  }
+
+  await prisma.workOrder.update({
+    where: { id: wo.id },
+    data: { dueDate: nueva, ...(responsableId ? { assignedToId: responsableId } : {}) },
+  });
+
+  return { numero: wo.number, aviso };
+}

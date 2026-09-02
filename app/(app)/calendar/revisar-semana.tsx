@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowRight, Loader2, Sparkles, Layers, ShieldAlert, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Loader2, Sparkles, Layers, ShieldAlert, X } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 type Revision = {
   resumen: string;
@@ -22,9 +24,47 @@ type Revision = {
  * laborables antes de mostrarse.
  */
 export function RevisarSemana({ semana }: { semana: string }) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [cargando, setCargando] = useState(false);
   const [revision, setRevision] = useState<Revision | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Por indice del movimiento: "aplicando", "aplicado" o el error que dio.
+  const [estado, setEstado] = useState<Record<number, string>>({});
+  const [aplicandoTodo, setAplicandoTodo] = useState(false);
+
+  async function aplicar(indice: number) {
+    const m = revision?.movimientos[indice];
+    if (!m || estado[indice] === "aplicado") return;
+    setEstado((e) => ({ ...e, [indice]: "aplicando" }));
+
+    const res = await fetch("/api/ia/agenda/aplicar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orden: m.orden, aFecha: m.aFecha, aResponsable: m.aResponsable }),
+    });
+    const cuerpo = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      setEstado((e) => ({ ...e, [indice]: cuerpo?.error ?? "No se pudo aplicar" }));
+      return;
+    }
+    setEstado((e) => ({ ...e, [indice]: cuerpo?.aviso ? `aplicado — ${cuerpo.aviso}` : "aplicado" }));
+    startTransition(() => router.refresh());
+  }
+
+  async function aplicarTodo() {
+    if (!revision) return;
+    setAplicandoTodo(true);
+    // En serie y no en paralelo: cada movimiento cambia la carga del dia, y en
+    // paralelo el ultimo podria aterrizar sobre un dia que los anteriores ya
+    // llenaron.
+    for (let i = 0; i < revision.movimientos.length; i++) {
+      if (estado[i] === "aplicado") continue;
+      await aplicar(i);
+    }
+    setAplicandoTodo(false);
+  }
 
   async function revisar() {
     setCargando(true); setError(null); setRevision(null);
@@ -78,25 +118,70 @@ export function RevisarSemana({ semana }: { semana: string }) {
 
           {revision.movimientos.length > 0 ? (
             <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Conviene mover
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Conviene mover
+                </p>
+                {revision.movimientos.some((_, i) => estado[i] !== "aplicado") ? (
+                  <button
+                    type="button"
+                    onClick={aplicarTodo}
+                    disabled={aplicandoTodo}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {aplicandoTodo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Aplicar todos
+                  </button>
+                ) : null}
+              </div>
               <ul className="mt-2 grid gap-1.5">
-                {revision.movimientos.map((m, i) => (
-                  <li key={i} className="rounded-lg border border-slate-200 px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <Link href={`/work-orders?q=${m.orden}`} className="font-medium text-brand-600 hover:underline">
-                        {m.orden}
-                      </Link>
-                      <ArrowRight className="h-3 w-3 text-slate-400" />
-                      <span className="font-medium capitalize text-slate-700">{fmt(m.aFecha)}</span>
-                      {m.aResponsable ? (
-                        <Badge tone="muted">a {m.aResponsable}</Badge>
+                {revision.movimientos.map((m, i) => {
+                  const suEstado = estado[i];
+                  const aplicado = suEstado?.startsWith("aplicado");
+                  const fallo = suEstado && !aplicado && suEstado !== "aplicando";
+                  return (
+                    <li
+                      key={i}
+                      className={cn(
+                        "rounded-lg border px-3 py-2",
+                        aplicado ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Link href={`/work-orders?q=${m.orden}`} className="font-medium text-brand-600 hover:underline">
+                          {m.orden}
+                        </Link>
+                        <ArrowRight className="h-3 w-3 text-slate-400" />
+                        <span className="font-medium capitalize text-slate-700">{fmt(m.aFecha)}</span>
+                        {m.aResponsable ? <Badge tone="muted">a {m.aResponsable}</Badge> : null}
+
+                        <span className="ml-auto">
+                          {aplicado ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                              <Check className="h-3.5 w-3.5" />
+                              Aplicado
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => aplicar(i)}
+                              disabled={suEstado === "aplicando"}
+                              className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 font-medium text-slate-600 hover:bg-white disabled:opacity-60"
+                            >
+                              {suEstado === "aplicando" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                              Aplicar
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{m.porQue}</p>
+                      {aplicado && suEstado !== "aplicado" ? (
+                        <p className="mt-1 text-xs text-amber-700">{suEstado.replace("aplicado — ", "")}</p>
                       ) : null}
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{m.porQue}</p>
-                  </li>
-                ))}
+                      {fallo ? <p className="mt-1 text-xs text-rose-600">{suEstado}</p> : null}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : (
@@ -153,7 +238,8 @@ export function RevisarSemana({ semana }: { semana: string }) {
           ) : null}
 
           <p className="mt-4 border-t border-slate-100 pt-2 text-[0.6875rem] text-slate-400">
-            Es una propuesta, no un cambio. Nada se movio: usted decide que aplicar y lo hace en cada orden.
+            Nada cambia hasta que usted lo aplique. Cada movimiento aplicado queda en la bitacora, y la
+            fecha se vuelve a verificar contra su calendario laboral antes de guardarse.
           </p>
         </Card>
       ) : null}

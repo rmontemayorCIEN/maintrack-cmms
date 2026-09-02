@@ -659,7 +659,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       {
         pregunta: "¿La IA mueve las órdenes por mí?",
         respuesta:
-          "No. Solo propone. Nada se mueve hasta que usted lo haga en cada orden. Y las fechas que sugiere se verifican contra sus días laborables antes de mostrárselas: no le va a proponer programar en domingo.",
+          "Solo si usted lo aplica. Cada propuesta trae su botón «Aplicar», y hay uno para aplicarlas todas. Nada cambia antes de eso. Al aplicar, el sistema vuelve a verificar que la fecha sea laborable y que la orden siga abierta —la sugerencia viene de un modelo y pasa por el navegador, así que no se da por buena—. Todo movimiento aplicado queda en la bitácora.",
       },
       {
         pregunta: "¿Qué pasa si un preventivo cae en domingo o en un festivo?",
