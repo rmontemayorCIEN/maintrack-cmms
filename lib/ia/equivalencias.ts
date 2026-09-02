@@ -86,13 +86,23 @@ export function paresCandidatos(
       const clave = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
       if (yaRelacionadas.has(clave)) continue;
 
+      // Dos piezas de familias distintas no se sustituyen entre si. Un balero
+      // y una valvula pueden compartir el numero 2 —dos pulgadas, dos
+      // amperes— y eso no significa nada.
+      if (a.category && b.category && a.category !== b.category) continue;
+
       const comparten = [...a.designaciones].filter((d) => b.designaciones.has(d));
       if (comparten.length === 0) continue;
+
+      // Una cifra suelta de una o dos posiciones suele ser una medida dentro
+      // del nombre (2 pulgadas, 15 amperes), no la designacion de la pieza.
+      // Para aceptarla hace falta que ademas los nombres se parezcan mucho.
+      const soloCifrasSueltas = comparten.every((d) => d.length <= 2);
 
       // Comparten designacion pero ademas deben parecerse: dos piezas
       // distintas pueden traer el mismo numero por casualidad.
       const puntaje = Math.max(parecido(a.name, b.name), parecido(a.code, b.code));
-      if (puntaje < 0.35) continue;
+      if (puntaje < (soloCifrasSueltas ? 0.7 : 0.4)) continue;
 
       pares.push({ a, b, puntaje, comparten });
     }

@@ -161,6 +161,23 @@ async function main() {
   revisar("pero la designacion real si",
     podados.some((c) => [c.a.code, c.b.code].sort().join() === "BAL-6205-A,BAL-6205-B"), true);
 
+  const familias = [
+    { id: "1", code: "BAL-6205", name: "Balero 6205", category: "Baleros" },
+    { id: "2", code: "VAL-2", name: "Valvula 2 pulgadas", category: "Valvulas" },
+    { id: "3", code: "BAL-6205N", name: "Balero 6205 NSK", category: "Baleros" },
+    { id: "4", code: "INT-2", name: "Interruptor 2 polos", category: "Electrico" },
+  ];
+  const porFamilia = paresCandidatos(familias, new Set());
+  revisar("familias distintas no se comparan",
+    porFamilia.some((c) => [c.a.category, c.b.category].includes("Valvulas")), false);
+  revisar("misma familia y misma designacion si",
+    porFamilia.some((c) => [c.a.code, c.b.code].sort().join() === "BAL-6205,BAL-6205N"), true);
+  revisar("una cifra suelta compartida no basta",
+    paresCandidatos([
+      { id: "a", code: "MAN-2", name: "Manometro 2 pulgadas", category: null },
+      { id: "b", code: "CON-2", name: "Contactor 2 polos", category: null },
+    ], new Set()).length, 0);
+
   revisar("sin designacion numerica no hay candidatos",
     paresCandidatos([
       { id: "a", code: "TRA-1", name: "Trapo industrial", category: null },
