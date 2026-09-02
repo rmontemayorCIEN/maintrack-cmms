@@ -53,6 +53,18 @@ model Organization {
   /// Arriba de este monto la requisicion de compra necesita autorizacion.
   /// Cero significa que todas la necesitan; un monto muy alto, ninguna.
   montoAutorizacion Float @default(0)
+  /// Horas de trabajo al dia de un tecnico. Es el piso: quien quiera precision
+  /// lo ajusta por persona en User.horasDisponibles.
+  ///
+  /// De aqui sale si un dia esta sobrecargado. Sin este numero el calendario
+  /// puede mostrar 38 horas de trabajo asignadas al mismo martes y verse
+  /// perfectamente normal.
+  horasJornada Float  @default(8)
+  /// Dias de la semana que se trabajan, separados por coma: 1 es lunes y 7 es
+  /// domingo. Texto y no arreglo, porque el esquema corre en SQLite y en
+  /// PostgreSQL con el mismo archivo.
+  diasHabiles  String @default("1,2,3,4,5")
+
   /// Si una OT puede juntar actividades de varios origenes (preventivo del
   /// plan + un correctivo + una mejora) en un solo esfuerzo.
   ///
@@ -114,6 +126,7 @@ model Organization {
   purchaseOrders   PurchaseOrder[]
   inventoryCounts  InventoryCount[]
   reportPoints     ReportPoint[]
+  festivos     DiaFestivo[]
 }
 
 model User {
@@ -179,6 +192,10 @@ model User {
 
   @@index([organizationId])
   tareasLiberadas  WorkOrderTask[] @relation("TareaLiberadaPor")
+  /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
+  /// organizacion: se define por excepcion, no llenando un campo por empleado.
+  horasDisponibles Float?
+  festivos         DiaFestivo[] @relation("FestivoCreadoPor")
 }
 
 model Invitation {
@@ -1808,4 +1825,27 @@ model AuditLog {
 
   @@index([organizationId])
   @@index([entity, entityId])
+}
+
+/// Dias que no se trabajan.
+///
+/// Por organizacion y no una lista global: los festivos de ley son los mismos
+/// para todos, pero cada empresa cierra en dias propios —el aniversario de la
+/// planta, la semana de vacaciones— y el programador no debe proyectar
+/// preventivos ahi.
+model DiaFestivo {
+  id             String   @id @default(cuid())
+  organizationId String
+  fecha          DateTime
+  nombre         String
+  /// De ley, o puesto por la empresa. Sirve para no borrar los de ley por error.
+  deLey          Boolean  @default(false)
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("FestivoCreadoPor", fields: [createdById], references: [id])
+
+  @@unique([organizationId, fecha])
+  @@index([organizationId])
 }

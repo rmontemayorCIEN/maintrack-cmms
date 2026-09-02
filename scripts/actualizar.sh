@@ -86,6 +86,10 @@ npx tsx scripts/prueba-backlog.ts >/dev/null 2>&1 \
   && echo "     Liberacion de actividades y backlog correctos." \
   || { echo "     ERROR: la prueba de backlog fallo."; npx tsx scripts/prueba-backlog.ts; exit 1; }
 
+npx tsx scripts/prueba-agenda.ts >/dev/null 2>&1 \
+  && echo "     Festivos, dias habiles y carga correctos." \
+  || { echo "     ERROR: la prueba de agenda fallo."; npx tsx scripts/prueba-agenda.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

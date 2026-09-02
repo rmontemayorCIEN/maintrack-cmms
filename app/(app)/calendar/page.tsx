@@ -1,21 +1,19 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { forecastSchedule } from "@/lib/scheduler";
-import { Badge, Card, PageHeader } from "@/components/ui";
-import { MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, OPEN_STATUSES } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cargaPorDia, jornada } from "@/lib/agenda";
+import { PageHeader } from "@/components/ui";
+import { OPEN_STATUSES } from "@/lib/constants";
 import { RunSchedulerButton } from "./run-scheduler";
+import { Calendario } from "./calendario";
 
 export const metadata = { title: "Calendario" };
 export const dynamic = "force-dynamic";
 
-const WEEKDAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
-
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; vista?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -24,143 +22,85 @@ export default async function CalendarPage({
   const year = base.getFullYear();
   const month = base.getMonth();
   const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
+  const last = new Date(year, month + 1, 0, 23, 59, 59);
 
-  const [workOrders, projected] = await Promise.all([
+  const incluir = {
+    asset: { select: { id: true, code: true, name: true } },
+    assignedTo: { select: { id: true, name: true, color: true, horasDisponibles: true } },
+  };
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const [ordenes, vencidas, proyectado, j, tecnicos] = await Promise.all([
+    prisma.workOrder.findMany({
+      where: { organizationId: user.organizationId, dueDate: { gte: first, lte: last } },
+      include: incluir,
+      orderBy: { dueDate: "asc" },
+    }),
+    // Lo vencido se muestra siempre, sin importar el mes que se este viendo.
+    // Antes se quedaba pintado en el mes en que vencio: uno abria el calendario
+    // de septiembre y las doce cosas de agosto que seguian abiertas no estaban
+    // en ningun lado de la pantalla donde se planea.
     prisma.workOrder.findMany({
       where: {
         organizationId: user.organizationId,
-        dueDate: { gte: first, lte: new Date(year, month + 1, 0, 23, 59, 59) },
+        status: { in: [...OPEN_STATUSES] },
+        dueDate: { lt: hoy },
       },
-      include: { asset: { select: { code: true } } },
+      include: incluir,
       orderBy: { dueDate: "asc" },
+      take: 50,
     }),
     forecastSchedule(user.organizationId, 120),
+    jornada(user.organizationId, first, last),
+    prisma.user.findMany({
+      where: { organizationId: user.organizationId, active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
+    }),
   ]);
 
-  // Se muestran solo las proyecciones que aun no tienen OT generada este mes.
-  const generatedPlanIds = new Set(workOrders.map((wo) => wo.planId).filter(Boolean));
-  const projections = projected.filter((event) => {
-    const date = new Date(event.date);
-    return date >= first && date <= last && !generatedPlanIds.has(event.planId);
+  const generados = new Set(ordenes.map((o) => o.planId).filter(Boolean));
+  const proyecciones = proyectado.filter((e) => {
+    const d = new Date(e.date);
+    return d >= first && d <= last && !generados.has(e.planId);
   });
 
-  const offset = (first.getDay() + 6) % 7; // Semana inicia en lunes
-  const cells: Array<Date | null> = [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: last.getDate() }, (_, i) => new Date(year, month, i + 1)),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const monthLabel = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(first);
-  const prev = new Date(year, month - 1, 1).toISOString().slice(0, 7);
-  const next = new Date(year, month + 1, 1).toISOString().slice(0, 7);
-  const today = new Date().toDateString();
+  const dias = Array.from({ length: last.getDate() }, (_, i) => new Date(year, month, i + 1));
+  const carga = cargaPorDia(dias, ordenes, j);
 
   return (
     <>
       <PageHeader
         title="Calendario de mantenimiento"
-        description="Ordenes programadas y proyeccion de los planes preventivos que aun no se han generado."
+        description="Lo programado, lo proyectado y si de verdad cabe en los dias que quedan."
         actions={<RunSchedulerButton />}
       />
-
-      <Card padded={false}>
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <h2 className="text-sm font-semibold capitalize text-slate-900">{monthLabel}</h2>
-          <div className="flex items-center gap-1.5">
-            <Link href={`/calendar?month=${prev}`} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
-              Anterior
-            </Link>
-            <Link href="/calendar" className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
-              Hoy
-            </Link>
-            <Link href={`/calendar?month=${next}`} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">
-              Siguiente
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/60">
-          {WEEKDAYS.map((day) => (
-            <div key={day} className="px-2 py-2 text-center text-[0.625rem] font-semibold uppercase tracking-wide text-slate-500">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7">
-          {cells.map((date, index) => {
-            if (!date) return <div key={index} className="min-h-28 border-b border-r border-slate-100 bg-slate-50/40" />;
-            const dayWorkOrders = workOrders.filter((wo) => wo.dueDate?.toDateString() === date.toDateString());
-            const dayProjections = projections.filter((p) => new Date(p.date).toDateString() === date.toDateString());
-            const isToday = date.toDateString() === today;
-            const isWeekend = [0, 6].includes(date.getDay());
-
-            return (
-              <div
-                key={index}
-                className={cn(
-                  "min-h-28 border-b border-r border-slate-100 p-1.5",
-                  isWeekend && "bg-slate-50/40",
-                )}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "grid h-5 w-5 place-items-center rounded-full text-[0.6875rem] font-medium",
-                      isToday ? "bg-brand-600 text-white" : "text-slate-500",
-                    )}
-                  >
-                    {date.getDate()}
-                  </span>
-                  {dayWorkOrders.length + dayProjections.length > 3 ? (
-                    <span className="text-[9px] text-slate-400">
-                      {dayWorkOrders.length + dayProjections.length}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-1">
-                  {dayWorkOrders.slice(0, 3).map((wo) => (
-                    <Link
-                      key={wo.id}
-                      href={`/work-orders/${wo.id}`}
-                      className={cn(
-                        "block truncate rounded border px-1.5 py-0.5 text-[0.625rem] font-medium",
-                        MAINTENANCE_TYPE_COLORS[wo.maintenanceType],
-                        !OPEN_STATUSES.includes(wo.status) && "opacity-50 line-through",
-                      )}
-                      title={`${wo.number} — ${wo.title}`}
-                    >
-                      {wo.number} {wo.title}
-                    </Link>
-                  ))}
-                  {dayProjections.slice(0, 2).map((event) => (
-                    <span
-                      key={event.id}
-                      className="block truncate rounded border border-dashed border-slate-300 bg-white px-1.5 py-0.5 text-[0.625rem] text-slate-500"
-                      title={`Proyectado: ${event.title} — ${event.asset}`}
-                    >
-                      ◇ {event.title}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        <span className="font-medium text-slate-600">Leyenda:</span>
-        {Object.entries(MAINTENANCE_TYPE_LABELS).map(([key, label]) => (
-          <Badge key={key} className={MAINTENANCE_TYPE_COLORS[key]}>{label}</Badge>
-        ))}
-        <span className="inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-[0.6875rem]">
-          ◇ Proyeccion del plan (aun no generada)
-        </span>
-      </div>
+      <Calendario
+        mes={`${year}-${String(month + 1).padStart(2, "0")}`}
+        dias={dias.map((d) => d.toISOString())}
+        carga={carga.map((c) => ({ ...c, fecha: c.fecha.toISOString() }))}
+        ordenes={ordenes.map((o) => ({
+          id: o.id, number: o.number, title: o.title,
+          maintenanceType: o.maintenanceType, status: o.status,
+          estimatedHours: o.estimatedHours,
+          dueDate: o.dueDate?.toISOString() ?? null,
+          asset: o.asset, assignedTo: o.assignedTo,
+        }))}
+        vencidas={vencidas.map((o) => ({
+          id: o.id, number: o.number, title: o.title,
+          maintenanceType: o.maintenanceType, status: o.status,
+          estimatedHours: o.estimatedHours,
+          dueDate: o.dueDate?.toISOString() ?? null,
+          asset: o.asset, assignedTo: o.assignedTo,
+        }))}
+        proyecciones={proyecciones.map((p) => ({
+          id: p.id, title: p.title, asset: p.asset, date: new Date(p.date).toISOString(),
+        }))}
+        tecnicos={tecnicos}
+        horasJornada={j.horasJornada}
+      />
     </>
   );
 }

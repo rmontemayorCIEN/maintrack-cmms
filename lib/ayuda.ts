@@ -615,10 +615,49 @@ export const AYUDA: Record<string, FichaAyuda> = {
   },
 
   "/calendar": {
-    titulo: "Calendario",
-    que: "El trabajo distribuido en el tiempo: qué toca cada día y qué se está encimando.",
-    hacer: ["Ver la carga por día", "Ejecutar el programador"],
-    flujo: ["Lo que ve aquí son órdenes ya generadas. Los planes que todavía no generan no aparecen."],
+    titulo: "Calendario de mantenimiento",
+    que: "Lo que está programado, lo que se proyecta y si de verdad cabe en los días que quedan.",
+    hacer: [
+      "Ver el mes completo y abrir cualquier día para ver todo lo que cae ahí",
+      "Filtrar por técnico, tipo de mantenimiento o solo lo abierto",
+      "Ver la carga de cada persona y qué días no alcanzan",
+      "Generar las órdenes de los planes que ya vencen",
+    ],
+    flujo: [
+      "Las órdenes se pintan en su fecha compromiso, con el color de su tipo y un punto del color del responsable.",
+      "Las proyecciones con línea punteada son planes que todavía no generan orden: aparecen para que se vea lo que viene.",
+      "Lo vencido y sin cerrar sale arriba siempre, sin importar el mes que esté viendo. Se quedaba escondido en el mes en que venció.",
+      "Un día en ámbar es un día donde a alguien no le cabe el trabajo asignado.",
+      "El botón «Ejecutar programador» crea las órdenes de los planes que ya vencieron, y dice por qué saltó las que no generó.",
+    ],
+    campos: [
+      { nombre: "Las horas de la esquina del día", explica: "La suma de horas estimadas de lo asignado ese día. En ámbar cuando alguien pasa de su jornada." },
+      { nombre: "Punto de color", explica: "El responsable de esa orden. Sirve para ver de un vistazo cómo está repartido el trabajo." },
+      { nombre: "Días en gris", explica: "No laborables: fin de semana o festivo, según lo que tenga configurado su empresa. El programador ya no proyecta ahí." },
+      { nombre: "Barra de cada persona", explica: "Al abrir un día: horas asignadas contra sus horas disponibles. En ámbar significa que ese día no le cabe." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo todas las órdenes de un día", porque: "La celda del mes muestra las primeras; toque el día y se abre completo abajo, con la carga por persona." },
+      { sintoma: "Un día aparece sobrecargado y no entiendo por qué", porque: "Ábralo. La barra de cada persona muestra sus horas contra su jornada. Puede ser una sola persona con demasiado, aunque el equipo tenga holgura." },
+      { sintoma: "Trabajo programado en sábado sale marcado", porque: "Ese día tiene capacidad cero según su configuración. Si su empresa sí trabaja sábados, ajústelo en la jornada de la organización." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿De dónde salen las horas disponibles de cada persona?",
+        respuesta:
+          "De la jornada de la organización, que es el valor general. Si alguien tiene un horario distinto, se le puede poner su propio número y ese manda. Se define por excepción: no hay que llenar un campo por cada empleado.",
+      },
+      {
+        pregunta: "¿Por qué un día puede verse sobrecargado si el equipo tiene gente libre?",
+        respuesta:
+          "Porque la carga se mide por persona, no por equipo. Si a un técnico le tocan diez horas y a otro ninguna, el día está sobrecargado aunque en total sobre capacidad. El problema no es que falte gente, es cómo está repartido.",
+      },
+      {
+        pregunta: "¿Qué pasa si un preventivo cae en domingo o en un festivo?",
+        respuesta:
+          "El programador lo recorre al siguiente día laborable. Hacia adelante y nunca hacia atrás: adelantar un mantenimiento sin que nadie lo pida sería cambiar el plan por cuenta propia. Los festivos de ley vienen cargados y su empresa puede agregar los suyos.",
+      },
+    ],
   },
 
   "/board": {

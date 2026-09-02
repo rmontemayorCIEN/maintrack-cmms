@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
 import { addDays, startOfDay } from "./utils";
 import { logAudit, notify } from "./audit";
+import { esHabil, jornada } from "./agenda";
 
 export type GenerationResult = {
   generated: number;
@@ -30,6 +31,15 @@ export async function generateScheduledWorkOrders(
   const today = startOfDay(new Date());
   const result: GenerationResult = { generated: 0, skipped: 0, details: [] };
 
+  // La jornada de la organizacion, una sola vez: sirve para no programar
+  // trabajo en domingo ni el 25 de diciembre. Se lee con margen hacia adelante
+  // porque el horizonte puede empujar una fecha varios meses.
+  const j = await jornada(
+    organizationId,
+    today,
+    new Date(today.getFullYear(), today.getMonth() + 14, 1),
+  );
+
   const plans = await prisma.maintenancePlan.findMany({
     where: { organizationId, active: true, triggerType: { in: ["CALENDAR", "METER"] } },
     include: { tasks: { orderBy: { position: "asc" } }, asset: true, meter: true },
@@ -56,7 +66,7 @@ export async function generateScheduledWorkOrders(
       continue;
     }
 
-    const due = resolveDueDate(plan);
+    const due = siguienteHabil(resolveDueDate(plan), j);
     if (!due) {
       result.skipped += 1;
       result.details.push({ plan: plan.name, reason: "Sin regla de vencimiento valida" });
@@ -255,4 +265,25 @@ export async function forecastSchedule(organizationId: string, days = 60) {
   }
 
   return events.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Recorre una fecha al siguiente dia laborable.
+ *
+ * Un preventivo con vencimiento en domingo o el 25 de diciembre nace vencido:
+ * nadie lo va a hacer ese dia, y al dia siguiente ya sale en rojo. Se recorre
+ * hacia adelante y no hacia atras porque adelantar un mantenimiento sin que
+ * nadie lo pida es cambiar el plan por cuenta propia.
+ *
+ * El tope de 15 dias evita un ciclo infinito si alguien deja la organizacion
+ * sin ningun dia habil configurado.
+ */
+export function siguienteHabil(fecha: Date | null, j: Parameters<typeof esHabil>[1]): Date | null {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  for (let i = 0; i < 15; i++) {
+    if (esHabil(d, j)) return d;
+    d.setDate(d.getDate() + 1);
+  }
+  return fecha;
 }
