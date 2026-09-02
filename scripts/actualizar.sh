@@ -94,6 +94,10 @@ npx tsx scripts/prueba-reprogramar.ts >/dev/null 2>&1 \
   && echo "     Guardas al reprogramar correctas." \
   || { echo "     ERROR: la prueba de reprogramacion fallo."; npx tsx scripts/prueba-reprogramar.ts; exit 1; }
 
+npx tsx scripts/prueba-equivalencias.ts >/dev/null 2>&1 \
+  && echo "     Equivalencias de refacciones correctas." \
+  || { echo "     ERROR: la prueba de equivalencias fallo."; npx tsx scripts/prueba-equivalencias.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

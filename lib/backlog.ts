@@ -12,6 +12,7 @@
  * sin llevar contadores que se desincronizan.
  */
 import { prisma } from "./db";
+import { equivalentesDe } from "./equivalencias";
 
 export const MOTIVOS_LIBERACION = {
   SIN_REFACCION: "No habia la refaccion",
@@ -81,19 +82,35 @@ export async function backlog(organizationId: string, opciones?: { assetId?: str
     },
   });
 
+  // Las equivalentes de las refacciones que trabaron trabajo. Se consultan de
+  // una vez y no una por tarea: dos actividades trabadas por el mismo balero
+  // no tienen por que preguntar dos veces.
+  const bloqueantes = [...new Set(tareas.map((t) => t.bloqueadaPorPartId).filter(Boolean))] as string[];
+  const alternativas = new Map<string, Awaited<ReturnType<typeof equivalentesDe>>>();
+  for (const partId of bloqueantes) {
+    alternativas.set(partId, (await equivalentesDe(organizationId, partId)).filter((e) => e.hay > 0));
+  }
+
   const ahora = Date.now();
-  return tareas.map((t) => ({
-    ...t,
-    diasEsperando: t.liberadaAt
-      ? Math.floor((ahora - t.liberadaAt.getTime()) / 86_400_000)
-      : 0,
-    // Deterministico, contra la existencia de hoy. Sin notificaciones ni
-    // maquinaria nueva: si se trabo por una refaccion y ya hay, se puede.
-    yaSePuede:
-      t.motivoLiberacion === "SIN_REFACCION"
-        ? (t.bloqueadaPor?.quantityOnHand ?? 0) > 0
-        : null,
-  }));
+  return tareas.map((t) => {
+    const equivalentes = t.bloqueadaPorPartId ? alternativas.get(t.bloqueadaPorPartId) ?? [] : [];
+    const hayPropia = (t.bloqueadaPor?.quantityOnHand ?? 0) > 0;
+    return {
+      ...t,
+      diasEsperando: t.liberadaAt
+        ? Math.floor((ahora - t.liberadaAt.getTime()) / 86_400_000)
+        : 0,
+      // Con equivalentes: una actividad trabada por un balero que no llego se
+      // puede hacer hoy si el equivalente de otra marca si esta en el almacen.
+      // Deterministico, contra la existencia de hoy.
+      yaSePuede:
+        t.motivoLiberacion === "SIN_REFACCION"
+          ? hayPropia || equivalentes.length > 0
+          : null,
+      /** Con que se puede resolver si la original sigue sin llegar. */
+      conEquivalente: hayPropia ? null : (equivalentes[0] ?? null),
+    };
+  });
 }
 
 export type ItemBacklog = Awaited<ReturnType<typeof backlog>>[number];

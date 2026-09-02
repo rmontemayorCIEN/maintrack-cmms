@@ -110,6 +110,20 @@ export default async function BacklogPage() {
                         : ""}
                     </p>
 
+                    {t.conEquivalente ? (
+                      <p className="mt-1 text-xs text-emerald-800">
+                        Se puede resolver con{" "}
+                        <span className="font-medium">
+                          {t.conEquivalente.refaccion.code} {t.conEquivalente.refaccion.name}
+                        </span>{" "}
+                        ({t.conEquivalente.tipo === "EQUIVALENTE" ? "misma pieza, otra marca" : "sustituto"},
+                        hay {t.conEquivalente.hay} {t.conEquivalente.refaccion.unit})
+                        {t.conEquivalente.nota ? (
+                          <span className="mt-0.5 block text-amber-800">⚠ {t.conEquivalente.nota}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+
                     <p className="mt-1 text-xs text-slate-400">
                       Liberada hace {t.diasEsperando} dia(s)
                       {t.liberadaPor?.name ? ` por ${t.liberadaPor.name}` : ""} · viene de{" "}

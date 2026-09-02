@@ -4,6 +4,7 @@ import { Badge, Progress } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
+import { EquivalenciasRefaccion } from "./equivalencias-refaccion";
 import { MovementForm } from "./movement-form";
 import { PartDialog } from "./part-dialog";
 
@@ -53,6 +54,8 @@ export function TablaRefacciones({
   /** Almacen en el que se aplican los movimientos. Nulo = el general. */
   warehouseId?: string | null;
 }) {
+  const catalogo = refacciones.map((r) => ({ id: r.id, code: r.code, name: r.name }));
+
   const FIJAS: Columna<FilaRefaccion>[] = [
     { id: "code", etiqueta: "Codigo", texto: (p) => p.code, pinta: (p) => <span className="font-medium text-slate-700">{p.code}</span> },
     {
@@ -62,10 +65,16 @@ export function TablaRefacciones({
         <div className="max-w-64">
           <p className="truncate font-medium text-slate-800">{p.name}</p>
           {p.category ? <p className="text-xs text-slate-500">{p.category}</p> : null}
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             <AdjuntosRefaccion
               partId={p.id} nombre={p.name} editable={editable}
               adjuntos={p.adjuntos} enlaces={p.enlaces}
+            />
+            {/* El catalogo para elegir la equivalente sale de la misma lista
+                que ya se pinta: no hace falta traerlo otra vez. */}
+            <EquivalenciasRefaccion
+              partId={p.id} code={p.code} editable={editable}
+              catalogo={catalogo}
             />
           </div>
         </div>

@@ -127,6 +127,7 @@ model Organization {
   inventoryCounts  InventoryCount[]
   reportPoints     ReportPoint[]
   festivos     DiaFestivo[]
+  equivalencias EquivalenciaRefaccion[]
 }
 
 model User {
@@ -196,6 +197,7 @@ model User {
   /// organizacion: se define por excepcion, no llenando un campo por empleado.
   horasDisponibles Float?
   festivos         DiaFestivo[] @relation("FestivoCreadoPor")
+  equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
 }
 
 model Invitation {
@@ -867,6 +869,8 @@ model Part {
   @@unique([organizationId, code])
   @@index([organizationId])
   tareasBloqueadas WorkOrderTask[]
+  equivalenciasA EquivalenciaRefaccion[] @relation("EquivalenciaA")
+  equivalenciasB EquivalenciaRefaccion[] @relation("EquivalenciaB")
 }
 
 model StockMovement {
@@ -1848,4 +1852,40 @@ model DiaFestivo {
 
   @@unique([organizationId, fecha])
   @@index([organizationId])
+}
+
+/// Refacciones que pueden usarse una por otra.
+///
+/// Dos casos distintos que la operacion vive todos los dias: la misma pieza de
+/// otra marca —un balero 6205 de SKF o de NSK es el mismo balero— y el
+/// sustituto que sirve cuando la original no llega a tiempo, casi siempre con
+/// una salvedad que hay que decir en voz alta.
+///
+/// La relacion se guarda UNA vez y se lee en los dos sentidos: si A sirve para
+/// B, B sirve para A. Guardar los dos renglones invita a que uno se actualice
+/// y el otro no, y entonces el almacen contesta distinto segun por donde se
+/// pregunte. El orden de los ids es canonico —el menor primero— para que la
+/// llave unica impida registrar el mismo par dos veces al reves.
+model EquivalenciaRefaccion {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// Siempre el id menor de los dos, para que el par no se pueda duplicar.
+  partAId        String
+  partBId        String
+  /// EQUIVALENTE (la misma pieza, otra marca) | SUSTITUTO (sirve, con salvedad)
+  tipo           String   @default("EQUIVALENTE")
+  /// La salvedad, cuando la hay: "requiere espaciador de 2 mm", "solo para el
+  /// lado libre". En un sustituto es lo mas importante del registro.
+  nota           String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  partA        Part         @relation("EquivalenciaA", fields: [partAId], references: [id], onDelete: Cascade)
+  partB        Part         @relation("EquivalenciaB", fields: [partBId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("EquivalenciaCreadaPor", fields: [createdById], references: [id])
+
+  @@unique([partAId, partBId])
+  @@index([organizationId])
+  @@index([partBId])
 }

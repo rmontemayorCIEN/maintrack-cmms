@@ -225,7 +225,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Si se liberó por falta de una refacción y se indicó cuál, esta pantalla marca «Ya se puede hacer» en cuanto hay existencia.",
     ],
     campos: [
-      { nombre: "Ya se puede hacer", explica: "Se liberó por falta de una refacción y hoy sí hay en el almacén. Es la señal de que ese trabajo ya no tiene por qué seguir esperando." },
+      { nombre: "Ya se puede hacer", explica: "Se liberó por falta de una refacción y hoy sí hay con qué: la original, o una equivalente registrada. Es la señal de que ese trabajo ya no tiene por qué seguir esperando." },
+      { nombre: "Se puede resolver con…", explica: "La refacción original no llegó, pero hay una equivalente en existencia. Si es un sustituto, la salvedad viene ahí mismo: léala antes de mandar a montar la pieza." },
       { nombre: "De un plan / De una solicitud", explica: "De dónde venía la actividad. Una que viene de un plan es trabajo preventivo que se dejó de hacer, y eso importa más que un pendiente suelto." },
       { nombre: "Liberada hace N días", explica: "Cuánto lleva esperando. Un número que crece sin parar es una refacción que nadie pidió o un servicio que nadie contrató." },
     ],
@@ -391,6 +392,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Entrar al kardex, a los traspasos, a los conteos y a los indicadores",
     ],
     flujo: [
+      "Cada refacción puede tener equivalentes: la misma pieza de otra marca, o un sustituto que sirve cuando la original no llega. Se registran con el botón «Equivalentes» del renglón.",
+      "En un sustituto, la salvedad —«requiere espaciador de 2 mm»— es lo más importante del registro: sin ella alguien monta la pieza equivocada creyendo que hizo bien.",
+      "La relación se guarda una sola vez y sirve en los dos sentidos: si A sirve para B, B sirve para A.",
       "La existencia baja sola cuando se surte una requisición o se consume en una orden de trabajo.",
       "Sube cuando se recibe una compra o cuando alguien devuelve lo que no usó.",
       "Cada uno de esos movimientos queda en el kardex con el documento que lo originó.",
