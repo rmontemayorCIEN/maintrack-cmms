@@ -33,6 +33,30 @@ export function CompraDialog({
   const [proveedorSugeridoId, setProveedor] = useState("");
   const [justificacion, setJustificacion] = useState("");
   const porId = useMemo(() => new Map(refacciones.map((r) => [r.id, r])), [refacciones]);
+
+  /**
+   * Con que se podria resolver sin comprar.
+   *
+   * Se consulta al elegir la refaccion: antes de mandar a comprar conviene
+   * saber si el equivalente de otra marca ya esta en el almacen. Comprar lo
+   * que ya se tiene es dinero parado en un anaquel.
+   */
+  const [equivalentes, setEquivalentes] = useState<Record<string, { code: string; unit: string; hay: number; tipo: string }[]>>({});
+
+  async function buscarEquivalentes(partId: string) {
+    if (equivalentes[partId]) return;
+    const res = await fetch(`/api/refacciones/equivalencias?partId=${partId}`);
+    if (!res.ok) { setEquivalentes((e) => ({ ...e, [partId]: [] })); return; }
+    const cuerpo = await res.json().catch(() => null);
+    setEquivalentes((e) => ({
+      ...e,
+      [partId]: (cuerpo?.equivalencias ?? [])
+        .filter((x: { hay: number }) => x.hay > 0)
+        .map((x: { hay: number; tipo: string; refaccion: { code: string; unit: string } }) => ({
+          code: x.refaccion.code, unit: x.refaccion.unit, hay: x.hay, tipo: x.tipo,
+        })),
+    }));
+  }
   const [renglones, setRenglones] = useState<Renglon[]>(
     precargados?.length
       ? precargados.map((p) => ({
@@ -129,15 +153,30 @@ export function CompraDialog({
                   <div className="grid gap-1">
                     <SelectorBuscable
                       valor={r.partId}
-                      onCambio={(id) => actualizar(i, {
-                        partId: id,
-                        descripcion: "",
-                        costo: id ? String(porId.get(id)?.costo ?? 0) : r.costo,
-                      })}
+                      onCambio={(id) => {
+                        actualizar(i, {
+                          partId: id,
+                          descripcion: "",
+                          costo: id ? String(porId.get(id)?.costo ?? 0) : r.costo,
+                        });
+                        if (id) buscarEquivalentes(id);
+                      }}
                       vacio="Del catálogo…"
                       marcador="Busque por clave o descripcion"
                       opciones={refacciones.map((d) => ({ id: d.id, etiqueta: `${d.code} — ${d.name}` }))}
                     />
+                    {r.partId && equivalentes[r.partId]?.length ? (
+                      <p className="text-[0.625rem] text-emerald-700">
+                        Ya hay en almacén un equivalente:{" "}
+                        {equivalentes[r.partId].map((e, k) => (
+                          <span key={e.code}>
+                            {k > 0 ? ", " : ""}
+                            <b>{e.code}</b> ({e.hay} {e.unit}{e.tipo === "SUSTITUTO" ? ", sustituto" : ""})
+                          </span>
+                        ))}
+                        . Revise si de verdad hace falta comprar.
+                      </p>
+                    ) : null}
                     {!r.partId ? (
                       <input value={r.descripcion} onChange={(e) => actualizar(i, { descripcion: e.target.value })}
                         placeholder="…o descríbalo: todavía no está en el catálogo"

@@ -9,6 +9,7 @@
 import { PrismaClient } from "@prisma/client";
 import { ErrorDeEquivalencia, equivalentesDe, hayConQue, parCanonico, quitarEquivalencia, registrarEquivalencia } from "../lib/equivalencias";
 import { backlog } from "../lib/backlog";
+import { paresCandidatos } from "../lib/ia/equivalencias";
 
 const prisma = new PrismaClient();
 let fallas = 0;
@@ -118,6 +119,36 @@ async function main() {
     try { await quitarEquivalencia(org.id, "x"); return null; }
     catch (e) { return e instanceof ErrorDeEquivalencia ? e.codigo : null; }
   })(), 404);
+
+  console.log("\nEL FILTRO ANTES DE LA IA\n");
+  // Lo que nunca debe llegarle al modelo: piezas de medida distinta.
+  const cat = [
+    { id: "1", code: "BAL-SKF", name: "Balero 6205 SKF", category: "Baleros" },
+    { id: "2", code: "BAL-NSK", name: "Rodamiento 6205 NSK", category: "Baleros" },
+    { id: "3", code: "BAL-206", name: "Balero 6206 SKF", category: "Baleros" },
+    { id: "4", code: "BAN-A52", name: "Banda A-52", category: "Bandas" },
+    { id: "5", code: "BAN-A52B", name: "Banda A52 Gates", category: "Bandas" },
+    { id: "6", code: "ACE-15W40", name: "Aceite 15W40", category: "Lubricantes" },
+  ];
+  const cands = paresCandidatos(cat, new Set());
+  const par = (a: string, b: string) =>
+    cands.some((c) => (c.a.code === a && c.b.code === b) || (c.a.code === b && c.b.code === a));
+
+  revisar("6205 SKF con 6205 NSK: si es candidato", par("BAL-SKF", "BAL-NSK"), true);
+  revisar("6205 con 6206: NUNCA llega al modelo", par("BAL-SKF", "BAL-206"), false);
+  revisar("6205 NSK con 6206: tampoco", par("BAL-NSK", "BAL-206"), false);
+  revisar("dos bandas A52: si es candidato", par("BAN-A52", "BAN-A52B"), true);
+  revisar("un balero y un aceite: no", par("BAL-SKF", "ACE-15W40"), false);
+  revisar("nada se compara consigo mismo", cands.some((c) => c.a.id === c.b.id), false);
+
+  const yaHay = new Set(["1|2"]);
+  revisar("lo ya registrado no se vuelve a proponer",
+    paresCandidatos(cat, yaHay).some((c) => (c.a.id === "1" && c.b.id === "2")), false);
+  revisar("sin designacion numerica no hay candidatos",
+    paresCandidatos([
+      { id: "a", code: "TRA-1", name: "Trapo industrial", category: null },
+      { id: "b", code: "TRA-2", name: "Trapo de algodon", category: null },
+    ], new Set()).length, 0);
 
   console.log(fallas ? `\n${fallas} revisiones fallaron\n` : "\nTodas las revisiones cuadran\n");
   process.exitCode = fallas ? 1 : 0;

@@ -427,6 +427,43 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/inventory/equivalencias": {
+    titulo: "Equivalencias entre refacciones",
+    que: "Qué se puede usar en lugar de qué cuando la refacción original no llega a tiempo.",
+    hacer: [
+      "Registrar que dos refacciones son la misma pieza de otra marca",
+      "Registrar un sustituto con su salvedad",
+      "Pedirle a la IA que revise el catálogo y proponga equivalencias",
+    ],
+    flujo: [
+      "Hay dos casos distintos: la misma pieza de otra marca —un balero 6205 de SKF o de NSK es el mismo balero— y el sustituto, que sirve pero con condición.",
+      "La relación se guarda una sola vez y sirve en los dos sentidos: si A sirve para B, B sirve para A.",
+      "La IA propone; usted acepta. Nada se registra solo.",
+      "Una vez registradas, el trabajo pendiente que se trabó por falta de una refacción avisa si hay equivalente con existencia.",
+    ],
+    campos: [
+      { nombre: "Misma pieza", explica: "Intercambiable sin condiciones: cambia la marca, no la pieza." },
+      { nombre: "Sustituto", explica: "Sirve, pero con una salvedad que hay que leer antes de mandarlo a montar." },
+      { nombre: "Confianza", explica: "Qué tan sostenida está la propuesta con lo que dice su catálogo. Baja significa que el sistema no tuvo con qué sostenerla: verifíquela con la ficha del fabricante." },
+    ],
+    noPuedo: [
+      { sintoma: "La IA no propuso nada", porque: "Solo compara refacciones que comparten designación numérica —un 6205 con otro 6205—. Si su catálogo no trae esos números en el código o el nombre, no hay de dónde sostener una propuesta." },
+      { sintoma: "Propuso algo que sé que está mal", porque: "Descártelo. Por eso nada se registra solo. La IA lee su catálogo, no tablas de referencias cruzadas del fabricante." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Por qué la IA no puede registrar las equivalencias directamente?",
+        respuesta:
+          "Porque una equivalencia mal registrada manda a montar la pieza equivocada, y eso rompe el equipo o lastima a alguien. El sistema ya impide lo más peligroso —un 6205 y un 6206 nunca se comparan entre sí— pero el resto es criterio de quien conoce el equipo. La IA propone y explica; usted decide.",
+      },
+      {
+        pregunta: "¿De dónde saca la IA las equivalencias?",
+        respuesta:
+          "De su propio catálogo, no de su memoria. Lee los códigos y nombres de sus refacciones y busca las que comparten designación. No inventa referencias cruzadas del fabricante: si el catálogo no da elementos, dice que no equivalen.",
+      },
+    ],
+  },
+
   "/inventory/duplicados": {
     titulo: "Limpieza del catálogo",
     que: "Refacciones que parecen ser la misma pieza capturada varias veces, con distinta redacción.",

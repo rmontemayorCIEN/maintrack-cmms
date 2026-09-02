@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, EmptyState, PageHeader, Progress, Stat } from "@/components/ui";
 import Link from "next/link";
-import { ArrowLeftRight, BookOpen, ClipboardCheck, Gauge, LineChart, Merge } from "lucide-react";
+import { ArrowLeftRight, BookOpen, Repeat, ClipboardCheck, Gauge, LineChart, Merge } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { PartDialog } from "./part-dialog";
 import { TablaRefacciones, type FilaRefaccion } from "./tabla-refacciones";
@@ -143,6 +143,12 @@ export default async function InventoryPage({
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <ClipboardCheck className="h-3.5 w-3.5" /> Conteos
+          </Link>
+          <Link
+            href="/inventory/equivalencias"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Repeat className="h-3.5 w-3.5" /> Equivalencias
           </Link>
           <Link
             href="/inventory/duplicados"

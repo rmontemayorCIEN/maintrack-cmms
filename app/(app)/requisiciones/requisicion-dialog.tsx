@@ -53,6 +53,30 @@ export function RequisicionDialog({
     [ordenFija, ordenes, workOrderId],
   );
   const porId = useMemo(() => new Map(refacciones.map((r) => [r.id, r])), [refacciones]);
+
+  /**
+   * Con que mas se puede resolver un renglon que no se cubre.
+   *
+   * Se consulta solo cuando de verdad falta material —que es el caso raro— y
+   * se recuerda: dos renglones del mismo balero no preguntan dos veces.
+   */
+  const [equivalentes, setEquivalentes] = useState<Record<string, { code: string; name: string; unit: string; hay: number; tipo: string; nota: string | null }[]>>({});
+
+  async function buscarEquivalentes(partId: string) {
+    if (equivalentes[partId]) return;
+    const res = await fetch(`/api/refacciones/equivalencias?partId=${partId}`);
+    if (!res.ok) { setEquivalentes((e) => ({ ...e, [partId]: [] })); return; }
+    const cuerpo = await res.json().catch(() => null);
+    setEquivalentes((e) => ({
+      ...e,
+      [partId]: (cuerpo?.equivalencias ?? [])
+        .filter((x: { hay: number }) => x.hay > 0)
+        .map((x: { hay: number; tipo: string; nota: string | null; refaccion: { code: string; name: string; unit: string } }) => ({
+          code: x.refaccion.code, name: x.refaccion.name, unit: x.refaccion.unit,
+          hay: x.hay, tipo: x.tipo, nota: x.nota,
+        })),
+    }));
+  }
   const hay = (partId: string) => existencias[warehouseId]?.[partId] ?? 0;
 
   /**
@@ -206,7 +230,10 @@ export function RequisicionDialog({
                     <div className="grid gap-1">
                       <SelectorBuscable
                         valor={r.partId}
-                        onCambio={(id) => actualizar(i, { partId: id, descripcion: "" })}
+                        onCambio={(id) => {
+                          actualizar(i, { partId: id, descripcion: "" });
+                          if (id) buscarEquivalentes(id);
+                        }}
                         vacio="Del catálogo…"
                         marcador="Busque por clave o descripcion"
                         opciones={refacciones.map((d) => ({
@@ -216,6 +243,23 @@ export function RequisicionDialog({
                         }))}
                       />
                       {estado ? <p className={`text-[0.625rem] ${estado.clase}`}>{estado.texto}</p> : null}
+                      {r.partId && pedido > disponible && equivalentes[r.partId]?.length ? (
+                        <p className="text-[0.625rem] text-emerald-700">
+                          Se puede resolver con{" "}
+                          {equivalentes[r.partId].map((e, k) => (
+                            <span key={e.code}>
+                              {k > 0 ? ", " : ""}
+                              <b>{e.code}</b> ({e.hay} {e.unit}
+                              {e.tipo === "SUSTITUTO" ? ", sustituto" : ""})
+                            </span>
+                          ))}
+                          {equivalentes[r.partId].find((e) => e.nota) ? (
+                            <span className="mt-0.5 block text-amber-800">
+                              ⚠ {equivalentes[r.partId].find((e) => e.nota)?.nota}
+                            </span>
+                          ) : null}
+                        </p>
+                      ) : null}
                       {!r.partId ? (
                         // Se puede pedir lo que no esta en el catalogo: es como
                         // llega a compras lo que todavia nadie ha dado de alta.

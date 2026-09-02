@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -88,6 +88,13 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     nombre: "Revisar la semana",
     descripcion:
       "Lee la carga real de la semana y propone que mover y en que orden: quien esta saturado, que se puede juntar en una sola visita y que no debe recorrerse.",
+    operaciones: 2,
+    disponible: true,
+  },
+  EQUIVALENCIAS: {
+    nombre: "Equivalencias sugeridas",
+    descripcion:
+      "Lee el catalogo y propone que refacciones son la misma pieza de otra marca o pueden sustituirse. Propone; usted decide cual se registra.",
     operaciones: 2,
     disponible: true,
   },
