@@ -54,9 +54,27 @@ export function paresCandidatos(
   yaRelacionadas: Set<string>,
   tope = 40,
 ) {
-  const conDesignacion = refacciones.map((r) => ({
+  const crudas = refacciones.map((r) => ({
     ...r,
     designaciones: designaciones(`${r.code} ${r.name}`),
+  }));
+
+  // Un numero que aparece en media docena de refacciones distintas no es una
+  // designacion: es el consecutivo del codigo interno. BOM-001 y CLIM-001
+  // comparten "001" y no tienen nada que ver.
+  //
+  // Sin esta poda el modelo recibe decenas de pares de puro ruido, y aunque
+  // los descarte bien, se paga por preguntarlo.
+  const frecuencia = new Map<string, number>();
+  for (const r of crudas) {
+    for (const d of r.designaciones) frecuencia.set(d, (frecuencia.get(d) ?? 0) + 1);
+  }
+  const topeFrecuencia = Math.max(3, Math.ceil(refacciones.length * 0.15));
+  const distintiva = (d: string) => (frecuencia.get(d) ?? 0) <= topeFrecuencia;
+
+  const conDesignacion = crudas.map((r) => ({
+    ...r,
+    designaciones: new Set([...r.designaciones].filter(distintiva)),
   }));
 
   const pares: { a: typeof conDesignacion[number]; b: typeof conDesignacion[number]; puntaje: number; comparten: string[] }[] = [];

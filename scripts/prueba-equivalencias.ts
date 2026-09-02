@@ -144,6 +144,23 @@ async function main() {
   const yaHay = new Set(["1|2"]);
   revisar("lo ya registrado no se vuelve a proponer",
     paresCandidatos(cat, yaHay).some((c) => (c.a.id === "1" && c.b.id === "2")), false);
+  // El consecutivo del codigo interno no es una designacion.
+  const conConsecutivos = [
+    { id: "1", code: "BOM-001", name: "Bomba", category: null },
+    { id: "2", code: "CLIM-001", name: "Minisplit", category: null },
+    { id: "3", code: "TAB-001", name: "Tablero", category: null },
+    { id: "4", code: "MOT-001", name: "Motor", category: null },
+    { id: "5", code: "VAL-001", name: "Valvula", category: null },
+    { id: "6", code: "FIL-001", name: "Filtro", category: null },
+    { id: "7", code: "BAL-6205-A", name: "Balero 6205 SKF", category: null },
+    { id: "8", code: "BAL-6205-B", name: "Balero 6205 NSK", category: null },
+  ];
+  const podados = paresCandidatos(conConsecutivos, new Set());
+  revisar("el consecutivo 001 no genera pares",
+    podados.some((c) => c.a.code === "BOM-001" || c.b.code === "CLIM-001"), false);
+  revisar("pero la designacion real si",
+    podados.some((c) => [c.a.code, c.b.code].sort().join() === "BAL-6205-A,BAL-6205-B"), true);
+
   revisar("sin designacion numerica no hay candidatos",
     paresCandidatos([
       { id: "a", code: "TRA-1", name: "Trapo industrial", category: null },
