@@ -106,6 +106,10 @@ npx tsx scripts/prueba-asignaciones.ts >/dev/null 2>&1 \
   && echo "     Planes aplicados a varios equipos correctos." \
   || { echo "     ERROR: la prueba de asignaciones fallo."; npx tsx scripts/prueba-asignaciones.ts; exit 1; }
 
+npx tsx scripts/prueba-ciclo-completo.ts >/dev/null 2>&1 \
+  && echo "     Ciclo completo plan-orden-refaccion-cierre correcto." \
+  || { echo "     ERROR: el ciclo completo fallo."; npx tsx scripts/prueba-ciclo-completo.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

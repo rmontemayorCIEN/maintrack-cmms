@@ -384,10 +384,32 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Pausar (en cada renglon)", explica: "Deja de generar ordenes sin borrar el plan ni su historial." },
     ],
     noPuedo: [
+      { sintoma: "Apliqué el plan a un equipo y no genera órdenes", porque: "Si el plan va por horas de operación, ese equipo necesita su medidor dado de alta. Ejecute el programador: dice el equipo y la causa por su nombre." },
+      { sintoma: "Todos los equipos vencen el mismo día", porque: "Se aplicaron con la opción de fecha única. Se puede quitar cada equipo del plan y volver a aplicarlo con las fechas repartidas." },
       { sintoma: "Ejecuté el programador y no generó nada", porque: "El programador ahora le dice el motivo de cada plan. Los más comunes: todavía no entra en la ventana de anticipación, ya existe una orden abierta de ese plan, o el plan no tiene activo asignado." },
       { sintoma: "Genera órdenes demasiado seguido", porque: "Revise el intervalo del plan. Un plan llamado «mensual» con intervalo de 3 días va a generar cada tres días: manda el número, no el nombre." },
     ],
     preguntas: [
+      {
+        pregunta: "¿Qué pasa si aplico un plan a un equipo que ya lo tenía?",
+        respuesta:
+          "No se duplica. El sistema le avisa que ese equipo ya estaba y no lo agrega dos veces.",
+      },
+      {
+        pregunta: "Si mejoro el plan, ¿se mejora para todos los equipos?",
+        respuesta:
+          "Sí, en su siguiente ciclo. Las actividades y refacciones se copian a la orden en el momento en que se genera, así que las órdenes ya creadas conservan lo que tenían y las nuevas traen la mejora.",
+      },
+      {
+        pregunta: "¿Por qué mi plan por horas de operación no muestra fechas?",
+        respuesta:
+          "Porque en ese tipo de plan la fecha la manda la lectura del medidor de cada equipo, no el calendario. Si un equipo no tiene medidor dado de alta, no va a generar órdenes y el sistema se lo dice al aplicarlo.",
+      },
+      {
+        pregunta: "Si cierro la orden de un compresor, ¿se mueve la fecha de los otros?",
+        respuesta:
+          "No. Cada equipo lleva su propia fecha. Cerrar la orden de uno avanza solo ese; los demás conservan la suya. Es lo que hace que se puedan escalonar.",
+      },
       { pregunta: "¿Cómo genero las órdenes de todo el mes de una vez?", respuesta: "En el programador, cambie el horizonte a «Próximos 30 días» antes de ejecutarlo." },
       { pregunta: "¿Por qué un plan dice «fuera de ventana»?", respuesta: "Porque todavía no toca. Vence más adelante y aún no entra en sus días de anticipación. Amplíe el horizonte si quiere adelantarlo." },
     ],
@@ -746,6 +768,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Las órdenes se pintan en su fecha compromiso, con el color de su tipo y un punto del color del responsable.",
       "Las proyecciones con línea punteada son planes que todavía no generan orden: aparecen para que se vea lo que viene.",
+      "Un plan aplicado a varios equipos proyecta una línea por equipo, cada una en su propia fecha. Si ve el mismo plan varias veces en el mes, son equipos distintos.",
       "Lo vencido y sin cerrar sale arriba siempre, sin importar el mes que esté viendo. Se quedaba escondido en el mes en que venció.",
       "Un día en ámbar es un día donde a alguien no le cabe el trabajo asignado.",
       "La vista de semana pone a cada persona en su renglón: ahí se ve si alguien trae tres días saturados mientras otro está libre. En el mes eso queda escondido porque todo se mezcla por día.",

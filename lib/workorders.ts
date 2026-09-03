@@ -121,6 +121,14 @@ export async function transitionWorkOrder(params: {
       });
     }
     // Se le pasa el activo: el plan puede servir a varios y solo avanza el de este.
+    // Recalcular al completar, aunque las rutas ya lo hagan al capturar.
+    //
+    // Aqui el costo deja de ser un dato en movimiento y se vuelve historia del
+    // equipo: es lo que despues decide si se repara otra vez o se reemplaza.
+    // Si algun camino escribiera horas o refacciones sin recalcular, el numero
+    // quedaria mal para siempre y nadie se enteraria.
+    await recalcWorkOrder(wo.id);
+
     if (wo.planId) await rollForwardPlan(wo.planId, now, wo.meterValue, wo.assetId);
 
     await prisma.predictiveAlert.updateMany({

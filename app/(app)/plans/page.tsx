@@ -38,13 +38,20 @@ export default async function PlansPage() {
         asset: { select: { code: true, name: true } },
         meter: { select: { name: true, unit: true, currentValue: true } },
         _count: { select: { workOrders: true, asignaciones: true } },
+        asignaciones: {
+          where: { active: true },
+          orderBy: { nextDueDate: "asc" },
+          select: { nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true },
+        },
         tasks: incluirTareas,
         links: {
           orderBy: { createdAt: "desc" },
           select: { id: true, title: true, url: true, note: true, createdAt: true },
         },
       },
-      orderBy: [{ active: "desc" }, { nextDueDate: "asc" }],
+      // El calendario vive en las asignaciones: la fecha que se muestra es la
+      // mas proxima de sus equipos, no la del plan, que quedo obsoleta.
+      orderBy: [{ active: "desc" }, { name: "asc" }],
     }),
     prisma.asset.findMany({
       where: { organizationId: user.organizationId, active: true },
@@ -158,9 +165,15 @@ export default async function PlansPage() {
         plan.triggerType === "METER" && plan.meter
           ? `Actual ${formatNumber(plan.meter.currentValue, 0)} ${plan.meter.unit}`
           : null,
-      nextDueDate: plan.nextDueDate?.toISOString() ?? null,
-      lastCompletedAt: plan.lastCompletedAt?.toISOString() ?? null,
-      lastGeneratedAt: plan.lastGeneratedAt?.toISOString() ?? null,
+      // La mas proxima de sus equipos: es lo que le interesa a quien mira la
+      // lista —cuando vuelve a tocar este plan— sin importar en cual equipo.
+      nextDueDate: plan.asignaciones.find((a) => a.nextDueDate)?.nextDueDate?.toISOString() ?? null,
+      lastCompletedAt: plan.asignaciones
+        .map((a) => a.lastCompletedAt).filter(Boolean)
+        .sort((x, y) => y!.getTime() - x!.getTime())[0]?.toISOString() ?? null,
+      lastGeneratedAt: plan.asignaciones
+        .map((a) => a.lastGeneratedAt).filter(Boolean)
+        .sort((x, y) => y!.getTime() - x!.getTime())[0]?.toISOString() ?? null,
       actividades: plan.tasks.length,
       costoEstimado: costo.total,
       horasEstimadas: costo.horas,

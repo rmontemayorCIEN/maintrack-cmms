@@ -272,10 +272,30 @@ export async function rollForwardPlan(
 
 /** Agenda proyectada (sin persistir) para la vista de calendario. */
 export async function forecastSchedule(organizationId: string, days = 60) {
-  const plans = await prisma.maintenancePlan.findMany({
-    where: { organizationId, active: true },
-    include: { asset: { select: { name: true, code: true } }, meter: true },
+  // Se proyecta por ASIGNACION, igual que se genera. Recorrer planes daria una
+  // sola linea por plan aunque sirva a diez equipos, y con la fecha del plan,
+  // que quedo obsoleta cuando el calendario se mudo al equipo.
+  const asignaciones = await prisma.planAsset.findMany({
+    where: { organizationId, active: true, plan: { active: true } },
+    include: {
+      plan: { select: { id: true, name: true, priority: true, maintenanceType: true, triggerType: true, intervalDays: true, intervalMeter: true, createdAt: true } },
+      asset: { select: { name: true, code: true } },
+      meter: true,
+    },
   });
+
+  const plans = asignaciones.map((a) => ({
+    ...a.plan,
+    // El identificador incluye el equipo: dos compresores del mismo plan son
+    // dos eventos distintos en el calendario, no uno repetido.
+    id: `${a.plan.id}:${a.assetId}`,
+    planId: a.plan.id,
+    asset: a.asset,
+    meter: a.meter,
+    nextDueDate: a.nextDueDate,
+    nextDueMeter: a.nextDueMeter,
+    lastCompletedAt: a.lastCompletedAt,
+  }));
 
   const horizon = addDays(new Date(), days);
   const events: Array<{
@@ -296,7 +316,7 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     while (due <= horizon && guard < 40) {
       events.push({
         id: `${plan.id}-${due.toISOString()}`,
-        planId: plan.id,
+        planId: plan.planId,
         title: plan.name,
         asset: plan.asset ? `${plan.asset.code} · ${plan.asset.name}` : "—",
         date: due.toISOString(),
