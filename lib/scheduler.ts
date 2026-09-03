@@ -40,22 +40,44 @@ export async function generateScheduledWorkOrders(
     new Date(today.getFullYear(), today.getMonth() + 14, 1),
   );
 
-  const plans = await prisma.maintenancePlan.findMany({
-    where: { organizationId, active: true, triggerType: { in: ["CALENDAR", "METER"] } },
-    include: { tasks: { orderBy: { position: "asc" } }, asset: true, meter: true },
+  // Se recorren ASIGNACIONES, no planes.
+  //
+  // Un plan puede servir a diez compresores iguales y cada uno tiene su propia
+  // fecha: uno se instalo en marzo y otro en agosto. La asignacion es donde
+  // vive ese calendario, y por eso es la unidad que se programa.
+  const asignaciones = await prisma.planAsset.findMany({
+    where: {
+      organizationId,
+      active: true,
+      plan: { active: true, triggerType: { in: ["CALENDAR", "METER"] } },
+    },
+    include: {
+      plan: { include: { tasks: { orderBy: { position: "asc" } } } },
+      asset: true,
+      meter: true,
+    },
   });
 
-  for (const plan of plans) {
-    if (!plan.assetId) {
-      result.skipped += 1;
-      result.details.push({ plan: plan.name, reason: "Plan sin activo asignado" });
-      continue;
-    }
+  for (const asignacion of asignaciones) {
+    // `plan` conserva el nombre para no reescribir el resto del cuerpo, pero
+    // las fechas y el medidor salen de la asignacion, que es lo que cambia
+    // entre un equipo y otro.
+    const plan = {
+      ...asignacion.plan,
+      assetId: asignacion.assetId,
+      asset: asignacion.asset,
+      meter: asignacion.meter,
+      nextDueDate: asignacion.nextDueDate,
+      nextDueMeter: asignacion.nextDueMeter,
+      lastCompletedAt: asignacion.lastCompletedAt,
+      lastGeneratedAt: asignacion.lastGeneratedAt,
+    };
 
     const openExisting = await prisma.workOrder.findFirst({
       where: {
         organizationId,
         planId: plan.id,
+        assetId: asignacion.assetId,
         status: { in: ["DRAFT", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] },
       },
       select: { id: true, number: true },
@@ -136,8 +158,10 @@ export async function generateScheduledWorkOrders(
       },
     });
 
-    await prisma.maintenancePlan.update({
-      where: { id: plan.id },
+    // Se marca la asignacion, no el plan: el plan sirve a varios equipos y
+    // cada uno lleva su propio avance.
+    await prisma.planAsset.update({
+      where: { id: asignacion.id },
       data: { lastGeneratedAt: new Date(), nextDueDate: due },
     });
 
@@ -198,12 +222,28 @@ function resolveDueDate(plan: {
 }
 
 /** Recalcula el siguiente vencimiento tras cerrar una OT preventiva. */
-export async function rollForwardPlan(planId: string, completedAt: Date, meterValue?: number | null) {
+export async function rollForwardPlan(
+  planId: string,
+  completedAt: Date,
+  meterValue?: number | null,
+  assetId?: string | null,
+) {
   const plan = await prisma.maintenancePlan.findUnique({
     where: { id: planId },
-    include: { meter: true },
+    select: { id: true, triggerType: true, intervalDays: true, intervalMeter: true },
   });
   if (!plan) return;
+
+  // Avanza la asignacion de ESTE equipo. Un plan que sirve a diez compresores
+  // no puede avanzar entero porque se cerro el de uno: los otros nueve siguen
+  // con su propia fecha.
+  const asignacion = assetId
+    ? await prisma.planAsset.findUnique({
+        where: { planId_assetId: { planId, assetId } },
+        include: { meter: true },
+      })
+    : null;
+  if (!asignacion) return;
 
   const data: Record<string, unknown> = { lastCompletedAt: completedAt };
 
@@ -211,13 +251,14 @@ export async function rollForwardPlan(planId: string, completedAt: Date, meterVa
     data.nextDueDate = addDays(completedAt, plan.intervalDays);
   }
   if (plan.triggerType === "METER" && plan.intervalMeter) {
-    const base = meterValue ?? plan.meter?.currentValue ?? 0;
+    const base = meterValue ?? asignacion.meter?.currentValue ?? 0;
     data.nextDueMeter = base + plan.intervalMeter;
-    const rate = plan.meter?.dailyAverage && plan.meter.dailyAverage > 0 ? plan.meter.dailyAverage : 1;
+    const rate = asignacion.meter?.dailyAverage && asignacion.meter.dailyAverage > 0
+      ? asignacion.meter.dailyAverage : 1;
     data.nextDueDate = addDays(completedAt, Math.ceil(plan.intervalMeter / rate));
   }
 
-  await prisma.maintenancePlan.update({ where: { id: planId }, data });
+  await prisma.planAsset.update({ where: { id: asignacion.id }, data });
 }
 
 /** Agenda proyectada (sin persistir) para la vista de calendario. */

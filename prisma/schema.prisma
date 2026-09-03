@@ -128,6 +128,7 @@ model Organization {
   reportPoints     ReportPoint[]
   festivos     DiaFestivo[]
   equivalencias EquivalenciaRefaccion[]
+  asignacionesPlan PlanAsset[]
 }
 
 model User {
@@ -198,6 +199,7 @@ model User {
   horasDisponibles Float?
   festivos         DiaFestivo[] @relation("FestivoCreadoPor")
   equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
+  asignacionesCreadas PlanAsset[] @relation("AsignacionCreadaPor")
 }
 
 model Invitation {
@@ -368,6 +370,7 @@ model Asset {
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
+  planesAsignados PlanAsset[]
 }
 
 model DowntimeEvent {
@@ -406,6 +409,7 @@ model Meter {
 
   @@index([organizationId])
   @@index([assetId])
+  asignaciones PlanAsset[]
 }
 
 model MeterReading {
@@ -451,6 +455,11 @@ model MaintenancePlan {
   procedure      String?
   safetyNotes    String?
   active         Boolean   @default(true)
+  /// OBSOLETOS: el calendario vive en PlanAsset, uno por activo.
+  ///
+  /// Se conservan porque un plan con un solo activo los sigue mostrando en
+  /// pantallas viejas y borrarlos ahora seria una migracion destructiva sin
+  /// necesidad. El programador ya NO los lee.
   lastGeneratedAt DateTime?
   lastCompletedAt DateTime?
   nextDueDate    DateTime?
@@ -469,6 +478,7 @@ model MaintenancePlan {
 
   @@index([organizationId])
   @@index([assetId])
+  asignaciones PlanAsset[]
 }
 
 model PlanTask {
@@ -1888,4 +1898,48 @@ model EquivalenciaRefaccion {
   @@unique([partAId, partBId])
   @@index([organizationId])
   @@index([partBId])
+}
+
+/// Un plan aplicado a un activo.
+///
+/// El plan es la PLANTILLA —que se hace, cada cuanto, con que refacciones— y
+/// esta tabla es donde ese plan se vuelve compromiso con un equipo concreto.
+///
+/// Aqui vive el calendario, y esa es la razon de existir de la tabla. Diez
+/// compresores iguales comparten el mismo plan pero NO la misma fecha: uno se
+/// instalo en marzo y otro en agosto, a uno se le hizo servicio la semana
+/// pasada porque fallo. Si la proxima fecha viviera en el plan, los diez
+/// generarian orden el mismo dia para siempre —peor que tener diez planes.
+model PlanAsset {
+  id             String   @id @default(cuid())
+  organizationId String
+  planId         String
+  assetId        String
+
+  /// El medidor de ESTE equipo. Cada compresor lleva sus propias horas.
+  meterId        String?
+
+  /// El calendario de este equipo con este plan.
+  nextDueDate     DateTime?
+  nextDueMeter    Float?
+  lastGeneratedAt DateTime?
+  lastCompletedAt DateTime?
+
+  /// Se puede pausar un equipo sin desactivar el plan de los demas.
+  active         Boolean  @default(true)
+
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         MaintenancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  asset        Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  meter        Meter?          @relation(fields: [meterId], references: [id])
+  createdBy    User?           @relation("AsignacionCreadaPor", fields: [createdById], references: [id])
+
+  @@unique([planId, assetId])
+  @@index([organizationId])
+  @@index([assetId])
+  @@index([nextDueDate])
 }

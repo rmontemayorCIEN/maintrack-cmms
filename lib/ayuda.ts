@@ -357,12 +357,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Ejecutar el programador para que nazcan las órdenes",
     ],
     flujo: [
+      "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
+      "Cada equipo conserva su propia fecha. Al aplicar el plan, el sistema ofrece repartir las fechas para que no se paren todos el mismo día —los críticos primero— o ponerlas todas iguales si así conviene.",
+      "Mejorar el plan una vez lo mejora para todos los equipos en su siguiente ciclo.",
       "Un plan no hace nada por sí solo: el programador es el que convierte planes en órdenes.",
       "Cada plan dispara con anticipación: si vence el día 5 y anticipa 3 días, la orden nace el día 2.",
       "Al cerrar la orden generada, el plan recalcula su próximo vencimiento.",
     ],
     tablaConfigurable: true,
     campos: [
+      { nombre: "Equipos", explica: "A cuántos equipos se aplica este plan. Cuando es uno solo se muestra cuál; cuando son varios, lo que importa es cuántos." },
       { nombre: "Plan", explica: "El nombre con el que lo va a reconocer el tecnico. Debajo van sus referencias y manuales." },
       { nombre: "Activo", explica: "A que equipo se le aplica. Un plan sin activo NO genera ordenes: es el motivo mas comun de que el programador no haga nada." },
       { nombre: "Tipo", explica: "Preventivo, predictivo o inspeccion. Define el tipo con el que nacen sus ordenes." },

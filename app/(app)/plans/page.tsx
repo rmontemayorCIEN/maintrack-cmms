@@ -37,7 +37,7 @@ export default async function PlansPage() {
       include: {
         asset: { select: { code: true, name: true } },
         meter: { select: { name: true, unit: true, currentValue: true } },
-        _count: { select: { workOrders: true } },
+        _count: { select: { workOrders: true, asignaciones: true } },
         tasks: incluirTareas,
         links: {
           orderBy: { createdAt: "desc" },
@@ -166,6 +166,8 @@ export default async function PlansPage() {
       horasEstimadas: costo.horas,
       otGeneradas: plan._count.workOrders,
       requiereParo: plan.requiresShutdown,
+      equipos: plan._count.asignaciones,
+      intervalDays: plan.intervalDays,
       active: plan.active,
       toleranciaDias: plan.toleranceDays,
       anticipacionDias: plan.leadTimeDays,

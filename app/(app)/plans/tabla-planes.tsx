@@ -7,6 +7,7 @@ import {
 } from "@/lib/constants";
 import { dueLabel, formatCurrency, formatNumber } from "@/lib/utils";
 import { EnlacesPlan } from "./enlaces-plan";
+import { EquiposDelPlan } from "./equipos-del-plan";
 import { PlanDialog } from "./plan-dialog";
 import { PlanRowActions } from "./plan-actions";
 
@@ -20,6 +21,9 @@ export type FilaPlan = {
   nextDueDate: string | null; lastCompletedAt: string | null; lastGeneratedAt: string | null;
   actividades: number; costoEstimado: number; horasEstimadas: number; otGeneradas: number;
   requiereParo: boolean; active: boolean;
+  /** A cuantos equipos se aplica este plan. */
+  equipos: number;
+  intervalDays: number | null;
   toleranciaDias: number; anticipacionDias: number;
   moneda: string;
   enlaces: Enlace[];
@@ -55,20 +59,30 @@ export function TablaPlanes({
         <div className={`max-w-64 ${p.active ? "" : "opacity-50"}`}>
           <p className="truncate font-medium text-slate-800">{p.name}</p>
           {p.description ? <p className="truncate text-xs text-slate-500">{p.description}</p> : null}
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             <EnlacesPlan planId={p.id} nombre={p.name} editable={editable} enlaces={p.enlaces} />
+            <EquiposDelPlan
+              planId={p.id} nombre={p.name} intervaloDias={p.intervalDays ?? null}
+              editable={editable}
+              activos={assets.map((a) => ({ id: a.id, code: a.code, name: a.name }))}
+            />
           </div>
         </div>
       ),
     },
     {
-      id: "activo", etiqueta: "Activo",
-      texto: (p) => (p.activoCodigo ? `${p.activoCodigo} ${p.activo}` : "—"),
-      pinta: (p) => (
-        <span className="text-xs text-slate-600">
-          {p.activoCodigo ? `${p.activoCodigo} · ${p.activo}` : "—"}
-        </span>
-      ),
+      // Un plan puede aplicarse a varios equipos. Cuando es uno solo se muestra
+      // cual, que es el caso comun; cuando son varios lo que importa es cuantos.
+      id: "activo", etiqueta: "Equipos",
+      texto: (p) => (p.equipos > 1 ? `${p.equipos} equipos` : p.activoCodigo ? `${p.activoCodigo} ${p.activo}` : "—"),
+      pinta: (p) =>
+        p.equipos > 1 ? (
+          <Badge tone="info">{p.equipos} equipos</Badge>
+        ) : (
+          <span className="text-xs text-slate-600">
+            {p.activoCodigo ? `${p.activoCodigo} · ${p.activo}` : "—"}
+          </span>
+        ),
     },
   ];
 

@@ -120,7 +120,8 @@ export async function transitionWorkOrder(params: {
         data: { status: "OPERATIONAL" },
       });
     }
-    if (wo.planId) await rollForwardPlan(wo.planId, now, wo.meterValue);
+    // Se le pasa el activo: el plan puede servir a varios y solo avanza el de este.
+    if (wo.planId) await rollForwardPlan(wo.planId, now, wo.meterValue, wo.assetId);
 
     await prisma.predictiveAlert.updateMany({
       where: { workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
