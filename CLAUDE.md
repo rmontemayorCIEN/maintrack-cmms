@@ -146,6 +146,20 @@ va en el despliegue.
 
 ---
 
+## Las cuentas son de clientes en vivo
+
+Casa Montemayor, Acero Industrial y Minerales Metalicos son cuentas de prueba
+hoy, y se tratan como si fueran de paga. Pronto lo seran.
+
+- **Ensayo antes de escribir en produccion**, y verificacion despues. Todo
+  script que modifique datos lleva `--aplicar`; sin esa bandera solo reporta.
+- **Migraciones aditivas.** Nunca borrar una columna con datos sin hablarlo.
+- **Al cambiar un proceso, revisar todo lo que lee esos datos**, no solo lo que
+  se toco. Los defectos aparecen en la pantalla de al lado: cuando el
+  calendario paso a vivir en la asignacion, la proyeccion y la lista de planes
+  quedaron mostrando fechas obsoletas y nadie lo habria notado.
+- **Decirlo cuando algo quedo mal**, antes de que lo encuentre el.
+
 ## Como trabajar aqui
 
 - **Verifica el orden de declaracion despues de insertar codigo.** Un bloque

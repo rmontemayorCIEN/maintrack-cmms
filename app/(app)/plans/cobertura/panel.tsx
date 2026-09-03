@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarDays, Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { SelectorBuscable } from "@/components/selector-buscable";
+import { ArranqueConIa } from "./arranque";
 import { cn } from "@/lib/utils";
 
 type PlanDeEquipo = {
@@ -111,6 +112,8 @@ export function PanelCobertura({
           </Card>
         ))}
       </div>
+
+      {editable ? <ArranqueConIa sinPlan={resumen.sinPlan} /> : null}
 
       <Card padded={false}>
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-3">

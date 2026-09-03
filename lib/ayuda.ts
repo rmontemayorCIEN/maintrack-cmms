@@ -355,6 +355,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Aplicar un plan a varios equipos de una vez",
       "Quitar un equipo de un plan",
       "Filtrar por categoría, sitio o buscar por clave",
+      "Pedirle a la IA por dónde empezar cuando no hay ningún plan todavía",
     ],
     flujo: [
       "La pantalla mira desde el lado del EQUIPO, no del plan. Es a propósito: una planta puede tener compresores tipo A, B y C —todos en la categoría «Compresores»— y cada tipo lleva su propio plan. Qué equipo va a qué plan lo decide usted; el sistema no puede adivinarlo.",
@@ -376,6 +377,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
         pregunta: "¿Por qué no se asignan los planes automáticamente por categoría?",
         respuesta:
           "Porque sería un error. Si su planta tiene compresores tipo A, B y C —todos en la categoría «Compresores»— y cada tipo lleva su plan, asignar por categoría le pondría a los tipo A el plan de los tipo B. Aplicar un plan compromete trabajo con una fecha, y eso lo decide quien conoce los equipos.",
+      },
+      {
+        pregunta: "¿Qué hace «Proponer un orden»?",
+        respuesta:
+          "Cuando hay muchos equipos sin plan, el problema es la hoja en blanco. La IA lee su catálogo —cuántos equipos por familia, cuáles son críticos y cuáles generan más correctivo— y propone en qué orden armar el programa y qué lleva típicamente cada familia. No crea nada: es el orden, no el plan. El plan lo redacta después el generador, desde un equipo representativo.",
       },
       {
         pregunta: "¿Un equipo puede tener varios planes?",

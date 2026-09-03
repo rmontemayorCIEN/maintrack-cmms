@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -102,6 +102,13 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     nombre: "Revisar al equipo",
     descripcion:
       "Lee como esta repartido el trabajo y senala lo que un numero no dice: carga desbalanceada, conocimiento concentrado en una persona, estimaciones que no sirven y trabas que no son de la gente.",
+    operaciones: 2,
+    disponible: true,
+  },
+  ARRANQUE_PLANES: {
+    nombre: "Por donde empezar los preventivos",
+    descripcion:
+      "Lee el catalogo de equipos sin plan y propone en que orden armar el programa preventivo: que familia primero, por que, y como estructurar cada una.",
     operaciones: 2,
     disponible: true,
   },
