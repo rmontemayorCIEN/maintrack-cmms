@@ -619,6 +619,23 @@ export async function sembrarDemo(opciones: OpcionesDemo) {
       },
       include: { tasks: true },
     });
+
+    // La asignacion es donde vive el calendario del plan PARA ESE EQUIPO. Sin
+    // ella el plan existe pero no genera nada: el programador recorre
+    // asignaciones, no planes. Una demo sin esto se ve completa y no produce
+    // una sola orden preventiva.
+    await prisma.planAsset.create({
+      data: {
+        organizationId: org.id,
+        planId: plan.id,
+        assetId: asset.id,
+        meterId: meter?.id ?? null,
+        nextDueDate: plan.nextDueDate,
+        nextDueMeter: plan.nextDueMeter,
+        lastCompletedAt: plan.lastCompletedAt,
+      },
+    });
+
     plans.push(plan);
   }
 
