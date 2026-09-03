@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAsignacion, asignarPlan, quitarAsignacion } from "@/lib/asignaciones";
+import { candidatosDelTipo } from "@/lib/cobertura-planes";
 import { logAudit } from "@/lib/audit";
 
 /** Los equipos a los que se aplica un plan, con la fecha de cada uno. */
@@ -17,7 +18,10 @@ export async function GET(request: Request) {
         asset: { select: { id: true, code: true, name: true, criticality: true } },
       },
     });
-    return ok({ asignaciones });
+    // Y los equipos del mismo tipo que todavia no lo tienen: es lo que permite
+    // aplicarlo a todos de un golpe y darse cuenta cuando entra uno nuevo.
+    const faltan = await candidatosDelTipo(orgId, planId);
+    return ok({ asignaciones, faltan });
   });
 }
 

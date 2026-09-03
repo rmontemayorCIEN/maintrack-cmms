@@ -7,6 +7,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { asignarPlan, escalonar, quitarAsignacion, ErrorDeAsignacion } from "../lib/asignaciones";
+import { candidatosDelTipo, equiposSinSuPlan } from "../lib/cobertura-planes";
 import { generateScheduledWorkOrders, rollForwardPlan } from "../lib/scheduler";
 
 const prisma = new PrismaClient();
@@ -129,6 +130,65 @@ async function main() {
   revisar("el primero arranca hoy", iso(rep[0].fecha), "2026-09-07");
   const uno = escalonar([{ assetId: "solo", criticidad: "B", ultimoServicio: null }], new Date(2026,8,7), 30, habilSiempre);
   revisar("con un solo equipo, arranca hoy", iso(uno[0].fecha), "2026-09-07");
+
+  console.log("\nEL PLAN APRENDE SU TIPO Y AVISA DE LOS QUE FALTAN\n");
+  // El caso real: se define el plan de compresores, se aplica a los que hay, y
+  // meses despues entra uno nuevo. Nadie se acuerda, y ese equipo se queda sin
+  // preventivo sin que nada avise.
+  const tipoComp = await prisma.assetCategory.create({
+    data: { organizationId: org.id, code: "COMP", name: "Compresores" },
+  });
+  const tipoBomba = await prisma.assetCategory.create({
+    data: { organizationId: org.id, code: "BOM", name: "Bombas" },
+  });
+  const conTipo = async (code: string, categoryId: string) =>
+    prisma.asset.create({
+      data: { organizationId: org.id, siteId: site.id, code, name: code, categoryId },
+    });
+  const c1 = await conTipo("K-1", tipoComp.id);
+  const c2 = await conTipo("K-2", tipoComp.id);
+  const b1 = await conTipo("B-1", tipoBomba.id);
+
+  const planT = await prisma.maintenancePlan.create({
+    data: { organizationId: org.id, name: "Preventivo compresor", triggerType: "CALENDAR", intervalDays: 30 },
+  });
+  revisar("nace sin tipo", planT.categoryId, null);
+
+  await asignarPlan({ organizationId: org.id, planId: planT.id, equipos: [{ assetId: c1.id }] });
+  const t1 = await prisma.maintenancePlan.findUnique({ where: { id: planT.id }, select: { categoryId: true } });
+  revisar("al aplicarlo a un compresor, aprende el tipo", t1?.categoryId, tipoComp.id);
+
+  const faltan1 = await candidatosDelTipo(org.id, planT.id);
+  revisar("avisa del otro compresor que falta", faltan1.equipos.map((e) => e.code), ["K-2"]);
+  revisar("y dice de que tipo es", faltan1.categoria, "Compresores");
+  revisar("la bomba NO aparece: es de otro tipo",
+    faltan1.equipos.some((e) => e.code === "B-1"), false);
+
+  // El caso que de verdad importa: entra uno nuevo despues
+  await asignarPlan({ organizationId: org.id, planId: planT.id, equipos: [{ assetId: c2.id }] });
+  revisar("con los dos aplicados, no falta nadie",
+    (await candidatosDelTipo(org.id, planT.id)).equipos.length, 0);
+  const c3 = await conTipo("K-3", tipoComp.id);
+  const faltan2 = await candidatosDelTipo(org.id, planT.id);
+  revisar("entra un compresor nuevo y el sistema lo detecta", faltan2.equipos.map((e) => e.code), ["K-3"]);
+
+  const descubiertos = await equiposSinSuPlan(org.id);
+  revisar("aparece en el reporte de cobertura",
+    descubiertos.find((d) => d.planId === planT.id)?.equipos.map((e) => e.code), ["K-3"]);
+
+  console.log("\nUN PLAN MEZCLADO NO PERTENECE A NINGUN TIPO\n");
+  await asignarPlan({ organizationId: org.id, planId: planT.id, equipos: [{ assetId: b1.id }] });
+  const t2 = await prisma.maintenancePlan.findUnique({ where: { id: planT.id }, select: { categoryId: true } });
+  revisar("con compresores Y bombas, sin tipo", t2?.categoryId, null);
+  revisar("y por lo tanto no reclama a nadie",
+    (await candidatosDelTipo(org.id, planT.id)).equipos.length, 0);
+
+  const asigBomba = await prisma.planAsset.findFirst({ where: { planId: planT.id, assetId: b1.id }, select: { id: true } });
+  await quitarAsignacion(org.id, asigBomba!.id);
+  const t3 = await prisma.maintenancePlan.findUnique({ where: { id: planT.id }, select: { categoryId: true } });
+  revisar("al quitar la bomba, vuelve a ser de compresores", t3?.categoryId, tipoComp.id);
+  revisar("y vuelve a reclamar al que falta",
+    (await candidatosDelTipo(org.id, planT.id)).equipos.map((e) => e.code), ["K-3"]);
 
   console.log("\nPLANES POR MEDIDOR\n");
   // El caso que se me escapo: un plan por horas de operacion no lleva fechas,

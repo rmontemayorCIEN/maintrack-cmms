@@ -358,6 +358,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
+      "El plan aprende su tipo de equipo al aplicarse. Si lo aplicó a compresores, es un plan de compresores, y desde ese momento el sistema le avisa cuando entra un compresor nuevo que se quedó sin él.",
       "Cada equipo conserva su propia fecha. Al aplicar el plan, el sistema ofrece repartir las fechas para que no se paren todos el mismo día —los críticos primero— o ponerlas todas iguales si así conviene.",
       "Mejorar el plan una vez lo mejora para todos los equipos en su siguiente ciclo.",
       "Un plan no hace nada por sí solo: el programador es el que convierte planes en órdenes.",
@@ -384,12 +385,18 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Pausar (en cada renglon)", explica: "Deja de generar ordenes sin borrar el plan ni su historial." },
     ],
     noPuedo: [
+      { sintoma: "Di de alta un equipo nuevo y no tiene preventivo", porque: "Aplicar un plan compromete trabajo con una fecha, así que el sistema no lo hace solo. Pero sí lo detecta: abra «Equipos» en el plan de ese tipo y aparecerá un aviso con los que faltan y un botón para aplicarlo a todos." },
       { sintoma: "Apliqué el plan a un equipo y no genera órdenes", porque: "Si el plan va por horas de operación, ese equipo necesita su medidor dado de alta. Ejecute el programador: dice el equipo y la causa por su nombre." },
       { sintoma: "Todos los equipos vencen el mismo día", porque: "Se aplicaron con la opción de fecha única. Se puede quitar cada equipo del plan y volver a aplicarlo con las fechas repartidas." },
       { sintoma: "Ejecuté el programador y no generó nada", porque: "El programador ahora le dice el motivo de cada plan. Los más comunes: todavía no entra en la ventana de anticipación, ya existe una orden abierta de ese plan, o el plan no tiene activo asignado." },
       { sintoma: "Genera órdenes demasiado seguido", porque: "Revise el intervalo del plan. Un plan llamado «mensual» con intervalo de 3 días va a generar cada tres días: manda el número, no el nombre." },
     ],
     preguntas: [
+      {
+        pregunta: "¿Cómo defino un plan «por tipo de equipo»?",
+        respuesta:
+          "No hay que capturarlo aparte: el plan aprende su tipo de los equipos a los que se aplica. Aplíquelo a un compresor y el sistema entiende que es un plan de compresores; de ahí en adelante le avisa cuando haya compresores sin él y le ofrece aplicarlo a todos de un clic. Si el plan cubre equipos de tipos distintos, no pertenece a ninguno y no reclama nada.",
+      },
       {
         pregunta: "¿Qué pasa si aplico un plan a un equipo que ya lo tenía?",
         respuesta:

@@ -437,6 +437,15 @@ model MaintenancePlan {
   id             String    @id @default(cuid())
   organizationId String
   assetId        String?
+  /// El TIPO de equipo al que pertenece este plan.
+  ///
+  /// Un plan de «Preventivo mensual compresor» pertenece a la categoria
+  /// COMPRESORES: eso permite aplicarlo a los cuatro de un golpe en vez de
+  /// buscarlos uno por uno, y —lo que de verdad importa— darse cuenta cuando
+  /// entra un compresor nuevo que se quedo sin plan.
+  ///
+  /// Un equipo sin preventivo porque nadie se acordo de agregarlo es una falla
+  /// que no avisa hasta que el equipo se para.
   categoryId     String?
   meterId        String?
   teamId         String?

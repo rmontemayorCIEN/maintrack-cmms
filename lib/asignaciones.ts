@@ -76,7 +76,7 @@ export async function asignarPlan(params: {
   const ids = params.equipos.map((e) => e.assetId);
   const activos = await prisma.asset.findMany({
     where: { id: { in: ids }, organizationId: params.organizationId },
-    select: { id: true, code: true, criticality: true },
+    select: { id: true, code: true, criticality: true, categoryId: true },
   });
   if (activos.length !== new Set(ids).size) {
     throw new ErrorDeAsignacion("Alguno de los equipos no existe en su catalogo.", 404);
@@ -158,14 +158,45 @@ export async function asignarPlan(params: {
     creadas.push(codigo);
   }
 
+  // El plan aprende su TIPO de los equipos a los que se aplica.
+  //
+  // Se deduce en vez de preguntarse: si el plan se aplico a compresores, es un
+  // plan de compresores, y pedirle al usuario que lo capture aparte solo abre
+  // la puerta a que quede mal. Con eso el sistema puede avisar despues cuando
+  // entre un compresor nuevo que se quedo sin este plan.
+  //
+  // Si se mezclan tipos no se asume ninguno: un plan que cubre compresores y
+  // bombas no "pertenece" a ninguno de los dos.
+  const todas = await prisma.planAsset.findMany({
+    where: { planId: plan.id },
+    select: { asset: { select: { categoryId: true } } },
+  });
+  const tipos = new Set(todas.map((a) => a.asset.categoryId).filter(Boolean));
+  await prisma.maintenancePlan.update({
+    where: { id: plan.id },
+    data: { categoryId: tipos.size === 1 ? [...tipos][0]! : null },
+  });
+
   return { creadas, yaEstaban, sinMedidor };
 }
 
 export async function quitarAsignacion(organizationId: string, id: string) {
   const a = await prisma.planAsset.findFirst({
     where: { id, organizationId },
-    select: { id: true },
+    select: { id: true, planId: true },
   });
   if (!a) throw new ErrorDeAsignacion("Asignacion no encontrada", 404);
   await prisma.planAsset.delete({ where: { id: a.id } });
+
+  // El tipo se recalcula: quitar el equipo que desentonaba puede dejar al plan
+  // perteneciendo claramente a un tipo otra vez.
+  const quedan = await prisma.planAsset.findMany({
+    where: { planId: a.planId },
+    select: { asset: { select: { categoryId: true } } },
+  });
+  const tipos = new Set(quedan.map((x) => x.asset.categoryId).filter(Boolean));
+  await prisma.maintenancePlan.update({
+    where: { id: a.planId },
+    data: { categoryId: tipos.size === 1 ? [...tipos][0]! : null },
+  });
 }

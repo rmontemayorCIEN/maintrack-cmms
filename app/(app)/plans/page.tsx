@@ -21,6 +21,8 @@ import { iaConfigurada } from "@/lib/ia/cliente";
 import { EnlacesPlan } from "./enlaces-plan";
 import { TablaPlanes, type FilaPlan } from "./tabla-planes";
 import { vistaGuardada } from "@/lib/vistas";
+import { equiposSinSuPlan } from "@/lib/cobertura-planes";
+import { AlertTriangle } from "lucide-react";
 
 export const metadata = { title: "Planes preventivos" };
 export const dynamic = "force-dynamic";
@@ -30,6 +32,10 @@ export default async function PlansPage() {
   const editable = can(user.role, "plan:write");
   const puedeCrearCatalogos = can(user.role, "settings:write");
   const currency = user.organization.currency;
+
+  // Equipos que quedaron sin su plan: un preventivo que nadie aplico es una
+  // falla que no avisa hasta que el equipo se para.
+  const descubiertos = await equiposSinSuPlan(user.organizationId);
 
   const [plans, assets, meters, technicians, especialidades, refacciones, servicios] = await Promise.all([
     prisma.maintenancePlan.findMany({
@@ -228,6 +234,27 @@ export default async function PlansPage() {
           ) : null
         }
       />
+
+      {descubiertos.length > 0 ? (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+            <AlertTriangle className="h-4 w-4" />
+            {descubiertos.reduce((n, d) => n + d.equipos.length, 0)} equipo(s) sin su plan preventivo
+          </p>
+          <ul className="mt-1.5 grid gap-1">
+            {descubiertos.map((d) => (
+              <li key={d.planId} className="text-xs text-amber-900">
+                <b>{d.categoriaNombre}</b> — {d.equipos.map((e) => e.code).join(", ")}
+                <span className="text-amber-700"> · les falta «{d.planNombre}»</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-amber-800">
+            Abra «Equipos» en ese plan para aplicárselo. El sistema no lo hace solo porque aplicar un
+            plan compromete trabajo con una fecha, y eso lo decide una persona.
+          </p>
+        </div>
+      ) : null}
 
       {plans.length === 0 ? (
         <EmptyState
