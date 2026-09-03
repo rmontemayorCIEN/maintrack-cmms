@@ -347,6 +347,44 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/plans/cobertura": {
+    titulo: "Equipos y sus planes",
+    que: "Qué plan tiene cada equipo, y cuáles no tienen ninguno.",
+    hacer: [
+      "Ver de un vistazo qué equipos quedaron sin plan de mantenimiento",
+      "Aplicar un plan a varios equipos de una vez",
+      "Quitar un equipo de un plan",
+      "Filtrar por categoría, sitio o buscar por clave",
+    ],
+    flujo: [
+      "La pantalla mira desde el lado del EQUIPO, no del plan. Es a propósito: una planta puede tener compresores tipo A, B y C —todos en la categoría «Compresores»— y cada tipo lleva su propio plan. Qué equipo va a qué plan lo decide usted; el sistema no puede adivinarlo.",
+      "Lo que el sistema sí garantiza es que se vea cuál equipo no está en ningún plan. Ese dato nunca se equivoca y es el que importa: un equipo sin preventivo es una falla que no avisa hasta que el equipo se para.",
+      "Se eligen varios equipos con las casillas, se escoge el plan y se aplica. Las fechas se reparten solas para no parar todos el mismo día.",
+      "Los equipos retirados no se reclaman: ya no necesitan preventivo.",
+    ],
+    campos: [
+      { nombre: "Sin ningún plan", explica: "Ese equipo no está en ningún plan de mantenimiento. No significa que le falte «el plan A»: significa que no tiene ninguno." },
+      { nombre: "Las etiquetas verdes", explica: "Los planes que ese equipo sí tiene, con su próxima fecha. Un equipo puede estar en varios planes —uno mensual y otro anual— y es normal." },
+      { nombre: "Elegir todos los visibles", explica: "Marca los que el filtro está mostrando, no todo el catálogo. Filtre primero y elija después." },
+    ],
+    noPuedo: [
+      { sintoma: "El sistema no me sugiere qué plan ponerle a un equipo", porque: "No puede saberlo sin equivocarse. Dos compresores de la misma categoría pueden llevar planes distintos si cambia una actividad o la frecuencia. Lo que sí hace es no dejar que un equipo se quede sin ninguno." },
+      { sintoma: "Apliqué un plan por horas y avisa que falta el medidor", porque: "Ese plan vence según la lectura del equipo. Sin medidor dado de alta no va a generar órdenes. Déselo de alta desde el activo." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Por qué no se asignan los planes automáticamente por categoría?",
+        respuesta:
+          "Porque sería un error. Si su planta tiene compresores tipo A, B y C —todos en la categoría «Compresores»— y cada tipo lleva su plan, asignar por categoría le pondría a los tipo A el plan de los tipo B. Aplicar un plan compromete trabajo con una fecha, y eso lo decide quien conoce los equipos.",
+      },
+      {
+        pregunta: "¿Un equipo puede tener varios planes?",
+        respuesta:
+          "Sí, y es lo normal: un preventivo mensual, una inspección trimestral y un servicio mayor anual. Cada uno lleva su propia fecha.",
+      },
+    ],
+  },
+
   "/plans": {
     titulo: "Planes preventivos",
     camposBuscables: true,
@@ -358,7 +396,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
-      "El plan aprende su tipo de equipo al aplicarse. Si lo aplicó a compresores, es un plan de compresores, y desde ese momento el sistema le avisa cuando entra un compresor nuevo que se quedó sin él.",
+      "Qué equipos van en cada plan lo decide usted: dos compresores de la misma categoría pueden llevar planes distintos si cambia una actividad o la frecuencia. Lo que el sistema sí vigila es que ningún equipo se quede sin plan, y lo avisa en «Equipos y sus planes».",
       "Cada equipo conserva su propia fecha. Al aplicar el plan, el sistema ofrece repartir las fechas para que no se paren todos el mismo día —los críticos primero— o ponerlas todas iguales si así conviene.",
       "Mejorar el plan una vez lo mejora para todos los equipos en su siguiente ciclo.",
       "Un plan no hace nada por sí solo: el programador es el que convierte planes en órdenes.",
@@ -385,7 +423,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Pausar (en cada renglon)", explica: "Deja de generar ordenes sin borrar el plan ni su historial." },
     ],
     noPuedo: [
-      { sintoma: "Di de alta un equipo nuevo y no tiene preventivo", porque: "Aplicar un plan compromete trabajo con una fecha, así que el sistema no lo hace solo. Pero sí lo detecta: abra «Equipos» en el plan de ese tipo y aparecerá un aviso con los que faltan y un botón para aplicarlo a todos." },
+      { sintoma: "Di de alta un equipo nuevo y no tiene preventivo", porque: "Aplicar un plan compromete trabajo con una fecha, así que el sistema no lo hace solo. Pero sí lo detecta: aparece un aviso arriba de esta pantalla y en «Equipos y sus planes» se ve cuáles son y se les aplica su plan." },
       { sintoma: "Apliqué el plan a un equipo y no genera órdenes", porque: "Si el plan va por horas de operación, ese equipo necesita su medidor dado de alta. Ejecute el programador: dice el equipo y la causa por su nombre." },
       { sintoma: "Todos los equipos vencen el mismo día", porque: "Se aplicaron con la opción de fecha única. Se puede quitar cada equipo del plan y volver a aplicarlo con las fechas repartidas." },
       { sintoma: "Ejecuté el programador y no generó nada", porque: "El programador ahora le dice el motivo de cada plan. Los más comunes: todavía no entra en la ventana de anticipación, ya existe una orden abierta de ese plan, o el plan no tiene activo asignado." },
@@ -393,9 +431,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     preguntas: [
       {
-        pregunta: "¿Cómo defino un plan «por tipo de equipo»?",
+        pregunta: "¿Cómo hago un plan «por tipo de equipo»?",
         respuesta:
-          "No hay que capturarlo aparte: el plan aprende su tipo de los equipos a los que se aplica. Aplíquelo a un compresor y el sistema entiende que es un plan de compresores; de ahí en adelante le avisa cuando haya compresores sin él y le ofrece aplicarlo a todos de un clic. Si el plan cubre equipos de tipos distintos, no pertenece a ninguno y no reclama nada.",
+          "Cree el plan y aplíquelo a los equipos que le corresponden. Si tiene compresores tipo A, B y C, son tres planes distintos —con que cambie una actividad o la frecuencia ya son planes diferentes— y cada uno se aplica a sus equipos desde «Equipos y sus planes». El sistema no agrupa por categoría a propósito: le pondría a unos el plan de otros.",
       },
       {
         pregunta: "¿Qué pasa si aplico un plan a un equipo que ya lo tenía?",

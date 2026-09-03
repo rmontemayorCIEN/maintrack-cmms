@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Sparkles, Layers, ShieldAlert, X } from "lucide-react";
@@ -99,8 +100,11 @@ export function RevisarSemana({ semana }: { semana: string }) {
         </p>
       ) : null}
 
-      {revision ? (
-        <Card className="mt-3">
+      {revision && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto border-t border-slate-200 bg-white p-4 shadow-2xl">
+              <div className="mx-auto max-w-5xl">
+        <Card>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
@@ -242,7 +246,11 @@ export function RevisarSemana({ semana }: { semana: string }) {
             fecha se vuelve a verificar contra su calendario laboral antes de guardarse.
           </p>
         </Card>
-      ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

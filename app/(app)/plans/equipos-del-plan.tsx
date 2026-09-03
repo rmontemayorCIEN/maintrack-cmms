@@ -42,8 +42,6 @@ export function EquiposDelPlan({
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [lista, setLista] = useState<Asignacion[] | null>(null);
-  /** Equipos del mismo tipo que todavia no tienen este plan. */
-  const [faltan, setFaltan] = useState<{ categoria: string | null; equipos: { id: string; code: string; name: string }[] }>({ categoria: null, equipos: [] });
   const [cargando, setCargando] = useState(false);
   const [elegidos, setElegidos] = useState<string[]>([]);
   const [uno, setUno] = useState("");
@@ -57,7 +55,6 @@ export function EquiposDelPlan({
     const res = await fetch(`/api/plans/asignaciones?planId=${planId}`);
     const c = await res.json().catch(() => null);
     setLista(res.ok ? c.asignaciones : []);
-    setFaltan(res.ok ? (c.faltan ?? { categoria: null, equipos: [] }) : { categoria: null, equipos: [] });
     setCargando(false);
   }
   useEffect(() => { if (abierto) cargar(); }, [abierto]);
@@ -127,27 +124,6 @@ export function EquiposDelPlan({
                   </button>
                 </div>
 
-                {faltan.equipos.length > 0 ? (
-                  <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
-                    <p className="text-sm font-medium text-amber-900">
-                      {faltan.equipos.length === 1
-                        ? `Hay 1 equipo de tipo «${faltan.categoria}» sin este plan`
-                        : `Hay ${faltan.equipos.length} equipos de tipo «${faltan.categoria}» sin este plan`}
-                    </p>
-                    <p className="mt-0.5 text-xs text-amber-800">
-                      {faltan.equipos.map((e) => e.code).join(", ")}
-                    </p>
-                    {editable ? (
-                      <button
-                        type="button"
-                        onClick={() => { setElegidos(faltan.equipos.map((e) => e.id)); setUno(""); }}
-                        className="mt-2 rounded border border-amber-400 bg-white px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                      >
-                        Aplicar a {faltan.equipos.length === 1 ? "ese equipo" : `los ${faltan.equipos.length}`}
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
 
                 {cargando ? (
                   <p className="py-8 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-slate-400" /></p>

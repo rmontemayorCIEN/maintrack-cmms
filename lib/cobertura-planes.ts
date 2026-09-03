@@ -1,79 +1,108 @@
 /**
- * Que equipos de un tipo quedaron sin su plan.
+ * Que equipos no tienen ningun plan de mantenimiento.
  *
- * El riesgo que resuelve: se define el plan de compresores, se aplica a los
- * cuatro que hay, y seis meses despues entra el quinto. Nadie se acuerda de
- * agregarlo y ese equipo se queda sin preventivo —una falla que no avisa hasta
- * que el equipo se para.
+ * La pregunta esta puesta al reves a proposito, y esa es toda la idea.
  *
- * Deliberadamente NO se asigna solo. Aplicar un plan es comprometer trabajo con
- * una fecha, y eso lo decide una persona. Lo que si hace el sistema es no
- * dejar que pase inadvertido.
+ * Preguntar «a este plan que equipos le faltan» no se puede contestar sin
+ * equivocarse: una planta tiene compresores tipo A, B y C, todos en la
+ * categoria «Compresores», y cada tipo lleva su plan. Ningun plan puede saber
+ * cuales compresores le tocan —eso lo sabe la persona.
+ *
+ * Preguntar «este equipo esta en algun plan» si tiene respuesta exacta, y es
+ * la que importa: un equipo sin preventivo es una falla que no avisa hasta que
+ * el equipo se para. Funciona igual con tres subtipos que con treinta.
  */
 import { prisma } from "./db";
 
-export type Descubierto = {
-  planId: string;
-  planNombre: string;
-  categoriaId: string;
+export type EquipoSinPlan = {
+  id: string;
+  code: string;
+  name: string;
+  criticality: string;
+  categoriaId: string | null;
   categoriaNombre: string;
-  /** Equipos de ese tipo que NO tienen el plan aplicado. */
-  equipos: { id: string; code: string; name: string; criticality: string }[];
+  sitio: string | null;
+  /** Cuando se dio de alta: los recien llegados son los que suelen olvidarse. */
+  creadoEl: Date;
 };
 
-export async function equiposSinSuPlan(organizationId: string): Promise<Descubierto[]> {
-  const planes = await prisma.maintenancePlan.findMany({
-    where: { organizationId, active: true, categoryId: { not: null } },
-    select: {
-      id: true, name: true, categoryId: true,
-      category: { select: { id: true, name: true } },
-      asignaciones: { select: { assetId: true } },
-    },
-  });
-  if (!planes.length) return [];
+export type CoberturaPreventiva = {
+  totalActivos: number;
+  conPlan: number;
+  sinPlan: EquipoSinPlan[];
+  /** Agrupado por categoria: ahi se ve el patron —«ninguna banda tiene plan». */
+  porCategoria: { categoria: string; total: number; sinPlan: number }[];
+};
 
-  const categorias = [...new Set(planes.map((p) => p.categoryId!))];
+export async function coberturaPreventiva(
+  organizationId: string,
+  opciones?: { soloCriticos?: boolean },
+): Promise<CoberturaPreventiva> {
   const activos = await prisma.asset.findMany({
-    where: { organizationId, active: true, categoryId: { in: categorias } },
-    select: { id: true, code: true, name: true, criticality: true, categoryId: true },
-    orderBy: { code: "asc" },
-  });
-
-  return planes
-    .map((p) => {
-      const yaTiene = new Set(p.asignaciones.map((a) => a.assetId));
-      const equipos = activos.filter((a) => a.categoryId === p.categoryId && !yaTiene.has(a.id));
-      return {
-        planId: p.id,
-        planNombre: p.name,
-        categoriaId: p.categoryId!,
-        categoriaNombre: p.category?.name ?? "—",
-        equipos: equipos.map(({ categoryId: _, ...resto }) => resto),
-      };
-    })
-    .filter((d) => d.equipos.length > 0);
-}
-
-/** Los equipos de un tipo que todavia no tienen este plan. */
-export async function candidatosDelTipo(organizationId: string, planId: string) {
-  const plan = await prisma.maintenancePlan.findFirst({
-    where: { id: planId, organizationId },
+    where: {
+      organizationId,
+      active: true,
+      // Un equipo retirado no necesita preventivo.
+      status: { not: "RETIRED" },
+      ...(opciones?.soloCriticos ? { criticality: "A" } : {}),
+    },
     select: {
+      id: true, code: true, name: true, criticality: true, createdAt: true,
       categoryId: true,
       category: { select: { name: true } },
-      asignaciones: { select: { assetId: true } },
+      site: { select: { name: true } },
+      // Basta saber si tiene AL MENOS UNA asignacion activa.
+      _count: { select: { planesAsignados: { where: { active: true } } } },
+    },
+    orderBy: [{ criticality: "asc" }, { code: "asc" }],
+  });
+
+  const sinPlan = activos
+    .filter((a) => a._count.planesAsignados === 0)
+    .map((a) => ({
+      id: a.id, code: a.code, name: a.name, criticality: a.criticality,
+      categoriaId: a.categoryId,
+      categoriaNombre: a.category?.name ?? "Sin categoría",
+      sitio: a.site?.name ?? null,
+      creadoEl: a.createdAt,
+    }));
+
+  const porCategoria = new Map<string, { total: number; sinPlan: number }>();
+  for (const a of activos) {
+    const clave = a.category?.name ?? "Sin categoría";
+    const actual = porCategoria.get(clave) ?? { total: 0, sinPlan: 0 };
+    actual.total += 1;
+    if (a._count.planesAsignados === 0) actual.sinPlan += 1;
+    porCategoria.set(clave, actual);
+  }
+
+  return {
+    totalActivos: activos.length,
+    conPlan: activos.length - sinPlan.length,
+    sinPlan,
+    porCategoria: [...porCategoria.entries()]
+      .map(([categoria, v]) => ({ categoria, ...v }))
+      .filter((c) => c.sinPlan > 0)
+      .sort((a, b) => b.sinPlan - a.sinPlan),
+  };
+}
+
+/**
+ * Los planes de un equipo. Para la pantalla de asociacion, donde se mira desde
+ * el lado del equipo y no del plan.
+ */
+export async function planesDelEquipo(organizationId: string, assetId: string) {
+  return prisma.planAsset.findMany({
+    where: { organizationId, assetId },
+    orderBy: { nextDueDate: "asc" },
+    select: {
+      id: true, nextDueDate: true, active: true,
+      plan: {
+        select: {
+          id: true, name: true, maintenanceType: true, triggerType: true,
+          intervalDays: true, intervalMeter: true, active: true,
+        },
+      },
     },
   });
-  if (!plan?.categoryId) return { categoria: null, equipos: [] };
-
-  const yaTiene = new Set(plan.asignaciones.map((a) => a.assetId));
-  const activos = await prisma.asset.findMany({
-    where: { organizationId, active: true, categoryId: plan.categoryId },
-    select: { id: true, code: true, name: true, criticality: true },
-    orderBy: { code: "asc" },
-  });
-  return {
-    categoria: plan.category?.name ?? null,
-    equipos: activos.filter((a) => !yaTiene.has(a.id)),
-  };
 }

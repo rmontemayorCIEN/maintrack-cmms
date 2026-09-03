@@ -114,16 +114,20 @@ export default async function CalendarPage({
 
   return (
     <>
-      <PageHeader
-        title="Calendario de mantenimiento"
-        description="Lo programado, lo proyectado y si de verdad cabe en los dias que quedan."
-        actions={<RunSchedulerButton />}
-      />
-
-      {/* Fuera del encabezado: el resultado es una tarjeta completa y dentro
-          del area de acciones romperia la maquetacion. */}
-      <div className="mb-4">
-        <RevisarSemana semana={first.toISOString().slice(0, 10)} />
+      {/* Encabezado compacto: el calendario tiene que entrar en la pantalla sin
+          desplazarse. Titulo, descripcion y los dos botones en una sola franja;
+          el resultado de la IA aparece debajo solo cuando hay algo que mostrar. */}
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Calendario de mantenimiento</h1>
+          <p className="text-xs text-slate-500">
+            Lo programado, lo proyectado y si de verdad cabe en los días que quedan.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <RevisarSemana semana={first.toISOString().slice(0, 10)} />
+          <RunSchedulerButton />
+        </div>
       </div>
       <Calendario
         vista={vista}

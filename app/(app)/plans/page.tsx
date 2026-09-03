@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -21,8 +22,8 @@ import { iaConfigurada } from "@/lib/ia/cliente";
 import { EnlacesPlan } from "./enlaces-plan";
 import { TablaPlanes, type FilaPlan } from "./tabla-planes";
 import { vistaGuardada } from "@/lib/vistas";
-import { equiposSinSuPlan } from "@/lib/cobertura-planes";
-import { AlertTriangle } from "lucide-react";
+import { coberturaPreventiva } from "@/lib/cobertura-planes";
+import { AlertTriangle, Network } from "lucide-react";
 
 export const metadata = { title: "Planes preventivos" };
 export const dynamic = "force-dynamic";
@@ -33,9 +34,10 @@ export default async function PlansPage() {
   const puedeCrearCatalogos = can(user.role, "settings:write");
   const currency = user.organization.currency;
 
-  // Equipos que quedaron sin su plan: un preventivo que nadie aplico es una
-  // falla que no avisa hasta que el equipo se para.
-  const descubiertos = await equiposSinSuPlan(user.organizationId);
+  // Equipos sin NINGUN plan. La pregunta va del lado del equipo, no del plan:
+  // «a este plan que equipos le faltan» no se puede contestar sin equivocarse
+  // cuando hay compresores tipo A, B y C en la misma categoria.
+  const cobertura = await coberturaPreventiva(user.organizationId);
 
   const [plans, assets, meters, technicians, especialidades, refacciones, servicios] = await Promise.all([
     prisma.maintenancePlan.findMany({
@@ -235,26 +237,36 @@ export default async function PlansPage() {
         }
       />
 
-      {descubiertos.length > 0 ? (
+      {cobertura.sinPlan.length > 0 ? (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
-          <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
             <AlertTriangle className="h-4 w-4" />
-            {descubiertos.reduce((n, d) => n + d.equipos.length, 0)} equipo(s) sin su plan preventivo
+            {cobertura.sinPlan.length} de {cobertura.totalActivos} equipos no tienen ningún plan de mantenimiento
           </p>
-          <ul className="mt-1.5 grid gap-1">
-            {descubiertos.map((d) => (
-              <li key={d.planId} className="text-xs text-amber-900">
-                <b>{d.categoriaNombre}</b> — {d.equipos.map((e) => e.code).join(", ")}
-                <span className="text-amber-700"> · les falta «{d.planNombre}»</span>
+          <ul className="mt-1.5 grid gap-0.5">
+            {cobertura.porCategoria.slice(0, 6).map((c) => (
+              <li key={c.categoria} className="text-xs text-amber-900">
+                <b>{c.categoria}</b>: {c.sinPlan} de {c.total} sin plan
               </li>
             ))}
           </ul>
-          <p className="mt-1.5 text-xs text-amber-800">
-            Abra «Equipos» en ese plan para aplicárselo. El sistema no lo hace solo porque aplicar un
-            plan compromete trabajo con una fecha, y eso lo decide una persona.
-          </p>
+          <Link
+            href="/plans/cobertura"
+            className="mt-2 inline-block text-xs font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-700"
+          >
+            Ver cuáles y asignarles su plan
+          </Link>
         </div>
       ) : null}
+
+      <div className="mb-3">
+        <Link
+          href="/plans/cobertura"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Network className="h-3.5 w-3.5" /> Equipos y sus planes
+        </Link>
+      </div>
 
       {plans.length === 0 ? (
         <EmptyState
