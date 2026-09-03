@@ -760,7 +760,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Ver el mes, la semana con el trabajo de cada persona, o un solo día a detalle",
       "Abrir cualquier día para ver todo lo que cae ahí",
-      "Filtrar por técnico, tipo de mantenimiento o solo lo abierto",
+      "Filtrar por técnico, tipo de mantenimiento, familia de equipo o equipos concretos",
       "Ver la carga de cada persona y qué días no alcanzan",
       "Generar las órdenes de los planes que ya vencen",
       "Pedirle a la IA que revise la semana y proponga qué mover",
@@ -779,6 +779,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     campos: [
       { nombre: "Las horas de la esquina del día", explica: "La suma de horas estimadas de lo asignado ese día. En ámbar cuando alguien pasa de su jornada." },
       { nombre: "Punto de color", explica: "El responsable de esa orden. Sirve para ver de un vistazo cómo está repartido el trabajo." },
+      { nombre: "Filtro de equipos", explica: "Se pueden elegir varios equipos a la vez: quedan como fichas arriba del calendario y solo se ve lo de ellos. Sirve para seguir un compresor en particular o los tres que van a paro el mismo día." },
+      { nombre: "Familia de equipo", explica: "Muestra solo una familia —todos los compresores, todo bombeo— sin elegirlos uno por uno. Si ya escogió equipos concretos, la familia se desactiva: la selección manda." },
       { nombre: "Días en gris", explica: "No laborables: fin de semana o festivo, según lo que tenga configurado su empresa. El programador ya no proyecta ahí." },
       { nombre: "Barra de cada persona", explica: "Al abrir un día: horas asignadas contra sus horas disponibles. En ámbar significa que ese día no le cabe." },
     ],
@@ -797,6 +799,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
         pregunta: "¿Por qué un día puede verse sobrecargado si el equipo tiene gente libre?",
         respuesta:
           "Porque la carga se mide por persona, no por equipo. Si a un técnico le tocan diez horas y a otro ninguna, el día está sobrecargado aunque en total sobre capacidad. El problema no es que falte gente, es cómo está repartido.",
+      },
+      {
+        pregunta: "¿Cómo veo solo el calendario de un equipo?",
+        respuesta:
+          "Con el buscador de equipos de la barra de filtros. Escriba la clave o el nombre y elíjalo; puede agregar varios y quedan como fichas arriba. El filtro aplica también a las proyecciones punteadas, así que ve el panorama completo de ese equipo y nada más.",
       },
       {
         pregunta: "¿La IA mueve las órdenes por mí?",

@@ -279,7 +279,7 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     where: { organizationId, active: true, plan: { active: true } },
     include: {
       plan: { select: { id: true, name: true, priority: true, maintenanceType: true, triggerType: true, intervalDays: true, intervalMeter: true, createdAt: true } },
-      asset: { select: { name: true, code: true } },
+      asset: { select: { id: true, name: true, code: true, categoryId: true } },
       meter: true,
     },
   });
@@ -303,6 +303,9 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     planId: string;
     title: string;
     asset: string;
+    /** El equipo, para poder filtrar la proyeccion igual que las ordenes. */
+    assetId: string | null;
+    categoryId: string | null;
     date: string;
     priority: string;
     type: string;
@@ -319,6 +322,8 @@ export async function forecastSchedule(organizationId: string, days = 60) {
         planId: plan.planId,
         title: plan.name,
         asset: plan.asset ? `${plan.asset.code} · ${plan.asset.name}` : "—",
+        assetId: plan.asset?.id ?? null,
+        categoryId: plan.asset?.categoryId ?? null,
         date: due.toISOString(),
         priority: plan.priority,
         type: plan.maintenanceType,

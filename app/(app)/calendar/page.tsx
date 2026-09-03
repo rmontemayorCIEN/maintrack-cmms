@@ -49,14 +49,14 @@ export default async function CalendarPage({
   const month = first.getMonth();
 
   const incluir = {
-    asset: { select: { id: true, code: true, name: true } },
+    asset: { select: { id: true, code: true, name: true, categoryId: true } },
     assignedTo: { select: { id: true, name: true, color: true, horasDisponibles: true } },
   };
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  const [ordenes, vencidas, proyectado, j, tecnicos] = await Promise.all([
+  const [ordenes, vencidas, proyectado, j, tecnicos, activos, familias] = await Promise.all([
     prisma.workOrder.findMany({
       where: { organizationId: user.organizationId, dueDate: { gte: first, lte: last } },
       include: incluir,
@@ -82,6 +82,18 @@ export default async function CalendarPage({
       where: { organizationId: user.organizationId, active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, color: true },
+    }),
+    // Solo los equipos que aparecen en el calendario: filtrar por uno que no
+    // tiene nada programado no le sirve a nadie y alarga la lista.
+    prisma.asset.findMany({
+      where: { organizationId: user.organizationId, active: true },
+      orderBy: { code: "asc" },
+      select: { id: true, code: true, name: true, categoryId: true },
+    }),
+    prisma.assetCategory.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
 
@@ -136,8 +148,11 @@ export default async function CalendarPage({
         }))}
         proyecciones={proyecciones.map((p) => ({
           id: p.id, title: p.title, asset: p.asset, date: new Date(p.date).toISOString(),
+          assetId: p.assetId, categoryId: p.categoryId,
         }))}
         tecnicos={tecnicos}
+        activos={activos}
+        familias={familias}
         horasJornada={j.horasJornada}
       />
     </>
