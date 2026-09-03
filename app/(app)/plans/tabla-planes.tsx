@@ -63,6 +63,7 @@ export function TablaPlanes({
             <EnlacesPlan planId={p.id} nombre={p.name} editable={editable} enlaces={p.enlaces} />
             <EquiposDelPlan
               planId={p.id} nombre={p.name} intervaloDias={p.intervalDays ?? null}
+              porMedidor={p.triggerType === "METER"}
               editable={editable}
               activos={assets.map((a) => ({ id: a.id, code: a.code, name: a.name }))}
             />

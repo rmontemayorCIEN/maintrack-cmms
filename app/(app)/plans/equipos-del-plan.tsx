@@ -27,12 +27,15 @@ export function EquiposDelPlan({
   planId,
   nombre,
   intervaloDias,
+  porMedidor,
   editable,
   activos,
 }: {
   planId: string;
   nombre: string;
   intervaloDias: number | null;
+  /** Un plan por medidor no lleva fechas: las calcula la lectura del equipo. */
+  porMedidor: boolean;
   editable: boolean;
   activos: { id: string; code: string; name: string }[];
 }) {
@@ -66,6 +69,13 @@ export function EquiposDelPlan({
     setGuardando(false);
     const c = await res.json().catch(() => null);
     if (!res.ok) { setError(c?.error ?? "No se pudo aplicar"); return; }
+    if (c?.sinMedidor?.length) {
+      setError(
+        `Se aplicó, pero ${c.sinMedidor.join(", ")} no tiene medidor. ` +
+        "Este plan va por horas de operación, así que ese equipo no va a generar órdenes " +
+        "hasta que se le dé de alta su medidor.",
+      );
+    }
     setElegidos([]); setUno(""); setDesde("");
     cargar(); router.refresh();
   }
@@ -125,7 +135,7 @@ export function EquiposDelPlan({
                         {a.asset.criticality === "A" ? <Badge tone="danger">Crítico</Badge> : null}
                         <span className="inline-flex items-center gap-1 text-slate-500">
                           <CalendarDays className="h-3 w-3" />
-                          {fmt(a.nextDueDate)}
+                          {porMedidor ? "según su medidor" : fmt(a.nextDueDate)}
                         </span>
                         {editable ? (
                           <button type="button" onClick={() => quitar(a.id)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Quitar">
@@ -171,6 +181,13 @@ export function EquiposDelPlan({
                       />
                     </div>
 
+                    {porMedidor ? (
+                      <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        Este plan va por <b>horas de operación</b>, no por calendario. Cada equipo vence
+                        según su propio medidor, así que no hay fechas que repartir. Si un equipo no
+                        tiene medidor dado de alta, no va a generar órdenes.
+                      </p>
+                    ) : (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <label className={cn(
                         "flex cursor-pointer items-start gap-2 rounded-lg border p-2.5 text-xs",
@@ -200,8 +217,9 @@ export function EquiposDelPlan({
                         </span>
                       </label>
                     </div>
+                    )}
 
-                    {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+                    {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
 
                     <button type="button" onClick={agregar} disabled={!elegidos.length || guardando} className="btn-primary mt-3">
                       {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

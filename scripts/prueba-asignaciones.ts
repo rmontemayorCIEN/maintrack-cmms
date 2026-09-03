@@ -130,6 +130,43 @@ async function main() {
   const uno = escalonar([{ assetId: "solo", criticidad: "B", ultimoServicio: null }], new Date(2026,8,7), 30, habilSiempre);
   revisar("con un solo equipo, arranca hoy", iso(uno[0].fecha), "2026-09-07");
 
+  console.log("\nPLANES POR MEDIDOR\n");
+  // El caso que se me escapo: un plan por horas de operacion no lleva fechas,
+  // y un equipo sin medidor se ve asignado pero no genera nunca.
+  const conMedidor = await compresor("M-1");
+  const sinMedidor = await compresor("M-2");
+  await prisma.meter.create({
+    data: { organizationId: org.id, assetId: conMedidor.id, name: "Horas", unit: "h", currentValue: 1900, dailyAverage: 10 },
+  });
+  const planMedidor = await prisma.maintenancePlan.create({
+    data: {
+      organizationId: org.id, name: "Servicio 2000 h", triggerType: "METER", intervalMeter: 2000,
+      tasks: { create: [{ position: 0, title: "Cambio de aceite" }] },
+    },
+  });
+  const rm = await asignarPlan({
+    organizationId: org.id, planId: planMedidor.id,
+    equipos: [{ assetId: conMedidor.id }, { assetId: sinMedidor.id }],
+    escalonarAuto: true,
+  });
+  revisar("avisa cual equipo no tiene medidor", rm.sinMedidor, ["M-2"]);
+
+  const asigsM = await prisma.planAsset.findMany({
+    where: { planId: planMedidor.id }, include: { asset: true },
+  });
+  revisar("no inventa fecha en plan por medidor",
+    asigsM.every((a) => a.nextDueDate === null), true);
+  revisar("liga solo el medidor que existe",
+    asigsM.filter((a) => a.meterId !== null).map((a) => a.asset.code), ["M-1"]);
+
+  const genM = await generateScheduledWorkOrders(org.id, {});
+  const motivoM2 = genM.details.find((d) => (d.reason ?? "").includes("M-2"))?.reason ?? "";
+  revisar("el motivo nombra al equipo y la causa",
+    /M-2.*medidor/i.test(motivoM2), true);
+  console.log(`       «${motivoM2}»`);
+  revisar("el que si tiene medidor no se salta por esa causa",
+    genM.details.some((d) => (d.reason ?? "").includes("M-1") && /medidor/i.test(d.reason ?? "")), false);
+
   console.log("\nQUITAR\n");
   await quitarAsignacion(org.id, asigs[4].id);
   revisar("queda fuera del plan", await prisma.planAsset.count({ where: { planId: plan.id } }), 4);

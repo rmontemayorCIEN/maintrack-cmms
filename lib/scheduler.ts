@@ -91,7 +91,16 @@ export async function generateScheduledWorkOrders(
     const due = siguienteHabil(resolveDueDate(plan), j);
     if (!due) {
       result.skipped += 1;
-      result.details.push({ plan: plan.name, reason: "Sin regla de vencimiento valida" });
+      // El motivo nombra al equipo y la causa real. Un plan por medidor
+      // aplicado a un equipo sin medidor se ve asignado y no genera nunca;
+      // decir "sin regla valida" manda a buscar el problema donde no esta.
+      const causa =
+        plan.triggerType === "METER" && !asignacion.meterId
+          ? `${asignacion.asset.code}: el plan es por medidor y este equipo no tiene medidor asignado`
+          : plan.triggerType === "METER" && !plan.intervalMeter
+            ? `${asignacion.asset.code}: el plan es por medidor pero no tiene intervalo`
+            : `${asignacion.asset.code}: sin regla de vencimiento valida`;
+      result.details.push({ plan: plan.name, reason: causa });
       continue;
     }
 

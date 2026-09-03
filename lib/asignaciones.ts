@@ -111,8 +111,27 @@ export async function asignarPlan(params: {
     );
   }
 
+  // En un plan por medidor la fecha la manda la lectura, no el reparto. Poner
+  // una fecha inventada haria que la pantalla muestre un compromiso que el
+  // programador no va a cumplir.
+  const porMedidor = plan.triggerType === "METER";
+
+  // Los medidores de cada equipo, para poder ligarlos sin que el usuario
+  // tenga que saber ids.
+  const medidores = porMedidor
+    ? await prisma.meter.findMany({
+        where: { organizationId: params.organizationId, assetId: { in: ids } },
+        select: { id: true, assetId: true, name: true },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const medidorDe = new Map<string, string>();
+  for (const m of medidores) if (!medidorDe.has(m.assetId)) medidorDe.set(m.assetId, m.id);
+
   const creadas: string[] = [];
   const yaEstaban: string[] = [];
+  /** Equipos que quedaron sin medidor en un plan que lo necesita. */
+  const sinMedidor: string[] = [];
   for (const e of params.equipos) {
     const existente = await prisma.planAsset.findUnique({
       where: { planId_assetId: { planId: plan.id, assetId: e.assetId } },
@@ -121,20 +140,25 @@ export async function asignarPlan(params: {
     const codigo = activos.find((a) => a.id === e.assetId)?.code ?? e.assetId;
     if (existente) { yaEstaban.push(codigo); continue; }
 
+    const meterId = e.meterId ?? medidorDe.get(e.assetId) ?? null;
+    if (porMedidor && !meterId) sinMedidor.push(codigo);
+
     await prisma.planAsset.create({
       data: {
         organizationId: params.organizationId,
         planId: plan.id,
         assetId: e.assetId,
-        meterId: e.meterId ?? null,
-        nextDueDate: e.desde ?? calendario.get(e.assetId) ?? hoy,
+        meterId,
+        // Sin fecha en los planes por medidor: la calcula el programador a
+        // partir de la lectura del equipo.
+        nextDueDate: porMedidor ? null : (e.desde ?? calendario.get(e.assetId) ?? hoy),
         createdById: params.userId ?? null,
       },
     });
     creadas.push(codigo);
   }
 
-  return { creadas, yaEstaban };
+  return { creadas, yaEstaban, sinMedidor };
 }
 
 export async function quitarAsignacion(organizationId: string, id: string) {
