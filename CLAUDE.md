@@ -119,6 +119,16 @@ npm run actualizar -- --sin-migrar
 incluso si truena. La llave de IA la trae de Secret Manager sin pasar por la
 terminal.
 
+### Publicar: siempre `npm run deploy`
+
+Nunca un `gcloud run deploy` a mano. El servicio de produccion, el que ven los
+clientes, se llama **`maintrack-cmms`** (no `cmms`).
+
+`scripts/deploy.sh` apunta al correcto y ademas conecta Cloud SQL, monta los
+secretos y abre el servicio al publico. Un `gcloud run deploy` escrito a mano
+se lleva todo eso: publica sin base de datos y sin llaves. Ya paso una vez —se
+creo un servicio `cmms` de mas, que hubo que borrar.
+
 ### Lo que revisa el despliegue antes de publicar
 
 1. Limpia duplicados de iCloud en `.next`

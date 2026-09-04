@@ -178,24 +178,36 @@ export function Calendario({
       ) : null}
 
       <Card padded={false}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold capitalize text-slate-900">{etiquetaMes}</h2>
+        {/* Dos renglones y no cinco: los filtros juntos arriba, la navegacion
+            abajo. Van con `compacto` porque `field` trae width 100% y apilaba
+            cada select en su propio renglon, empujando el calendario fuera de
+            pantalla. */}
+        <div className="border-b border-slate-200 px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="mr-1 text-sm font-semibold capitalize text-slate-900">{etiquetaMes}</h2>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <select className="field h-8 py-0 text-xs" value={tecnico} onChange={(e) => setTecnico(e.target.value)}>
+            <select
+              className="field compacto h-8 min-w-32"
+              value={tecnico}
+              onChange={(e) => setTecnico(e.target.value)}
+            >
               <option value="">Todo el equipo</option>
               <option value="__sin">Sin responsable</option>
               {tecnicos.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <select className="field h-8 py-0 text-xs" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+
+            <select
+              className="field compacto h-8 min-w-32"
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+            >
               <option value="">Todos los tipos</option>
               {Object.entries(MAINTENANCE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
 
-            {/* Por familia de equipo: «todos los compresores» sin elegirlos uno por uno. */}
             {familias.length > 0 ? (
               <select
-                className="field h-8 py-0 text-xs"
+                className="field compacto h-8 min-w-32"
                 value={familia}
                 onChange={(e) => { setFamilia(e.target.value); setEquipos([]); }}
                 disabled={equipos.length > 0}
@@ -206,8 +218,7 @@ export function Calendario({
               </select>
             ) : null}
 
-            {/* Uno o varios equipos concretos. */}
-            <div className="w-52">
+            <div className="w-44">
               <SelectorBuscable
                 className="[&_button]:h-8 [&_button]:py-0 [&_button]:text-xs"
                 valor={unEquipo}
@@ -222,67 +233,51 @@ export function Calendario({
                   .map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
               />
             </div>
-            <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
+
+            <label className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
               <input type="checkbox" className="h-3.5 w-3.5" checked={soloAbiertas} onChange={(e) => setSoloAbiertas(e.target.checked)} />
               Solo abiertas
             </label>
+
             {hayFiltro ? (
               <button
                 type="button"
                 onClick={() => { setTecnico(""); setTipo(""); setSoloAbiertas(false); setEquipos([]); setFamilia(""); setUnEquipo(""); }}
-                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50"
+                className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50"
               >
                 Limpiar
               </button>
             ) : null}
-            <span className="mx-1 h-4 w-px bg-slate-200" />
-            <div className="flex overflow-hidden rounded-lg border border-slate-200">
-              {([
-                ["mes", "Mes", "/calendar"],
-                ["semana", "Semana", "/calendar?vista=semana"],
-                ["dia", "Dia", "/calendar?vista=dia"],
-              ] as const).map(([clave, texto, destino], i) => (
-                <button
-                  key={clave}
-                  onClick={() => irA(destino)}
-                  className={cn(
-                    "px-2.5 py-1 text-xs",
-                    i > 0 && "border-l border-slate-200",
-                    vista === clave ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50",
-                  )}
-                >
-                  {texto}
-                </button>
-              ))}
+
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              <div className="flex overflow-hidden rounded-lg border border-slate-200">
+                {([
+                  ["mes", "Mes", "/calendar"],
+                  ["semana", "Semana", "/calendar?vista=semana"],
+                  ["dia", "Dia", "/calendar?vista=dia"],
+                ] as const).map(([clave, texto, destino], i) => (
+                  <button
+                    key={clave}
+                    onClick={() => irA(destino)}
+                    className={cn(
+                      "px-2.5 py-1 text-xs",
+                      i > 0 && "border-l border-slate-200",
+                      vista === clave ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50",
+                    )}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+              <div className="flex overflow-hidden rounded-lg border border-slate-200">
+                <button onClick={() => irA(rutaAnterior)} className="px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">‹</button>
+                <button onClick={() => irA(rutaHoy)} className="border-x border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Hoy</button>
+                <button onClick={() => irA(rutaSiguiente)} className="px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">›</button>
+              </div>
             </div>
-            <button onClick={() => irA(rutaAnterior)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Anterior</button>
-            <button onClick={() => irA(rutaHoy)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Hoy</button>
-            <button onClick={() => irA(rutaSiguiente)} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50">Siguiente</button>
           </div>
         </div>
 
-        {vista === "dia" ? (
-          <div className="p-4">
-            {(() => {
-              const c = cargaDe(dia);
-              return c ? (
-                <DetalleDia dia={c} ordenes={delDia(dia)} proyecciones={proyeccionesDe(dia)} sinMarco />
-              ) : (
-                <p className="py-10 text-center text-xs text-slate-400">Sin informacion para ese dia.</p>
-              );
-            })()}
-          </div>
-        ) : vista === "semana" ? (
-          <RejillaSemana
-            dias={dias}
-            carga={carga}
-            ordenes={visibles}
-            proyecciones={proyeccionesVisibles}
-            hoy={hoy}
-            onAbrirDia={setDiaAbierto}
-          />
-        ) : (
-        <>
         {equipos.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/40 px-4 py-2">
             <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-400">
@@ -314,6 +309,30 @@ export function Calendario({
           </div>
         ) : null}
 
+        {/* Las fichas de equipos quedan ARRIBA del condicional para que se vean
+            en las tres vistas, no solo en el mes. */}
+        {vista === "dia" ? (
+          <div className="p-4">
+            {(() => {
+              const c = cargaDe(dia);
+              return c ? (
+                <DetalleDia dia={c} ordenes={delDia(dia)} proyecciones={proyeccionesDe(dia)} sinMarco />
+              ) : (
+                <p className="py-10 text-center text-xs text-slate-400">Sin informacion para ese dia.</p>
+              );
+            })()}
+          </div>
+        ) : vista === "semana" ? (
+          <RejillaSemana
+            dias={dias}
+            carga={carga}
+            ordenes={visibles}
+            proyecciones={proyeccionesVisibles}
+            hoy={hoy}
+            onAbrirDia={setDiaAbierto}
+          />
+        ) : (
+        <>
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/60">
           {DIAS.map((d) => (
             <div key={d} className="px-2 py-2 text-center text-[0.625rem] font-semibold uppercase tracking-wide text-slate-500">{d}</div>

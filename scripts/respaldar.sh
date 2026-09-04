@@ -12,19 +12,51 @@
 # Uso:  ./scripts/respaldar.sh
 set -euo pipefail
 
-DESTINO="$HOME/Google Drive/Respaldos MainTrack"
 PROYECTO="$(cd "$(dirname "$0")/.." && pwd)"
-CONSERVAR=7
+DIAS=7
 
 cd "$PROYECTO"
 
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "ERROR: esta carpeta no es un repositorio git."; exit 1; }
 
-[ -d "$HOME/Google Drive" ] \
-  || { echo "ERROR: no encuentro Google Drive en $HOME/Google Drive"; exit 1; }
+# --- Encontrar Google Drive -------------------------------------------------
+# La app monta en ~/Library/CloudStorage/GoogleDrive-<cuenta>/. NO usar
+# ~/Google Drive: una carpeta local con ese nombre pasa cualquier prueba de
+# existencia y el respaldo termina en el mismo disco que el original. Eso
+# ya paso —dos dias de respaldos que no salieron de la Mac.
+RAIZ=$(ls -d "$HOME/Library/CloudStorage/GoogleDrive-"*/ 2>/dev/null | head -1 || true)
 
+if [ -z "$RAIZ" ]; then
+  echo "ERROR: Google Drive no esta instalado o no ha iniciado sesion."
+  echo "       Se esperaba algo en ~/Library/CloudStorage/GoogleDrive-*/"
+  exit 1
+fi
+
+RAIZ="${RAIZ%/}"   # ls -d deja una diagonal al final
+UNIDAD="$RAIZ/My Drive"
+[ -d "$UNIDAD" ] || UNIDAD="$RAIZ/Mi unidad"
+
+# Que el volumen responda de verdad. Si Drive esta instalado pero no corriendo,
+# la carpeta existe y toda operacion se queda colgada; sin este limite de
+# tiempo el respaldo se congela en silencio.
+if ! ( ls "$UNIDAD" >/dev/null 2>&1 & P=$!; ( sleep 15; kill -9 $P 2>/dev/null ) & W=$!; wait $P 2>/dev/null; R=$?; kill $W 2>/dev/null; exit $R ); then
+  echo "ERROR: Google Drive no responde. Abra la aplicacion e inicie sesion."
+  echo "       Ruta esperada: $UNIDAD"
+  exit 1
+fi
+
+DESTINO="$UNIDAD/Respaldos MainTrack"
 mkdir -p "$DESTINO"
+
+# Prueba de escritura: que el archivo se pueda crear Y volver a leer.
+SONDA="$DESTINO/.sonda-$$"
+if ! ( echo ok > "$SONDA" 2>/dev/null && [ "$(cat "$SONDA" 2>/dev/null)" = "ok" ] ); then
+  rm -f "$SONDA" 2>/dev/null || true
+  echo "ERROR: no se puede escribir en $DESTINO"
+  exit 1
+fi
+rm -f "$SONDA"
 
 # Avisar si hay trabajo sin guardar: el respaldo solo lleva lo confirmado.
 PENDIENTES=$(git status --porcelain | wc -l | tr -d ' ')
@@ -54,12 +86,28 @@ else
   exit 1
 fi
 
-# Conservar solo los ultimos, para no llenar el Drive.
-BORRADOS=$(ls -1t "$DESTINO"/maintrack-*.bundle 2>/dev/null | tail -n +$((CONSERVAR + 1)) || true)
-if [ -n "$BORRADOS" ]; then
-  echo "$BORRADOS" | while read -r viejo; do rm -f "$viejo"; done
-  echo "  Se conservan los ultimos $CONSERVAR respaldos."
-fi
+# --- Conservar por DIA, no por archivo --------------------------------------
+# Contar archivos hace que varias corridas en un mismo dia se coman la
+# historia: siete corridas hoy borran los siete dias anteriores.
+HOY=$(date +%Y-%m-%d)
+
+# De cada dia pasado, quedarse solo con el mas reciente.
+for d in $(ls -1 "$DESTINO"/maintrack-*.bundle 2>/dev/null \
+           | sed 's/.*maintrack-\(....-..-..\).*/\1/' | sort -u); do
+  [ "$d" = "$HOY" ] && continue
+  ls -1t "$DESTINO"/maintrack-"$d"-*.bundle 2>/dev/null | tail -n +2 \
+    | while read -r viejo; do rm -f "$viejo"; done
+done
+
+# Y conservar solo los ultimos N dias.
+for d in $(ls -1 "$DESTINO"/maintrack-*.bundle 2>/dev/null \
+           | sed 's/.*maintrack-\(....-..-..\).*/\1/' | sort -ur | tail -n +$((DIAS + 1))); do
+  rm -f "$DESTINO"/maintrack-"$d"-*.bundle
+done
+
+DIAS_VIVOS=$(ls -1 "$DESTINO"/maintrack-*.bundle 2>/dev/null \
+             | sed 's/.*maintrack-\(....-..-..\).*/\1/' | sort -u | wc -l | tr -d ' ')
+echo "  Se conservan $DIAS_VIVOS dias de respaldo."
 
 echo ""
 echo "Listo: $ARCHIVO"

@@ -79,6 +79,16 @@ body {
   color: var(--muted);
 }
 
+/* Variante compacta: para barras de filtros donde varios controles
+   comparten renglon. Va con doble clase (.field.compacto) a proposito,
+   para ganarle por especificidad al width:100% de .field. */
+.field.compacto {
+  width: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.5rem;
+}
+
 .label {
   display: block;
   font-size: 0.75rem;

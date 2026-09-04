@@ -19,3 +19,9 @@ gcp-*.json
 # Ya rompieron una compilacion; el despliegue los limpia de .next y aqui se
 # evita que lleguen al repositorio.
 * [0-9].*
+
+# Artefacto de compilacion de TypeScript: se regenera solo.
+tsconfig.tsbuildinfo
+
+# Archivos de bloqueo que deja Word mientras un documento esta abierto.
+~$*
