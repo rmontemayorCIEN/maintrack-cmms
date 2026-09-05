@@ -77,16 +77,26 @@ export function WorkOrderActions({
    * Que se captura para cada falla. La llave es el id de la actividad, o
    * ENCABEZADO en las ordenes viejas que no tienen actividades.
    */
+  /**
+   * Que se captura para cada falla. La llave es el id de la actividad, o
+   * ENCABEZADO en las ordenes viejas de falla que no tienen actividades.
+   *
+   * Queda VACIO en una orden puramente preventiva: si aqui se colara una
+   * entrada, el modal dibujaria los campos de falla debajo del aviso que dice
+   * que no se piden, y se contradiria en pantalla.
+   */
   const [fallas, setFallas] = useState<
     Record<string, { failureCodeId: string; rootCauseId: string; downtimeMinutes: string }>
-  >(() =>
-    Object.fromEntries(
-      (actividadesDeFalla.length ? actividadesDeFalla.map((a) => a.id) : [ENCABEZADO]).map((k) => [
-        k,
-        { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" },
-      ]),
-    ),
-  );
+  >(() => {
+    const claves = actividadesDeFalla.length
+      ? actividadesDeFalla.map((a) => a.id)
+      : esOrdenDeFalla
+        ? [ENCABEZADO]
+        : [];
+    return Object.fromEntries(
+      claves.map((k) => [k, { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" }]),
+    );
+  });
 
   /** Una orden sin actividades de falla no pregunta nada de fallas. */
   const pideFallas = actividadesDeFalla.length > 0 || esOrdenDeFalla;
