@@ -113,7 +113,14 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
       <PageHeader
         title="Ordenes de trabajo"
         description={`${workOrders.length} resultados · ${openCount} abiertas en total · costo listado ${formatCurrency(totalCost, user.organization.currency)}`}
-        actions={<LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton>}
+        actions={
+          <div className="flex gap-2">
+            {/* Armar junta trabajo de varios origenes en una sola orden; Nueva
+                sigue siendo la captura suelta de un correctivo. */}
+            <LinkButton href="/work-orders/armar" size="sm" variant="secondary">Armar orden</LinkButton>
+            <LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton>
+          </div>
+        }
       />
 
       <WorkOrderFilters technicians={technicians} />

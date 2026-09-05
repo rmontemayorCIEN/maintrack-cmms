@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { recalcWorkOrder } from "@/lib/workorders";
 import { logAudit } from "@/lib/audit";
+import { actividadValida } from "@/lib/workorders";
 
 /**
  * Servicios subcontratados de una orden de trabajo.
@@ -19,6 +20,11 @@ const schema = z.object({
   unitCost: z.coerce.number().min(0),
   folioProveedor: z.string().trim().max(60).optional().nullable(),
   nota: z.string().trim().max(300).optional().nullable(),
+  /**
+   * A que actividad se le carga. Opcional: los gastos generales de la orden
+   * —el viaje, la grua— no son de ninguna actividad en particular.
+   */
+  taskId: z.string().optional().nullable(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         cost: input.quantity * input.unitCost,
         folioProveedor: input.folioProveedor || null,
         nota: input.nota || null,
+        taskId: await actividadValida(id, input.taskId),
       },
     });
 

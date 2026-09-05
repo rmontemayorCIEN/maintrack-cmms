@@ -1,12 +1,17 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { recalcWorkOrder } from "@/lib/workorders";
+import { actividadValida, recalcWorkOrder } from "@/lib/workorders";
 
 const schema = z.object({
   userId: z.string().optional(),
   hours: z.coerce.number().positive(),
   notes: z.string().optional(),
+  /**
+   * A que actividad se le carga. Opcional: los gastos generales de la orden
+   * —el viaje, la grua— no son de ninguna actividad en particular.
+   */
+  taskId: z.string().optional().nullable(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         rate: technician.hourlyRate,
         cost: input.hours * technician.hourlyRate,
         notes: input.notes,
+        taskId: await actividadValida(id, input.taskId),
       },
     });
 

@@ -33,6 +33,12 @@ export type FallaContada = {
   failureCodeId: string;
   rootCauseId: string | null;
   downtimeMinutes: number;
+  /**
+   * Lo que costo esta falla. En las de actividad es lo que se le cargo
+   * directamente; en las de encabezado, el total de la orden —esas ordenes
+   * viejas atendian una sola falla, asi que todo su costo le corresponde.
+   */
+  costo: number;
   /** De donde salio: la actividad (lo nuevo) o el encabezado (ordenes viejas). */
   fuente: "ACTIVIDAD" | "ENCABEZADO";
   assetId: string | null;
@@ -68,7 +74,7 @@ export async function fallasCodificadas(
       },
       select: {
         failureCodeId: true, rootCauseId: true, downtimeMinutes: true,
-        maintenanceType: true,
+        maintenanceType: true, totalCost: true,
         workOrder: { select: { id: true, assetId: true, completedAt: true, maintenanceType: true } },
       },
     }),
@@ -81,7 +87,7 @@ export async function fallasCodificadas(
       },
       select: {
         id: true, failureCodeId: true, rootCauseId: true, downtimeMinutes: true,
-        assetId: true, completedAt: true,
+        assetId: true, completedAt: true, totalCost: true,
       },
     }),
   ]);
@@ -94,6 +100,7 @@ export async function fallasCodificadas(
       failureCodeId: a.failureCodeId!,
       rootCauseId: a.rootCauseId,
       downtimeMinutes: a.downtimeMinutes,
+      costo: a.totalCost,
       fuente: "ACTIVIDAD" as const,
       assetId: a.workOrder.assetId,
       ocurrioEl: a.workOrder.completedAt!,
@@ -105,6 +112,7 @@ export async function fallasCodificadas(
       failureCodeId: w.failureCodeId!,
       rootCauseId: w.rootCauseId,
       downtimeMinutes: w.downtimeMinutes,
+      costo: w.totalCost,
       fuente: "ENCABEZADO" as const,
       assetId: w.assetId,
       ocurrioEl: w.completedAt!,
@@ -115,11 +123,12 @@ export async function fallasCodificadas(
 
 /** Agrupa por codigo, de mayor a menor. Lo que alimenta el Pareto. */
 export function agruparPorCodigo(fallas: FallaContada[]) {
-  const mapa = new Map<string, { failureCodeId: string; eventos: number; minutosParo: number }>();
+  const mapa = new Map<string, { failureCodeId: string; eventos: number; minutosParo: number; costo: number }>();
   for (const f of fallas) {
-    const acc = mapa.get(f.failureCodeId) ?? { failureCodeId: f.failureCodeId, eventos: 0, minutosParo: 0 };
+    const acc = mapa.get(f.failureCodeId) ?? { failureCodeId: f.failureCodeId, eventos: 0, minutosParo: 0, costo: 0 };
     acc.eventos += 1;
     acc.minutosParo += f.downtimeMinutes;
+    acc.costo += f.costo;
     mapa.set(f.failureCodeId, acc);
   }
   return [...mapa.values()].sort((a, b) => b.eventos - a.eventos);

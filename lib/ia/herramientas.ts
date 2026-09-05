@@ -350,12 +350,12 @@ export async function ejecutarHerramienta(
         fallas: porCodigo
           .map((f) => {
             const c = codigos.find((x) => x.id === f.failureCodeId);
-            // El costo salio de aqui: con ordenes mezcladas los costos viven
-            // en el encabezado y no se pueden repartir entre varias fallas sin
-            // inventar. Frecuencia y paro si son por falla.
+            // El costo es el que se le cargo a esa falla, no el de la orden
+            // entera: una OT mezclada reparte sus cargos entre actividades.
             return {
               codigo: c?.code, descripcion: c?.description, ordenes: f.eventos,
               horasDeParo: Math.round(f.minutosParo / 60),
+              costo: Math.round(f.costo),
             };
           })
           .sort((a, b) => b.ordenes - a.ordenes),

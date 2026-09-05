@@ -299,6 +299,32 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/work-orders/armar": {
+    titulo: "Armar una orden",
+    que: "Junta en una sola orden todo lo que se le debe a un equipo: el preventivo que ya toca, las fallas que le reportaron y lo que quedó trabado la vez pasada.",
+    hacer: [
+      "Elegir el equipo y ver los tres orígenes juntos",
+      "Marcar qué se va en esta orden",
+      "Asignar responsable, fecha y prioridad",
+    ],
+    flujo: [
+      "El técnico va a bajar a esa bomba de todos modos. Verlo todo junto antes de bajar evita hacer tres viajes por tres órdenes.",
+      "Los planes se ofrecen aunque no hayan vencido: si ya va a bajar, adelantar el que vence en cuatro días sale más barato que un segundo viaje. La etiqueta dice cuál ya toca.",
+      "Cada actividad conserva de dónde vino y su propio tipo. Por eso al cerrar se pide la causa solo de las correctivas, y el paro de un correctivo colado en un preventivo se cuenta como no planeado.",
+      "Los reportes que marque quedan ligados a la orden y se dan por atendidos.",
+    ],
+    botones: [
+      { nombre: "Crear la orden", explica: "Arma la orden con lo marcado. El título se sugiere solo con lo que eligió, y se puede cambiar." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo esta pantalla", porque: "Armar órdenes requiere perfil de supervisor o superior." },
+      { sintoma: "El equipo no tiene nada que ofrecer", porque: "No tiene planes asignados, ni fallas reportadas, ni pendientes. Para asignarle un plan vaya a Planes → Equipos y sus planes." },
+    ],
+    preguntas: [
+      { pregunta: "¿En qué se diferencia de «Nueva orden»?", respuesta: "«Nueva orden» captura un trabajo suelto a mano. «Armar» parte de lo que el sistema ya sabe que se le debe a ese equipo y lo junta. Si solo va a levantar un correctivo que nadie reportó, use Nueva orden." },
+      { pregunta: "¿Qué pasa con el preventivo si lo adelanto?", respuesta: "El plan de ESE equipo avanza desde la fecha en que se hizo, no desde la que tocaba. Los demás equipos del mismo plan siguen su propio calendario." },
+    ],
+  },
   "/work-orders": {
     titulo: "Órdenes de trabajo",
     camposBuscables: true,

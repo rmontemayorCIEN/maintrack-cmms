@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
 
 export function PartsPanel({
+  actividades,
   workOrderId,
   used,
   catalog,
@@ -14,6 +16,8 @@ export function PartsPanel({
   editable,
 }: {
   workOrderId: string;
+  /** Las actividades de la orden, para cargarle el gasto a una. */
+  actividades: ActividadCargable[];
   used: Array<{ id: string; code: string; name: string; unit: string; quantity: number; cost: number }>;
   catalog: Array<{ id: string; code: string; name: string; unit: string; unitCost: number; quantityOnHand: number }>;
   currency: string;
@@ -22,6 +26,7 @@ export function PartsPanel({
   const router = useRouter();
   const [partId, setPartId] = useState(catalog[0]?.id ?? "");
   const [quantity, setQuantity] = useState("1");
+  const [taskId, setTaskId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +36,7 @@ export function PartsPanel({
     const res = await fetch(`/api/work-orders/${workOrderId}/parts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ partId, quantity: Number(quantity) }),
+      body: JSON.stringify({ partId, quantity: Number(quantity), taskId: taskId || null }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -94,7 +99,8 @@ export function PartsPanel({
                 Cargar a la OT
               </Button>
             </div>
-            {error ? <p className="text-[0.6875rem] text-red-600">{error}</p> : null}
+            <SelectActividad actividades={actividades} valor={taskId} onChange={setTaskId} />
+          {error ? <p className="text-[0.6875rem] text-red-600">{error}</p> : null}
           </div>
         )
       ) : null}

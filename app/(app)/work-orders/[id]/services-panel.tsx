@@ -6,6 +6,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { SelectorBuscable } from "@/components/selector-buscable";
+import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
 
 type Linea = {
   id: string;
@@ -26,6 +27,7 @@ type Linea = {
  */
 export function ServicesPanel({
   workOrderId,
+  actividades,
   lineas,
   catalogo,
   proveedores,
@@ -33,6 +35,8 @@ export function ServicesPanel({
   editable,
 }: {
   workOrderId: string;
+  /** Las actividades de la orden, para cargarle el gasto a una. */
+  actividades: ActividadCargable[];
   lineas: Linea[];
   catalogo: Array<{ id: string; code: string; name: string; unit: string; unitCost: number; supplierId: string | null }>;
   proveedores: Array<{ id: string; name: string }>;
@@ -41,6 +45,7 @@ export function ServicesPanel({
 }) {
   const router = useRouter();
   const [serviceId, setServiceId] = useState("");
+  const [taskId, setTaskId] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -71,6 +76,7 @@ export function ServicesPanel({
         quantity: Number(quantity),
         unitCost: Number(unitCost),
         folioProveedor: folio || null,
+        taskId: taskId || null,
       }),
     });
     setLoading(false);
@@ -183,6 +189,7 @@ export function ServicesPanel({
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             Cargar {formatCurrency(Number(quantity || 0) * Number(unitCost || 0), currency)} a la OT
           </Button>
+          <SelectActividad actividades={actividades} valor={taskId} onChange={setTaskId} />
           {error ? <p className="text-[0.6875rem] text-red-600">{error}</p> : null}
         </div>
       ) : null}

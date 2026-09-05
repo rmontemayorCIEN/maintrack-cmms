@@ -635,6 +635,16 @@ model WorkOrderTask {
   motivoDetalle      String?
   /// La refaccion que trabo la actividad, cuando el motivo es SIN_REFACCION.
   bloqueadaPorPartId String?
+  /// Lo que costo ESTA actividad, sumando lo que se le cargo directamente.
+  ///
+  /// Se recalcula igual que el de la orden. Lo que no se pudo atribuir a
+  /// ninguna actividad no entra aqui: vive solo en el total de la orden, y por
+  /// eso la suma de las actividades puede ser menor que el total de la OT.
+  laborCost          Float     @default(0)
+  partsCost          Float     @default(0)
+  serviceCost        Float     @default(0)
+  totalCost          Float     @default(0)
+
   /// Por que fallo ESTA actividad. Vive aqui y no en el encabezado de la OT
   /// porque una orden mezclada puede traer varios reportes de falla —el
   /// preventivo del mes mas dos fugas reportadas— y un solo codigo en la
@@ -645,11 +655,11 @@ model WorkOrderTask {
   /// Solo aplica a actividades cuyo maintenanceType es de falla (CORRECTIVE o
   /// SAFETY). Un preventivo que se ejecuto bien no es una falla, y codificarlo
   /// inventa un evento que despues ensucia el Pareto y el MTBF.
-  failureCodeId      String?
-  rootCauseId        String?
+  failureCodeId   String?
+  rootCauseId     String?
   /// Paro que causo esta actividad. Mismo motivo que arriba: el paro del
   /// encabezado no se puede repartir entre varias fallas.
-  downtimeMinutes    Int       @default(0)
+  downtimeMinutes Int     @default(0)
 
   /// La actividad liberada que esta continua, cuando se retomo del backlog.
   ///
@@ -658,15 +668,18 @@ model WorkOrderTask {
   /// contador que se desincroniza.
   retomaDeTaskId String? @unique
 
-  workOrder     WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  completedBy   User?          @relation(fields: [completedById], references: [id])
-  liberadaPor   User?          @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
-  bloqueadaPor  Part?          @relation(fields: [bloqueadaPorPartId], references: [id])
-  failureCode   FailureCode?   @relation(fields: [failureCodeId], references: [id])
-  rootCause     RootCause?     @relation(fields: [rootCauseId], references: [id])
-  origenRequest WorkRequest?   @relation("SolicitudAtendida", fields: [origenRequestId], references: [id])
-  retomaDe      WorkOrderTask? @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
-  retomadaPor   WorkOrderTask? @relation("CadenaDeRetoma")
+  workOrder        WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  completedBy      User?              @relation(fields: [completedById], references: [id])
+  liberadaPor      User?              @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
+  bloqueadaPor     Part?              @relation(fields: [bloqueadaPorPartId], references: [id])
+  cargosRefaccion  WorkOrderPart[]
+  cargosManoDeObra WorkOrderLabor[]
+  cargosServicio   WorkOrderService[]
+  failureCode      FailureCode?       @relation(fields: [failureCodeId], references: [id])
+  rootCause        RootCause?         @relation(fields: [rootCauseId], references: [id])
+  origenRequest    WorkRequest?       @relation("SolicitudAtendida", fields: [origenRequestId], references: [id])
+  retomaDe         WorkOrderTask?     @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
+  retomadaPor      WorkOrderTask?     @relation("CadenaDeRetoma")
 
   @@index([workOrderId])
   @@index([liberadaAt])
@@ -682,10 +695,20 @@ model WorkOrderLabor {
   workedAt    DateTime @default(now())
   notes       String?
 
-  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id])
+  /// A que actividad se le carga este gasto.
+  ///
+  /// Opcional a proposito: hay gastos que son de la orden entera —el viaje, la
+  /// grua, una refaccion que sirvio para dos cosas— y forzarlos a una actividad
+  /// seria inventar. Los que si se pueden atribuir permiten saber cuanto costo
+  /// cada falla, que es lo que el Pareto necesita para ordenar por dinero y no
+  /// solo por frecuencia.
+  taskId    String?
+  task      WorkOrderTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workOrder WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id])
 
   @@index([workOrderId])
+  @@index([taskId])
 }
 
 model WorkOrderPart {
@@ -696,10 +719,20 @@ model WorkOrderPart {
   unitCost    Float  @default(0)
   cost        Float  @default(0)
 
-  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  part      Part      @relation(fields: [partId], references: [id])
+  /// A que actividad se le carga este gasto.
+  ///
+  /// Opcional a proposito: hay gastos que son de la orden entera —el viaje, la
+  /// grua, una refaccion que sirvio para dos cosas— y forzarlos a una actividad
+  /// seria inventar. Los que si se pueden atribuir permiten saber cuanto costo
+  /// cada falla, que es lo que el Pareto necesita para ordenar por dinero y no
+  /// solo por frecuencia.
+  taskId    String?
+  task      WorkOrderTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workOrder WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  part      Part           @relation(fields: [partId], references: [id])
 
   @@index([workOrderId])
+  @@index([taskId])
 }
 
 /// Servicio externo realmente contratado para una orden de trabajo.
@@ -718,11 +751,21 @@ model WorkOrderService {
   nota           String?
   createdAt      DateTime @default(now())
 
+  /// A que actividad se le carga este gasto.
+  ///
+  /// Opcional a proposito: hay gastos que son de la orden entera —el viaje, la
+  /// grua, una refaccion que sirvio para dos cosas— y forzarlos a una actividad
+  /// seria inventar. Los que si se pueden atribuir permiten saber cuanto costo
+  /// cada falla, que es lo que el Pareto necesita para ordenar por dinero y no
+  /// solo por frecuencia.
+  taskId    String?
+  task      WorkOrderTask?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
   workOrder WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   service   ExternalService? @relation(fields: [serviceId], references: [id])
   supplier  Supplier?        @relation(fields: [supplierId], references: [id])
 
   @@index([workOrderId])
+  @@index([taskId])
 }
 
 model WorkOrderComment {

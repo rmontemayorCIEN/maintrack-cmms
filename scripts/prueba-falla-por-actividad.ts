@@ -8,7 +8,7 @@
  *   npx tsx scripts/prueba-falla-por-actividad.ts
  */
 import { prisma } from "../lib/db";
-import { transitionWorkOrder } from "../lib/workorders";
+import { transitionWorkOrder, recalcWorkOrder } from "../lib/workorders";
 import { fallasCodificadas, agruparPorCodigo } from "../lib/fallas";
 
 let fallos = 0;
@@ -126,6 +126,44 @@ async function main() {
     revisar("el Pareto trae 2 codigos distintos", pareto.length === 2, `${pareto.length}`);
     revisar("el paro se reparte bien", pareto.every((p) => [30, 15].includes(p.minutosParo)));
 
+    // ── El costo se atribuye a la actividad que lo causo ─────────────────────
+    console.log("\nEl costo por actividad");
+    // A la fuga: 2 h de mano de obra. Al ruido: un servicio externo.
+    await prisma.workOrderLabor.create({
+      data: { workOrderId: ot.id, userId: user.id, hours: 2, rate: 250, cost: 500, taskId: fuga.id },
+    });
+    await prisma.workOrderService.create({
+      data: { workOrderId: ot.id, descripcion: "Rebobinado", quantity: 1, unitCost: 800, cost: 800, taskId: ruido.id },
+    });
+    // Y un gasto general, que no es de ninguna actividad: el viaje.
+    await prisma.workOrderService.create({
+      data: { workOrderId: ot.id, descripcion: "Viaje", quantity: 1, unitCost: 300, cost: 300 },
+    });
+    await recalcWorkOrder(ot.id);
+
+    const conCosto = await prisma.workOrderTask.findMany({ where: { workOrderId: ot.id } });
+    const cFuga = conCosto.find((t) => t.id === fuga.id)!;
+    const cRuido = conCosto.find((t) => t.id === ruido.id)!;
+    const cPlan = conCosto.find((t) => t.origen === "PLAN")!;
+    revisar("la fuga costo 500", cFuga.totalCost === 500, `${cFuga.totalCost}`);
+    revisar("el ruido costo 800", cRuido.totalCost === 800, `${cRuido.totalCost}`);
+    revisar("la actividad del plan costo 0", cPlan.totalCost === 0, `${cPlan.totalCost}`);
+
+    const otCosto = await prisma.workOrder.findUnique({ where: { id: ot.id }, select: { totalCost: true } });
+    revisar("el total de la OT incluye el viaje (1600)", otCosto?.totalCost === 1600, `${otCosto?.totalCost}`);
+    revisar(
+      "la suma de actividades es menor que el total, y esta bien",
+      cFuga.totalCost + cRuido.totalCost + cPlan.totalCost === 1300,
+    );
+
+    const conDinero = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
+    const paretoCosto = agruparPorCodigo(conDinero);
+    revisar(
+      "el Pareto ordena por su propio costo, no por el de la orden",
+      paretoCosto.every((x) => [500, 800].includes(x.costo)),
+      paretoCosto.map((x) => x.costo).join(" / "),
+    );
+
     // ── Una OT puramente preventiva no aporta fallas ─────────────────────────
     console.log("\nUn preventivo limpio no inventa fallas");
     const limpia = await prisma.workOrder.create({
@@ -165,6 +203,9 @@ async function main() {
     const sinElMalo = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
     revisar("un preventivo con codigo NO ensucia el Pareto", sinElMalo.length === 2, `${sinElMalo.length}`);
   } finally {
+    // Las ordenes primero: sus cargos apuntan a usuarios, y esa llave no
+    // cascadea desde la organizacion.
+    await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
     await prisma.organization.delete({ where: { id: org.id } });
   }
 

@@ -327,6 +327,7 @@ export default async function ReportsPage({
                       <th>Codigo</th>
                       <th className="text-right">Eventos</th>
                       <th className="text-right">Paro</th>
+                      <th className="text-right">Costo</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -341,6 +342,9 @@ export default async function ReportsPage({
                           <td className="text-right tabular-nums text-xs">{row.eventos}</td>
                           <td className="text-right tabular-nums text-xs">
                             {formatNumber(row.minutosParo / 60, 1)} h
+                          </td>
+                          <td className="text-right tabular-nums text-xs">
+                            {formatCurrency(row.costo, currency)}
                           </td>
                         </tr>
                       );

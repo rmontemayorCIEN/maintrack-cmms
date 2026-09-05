@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { Avatar, Button } from "@/components/ui";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
 
 export function LaborPanel({
+  actividades,
   workOrderId,
   entries,
   technicians,
@@ -15,6 +17,8 @@ export function LaborPanel({
   editable,
 }: {
   workOrderId: string;
+  /** Las actividades de la orden, para cargarle el gasto a una. */
+  actividades: ActividadCargable[];
   entries: Array<{ id: string; name: string; color: string; hours: number; cost: number; workedAt: string; notes: string | null }>;
   technicians: Array<{ id: string; name: string; hourlyRate: number }>;
   currentUserId: string;
@@ -25,6 +29,7 @@ export function LaborPanel({
   const [userId, setUserId] = useState(currentUserId);
   const [hours, setHours] = useState("1");
   const [notes, setNotes] = useState("");
+  const [taskId, setTaskId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +39,7 @@ export function LaborPanel({
     const res = await fetch(`/api/work-orders/${workOrderId}/labor`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, hours: Number(hours), notes: notes || undefined }),
+      body: JSON.stringify({ userId, hours: Number(hours), notes: notes || undefined, taskId: taskId || null }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -98,6 +103,7 @@ export function LaborPanel({
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             </Button>
           </div>
+          <SelectActividad actividades={actividades} valor={taskId} onChange={setTaskId} />
           {error ? <p className="text-[0.6875rem] text-red-600">{error}</p> : null}
         </div>
       ) : null}

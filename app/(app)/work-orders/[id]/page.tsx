@@ -81,6 +81,18 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
    * Las liberadas quedan fuera: no se hicieron, asi que no hay falla que
    * documentar. Se van al backlog y se codificaran cuando se atiendan.
    */
+  /**
+   * A que actividades se les puede cargar un gasto. Las liberadas quedan
+   * fuera: no se hicieron, asi que no consumieron nada.
+   */
+  const actividadesCargables = wo.tasks
+    .filter((t) => !t.liberadaAt)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      maintenanceType: tipoDeActividad(t.maintenanceType, wo.maintenanceType),
+    }));
+
   const actividadesDeFalla = wo.tasks
     .filter((t) => !t.liberadaAt && esFalla(tipoDeActividad(t.maintenanceType, wo.maintenanceType)))
     .map((t) => ({
@@ -380,6 +392,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               <CardHeader title="Mano de obra" subtitle={`${formatNumber(wo.actualHours, 1)} h · ${formatCurrency(wo.laborCost, currency)}`} />
               <LaborPanel
                 workOrderId={wo.id}
+                actividades={actividadesCargables}
                 entries={wo.labor.map((l) => ({
                   id: l.id,
                   name: l.user.name,
@@ -428,6 +441,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               <CardHeader title="Refacciones" subtitle={formatCurrency(wo.partsCost, currency)} />
               <PartsPanel
                 workOrderId={wo.id}
+                actividades={actividadesCargables}
                 used={wo.partsUsed.map((p) => ({
                   id: p.id,
                   code: p.part.code,
@@ -453,6 +467,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 si por el costo de la orden. */}
             <ServicesPanel
               workOrderId={wo.id}
+              actividades={actividadesCargables}
               lineas={wo.servicesUsed.map((s) => ({
                 id: s.id,
                 descripcion: s.descripcion,

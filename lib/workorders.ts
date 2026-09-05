@@ -25,6 +25,46 @@ export async function recalcWorkOrder(workOrderId: string) {
   const serviceCost = services.reduce((s, x) => s + x.cost, 0);
   const otherCost = wo?.otherCost ?? 0;
 
+  /**
+   * Y lo mismo por actividad, con lo que se le cargo directamente.
+   *
+   * Lo que no trae actividad —el viaje, la grua, una refaccion que sirvio para
+   * dos cosas— se queda solo en el total de la orden. Por eso la suma de las
+   * actividades puede ser menor que el total, y esta bien que asi sea: es
+   * preferible a repartir un gasto comun con una regla inventada.
+   */
+  const porTarea = new Map<string, { labor: number; parts: number; service: number }>();
+  const acumular = (taskId: string | null, campo: "labor" | "parts" | "service", monto: number) => {
+    if (!taskId) return;
+    const acc = porTarea.get(taskId) ?? { labor: 0, parts: 0, service: 0 };
+    acc[campo] += monto;
+    porTarea.set(taskId, acc);
+  };
+  for (const l of labor) acumular(l.taskId, "labor", l.cost);
+  for (const p of parts) acumular(p.taskId, "parts", p.cost);
+  for (const x of services) acumular(x.taskId, "service", x.cost);
+
+  // Se reescriben TODAS las actividades de la orden, no solo las que tienen
+  // cargos: si a una se le quito el ultimo cargo, su costo debe volver a cero.
+  const tareas = await prisma.workOrderTask.findMany({
+    where: { workOrderId },
+    select: { id: true },
+  });
+  await Promise.all(
+    tareas.map((t) => {
+      const c = porTarea.get(t.id) ?? { labor: 0, parts: 0, service: 0 };
+      return prisma.workOrderTask.update({
+        where: { id: t.id },
+        data: {
+          laborCost: c.labor,
+          partsCost: c.parts,
+          serviceCost: c.service,
+          totalCost: c.labor + c.parts + c.service,
+        },
+      });
+    }),
+  );
+
   return prisma.workOrder.update({
     where: { id: workOrderId },
     data: {
@@ -35,6 +75,26 @@ export async function recalcWorkOrder(workOrderId: string) {
       totalCost: laborCost + partsCost + serviceCost + otherCost,
     },
   });
+}
+
+/**
+ * Devuelve el taskId solo si esa actividad es de esa orden.
+ *
+ * Sin esta comprobacion, un taskId de otra orden cargaria el gasto en el
+ * historial de un equipo ajeno. Devolver null en vez de reventar es a
+ * proposito: el cargo se guarda igual, solo que como gasto general de la
+ * orden, que es el comportamiento de siempre.
+ */
+export async function actividadValida(
+  workOrderId: string,
+  taskId: string | null | undefined,
+): Promise<string | null> {
+  if (!taskId) return null;
+  const t = await prisma.workOrderTask.findFirst({
+    where: { id: taskId, workOrderId },
+    select: { id: true },
+  });
+  return t?.id ?? null;
 }
 
 export function canTransition(from: string, to: string) {
@@ -236,6 +296,8 @@ export async function consumePart(params: {
   userId: string;
   /** De que almacen sale. Sin indicar, el general de la cuenta. */
   warehouseId?: string | null;
+  /** A que actividad se le carga la refaccion. */
+  taskId?: string | null;
 }) {
   const part = await prisma.part.findFirst({
     where: { id: params.partId, organizationId: params.organizationId },
@@ -261,6 +323,7 @@ export async function consumePart(params: {
         quantity: params.quantity,
         unitCost: part.unitCost,
         cost,
+        taskId: params.taskId ?? null,
       },
     });
     return aplicarMovimiento(
