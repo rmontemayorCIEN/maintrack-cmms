@@ -15,55 +15,55 @@ datasource db {
 // ---------------------------------------------------------------- Tenancy ---
 
 model Organization {
-  id           String   @id @default(cuid())
-  name         String
-  slug         String   @unique
+  id                String    @id @default(cuid())
+  name              String
+  slug              String    @unique
   /// Giro en texto libre: "Manufactura metalmecanica", "Alimentos".
-  industry     String?
+  industry          String?
   /// Tipo de instalacion, de lib/instalaciones.ts. Alimenta los ejemplos de
   /// captura y el contexto de todos los prompts de IA.
-  tipoInstalacion String?
-  plan         String   @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
-  status       String   @default("ACTIVE")       // ACTIVE | TRIAL | SUSPENDED | CANCELLED
-  trialEndsAt  DateTime?
-  seats        Int      @default(10)
-  timezone     String   @default("America/Mexico_City")
-  currency     String   @default("MXN")
-  locale       String   @default("es-MX")
-  logoUrl      String?
+  tipoInstalacion   String?
+  plan              String    @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
+  status            String    @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELLED
+  trialEndsAt       DateTime?
+  seats             Int       @default(10)
+  timezone          String    @default("America/Mexico_City")
+  currency          String    @default("MXN")
+  locale            String    @default("es-MX")
+  logoUrl           String?
   /// Paleta de acento de la empresa, de lib/apariencia.ts.
-  colorAcento  String?
-  settings     String   @default("{}")
-  woSequence   Int      @default(0)
-  wrSequence   Int      @default(0)
-  poSequence   Int      @default(0)
-  invSequence  Int      @default(0)
-  tsSequence   Int      @default(0)
-  rmSequence   Int      @default(0)
-  rcSequence   Int      @default(0)
-  reSequence   Int      @default(0)
-  icSequence   Int      @default(0)
+  colorAcento       String?
+  settings          String    @default("{}")
+  woSequence        Int       @default(0)
+  wrSequence        Int       @default(0)
+  poSequence        Int       @default(0)
+  invSequence       Int       @default(0)
+  tsSequence        Int       @default(0)
+  rmSequence        Int       @default(0)
+  rcSequence        Int       @default(0)
+  reSequence        Int       @default(0)
+  icSequence        Int       @default(0)
   /// Si el proceso de compras corre DENTRO de MainTrack.
   ///
   /// Apagado por omision a proposito: la mayoria de las empresas ya compra en
   /// su ERP y no lo va a mover. Con el apagado, la requisicion de compra
   /// guarda el folio de la orden externa y salta directo a recepcion, sin
   /// perder trazabilidad de quien pidio ni de donde termino el material.
-  comprasInternas Boolean @default(false)
+  comprasInternas   Boolean   @default(false)
   /// Arriba de este monto la requisicion de compra necesita autorizacion.
   /// Cero significa que todas la necesitan; un monto muy alto, ninguna.
-  montoAutorizacion Float @default(0)
+  montoAutorizacion Float     @default(0)
   /// Horas de trabajo al dia de un tecnico. Es el piso: quien quiera precision
   /// lo ajusta por persona en User.horasDisponibles.
   ///
   /// De aqui sale si un dia esta sobrecargado. Sin este numero el calendario
   /// puede mostrar 38 horas de trabajo asignadas al mismo martes y verse
   /// perfectamente normal.
-  horasJornada Float  @default(8)
+  horasJornada      Float     @default(8)
   /// Dias de la semana que se trabajan, separados por coma: 1 es lunes y 7 es
   /// domingo. Texto y no arreglo, porque el esquema corre en SQLite y en
   /// PostgreSQL con el mismo archivo.
-  diasHabiles  String @default("1,2,3,4,5")
+  diasHabiles       String    @default("1,2,3,4,5")
 
   /// Si una OT puede juntar actividades de varios origenes (preventivo del
   /// plan + un correctivo + una mejora) en un solo esfuerzo.
@@ -71,17 +71,17 @@ model Organization {
   /// Encendido por omision porque es como trabaja la gente en campo: se
   /// aprovecha la vuelta. Quien prefiera una OT por origen lo apaga y los
   /// selectores desaparecen del formulario.
-  otMultiOrigen Boolean @default(true)
+  otMultiOrigen   Boolean @default(true)
   /// Dias hacia adelante que se ofrecen al elegir actividades programadas para
   /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
-  otHorizonteDias Int   @default(15)
+  otHorizonteDias Int     @default(15)
 
   /// Complemento "IA Avanzada" contratado sobre el plan.
-  iaComplemento Boolean @default(false)
+  iaComplemento Boolean  @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
-  iaExtra      Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  iaExtra       Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   users            User[]
   sites            Site[]
@@ -126,8 +126,8 @@ model Organization {
   purchaseOrders   PurchaseOrder[]
   inventoryCounts  InventoryCount[]
   reportPoints     ReportPoint[]
-  festivos     DiaFestivo[]
-  equivalencias EquivalenciaRefaccion[]
+  festivos         DiaFestivo[]
+  equivalencias    EquivalenciaRefaccion[]
   asignacionesPlan PlanAsset[]
 }
 
@@ -150,56 +150,56 @@ model User {
   active         Boolean   @default(true)
   lastLoginAt    DateTime?
   /// NORMAL | GRANDE | MAYOR
-  escalaUi       String   @default("NORMAL")
+  escalaUi       String    @default("NORMAL")
   /// COMPACTA | COMODA | AMPLIA
-  densidadUi     String   @default("COMODA")
+  densidadUi     String    @default("COMODA")
   /// Como quiere ver cada tabla del sistema: que columnas, en que orden y con
   /// que agrupacion. Es un objeto por tabla —activos, ordenes, refacciones,
   /// planes— para no agregar una columna cada vez que otra lista se vuelve
   /// configurable. Va por usuario y no por organizacion porque el almacenista
   /// y el jefe de mantenimiento no miran lo mismo.
-  vistasTabla    String   @default("{}")
+  vistasTabla    String    @default("{}")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  teamMemberships     TeamMember[]
-  assignedWorkOrders  WorkOrder[]       @relation("WorkOrderAssignee")
-  createdWorkOrders   WorkOrder[]       @relation("WorkOrderCreator")
-  laborEntries        WorkOrderLabor[]
-  comments            WorkOrderComment[]
-  requests            WorkRequest[]     @relation("RequestAuthor")
-  reviewedRequests    WorkRequest[]     @relation("RequestReviewer")
-  meterReadings       MeterReading[]
-  stockMovements      StockMovement[]
-  notifications       Notification[]
-  auditLogs           AuditLog[]
-  acknowledgedAlerts  PredictiveAlert[]
-  completedTasks      WorkOrderTask[]
-  attachments         Attachment[]
-  links               ReferenceLink[]
-  planRequests        PlanRequest[]
-  aiUsage             AiUsage[]
-  assetIntakes        AssetIntake[]
-  warehousesACargo    Warehouse[]
-  stockTransfers      StockTransfer[]
-  materialRequests    MaterialRequest[]
-  purchaseRequests    PurchaseRequest[]  @relation("CompraSolicitante")
-  purchaseAuthorized  PurchaseRequest[]  @relation("CompraAutorizador")
-  goodsReceipts       GoodsReceipt[]
-  quotesCapturadas    Quote[]
-  purchaseOrders      PurchaseOrder[]
-  inventoryCounts     InventoryCount[]
-  reportPoints        ReportPoint[]
-
-  @@index([organizationId])
-  tareasLiberadas  WorkOrderTask[] @relation("TareaLiberadaPor")
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamMemberships      TeamMember[]
+  assignedWorkOrders   WorkOrder[]             @relation("WorkOrderAssignee")
+  createdWorkOrders    WorkOrder[]             @relation("WorkOrderCreator")
+  laborEntries         WorkOrderLabor[]
+  comments             WorkOrderComment[]
+  requests             WorkRequest[]           @relation("RequestAuthor")
+  reviewedRequests     WorkRequest[]           @relation("RequestReviewer")
+  meterReadings        MeterReading[]
+  stockMovements       StockMovement[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  acknowledgedAlerts   PredictiveAlert[]
+  completedTasks       WorkOrderTask[]
+  attachments          Attachment[]
+  links                ReferenceLink[]
+  planRequests         PlanRequest[]
+  aiUsage              AiUsage[]
+  assetIntakes         AssetIntake[]
+  warehousesACargo     Warehouse[]
+  stockTransfers       StockTransfer[]
+  materialRequests     MaterialRequest[]
+  purchaseRequests     PurchaseRequest[]       @relation("CompraSolicitante")
+  purchaseAuthorized   PurchaseRequest[]       @relation("CompraAutorizador")
+  goodsReceipts        GoodsReceipt[]
+  quotesCapturadas     Quote[]
+  purchaseOrders       PurchaseOrder[]
+  inventoryCounts      InventoryCount[]
+  reportPoints         ReportPoint[]
+  tareasLiberadas      WorkOrderTask[]         @relation("TareaLiberadaPor")
   /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
   /// organizacion: se define por excepcion, no llenando un campo por empleado.
-  horasDisponibles Float?
-  festivos         DiaFestivo[] @relation("FestivoCreadoPor")
+  horasDisponibles     Float?
+  festivos             DiaFestivo[]            @relation("FestivoCreadoPor")
   equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
-  asignacionesCreadas PlanAsset[] @relation("AsignacionCreadaPor")
+  asignacionesCreadas  PlanAsset[]             @relation("AsignacionCreadaPor")
+
+  @@index([organizationId])
 }
 
 model Invitation {
@@ -225,7 +225,7 @@ model Team {
   color          String   @default("#0ea5e9")
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      TeamMember[]
   workOrders   WorkOrder[]
   plans        MaintenancePlan[]
@@ -264,7 +264,7 @@ model Site {
   timezone       String   @default("America/Mexico_City")
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   locations    Location[]
   assets       Asset[]
   workOrders   WorkOrder[]
@@ -286,10 +286,10 @@ model Location {
   description    String?
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  parent       Location?    @relation("LocationTree", fields: [parentId], references: [id])
-  children     Location[]   @relation("LocationTree")
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent       Location?     @relation("LocationTree", fields: [parentId], references: [id])
+  children     Location[]    @relation("LocationTree")
   assets       Asset[]
   workOrders   WorkOrder[]
   requests     WorkRequest[]
@@ -318,59 +318,59 @@ model AssetCategory {
 }
 
 model Asset {
-  id             String    @id @default(cuid())
-  organizationId String
-  siteId         String
-  locationId     String?
-  categoryId     String?
-  parentId       String?
-  code           String
-  name           String
-  description    String?
-  manufacturer   String?
-  model          String?
-  serialNumber   String?
-  criticality    String    @default("B")           // A | B | C
-  status         String    @default("OPERATIONAL") // OPERATIONAL|DEGRADED|DOWN|STANDBY|RETIRED
-  purchaseDate   DateTime?
-  purchaseCost   Float     @default(0)
-  replacementCost Float    @default(0)
-  warrantyExpiry DateTime?
-  commissionedAt DateTime?
+  id                String    @id @default(cuid())
+  organizationId    String
+  siteId            String
+  locationId        String?
+  categoryId        String?
+  parentId          String?
+  code              String
+  name              String
+  description       String?
+  manufacturer      String?
+  model             String?
+  serialNumber      String?
+  criticality       String    @default("B") // A | B | C
+  status            String    @default("OPERATIONAL") // OPERATIONAL|DEGRADED|DOWN|STANDBY|RETIRED
+  purchaseDate      DateTime?
+  purchaseCost      Float     @default(0)
+  replacementCost   Float     @default(0)
+  warrantyExpiry    DateTime?
+  commissionedAt    DateTime?
   expectedLifeYears Int?
   /// Ultimo analisis de recurrencia de fallas, en JSON, y cuando se hizo. Se
   /// guarda para no volver a pagarlo cada vez que alguien abre la ficha.
-  iaRecurrencia   String?
-  iaRecurrenciaEl DateTime?
-  imageUrl       String?
-  qrToken        String    @unique @default(cuid())
-  specsJson      String    @default("{}")
-  active         Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  iaRecurrencia     String?
+  iaRecurrenciaEl   DateTime?
+  imageUrl          String?
+  qrToken           String    @unique @default(cuid())
+  specsJson         String    @default("{}")
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  location     Location?         @relation(fields: [locationId], references: [id])
-  category     AssetCategory?    @relation(fields: [categoryId], references: [id])
-  parent       Asset?            @relation("AssetTree", fields: [parentId], references: [id])
-  children     Asset[]           @relation("AssetTree")
-  meters       Meter[]
-  sensors      Sensor[]
-  plans        MaintenancePlan[]
-  workOrders   WorkOrder[]
-  requests     WorkRequest[]
-  alerts       PredictiveAlert[]
-  downtimes    DowntimeEvent[]
-  requisiciones MaterialRequest[]
-  attachments  Attachment[]
-  links        ReferenceLink[]
-  reportPoints ReportPoint[]
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site            Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  location        Location?         @relation(fields: [locationId], references: [id])
+  category        AssetCategory?    @relation(fields: [categoryId], references: [id])
+  parent          Asset?            @relation("AssetTree", fields: [parentId], references: [id])
+  children        Asset[]           @relation("AssetTree")
+  meters          Meter[]
+  sensors         Sensor[]
+  plans           MaintenancePlan[]
+  workOrders      WorkOrder[]
+  requests        WorkRequest[]
+  alerts          PredictiveAlert[]
+  downtimes       DowntimeEvent[]
+  requisiciones   MaterialRequest[]
+  attachments     Attachment[]
+  links           ReferenceLink[]
+  reportPoints    ReportPoint[]
+  planesAsignados PlanAsset[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
-  planesAsignados PlanAsset[]
 }
 
 model DowntimeEvent {
@@ -406,10 +406,10 @@ model Meter {
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   readings     MeterReading[]
   plans        MaintenancePlan[]
+  asignaciones PlanAsset[]
 
   @@index([organizationId])
   @@index([assetId])
-  asignaciones PlanAsset[]
 }
 
 model MeterReading {
@@ -434,51 +434,60 @@ model MeterReading {
 // --------------------------------------------------- Planes de mantenimiento ---
 
 model MaintenancePlan {
-  id             String    @id @default(cuid())
-  organizationId String
-  assetId        String?
-  categoryId     String?
-  meterId        String?
-  teamId         String?
-  assignedToId   String?
-  name           String
-  description    String?
-  maintenanceType String   @default("PREVENTIVE") // PREVENTIVE | PREDICTIVE | INSPECTION
-  triggerType    String    @default("CALENDAR")   // CALENDAR | METER | CONDITION
-  intervalDays   Int?
-  intervalMeter  Float?
-  leadTimeDays   Int       @default(3)
-  toleranceDays  Int       @default(2)
-  priority       String    @default("MEDIUM")
-  estimatedHours Float     @default(1)
-  requiresShutdown Boolean @default(false)
-  procedure      String?
-  safetyNotes    String?
-  active         Boolean   @default(true)
+  id               String    @id @default(cuid())
+  organizationId   String
+  assetId          String?
+  /// El TIPO de equipo al que pertenece este plan.
+  ///
+  /// Un plan de «Preventivo mensual compresor» pertenece a la categoria
+  /// COMPRESORES: eso permite aplicarlo a los cuatro de un golpe en vez de
+  /// buscarlos uno por uno, y —lo que de verdad importa— darse cuenta cuando
+  /// entra un compresor nuevo que se quedo sin plan.
+  ///
+  /// Un equipo sin preventivo porque nadie se acordo de agregarlo es una falla
+  /// que no avisa hasta que el equipo se para.
+  categoryId       String?
+  meterId          String?
+  teamId           String?
+  assignedToId     String?
+  name             String
+  description      String?
+  maintenanceType  String    @default("PREVENTIVE") // PREVENTIVE | PREDICTIVE | INSPECTION
+  triggerType      String    @default("CALENDAR") // CALENDAR | METER | CONDITION
+  intervalDays     Int?
+  intervalMeter    Float?
+  leadTimeDays     Int       @default(3)
+  toleranceDays    Int       @default(2)
+  priority         String    @default("MEDIUM")
+  estimatedHours   Float     @default(1)
+  requiresShutdown Boolean   @default(false)
+  procedure        String?
+  safetyNotes      String?
+  active           Boolean   @default(true)
   /// OBSOLETOS: el calendario vive en PlanAsset, uno por activo.
   ///
   /// Se conservan porque un plan con un solo activo los sigue mostrando en
   /// pantallas viejas y borrarlos ahora seria una migracion destructiva sin
   /// necesidad. El programador ya NO los lee.
-  lastGeneratedAt DateTime?
-  lastCompletedAt DateTime?
-  nextDueDate    DateTime?
-  nextDueMeter   Float?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  lastGeneratedAt  DateTime?
+  lastCompletedAt  DateTime?
+  nextDueDate      DateTime?
+  nextDueMeter     Float?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  asset        Asset?         @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  category     AssetCategory? @relation(fields: [categoryId], references: [id])
-  meter        Meter?         @relation(fields: [meterId], references: [id])
-  team         Team?          @relation(fields: [teamId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset?          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  category     AssetCategory?  @relation(fields: [categoryId], references: [id])
+  meter        Meter?          @relation(fields: [meterId], references: [id])
+  team         Team?           @relation(fields: [teamId], references: [id])
   tasks        PlanTask[]
   workOrders   WorkOrder[]
   links        ReferenceLink[]
+  asignaciones PlanAsset[]
 
   @@index([organizationId])
   @@index([assetId])
-  asignaciones PlanAsset[]
 }
 
 model PlanTask {
@@ -501,70 +510,69 @@ model PlanTask {
   @@index([planId])
 }
 
-
 // ------------------------------------------------------------ Ordenes de trabajo ---
 
 model WorkOrder {
-  id             String    @id @default(cuid())
-  organizationId String
-  number         String
-  title          String
-  description    String?
-  maintenanceType String   @default("CORRECTIVE") // PREVENTIVE|CORRECTIVE|PREDICTIVE|INSPECTION|SAFETY|IMPROVEMENT
-  status         String    @default("OPEN")       // DRAFT|OPEN|ASSIGNED|IN_PROGRESS|ON_HOLD|COMPLETED|CLOSED|CANCELLED
-  priority       String    @default("MEDIUM")     // LOW|MEDIUM|HIGH|CRITICAL
-  assetId        String?
-  siteId         String?
-  locationId     String?
-  planId         String?
-  assignedToId   String?
-  teamId         String?
-  createdById    String?
-  dueDate        DateTime?
-  scheduledStart DateTime?
-  scheduledEnd   DateTime?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  closedAt       DateTime?
-  estimatedHours Float     @default(1)
-  actualHours    Float     @default(0)
-  downtimeMinutes Int      @default(0)
-  responseMinutes Int?
-  requiresShutdown Boolean @default(false)
-  failureCodeId  String?
-  rootCauseId    String?
-  resolution     String?
-  procedure      String?
-  safetyNotes    String?
-  meterValue     Float?
-  laborCost      Float     @default(0)
-  partsCost      Float     @default(0)
-  serviceCost    Float     @default(0)
-  otherCost      Float     @default(0)
-  totalCost      Float     @default(0)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  organizationId   String
+  number           String
+  title            String
+  description      String?
+  maintenanceType  String    @default("CORRECTIVE") // PREVENTIVE|CORRECTIVE|PREDICTIVE|INSPECTION|SAFETY|IMPROVEMENT
+  status           String    @default("OPEN") // DRAFT|OPEN|ASSIGNED|IN_PROGRESS|ON_HOLD|COMPLETED|CLOSED|CANCELLED
+  priority         String    @default("MEDIUM") // LOW|MEDIUM|HIGH|CRITICAL
+  assetId          String?
+  siteId           String?
+  locationId       String?
+  planId           String?
+  assignedToId     String?
+  teamId           String?
+  createdById      String?
+  dueDate          DateTime?
+  scheduledStart   DateTime?
+  scheduledEnd     DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  closedAt         DateTime?
+  estimatedHours   Float     @default(1)
+  actualHours      Float     @default(0)
+  downtimeMinutes  Int       @default(0)
+  responseMinutes  Int?
+  requiresShutdown Boolean   @default(false)
+  failureCodeId    String?
+  rootCauseId      String?
+  resolution       String?
+  procedure        String?
+  safetyNotes      String?
+  meterValue       Float?
+  laborCost        Float     @default(0)
+  partsCost        Float     @default(0)
+  serviceCost      Float     @default(0)
+  otherCost        Float     @default(0)
+  totalCost        Float     @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  asset        Asset?            @relation(fields: [assetId], references: [id])
-  site         Site?             @relation(fields: [siteId], references: [id])
-  location     Location?         @relation(fields: [locationId], references: [id])
-  plan         MaintenancePlan?  @relation(fields: [planId], references: [id])
-  assignedTo   User?             @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
-  createdBy    User?             @relation("WorkOrderCreator", fields: [createdById], references: [id])
-  team         Team?             @relation(fields: [teamId], references: [id])
-  failureCode  FailureCode?      @relation(fields: [failureCodeId], references: [id])
-  rootCause    RootCause?        @relation(fields: [rootCauseId], references: [id])
-  tasks        WorkOrderTask[]
-  labor        WorkOrderLabor[]
-  partsUsed    WorkOrderPart[]
-  servicesUsed WorkOrderService[]
-  comments     WorkOrderComment[]
-  attachments  Attachment[]
-  request      WorkRequest?
-  alerts       PredictiveAlert[]
-  downtimes    DowntimeEvent[]
-  stockMoves   StockMovement[]
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset         Asset?             @relation(fields: [assetId], references: [id])
+  site          Site?              @relation(fields: [siteId], references: [id])
+  location      Location?          @relation(fields: [locationId], references: [id])
+  plan          MaintenancePlan?   @relation(fields: [planId], references: [id])
+  assignedTo    User?              @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  createdBy     User?              @relation("WorkOrderCreator", fields: [createdById], references: [id])
+  team          Team?              @relation(fields: [teamId], references: [id])
+  failureCode   FailureCode?       @relation(fields: [failureCodeId], references: [id])
+  rootCause     RootCause?         @relation(fields: [rootCauseId], references: [id])
+  tasks         WorkOrderTask[]
+  labor         WorkOrderLabor[]
+  partsUsed     WorkOrderPart[]
+  servicesUsed  WorkOrderService[]
+  comments      WorkOrderComment[]
+  attachments   Attachment[]
+  requests      WorkRequest[]
+  alerts        PredictiveAlert[]
+  downtimes     DowntimeEvent[]
+  stockMoves    StockMovement[]
   requisiciones MaterialRequest[]
 
   @@unique([organizationId, number])
@@ -575,40 +583,40 @@ model WorkOrder {
 }
 
 model WorkOrderTask {
-  id            String    @id @default(cuid())
-  workOrderId   String
-  position      Int       @default(0)
+  id              String    @id @default(cuid())
+  workOrderId     String
+  position        Int       @default(0)
   /// De donde salio esta actividad: PLAN | SOLICITUD | BACKLOG | ALERTA | MANUAL.
   ///
   /// Una OT puede juntar actividades de varios origenes —el tecnico va a la
   /// bomba por el preventivo del mes y de paso atiende la fuga reportada— y
   /// sin este campo no habria forma de saber cual actividad cumplio que
   /// compromiso, ni de avanzar el plan correcto al cerrar.
-  origen        String    @default("MANUAL")
+  origen          String    @default("MANUAL")
   /// El plan que aporto esta actividad, si vino de uno. No se usa el planId de
   /// la OT: esa es una sola referencia y una OT mezclada puede traer
   /// actividades de dos planes distintos.
-  planTaskId    String?
-  origenPlanId  String?
+  planTaskId      String?
+  origenPlanId    String?
   /// La solicitud de servicio que dio origen a esta actividad, si aplica.
   origenRequestId String?
   /// Tipo de mantenimiento de ESTA actividad, que puede diferir del de la OT.
   /// De aqui sale la clasificacion de paro planeado o no planeado: tomarla del
   /// encabezado contaria un correctivo colado en un preventivo como planeado.
   maintenanceType String?
-  title         String
-  description   String?
-  taskType      String    @default("CHECK")
-  unit          String?
-  minValue      Float?
-  maxValue      Float?
-  required      Boolean   @default(true)
-  done          Boolean   @default(false)
-  resultText    String?
-  resultNumber  Float?
-  passed        Boolean?
-  completedById String?
-  completedAt   DateTime?
+  title           String
+  description     String?
+  taskType        String    @default("CHECK")
+  unit            String?
+  minValue        Float?
+  maxValue        Float?
+  required        Boolean   @default(true)
+  done            Boolean   @default(false)
+  resultText      String?
+  resultNumber    Float?
+  passed          Boolean?
+  completedById   String?
+  completedAt     DateTime?
 
   /// Cuando el tecnico libero esta actividad en vez de ejecutarla.
   ///
@@ -616,17 +624,33 @@ model WorkOrderTask {
   /// orden cuenta lo que de verdad paso ese dia —tres hechas, una liberada por
   /// falta de refaccion— en vez de que el trabajo pendiente desaparezca del
   /// registro. El backlog es una consulta sobre estas, no una tabla aparte.
-  liberadaAt    DateTime?
-  liberadaPorId String?
+  liberadaAt         DateTime?
+  liberadaPorId      String?
   /// SIN_REFACCION | SIN_MANO_DE_OBRA | SERVICIO_EXTERNO | SIN_ACCESO | OTRO
   ///
   /// Estructurado y no texto libre porque de aqui salen las decisiones: con
   /// SIN_REFACCION y la refaccion identificada, el backlog puede decir cuales
   /// actividades ya se pueden hacer con lo que hay hoy en el almacen.
-  motivoLiberacion String?
-  motivoDetalle    String?
+  motivoLiberacion   String?
+  motivoDetalle      String?
   /// La refaccion que trabo la actividad, cuando el motivo es SIN_REFACCION.
   bloqueadaPorPartId String?
+  /// Por que fallo ESTA actividad. Vive aqui y no en el encabezado de la OT
+  /// porque una orden mezclada puede traer varios reportes de falla —el
+  /// preventivo del mes mas dos fugas reportadas— y un solo codigo en la
+  /// cabecera no puede representar tres eventos distintos. El del encabezado
+  /// se conserva para las ordenes viejas y se sigue leyendo, pero lo nuevo se
+  /// captura aqui.
+  ///
+  /// Solo aplica a actividades cuyo maintenanceType es de falla (CORRECTIVE o
+  /// SAFETY). Un preventivo que se ejecuto bien no es una falla, y codificarlo
+  /// inventa un evento que despues ensucia el Pareto y el MTBF.
+  failureCodeId      String?
+  rootCauseId        String?
+  /// Paro que causo esta actividad. Mismo motivo que arriba: el paro del
+  /// encabezado no se puede repartir entre varias fallas.
+  downtimeMinutes    Int       @default(0)
+
   /// La actividad liberada que esta continua, cuando se retomo del backlog.
   ///
   /// Encadena el historial: liberada en una OT, retomada en otra, hecha. Saber
@@ -634,12 +658,15 @@ model WorkOrderTask {
   /// contador que se desincroniza.
   retomaDeTaskId String? @unique
 
-  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  completedBy User?     @relation(fields: [completedById], references: [id])
-  liberadaPor User?     @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
-  bloqueadaPor Part?    @relation(fields: [bloqueadaPorPartId], references: [id])
-  retomaDe    WorkOrderTask?  @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
-  retomadaPor WorkOrderTask?  @relation("CadenaDeRetoma")
+  workOrder     WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  completedBy   User?          @relation(fields: [completedById], references: [id])
+  liberadaPor   User?          @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
+  bloqueadaPor  Part?          @relation(fields: [bloqueadaPorPartId], references: [id])
+  failureCode   FailureCode?   @relation(fields: [failureCodeId], references: [id])
+  rootCause     RootCause?     @relation(fields: [rootCauseId], references: [id])
+  origenRequest WorkRequest?   @relation("SolicitudAtendida", fields: [origenRequestId], references: [id])
+  retomaDe      WorkOrderTask? @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
+  retomadaPor   WorkOrderTask? @relation("CadenaDeRetoma")
 
   @@index([workOrderId])
   @@index([liberadaAt])
@@ -750,26 +777,26 @@ model Attachment {
 // ------------------------------------------------------------------ Solicitudes ---
 
 model WorkRequest {
-  id             String    @id @default(cuid())
-  organizationId String
-  number         String
-  title          String
-  description    String?
-  assetId        String?
-  siteId         String?
-  locationId     String?
-  priority       String    @default("MEDIUM")
-  status         String    @default("PENDING") // PENDING|APPROVED|REJECTED|CONVERTED
-  requestedById  String?
+  id              String  @id @default(cuid())
+  organizationId  String
+  number          String
+  title           String
+  description     String?
+  assetId         String?
+  siteId          String?
+  locationId      String?
+  priority        String  @default("MEDIUM")
+  status          String  @default("PENDING") // PENDING|APPROVED|REJECTED|CONVERTED
+  requestedById   String?
   /// Punto de reporte del que salio, cuando entro por el portal publico.
-  reportPointId  String?
+  reportPointId   String?
   /// Quien reporto sin ser usuario del sistema. Obligatorios en el portal: una
   /// solicitud anonima es una que nadie puede aclarar por telefono.
-  reporterNombre String?
+  reporterNombre  String?
   reporterCelular String?
-  reporterCorreo String?
+  reporterCorreo  String?
   /// Liga de seguimiento. Solo revela ESTA solicitud y no permite listar otras.
-  publicToken    String?   @unique
+  publicToken     String? @unique
 
   // ── Triage ──────────────────────────────────────────────────────────────
   /// Riesgo detectado al recibir, por patrones en el texto. NINGUNO | ALTO.
@@ -777,31 +804,36 @@ model WorkRequest {
   /// Se calcula en codigo y sin IA a proposito: tiene que ser instantaneo. Un
   /// "huele a gas" no puede esperar a que alguien abra la bandeja, y el
   /// reportante tampoco puede esperar a un modelo con el dedo en Enviar.
-  riesgo         String    @default("NINGUNO")
-  riesgoMotivo   String?
+  riesgo        String    @default("NINGUNO")
+  riesgoMotivo  String?
   /// Lo que propuso la IA al abrir la bandeja. Se guarda para no volver a
   /// pagarlo cada vez que alguien mire la misma solicitud.
-  iaTitulo       String?
-  iaPrioridad    String?
-  iaTipo         String?
-  iaResumen      String?
-  iaDuplicadoDe  String?
-  iaEl           DateTime?
-  reviewedById   String?
-  reviewNotes    String?
-  workOrderId    String?   @unique
-  createdAt      DateTime  @default(now())
-  reviewedAt     DateTime?
+  iaTitulo      String?
+  iaPrioridad   String?
+  iaTipo        String?
+  iaResumen     String?
+  iaDuplicadoDe String?
+  iaEl          DateTime?
+  reviewedById  String?
+  reviewNotes   String?
+  /// La OT donde se esta atendiendo. Sin @unique a proposito: una orden
+  /// mezclada puede atender varios reportes de falla a la vez, cada uno como
+  /// su propia actividad. El detalle de que actividad atiende que reporte
+  /// vive en WorkOrderTask.origenRequestId.
+  workOrderId   String?
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  asset        Asset?       @relation(fields: [assetId], references: [id])
-  site         Site?        @relation(fields: [siteId], references: [id])
-  location     Location?    @relation(fields: [locationId], references: [id])
-  requestedBy  User?        @relation("RequestAuthor", fields: [requestedById], references: [id])
-  reportPoint  ReportPoint? @relation(fields: [reportPointId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset?          @relation(fields: [assetId], references: [id])
+  site         Site?           @relation(fields: [siteId], references: [id])
+  location     Location?       @relation(fields: [locationId], references: [id])
+  requestedBy  User?           @relation("RequestAuthor", fields: [requestedById], references: [id])
+  reportPoint  ReportPoint?    @relation(fields: [reportPointId], references: [id])
   attachments  Attachment[]
-  reviewedBy   User?        @relation("RequestReviewer", fields: [reviewedById], references: [id])
-  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
+  reviewedBy   User?           @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  workOrder    WorkOrder?      @relation(fields: [workOrderId], references: [id])
+  actividades  WorkOrderTask[] @relation("SolicitudAtendida")
 
   @@unique([organizationId, number])
   @@index([organizationId])
@@ -821,13 +853,13 @@ model Supplier {
   notes          String?
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  parts        Part[]
-  services     ExternalService[]
-  compras      PurchaseRequest[]
-  recepciones  GoodsReceipt[]
-  cotizaciones Quote[]
-  ordenes      PurchaseOrder[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parts             Part[]
+  services          ExternalService[]
+  compras           PurchaseRequest[]
+  recepciones       GoodsReceipt[]
+  cotizaciones      Quote[]
+  ordenes           PurchaseOrder[]
   workOrderServices WorkOrderService[]
 
   @@index([organizationId])
@@ -861,60 +893,60 @@ model Part {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
-  movements    StockMovement[]
-  existencias  PartStock[]
-  traspasos    StockTransferLine[]
-  requisiciones MaterialRequestLine[]
-  compras       PurchaseRequestLine[]
-  recibidas     GoodsReceiptLine[]
-  cotizadas     QuoteLine[]
-  conteos       InventoryCountLine[]
-  planTaskParts PlanTaskPart[]
-  usedIn       WorkOrderPart[]
-  attachments  Attachment[]
-  links        ReferenceLink[]
+  organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier         Supplier?               @relation(fields: [supplierId], references: [id])
+  movements        StockMovement[]
+  existencias      PartStock[]
+  traspasos        StockTransferLine[]
+  requisiciones    MaterialRequestLine[]
+  compras          PurchaseRequestLine[]
+  recibidas        GoodsReceiptLine[]
+  cotizadas        QuoteLine[]
+  conteos          InventoryCountLine[]
+  planTaskParts    PlanTaskPart[]
+  usedIn           WorkOrderPart[]
+  attachments      Attachment[]
+  links            ReferenceLink[]
+  tareasBloqueadas WorkOrderTask[]
+  equivalenciasA   EquivalenciaRefaccion[] @relation("EquivalenciaA")
+  equivalenciasB   EquivalenciaRefaccion[] @relation("EquivalenciaB")
 
   @@unique([organizationId, code])
   @@index([organizationId])
-  tareasBloqueadas WorkOrderTask[]
-  equivalenciasA EquivalenciaRefaccion[] @relation("EquivalenciaA")
-  equivalenciasB EquivalenciaRefaccion[] @relation("EquivalenciaB")
 }
 
 model StockMovement {
-  id             String   @id @default(cuid())
-  organizationId String
-  partId         String
-  warehouseId    String?
-  workOrderId    String?
-  transferId     String?
+  id                String   @id @default(cuid())
+  organizationId    String
+  partId            String
+  warehouseId       String?
+  workOrderId       String?
+  transferId        String?
   materialRequestId String?
-  userId         String?
+  userId            String?
   /// A quien se le entrego fisicamente. Puede no ser quien pidio —un ayudante
   /// pasa por el material— y por eso no basta con el solicitante de la
   /// requisicion. Es texto libre porque el que recoge no siempre es usuario.
-  entregadoA     String?
+  entregadoA        String?
   /// IN | OUT | ADJUST | RETURN | TRANSFER_IN | TRANSFER_OUT
   ///
   /// RETURN es la devolucion de lo que el tecnico pidio y no uso. Se separa de
   /// IN a proposito: una devolucion no es una compra, y mezclarlas inflaria el
   /// consumo aparente del almacen.
-  movementType   String
-  quantity       Float
-  unitCost       Float    @default(0)
-  balanceAfter   Float    @default(0)
-  reference      String?
-  createdAt      DateTime @default(now())
+  movementType      String
+  quantity          Float
+  unitCost          Float    @default(0)
+  balanceAfter      Float    @default(0)
+  reference         String?
+  createdAt         DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  part         Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
-  warehouse    Warehouse?     @relation(fields: [warehouseId], references: [id])
-  workOrder    WorkOrder?     @relation(fields: [workOrderId], references: [id])
-  transfer     StockTransfer?   @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  part            Part             @relation(fields: [partId], references: [id], onDelete: Cascade)
+  warehouse       Warehouse?       @relation(fields: [warehouseId], references: [id])
+  workOrder       WorkOrder?       @relation(fields: [workOrderId], references: [id])
+  transfer        StockTransfer?   @relation(fields: [transferId], references: [id], onDelete: Cascade)
   materialRequest MaterialRequest? @relation(fields: [materialRequestId], references: [id])
-  user         User?            @relation(fields: [userId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
   @@index([partId])
@@ -938,13 +970,13 @@ model Warehouse {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site?           @relation(fields: [siteId], references: [id])
-  responsable  User?           @relation(fields: [responsableId], references: [id])
-  existencias  PartStock[]
-  movements    StockMovement[]
-  salidas      StockTransfer[] @relation("TraspasoOrigen")
-  entradas     StockTransfer[] @relation("TraspasoDestino")
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site          Site?             @relation(fields: [siteId], references: [id])
+  responsable   User?             @relation(fields: [responsableId], references: [id])
+  existencias   PartStock[]
+  movements     StockMovement[]
+  salidas       StockTransfer[]   @relation("TraspasoOrigen")
+  entradas      StockTransfer[]   @relation("TraspasoDestino")
   requisiciones MaterialRequest[]
   compras       PurchaseRequest[]
   recepciones   GoodsReceipt[]
@@ -988,37 +1020,37 @@ model PartStock {
 /// empresa compra en su propio ERP, aqui se anota el folio de esa orden y el
 /// documento salta directo a recepcion sin perder el rastro.
 model PurchaseRequest {
-  id             String   @id @default(cuid())
-  organizationId String
-  folio          String
-  warehouseId    String
-  materialRequestId String?
-  solicitanteId  String?
+  id                  String    @id @default(cuid())
+  organizationId      String
+  folio               String
+  warehouseId         String
+  materialRequestId   String?
+  solicitanteId       String?
   proveedorSugeridoId String?
   /// NORMAL | ALTA | PARO
-  urgencia       String   @default("NORMAL")
-  justificacion  String?
-  montoEstimado  Float    @default(0)
+  urgencia            String    @default("NORMAL")
+  justificacion       String?
+  montoEstimado       Float     @default(0)
   /// Folio de la orden de compra, sea la interna o la del ERP del cliente.
-  ordenCompra    String?
+  ordenCompra         String?
   /// SOLICITADA | AUTORIZADA | RECHAZADA | EN_COMPRA | RECIBIDA_PARCIAL | RECIBIDA | CERRADA | CANCELADA
-  estado         String   @default("SOLICITADA")
-  autorizadaPorId String?
-  autorizadaEl   DateTime?
-  motivoRechazo  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  estado              String    @default("SOLICITADA")
+  autorizadaPorId     String?
+  autorizadaEl        DateTime?
+  motivoRechazo       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  warehouse     Warehouse             @relation(fields: [warehouseId], references: [id])
-  materialRequest MaterialRequest?    @relation(fields: [materialRequestId], references: [id])
-  solicitante   User?                 @relation("CompraSolicitante", fields: [solicitanteId], references: [id])
-  autorizadaPor User?                 @relation("CompraAutorizador", fields: [autorizadaPorId], references: [id])
-  proveedorSugerido Supplier?         @relation(fields: [proveedorSugeridoId], references: [id])
-  renglones     PurchaseRequestLine[]
-  recepciones   GoodsReceipt[]
-  cotizaciones  Quote[]
-  ordenes       PurchaseOrder[]
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse         Warehouse             @relation(fields: [warehouseId], references: [id])
+  materialRequest   MaterialRequest?      @relation(fields: [materialRequestId], references: [id])
+  solicitante       User?                 @relation("CompraSolicitante", fields: [solicitanteId], references: [id])
+  autorizadaPor     User?                 @relation("CompraAutorizador", fields: [autorizadaPorId], references: [id])
+  proveedorSugerido Supplier?             @relation(fields: [proveedorSugeridoId], references: [id])
+  renglones         PurchaseRequestLine[]
+  recepciones       GoodsReceipt[]
+  cotizaciones      Quote[]
+  ordenes           PurchaseOrder[]
 
   @@unique([organizationId, folio])
   @@index([organizationId])
@@ -1026,14 +1058,14 @@ model PurchaseRequest {
 }
 
 model PurchaseRequestLine {
-  id        String  @id @default(cuid())
-  requestId String
-  partId    String?
-  descripcion String
+  id                 String  @id @default(cuid())
+  requestId          String
+  partId             String?
+  descripcion        String
   cantidadSolicitada Float
-  cantidadRecibida   Float @default(0)
-  costoEstimado      Float @default(0)
-  nota      String?
+  cantidadRecibida   Float   @default(0)
+  costoEstimado      Float   @default(0)
+  nota               String?
 
   request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   part    Part?           @relation(fields: [partId], references: [id])
@@ -1047,41 +1079,41 @@ model PurchaseRequestLine {
 /// varias entregas, cada una con su remision, su fecha y su revision. La
 /// entrada al inventario la hacen los movimientos que produce.
 model GoodsReceipt {
-  id             String   @id @default(cuid())
-  organizationId String
-  folio          String
+  id                String   @id @default(cuid())
+  organizationId    String
+  folio             String
   purchaseRequestId String?
-  warehouseId    String
-  supplierId     String?
+  warehouseId       String
+  supplierId        String?
   /// Remision o factura con la que llego la mercancia.
-  remision       String?
-  ordenCompra    String?
-  recibidoPorId  String?
-  nota           String?
-  createdAt      DateTime @default(now())
+  remision          String?
+  ordenCompra       String?
+  recibidoPorId     String?
+  nota              String?
+  createdAt         DateTime @default(now())
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  purchaseRequest PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
-  warehouse    Warehouse         @relation(fields: [warehouseId], references: [id])
-  supplier     Supplier?         @relation(fields: [supplierId], references: [id])
-  recibidoPor  User?             @relation(fields: [recibidoPorId], references: [id])
-  renglones    GoodsReceiptLine[]
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseRequest PurchaseRequest?   @relation(fields: [purchaseRequestId], references: [id])
+  warehouse       Warehouse          @relation(fields: [warehouseId], references: [id])
+  supplier        Supplier?          @relation(fields: [supplierId], references: [id])
+  recibidoPor     User?              @relation(fields: [recibidoPorId], references: [id])
+  renglones       GoodsReceiptLine[]
 
   @@unique([organizationId, folio])
   @@index([organizationId])
 }
 
 model GoodsReceiptLine {
-  id        String  @id @default(cuid())
-  receiptId String
+  id            String  @id @default(cuid())
+  receiptId     String
   requestLineId String?
-  partId    String
-  cantidad  Float
-  costoUnitario Float @default(0)
+  partId        String
+  cantidad      Float
+  costoUnitario Float   @default(0)
   /// Si paso la revision fisica. Lo que no pasa se recibe igual pero queda
   /// senalado: devolverlo al proveedor es una conversacion, no un borrado.
-  conforme  Boolean @default(true)
-  observacion String?
+  conforme      Boolean @default(true)
+  observacion   String?
 
   receipt GoodsReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   part    Part         @relation(fields: [partId], references: [id])
@@ -1096,52 +1128,52 @@ model GoodsReceiptLine {
 /// desactualiza en cuanto llega una cotizacion mas. Lo unico que hay que
 /// conservar es cual gano y por que, y eso vive aqui mismo.
 model Quote {
-  id             String   @id @default(cuid())
-  organizationId String
+  id                String    @id @default(cuid())
+  organizationId    String
   purchaseRequestId String
-  supplierId     String
+  supplierId        String
   /// El numero con el que el proveedor identifica su cotizacion.
-  folioProveedor String?
-  vigenciaHasta  DateTime?
-  diasEntrega    Int?
-  condicionesPago String?
-  garantia       String?
+  folioProveedor    String?
+  vigenciaHasta     DateTime?
+  diasEntrega       Int?
+  condicionesPago   String?
+  garantia          String?
   /// Cuando cotizan en otra moneda. El total siempre se guarda ya convertido.
-  monedaOriginal String?
-  tipoCambio     Float?
-  total          Float    @default(0)
-  seleccionada   Boolean  @default(false)
+  monedaOriginal    String?
+  tipoCambio        Float?
+  total             Float     @default(0)
+  seleccionada      Boolean   @default(false)
   /// Por que se eligio esta y no la mas barata. Es lo que defiende la decision
   /// cuando alguien la revise en dos años.
-  motivoSeleccion String?
-  nota           String?
-  capturadaPorId String?
-  createdAt      DateTime @default(now())
+  motivoSeleccion   String?
+  nota              String?
+  capturadaPorId    String?
+  createdAt         DateTime  @default(now())
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
-  supplier     Supplier        @relation(fields: [supplierId], references: [id])
-  capturadaPor User?           @relation(fields: [capturadaPorId], references: [id])
-  renglones    QuoteLine[]
-  ordenes      PurchaseOrder[]
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  capturadaPor    User?           @relation(fields: [capturadaPorId], references: [id])
+  renglones       QuoteLine[]
+  ordenes         PurchaseOrder[]
 
   @@index([organizationId])
   @@index([purchaseRequestId])
 }
 
 model QuoteLine {
-  id       String  @id @default(cuid())
-  quoteId  String
-  requestLineId String?
-  partId   String?
-  descripcion String
-  marca    String?
+  id             String  @id @default(cuid())
+  quoteId        String
+  requestLineId  String?
+  partId         String?
+  descripcion    String
+  marca          String?
   especificacion String?
-  cantidad Float
-  costoUnitario Float @default(0)
+  cantidad       Float
+  costoUnitario  Float   @default(0)
   /// El proveedor puede no tener uno de los renglones. Se registra igual:
   /// que no lo surta es informacion para el comparativo.
-  disponible Boolean @default(true)
+  disponible     Boolean @default(true)
 
   quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   part  Part? @relation(fields: [partId], references: [id])
@@ -1156,28 +1188,28 @@ model QuoteLine {
 /// tres copias de la misma lista y la recepcion tendria que decidir contra
 /// cual cuadrar.
 model PurchaseOrder {
-  id             String   @id @default(cuid())
-  organizationId String
-  folio          String
+  id                String    @id @default(cuid())
+  organizationId    String
+  folio             String
   purchaseRequestId String
-  quoteId        String?
-  supplierId     String
-  warehouseId    String
+  quoteId           String?
+  supplierId        String
+  warehouseId       String
   /// ABIERTA | RECIBIDA_PARCIAL | RECIBIDA | CANCELADA
-  estado         String   @default("ABIERTA")
-  condicionesPago String?
-  fechaPrometida DateTime?
-  total          Float    @default(0)
-  nota           String?
-  emitidaPorId   String?
-  createdAt      DateTime @default(now())
+  estado            String    @default("ABIERTA")
+  condicionesPago   String?
+  fechaPrometida    DateTime?
+  total             Float     @default(0)
+  nota              String?
+  emitidaPorId      String?
+  createdAt         DateTime  @default(now())
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id])
-  quote        Quote?          @relation(fields: [quoteId], references: [id])
-  supplier     Supplier        @relation(fields: [supplierId], references: [id])
-  warehouse    Warehouse       @relation(fields: [warehouseId], references: [id])
-  emitidaPor   User?           @relation(fields: [emitidaPorId], references: [id])
+  quote           Quote?          @relation(fields: [quoteId], references: [id])
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  emitidaPor      User?           @relation(fields: [emitidaPorId], references: [id])
 
   @@unique([organizationId, folio])
   @@index([organizationId])
@@ -1190,17 +1222,17 @@ model PurchaseOrder {
 /// lo que haya al momento de cerrar. Si entre una cosa y otra hubo movimientos
 /// legitimos, el sistema lo dice en vez de borrarlos en silencio.
 model InventoryCount {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   folio          String
   warehouseId    String
   responsableId  String?
   /// ABIERTO | CERRADO | CANCELADO
-  estado         String   @default("ABIERTO")
+  estado         String    @default("ABIERTO")
   /// Que se conto: todo el almacen o una familia. Solo informativo.
   alcance        String?
   nota           String?
-  abiertoEl      DateTime @default(now())
+  abiertoEl      DateTime  @default(now())
   cerradoEl      DateTime?
 
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1213,17 +1245,17 @@ model InventoryCount {
 }
 
 model InventoryCountLine {
-  id      String @id @default(cuid())
-  countId String
-  partId  String
+  id               String  @id @default(cuid())
+  countId          String
+  partId           String
   /// Lo que el sistema decia al ABRIR el conteo.
-  cantidadSistema Float
+  cantidadSistema  Float
   /// Lo que se conto en el anaquel. Nulo mientras no se capture.
-  cantidadContada Float?
+  cantidadContada  Float?
   /// Lo que habia al momento de cerrar. Si difiere de cantidadSistema es que
   /// hubo movimientos durante el conteo.
   cantidadAlCerrar Float?
-  nota    String?
+  nota             String?
 
   count InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
   part  Part           @relation(fields: [partId], references: [id])
@@ -1296,7 +1328,7 @@ model StockTransfer {
 /// su fecha y a quien se le dio. Separarlos obligaria a reconciliar dos
 /// documentos para siempre.
 model MaterialRequest {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   folio          String
   warehouseId    String
@@ -1306,15 +1338,15 @@ model MaterialRequest {
   assetId        String?
   solicitanteId  String?
   /// PREVENTIVO | CORRECTIVO | MINIMO | PROYECTO
-  motivo         String   @default("CORRECTIVO")
+  motivo         String    @default("CORRECTIVO")
   /// NORMAL | ALTA | PARO
-  urgencia       String   @default("NORMAL")
+  urgencia       String    @default("NORMAL")
   nota           String?
   /// SOLICITADA | PARCIAL | SURTIDA | CERRADA | CANCELADA
-  estado         String   @default("SOLICITADA")
+  estado         String    @default("SOLICITADA")
   cerradaEl      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   warehouse    Warehouse             @relation(fields: [warehouseId], references: [id])
@@ -1332,16 +1364,16 @@ model MaterialRequest {
 }
 
 model MaterialRequestLine {
-  id        String  @id @default(cuid())
-  requestId String
+  id                 String  @id @default(cuid())
+  requestId          String
   /// Nulo cuando se pide algo que no esta en el catalogo. La descripcion
   /// siempre va: es lo que permite pedir lo que todavia no existe.
-  partId    String?
-  descripcion String
+  partId             String?
+  descripcion        String
   cantidadSolicitada Float
-  cantidadSurtida    Float @default(0)
-  cantidadDevuelta   Float @default(0)
-  nota      String?
+  cantidadSurtida    Float   @default(0)
+  cantidadDevuelta   Float   @default(0)
+  nota               String?
 
   request MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   part    Part?           @relation(fields: [partId], references: [id])
@@ -1390,7 +1422,6 @@ model ReferenceLink {
   @@index([partId])
   @@index([planId])
 }
-
 
 // -------------------------------------------- Especialidades y servicios
 
@@ -1512,25 +1543,24 @@ model PartUnit {
   @@index([organizationId])
 }
 
-
 // ----------------------------------------------------------------- Predictivo ---
 
 model Sensor {
-  id             String   @id @default(cuid())
-  organizationId String
-  assetId        String
-  name           String
-  sensorType     String   // VIBRATION|TEMPERATURE|PRESSURE|CURRENT|OIL|ULTRASOUND|FLOW|RPM
-  unit           String
+  id                String    @id @default(cuid())
+  organizationId    String
+  assetId           String
+  name              String
+  sensorType        String // VIBRATION|TEMPERATURE|PRESSURE|CURRENT|OIL|ULTRASOUND|FLOW|RPM
+  unit              String
   warningThreshold  Float?
   criticalThreshold Float?
-  direction      String   @default("ABOVE") // ABOVE | BELOW
-  samplingHours  Int      @default(24)
-  active         Boolean  @default(true)
-  lastValue      Float?
-  lastStatus     String   @default("NORMAL")
-  lastReadingAt  DateTime?
-  createdAt      DateTime @default(now())
+  direction         String    @default("ABOVE") // ABOVE | BELOW
+  samplingHours     Int       @default(24)
+  active            Boolean   @default(true)
+  lastValue         Float?
+  lastStatus        String    @default("NORMAL")
+  lastReadingAt     DateTime?
+  createdAt         DateTime  @default(now())
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -1558,22 +1588,22 @@ model SensorReading {
 }
 
 model PredictiveAlert {
-  id             String    @id @default(cuid())
-  organizationId String
-  sensorId       String?
-  assetId        String
-  workOrderId    String?
-  severity       String    @default("WARNING") // WARNING | CRITICAL
-  title          String
-  message        String
-  value          Float?
-  threshold      Float?
-  trendSlope     Float?
+  id                 String    @id @default(cuid())
+  organizationId     String
+  sensorId           String?
+  assetId            String
+  workOrderId        String?
+  severity           String    @default("WARNING") // WARNING | CRITICAL
+  title              String
+  message            String
+  value              Float?
+  threshold          Float?
+  trendSlope         Float?
   projectedFailureAt DateTime?
-  status         String    @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED | DISMISSED
-  acknowledgedById String?
-  acknowledgedAt DateTime?
-  createdAt      DateTime  @default(now())
+  status             String    @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED | DISMISSED
+  acknowledgedById   String?
+  acknowledgedAt     DateTime?
+  createdAt          DateTime  @default(now())
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sensor         Sensor?      @relation(fields: [sensorId], references: [id], onDelete: Cascade)
@@ -1602,25 +1632,25 @@ model PredictiveAlert {
 /// que es como se factura el modelo) y cuantas operaciones lleva el cliente
 /// contra las que incluye su plan.
 model AiUsage {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String?
+  id               String   @id @default(cuid())
+  organizationId   String
+  userId           String?
   /// Clave de lib/ia/funciones.ts: DIAGNOSTICO, CIERRE_OT, PLAN…
-  funcion        String
-  modelo         String
-  inputTokens      Int   @default(0)
-  outputTokens     Int   @default(0)
-  cacheReadTokens  Int   @default(0)
-  cacheWriteTokens Int   @default(0)
+  funcion          String
+  modelo           String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
   /// Lo que se le descuenta al cliente de su bolsa mensual.
-  operaciones    Int      @default(1)
+  operaciones      Int      @default(1)
   /// Costo real ante Anthropic, en USD.
-  costoUsd       Float    @default(0)
+  costoUsd         Float    @default(0)
   /// AAAA-MM, para agrupar sin convertir fechas.
-  periodo        String
-  ok             Boolean  @default(true)
-  error          String?
-  createdAt      DateTime @default(now())
+  periodo          String
+  ok               Boolean  @default(true)
+  error            String?
+  createdAt        DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
@@ -1660,7 +1690,7 @@ model AiReport {
 /// inventario mal levantado ensucia el sistema para siempre, y deshacerlo
 /// cuesta mas que levantarlo bien.
 model AssetIntake {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   createdById    String?
   /// Como describio el usuario la instalacion.
@@ -1668,11 +1698,11 @@ model AssetIntake {
   /// Tipo de instalacion detectado: EDIFICIO, GIMNASIO, ESCUELA, HOSPITAL…
   tipo           String?
   /// Preguntas y respuestas de la entrevista, serializadas.
-  entrevista     String   @default("[]")
+  entrevista     String    @default("[]")
   /// BORRADOR | REVISADO | APLICADO
-  estado         String   @default("BORRADOR")
+  estado         String    @default("BORRADOR")
   notaIa         String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
   aplicadoEl     DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1688,25 +1718,25 @@ model AssetIntake {
 
 /// Un activo propuesto, todavia sin existir.
 model AssetDraft {
-  id            String  @id @default(cuid())
-  intakeId      String
+  id           String  @id @default(cuid())
+  intakeId     String
   /// Sistema o area al que pertenece: climatizacion, electrico, cocina…
-  sistema       String
-  nombre        String
-  categoria     String?
-  criticidad    String  @default("C")
-  ubicacion     String?
+  sistema      String
+  nombre       String
+  categoria    String?
+  criticidad   String  @default("C")
+  ubicacion    String?
   /// Cuantos equipos iguales. Al aplicar se crea uno por cada uno.
-  cantidad      Int     @default(1)
+  cantidad     Int     @default(1)
   /// Por que se propone: que funcion cumple y que pasa si falla.
-  porQue        String?
+  porQue       String?
   /// Datos de placa. Nacen vacios y se llenan en piso: nunca se inventan.
-  fabricante    String?
-  modelo        String?
+  fabricante   String?
+  modelo       String?
   /// PENDIENTE | ACEPTADO | DESCARTADO | APLICADO
-  estado        String  @default("PENDIENTE")
+  estado       String  @default("PENDIENTE")
   /// Codigo con el que se creo, cuando ya se aplico.
-  codigoCreado  String?
+  codigoCreado String?
 
   intake AssetIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
 
@@ -1743,7 +1773,6 @@ model Invoice {
   @@index([status])
 }
 
-
 // ------------------------------------------------ Cambios de plan
 
 /// Solicitud de cambio de plan hecha por el cliente.
@@ -1770,7 +1799,6 @@ model PlanRequest {
   @@index([status])
 }
 
-
 // -------------------------------------------------------------------- Soporte ---
 
 /// Por que fallo, no que fallo. El codigo de falla describe el sintoma
@@ -1785,22 +1813,24 @@ model RootCause {
   category       String?
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workOrders   WorkOrder[]
+  actividades  WorkOrderTask[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
 }
 
 model FailureCode {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   code           String
   description    String
-  category       String?  // MECANICO | ELECTRICO | HIDRAULICO | OPERACION | OTRO
+  category       String? // MECANICO | ELECTRICO | HIDRAULICO | OPERACION | OTRO
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workOrders   WorkOrder[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workOrders     WorkOrder[]
+  workOrderTasks WorkOrderTask[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -1911,13 +1941,13 @@ model EquivalenciaRefaccion {
 /// pasada porque fallo. Si la proxima fecha viviera en el plan, los diez
 /// generarian orden el mismo dia para siempre —peor que tener diez planes.
 model PlanAsset {
-  id             String   @id @default(cuid())
+  id             String @id @default(cuid())
   organizationId String
   planId         String
   assetId        String
 
   /// El medidor de ESTE equipo. Cada compresor lleva sus propias horas.
-  meterId        String?
+  meterId String?
 
   /// El calendario de este equipo con este plan.
   nextDueDate     DateTime?
@@ -1926,11 +1956,11 @@ model PlanAsset {
   lastCompletedAt DateTime?
 
   /// Se puede pausar un equipo sin desactivar el plan de los demas.
-  active         Boolean  @default(true)
+  active Boolean @default(true)
 
-  createdById    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   plan         MaintenancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)

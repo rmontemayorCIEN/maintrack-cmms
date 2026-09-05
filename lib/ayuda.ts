@@ -311,6 +311,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Las preventivas las genera el programador desde los planes; no se capturan una por una.",
       "Las correctivas nacen de una solicitud, de una alerta predictiva o a mano.",
+      "Una misma orden puede juntar trabajo de varios orígenes: el preventivo del mes de esa bomba, más la fuga que alguien reportó. Cada actividad conserva de dónde vino.",
       "Al cerrarlas, sus horas, refacciones y servicios alimentan el costo por equipo.",
       "En las preventivas, el plan ya dice qué refacciones se van a consumir: la requisición se arma con eso y descuenta lo que ya se pidió o se consumió.",
       "Al pedir, el sistema dice cuánto cubre el almacén y cuánto no, para poder empezar con lo que hay y mandar el resto a compras.",
@@ -342,6 +343,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     preguntas: [
       { pregunta: "¿Por qué no aparecen mis órdenes preventivas?", respuesta: "Las genera el programador desde los planes. Vaya a Planes preventivos y ejecútelo: ahí le dice, plan por plan, por qué generó o por qué no." },
+      { pregunta: "¿Por qué al cerrar un preventivo no me pide código de falla?", respuesta: "Porque una rutina que se ejecutó bien no es una falla. El código de falla documenta un evento de falla, y ponérselo a un preventivo inventa una avería que nunca ocurrió: después aparece en el Pareto de modos de falla y en el cálculo de tiempo entre fallas, y le hace creer que ese equipo tiene un problema que no tiene. Si al hacer el preventivo el técnico SÍ encontró algo, eso se levanta como reporte de falla y se atiende como actividad correctiva —ahí sí se codifica." },
+      { pregunta: "Mi orden trae el preventivo y dos fallas reportadas. ¿Cómo se cierra?", respuesta: "El cierre le pregunta la causa una vez por cada falla, no una sola vez para toda la orden. Son eventos distintos y cada uno conserva su código, su causa raíz y su tiempo de paro. Las actividades del plan no piden nada. El paro total del equipo es la suma de lo que causó cada falla, y se cuenta como paro no planeado aunque la orden haya nacido de un preventivo." },
       { pregunta: "¿De dónde saca el procedimiento de una correctiva?", respuesta: "Del equipo, de la falla reportada y —lo más valioso— de las reparaciones anteriores de ese mismo equipo. Lo que ya funcionó ahí vale más que un procedimiento de manual. Las refacciones que sugiere salen de su catálogo, con código: nunca inventa una que no existe." },
       { pregunta: "¿Cómo cargo las refacciones que se usaron?", respuesta: "Dentro de la orden, en el panel de refacciones. Si el material salió por una requisición al almacén, el consumo ya quedó cargado solo." },
     ],

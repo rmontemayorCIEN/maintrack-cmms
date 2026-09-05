@@ -19,7 +19,7 @@ async function main() {
       workOrder: {
         select: {
           number: true, planId: true, maintenanceType: true,
-          request: { select: { id: true } },
+          requests: { select: { id: true } },
         },
       },
     },
@@ -39,10 +39,13 @@ async function main() {
         datos: { ...base, origen: "PLAN", origenPlanId: wo.planId },
         nota: `${wo.number}  ${t.title.slice(0, 44)}`,
       });
-    } else if (wo.request) {
+    } else if (wo.requests.length === 1) {
+      // Solo cuando la orden atiende UNA solicitud. Con varias no hay forma de
+      // saber cual actividad corresponde a cual reporte, y adivinar seria peor
+      // que dejarla en MANUAL.
       cambios.push({
         id: t.id, origen: "SOLICITUD",
-        datos: { ...base, origen: "SOLICITUD", origenRequestId: wo.request.id },
+        datos: { ...base, origen: "SOLICITUD", origenRequestId: wo.requests[0].id },
         nota: `${wo.number}  ${t.title.slice(0, 44)}`,
       });
     } else {

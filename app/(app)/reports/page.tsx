@@ -11,6 +11,7 @@ import {
   PRIORITY_LABELS,
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 
 export const metadata = { title: "Reportes" };
 export const dynamic = "force-dynamic";
@@ -44,12 +45,10 @@ export default async function ReportsPage({
       _sum: { hours: true, cost: true },
       _count: { _all: true },
     }),
-    prisma.workOrder.groupBy({
-      by: ["failureCodeId"],
-      where: { organizationId: orgId, failureCodeId: { not: null }, completedAt: { gte: range.from } },
-      _count: { _all: true },
-      _sum: { downtimeMinutes: true, totalCost: true },
-    }),
+    // Pasa por fallasCodificadas y no por un groupBy directo: ese contaba
+    // cualquier OT con codigo, incluidos preventivos codificados por error, y
+    // el Pareto no coincidia con el analisis de recurrencia.
+    fallasCodificadas(orgId, range.from).then(agruparPorCodigo),
     prisma.workOrder.findMany({
       where: { organizationId: orgId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } },
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
@@ -62,7 +61,7 @@ export default async function ReportsPage({
       select: { id: true, name: true, color: true, hourlyRate: true },
     }),
     prisma.failureCode.findMany({
-      where: { id: { in: failureCodes.map((row) => row.failureCodeId!) } },
+      where: { id: { in: failureCodes.map((row) => row.failureCodeId) } },
     }),
   ]);
 
@@ -328,30 +327,24 @@ export default async function ReportsPage({
                       <th>Codigo</th>
                       <th className="text-right">Eventos</th>
                       <th className="text-right">Paro</th>
-                      <th className="text-right">Costo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {failureCodes
-                      .sort((a, b) => b._count._all - a._count._all)
-                      .map((row) => {
-                        const code = codes.find((c) => c.id === row.failureCodeId);
-                        return (
-                          <tr key={row.failureCodeId}>
-                            <td className="text-xs text-slate-700">
-                              <span className="font-medium">{code?.code}</span>{" "}
-                              <span className="text-slate-500">{code?.description}</span>
-                            </td>
-                            <td className="text-right tabular-nums text-xs">{row._count._all}</td>
-                            <td className="text-right tabular-nums text-xs">
-                              {formatNumber((row._sum.downtimeMinutes ?? 0) / 60, 1)} h
-                            </td>
-                            <td className="text-right tabular-nums text-xs">
-                              {formatCurrency(row._sum.totalCost ?? 0, currency)}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                    {failureCodes.map((row) => {
+                      const code = codes.find((c) => c.id === row.failureCodeId);
+                      return (
+                        <tr key={row.failureCodeId}>
+                          <td className="text-xs text-slate-700">
+                            <span className="font-medium">{code?.code}</span>{" "}
+                            <span className="text-slate-500">{code?.description}</span>
+                          </td>
+                          <td className="text-right tabular-nums text-xs">{row.eventos}</td>
+                          <td className="text-right tabular-nums text-xs">
+                            {formatNumber(row.minutosParo / 60, 1)} h
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

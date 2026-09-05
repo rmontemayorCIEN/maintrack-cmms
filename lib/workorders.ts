@@ -55,6 +55,17 @@ export async function transitionWorkOrder(params: {
   rootCauseId?: string | null;
   failureCodeId?: string | null;
   downtimeMinutes?: number;
+  /**
+   * Una falla por actividad. Es la forma nueva de cerrar: una OT mezclada
+   * puede traer varios reportes y cada uno conserva su codigo, su causa y su
+   * paro. taskId en null cae en el encabezado, para las ordenes viejas.
+   */
+  fallas?: Array<{
+    taskId: string | null;
+    failureCodeId: string | null;
+    rootCauseId: string | null;
+    downtimeMinutes: number;
+  }>;
 }) {
   const wo = await prisma.workOrder.findFirst({
     where: { id: params.workOrderId, organizationId: params.organizationId },
@@ -94,14 +105,55 @@ export async function transitionWorkOrder(params: {
     if (params.rootCauseId !== undefined) data.rootCauseId = params.rootCauseId;
     if (params.failureCodeId !== undefined) data.failureCodeId = params.failureCodeId;
     if (params.downtimeMinutes !== undefined) data.downtimeMinutes = params.downtimeMinutes;
+
+    // La falla del encabezado, cuando el cierre nuevo la manda con taskId null.
+    const delEncabezado = params.fallas?.find((f) => f.taskId === null);
+    if (delEncabezado) {
+      data.failureCodeId = delEncabezado.failureCodeId;
+      data.rootCauseId = delEncabezado.rootCauseId;
+      data.downtimeMinutes = delEncabezado.downtimeMinutes;
+    }
   }
   if (params.to === "CLOSED") data.closedAt = now;
 
   const updated = await prisma.workOrder.update({ where: { id: wo.id }, data });
 
   if (params.to === "COMPLETED") {
+    /**
+     * Cada actividad guarda su propia falla. Se valida que la actividad sea de
+     * esta orden: un taskId de otra orden escribiria la falla en el historial
+     * de un equipo ajeno.
+     */
+    const porActividad = (params.fallas ?? []).filter((f) => f.taskId !== null);
+    if (porActividad.length) {
+      const propias = new Set(
+        (await prisma.workOrderTask.findMany({
+          where: { workOrderId: wo.id, id: { in: porActividad.map((f) => f.taskId!) } },
+          select: { id: true },
+        })).map((t) => t.id),
+      );
+      for (const f of porActividad) {
+        if (!propias.has(f.taskId!)) continue;
+        await prisma.workOrderTask.update({
+          where: { id: f.taskId! },
+          data: {
+            failureCodeId: f.failureCodeId,
+            rootCauseId: f.rootCauseId,
+            downtimeMinutes: f.downtimeMinutes,
+          },
+        });
+      }
+    }
+
     if (wo.assetId) {
-      const minutes = params.downtimeMinutes ?? wo.downtimeMinutes;
+      /**
+       * El paro del equipo es la suma de lo que causo cada falla. Tomar solo el
+       * del encabezado perderia el de las demas actividades de una OT mezclada.
+       */
+      const sumaDeActividades = porActividad.reduce((a, f) => a + f.downtimeMinutes, 0);
+      const minutes = params.fallas
+        ? sumaDeActividades + (params.fallas.find((f) => f.taskId === null)?.downtimeMinutes ?? 0)
+        : params.downtimeMinutes ?? wo.downtimeMinutes;
       if (minutes > 0) {
         await prisma.downtimeEvent.create({
           data: {
@@ -110,7 +162,17 @@ export async function transitionWorkOrder(params: {
             startedAt: wo.startedAt ?? wo.createdAt,
             endedAt: now,
             minutes,
-            planned: wo.maintenanceType === "PREVENTIVE" || wo.maintenanceType === "INSPECTION",
+            /**
+             * Planeado solo si el paro no vino de una falla.
+             *
+             * Antes se decidia con el tipo del encabezado, y eso contaba como
+             * paro planeado un correctivo colado en una OT preventiva —que es
+             * justo el caso que el sistema ahora permite. Si alguna actividad
+             * de falla reporto paro, el paro no fue planeado.
+             */
+            planned:
+              sumaDeActividades === 0 &&
+              (wo.maintenanceType === "PREVENTIVE" || wo.maintenanceType === "INSPECTION"),
             reason: wo.title,
           },
         });

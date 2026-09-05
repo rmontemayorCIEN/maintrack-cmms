@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import { computeKpis } from "../kpi";
 import { analizarAlmacen } from "../almacen-analisis";
 import { AYUDA, CONTROLES_TABLA } from "../ayuda";
+import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 
 /**
  * Herramientas de consulta para la IA.
@@ -330,11 +331,7 @@ export async function ejecutarHerramienta(
     case "fallas_frecuentes": {
       const r = rango(dias ?? 180);
       const [porCodigo, porCausa] = await Promise.all([
-        prisma.workOrder.groupBy({
-          by: ["failureCodeId"],
-          where: { organizationId, failureCodeId: { not: null }, createdAt: { gte: r.from } },
-          _count: { _all: true }, _sum: { downtimeMinutes: true, totalCost: true },
-        }),
+        fallasCodificadas(organizationId, r.from).then(agruparPorCodigo),
         prisma.workOrder.groupBy({
           by: ["rootCauseId"],
           where: { organizationId, rootCauseId: { not: null }, createdAt: { gte: r.from } },
@@ -342,7 +339,7 @@ export async function ejecutarHerramienta(
         }),
       ]);
       const [codigos, causas] = await Promise.all([
-        prisma.failureCode.findMany({ where: { id: { in: porCodigo.map((x) => x.failureCodeId!) } }, select: { id: true, code: true, description: true } }),
+        prisma.failureCode.findMany({ where: { id: { in: porCodigo.map((x) => x.failureCodeId) } }, select: { id: true, code: true, description: true } }),
         prisma.rootCause.findMany({ where: { id: { in: porCausa.map((x) => x.rootCauseId!) } }, select: { id: true, description: true } }),
       ]);
       const sinCausa = await prisma.workOrder.count({
@@ -353,10 +350,12 @@ export async function ejecutarHerramienta(
         fallas: porCodigo
           .map((f) => {
             const c = codigos.find((x) => x.id === f.failureCodeId);
+            // El costo salio de aqui: con ordenes mezcladas los costos viven
+            // en el encabezado y no se pueden repartir entre varias fallas sin
+            // inventar. Frecuencia y paro si son por falla.
             return {
-              codigo: c?.code, descripcion: c?.description, ordenes: f._count._all,
-              horasDeParo: Math.round((f._sum.downtimeMinutes ?? 0) / 60),
-              costo: Math.round(f._sum.totalCost ?? 0),
+              codigo: c?.code, descripcion: c?.description, ordenes: f.eventos,
+              horasDeParo: Math.round(f.minutosParo / 60),
             };
           })
           .sort((a, b) => b.ordenes - a.ordenes),

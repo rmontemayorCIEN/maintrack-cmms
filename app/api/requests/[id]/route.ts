@@ -9,6 +9,14 @@ const schema = z.object({
   reviewNotes: z.string().optional(),
   assignedToId: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
+  /**
+   * OT existente a la que se suma el reporte, en vez de abrir una nueva.
+   *
+   * Es el caso real: el tecnico ya va a esa bomba por el preventivo del mes,
+   * asi que la fuga reportada se atiende en el mismo viaje. El reporte entra
+   * como una actividad mas, con su propio tipo, no como orden aparte.
+   */
+  workOrderId: z.string().optional().nullable(),
 });
 
 /** Aprobar una solicitud la convierte en orden de trabajo correctiva. */
@@ -47,25 +55,73 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return ok({ request: updated });
     }
 
-    const number = await nextWorkOrderNumber(orgId);
-    const workOrder = await prisma.workOrder.create({
+    /**
+     * El reporte se atiende como ACTIVIDAD, no como encabezado.
+     *
+     * Antes la conversion creaba una OT vacia, sin una sola actividad, y el
+     * codigo de falla se capturaba arriba. Eso impedia que una misma orden
+     * atendiera dos reportes: un encabezado no puede tener dos causas. Ahora
+     * cada reporte entra como su propia actividad, con su origen y su tipo, y
+     * al cerrar se le pregunta su causa por separado.
+     */
+    let workOrder: { id: string; number: string };
+
+    if (input.workOrderId) {
+      const destino = await prisma.workOrder.findFirst({
+        where: { id: input.workOrderId, organizationId: orgId },
+        select: { id: true, number: true, status: true, assetId: true },
+      });
+      if (!destino) return fail("La orden de trabajo no existe", 404);
+      if (["COMPLETED", "CANCELLED"].includes(destino.status)) {
+        return fail("Esa orden ya esta cerrada. Elija otra o abra una nueva.", 409);
+      }
+      // Sumar a una orden de otro equipo mezclaria el historial de dos activos.
+      if (workRequest.assetId && destino.assetId && workRequest.assetId !== destino.assetId) {
+        return fail("La orden es de otro equipo. El reporte debe ir a una orden del mismo activo.", 409);
+      }
+      workOrder = destino;
+    } else {
+      const number = await nextWorkOrderNumber(orgId);
+      workOrder = await prisma.workOrder.create({
+        data: {
+          organizationId: orgId,
+          number,
+          title: workRequest.title,
+          description: workRequest.description,
+          maintenanceType: "CORRECTIVE",
+          status: input.assignedToId ? "ASSIGNED" : "OPEN",
+          priority: workRequest.priority,
+          assetId: workRequest.assetId,
+          siteId: workRequest.siteId,
+          locationId: workRequest.locationId,
+          assignedToId: input.assignedToId || null,
+          createdById: user.id,
+          dueDate: input.dueDate ? new Date(input.dueDate) : new Date(Date.now() + 3 * 86_400_000),
+          estimatedHours: 2,
+        },
+        select: { id: true, number: true },
+      });
+    }
+
+    const ultima = await prisma.workOrderTask.aggregate({
+      where: { workOrderId: workOrder.id },
+      _max: { position: true },
+    });
+    await prisma.workOrderTask.create({
       data: {
-        organizationId: orgId,
-        number,
+        workOrderId: workOrder.id,
+        position: (ultima._max.position ?? -1) + 1,
+        origen: "SOLICITUD",
+        origenRequestId: workRequest.id,
+        maintenanceType: "CORRECTIVE",
         title: workRequest.title,
         description: workRequest.description,
-        maintenanceType: "CORRECTIVE",
-        status: input.assignedToId ? "ASSIGNED" : "OPEN",
-        priority: workRequest.priority,
-        assetId: workRequest.assetId,
-        siteId: workRequest.siteId,
-        locationId: workRequest.locationId,
-        assignedToId: input.assignedToId || null,
-        createdById: user.id,
-        dueDate: input.dueDate ? new Date(input.dueDate) : new Date(Date.now() + 3 * 86_400_000),
-        estimatedHours: 2,
+        taskType: "CHECK",
+        required: true,
       },
     });
+
+    const number = workOrder.number;
 
     const updated = await prisma.workRequest.update({
       where: { id },

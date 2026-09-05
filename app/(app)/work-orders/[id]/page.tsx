@@ -28,6 +28,7 @@ import { refaccionesDelPlan } from "@/lib/requisiciones";
 import { ServicesPanel } from "./services-panel";
 import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
+import { esFalla, tipoDeActividad } from "@/lib/fallas";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       createdBy: { select: { name: true } },
       failureCode: true,
       rootCause: true,
-      tasks: { orderBy: { position: "asc" } },
+      tasks: {
+        orderBy: { position: "asc" },
+        include: { origenRequest: { select: { number: true } } },
+      },
       labor: { include: { user: { select: { name: true, color: true } } }, orderBy: { workedAt: "desc" } },
       partsUsed: { include: { part: { select: { code: true, name: true, unit: true } } } },
       servicesUsed: {
@@ -64,10 +68,27 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         id: true, name: true, kind: true, size: true, mimeType: true, createdAt: true,
         uploadedBy: { select: { name: true } },
       } },
-      request: { select: { number: true } },
+      requests: { select: { number: true } },
     },
   });
   if (!wo) notFound();
+
+  /**
+   * Las actividades que representan una falla y por lo tanto se codifican al
+   * cerrar. El tipo de la actividad manda sobre el del encabezado: un
+   * correctivo colado en una OT preventiva sigue siendo un correctivo.
+   *
+   * Las liberadas quedan fuera: no se hicieron, asi que no hay falla que
+   * documentar. Se van al backlog y se codificaran cuando se atiendan.
+   */
+  const actividadesDeFalla = wo.tasks
+    .filter((t) => !t.liberadaAt && esFalla(tipoDeActividad(t.maintenanceType, wo.maintenanceType)))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      maintenanceType: tipoDeActividad(t.maintenanceType, wo.maintenanceType),
+      solicitud: t.origenRequest?.number ?? null,
+    }));
 
   // Lo que el plan pide para esta orden, y con que se puede cubrir. Solo tiene
   // sentido en preventivas: una correctiva no nace de un plan.
@@ -248,6 +269,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 status={wo.status}
                 failureCodes={failureCodes}
                 causasRaiz={causasRaiz}
+                actividadesDeFalla={actividadesDeFalla}
+                esOrdenDeFalla={esFalla(wo.maintenanceType)}
                 pendingRequired={wo.tasks.filter((t) => !t.done && !t.liberadaAt).length}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
               />
@@ -268,7 +291,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             Generada por el plan: {wo.plan.name}
           </Link>
         ) : null}
-        {wo.request ? <Badge tone="info">Desde solicitud {wo.request.number}</Badge> : null}
+        {wo.requests.map((r) => (
+          <Badge key={r.number} tone="info">Desde solicitud {r.number}</Badge>
+        ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

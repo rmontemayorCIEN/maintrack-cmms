@@ -3,6 +3,7 @@ import { assetCostRanking, computeKpis } from "../kpi";
 import { saludDeDatos } from "../salud-datos";
 import { contextoDeInstalacion } from "../instalaciones";
 import { contextoGeografico } from "../geografia";
+import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 
 /**
  * El expediente que se le entrega al modelo.
@@ -42,11 +43,9 @@ export async function construirExpediente(organizationId: string, dias = 30) {
 
   const [fallas, causas, bajoMinimo, planesVencidos, alertas, sinMovimiento, correctivasRepetidas] =
     await Promise.all([
-      prisma.workOrder.groupBy({
-        by: ["failureCodeId"],
-        where: { organizationId, failureCodeId: { not: null }, createdAt: { gte: desdePrevio } },
-        _count: { _all: true },
-      }),
+      // Por fallasCodificadas y no por groupBy: este contaba cualquier OT con
+      // codigo, y el modelo razonaba sobre preventivos codificados por error.
+      fallasCodificadas(organizationId, desdePrevio).then(agruparPorCodigo),
       prisma.workOrder.groupBy({
         by: ["rootCauseId"],
         where: { organizationId, rootCauseId: { not: null }, createdAt: { gte: desdePrevio } },
@@ -93,7 +92,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
 
   const [codigos, raices, activosRepetidos] = await Promise.all([
     prisma.failureCode.findMany({
-      where: { id: { in: fallas.map((f) => f.failureCodeId!) } },
+      where: { id: { in: fallas.map((f) => f.failureCodeId) } },
       select: { id: true, code: true, description: true },
     }),
     prisma.rootCause.findMany({
@@ -192,7 +191,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       codigosMasFrecuentes: fallas
         .map((f) => {
           const c = codigos.find((x) => x.id === f.failureCodeId);
-          return { codigo: c?.code ?? "?", descripcion: c?.description ?? "", ordenes: f._count._all };
+          return { codigo: c?.code ?? "?", descripcion: c?.description ?? "", ordenes: f.eventos };
         })
         .sort((a, b) => b.ordenes - a.ordenes)
         .slice(0, 8),

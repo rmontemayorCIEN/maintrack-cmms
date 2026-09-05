@@ -7,12 +7,23 @@ import { Button } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 import { STATUS_TRANSITIONS, WO_STATUS_LABELS } from "@/lib/constants";
 
+/**
+ * La clave con la que se guarda la falla del encabezado.
+ *
+ * Las ordenes viejas —correctivas creadas antes de que la falla viviera en la
+ * actividad— no tienen actividades donde colgar el codigo. Para esas se sigue
+ * capturando arriba, con esta clave reservada.
+ */
+const ENCABEZADO = "__encabezado";
+
 export function WorkOrderActions({
   workOrderId,
   status,
   failureCodes,
   causasRaiz,
   pendingRequired,
+  actividadesDeFalla,
+  esOrdenDeFalla,
   puedeGestionarCatalogos = false,
   iaDisponible = false,
 }: {
@@ -21,6 +32,31 @@ export function WorkOrderActions({
   failureCodes: Array<{ id: string; code: string; description: string }>;
   causasRaiz: Array<{ id: string; code: string; description: string }>;
   pendingRequired: number;
+  /**
+   * Las actividades de esta orden que SI representan una falla —correctivo o
+   * seguridad—, cada una con su reporte de origen si vino de uno.
+   *
+   * Se pregunta la causa una vez por cada una, no una sola vez para toda la
+   * orden: una OT mezclada puede traer el preventivo del mes mas dos fugas
+   * reportadas, y esos son tres eventos distintos con causas distintas.
+   *
+   * Vacio en una orden puramente preventiva, y entonces el cierre no pregunta
+   * nada de fallas: un preventivo que se ejecuto bien no es una falla, y
+   * codificarlo inventa un evento que ensucia el Pareto y el MTBF.
+   */
+  actividadesDeFalla: Array<{
+    id: string;
+    title: string;
+    maintenanceType: string;
+    solicitud: string | null;
+  }>;
+  /**
+   * Si el encabezado de la orden es de un tipo que representa falla.
+   *
+   * Solo se usa para las ordenes viejas, sin actividades: ahi todavia hay que
+   * capturar arriba. En las nuevas manda la actividad.
+   */
+  esOrdenDeFalla: boolean;
   puedeGestionarCatalogos?: boolean;
   /** Si el plan de la empresa incluye el asistente de cierre. */
   iaDisponible?: boolean;
@@ -35,12 +71,29 @@ export function WorkOrderActions({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
-  const [closeForm, setCloseForm] = useState({
-    resolution: "",
-    rootCauseId: "",
-    failureCodeId: "",
-    downtimeMinutes: "0",
-  });
+  const [closeForm, setCloseForm] = useState({ resolution: "" });
+
+  /**
+   * Que se captura para cada falla. La llave es el id de la actividad, o
+   * ENCABEZADO en las ordenes viejas que no tienen actividades.
+   */
+  const [fallas, setFallas] = useState<
+    Record<string, { failureCodeId: string; rootCauseId: string; downtimeMinutes: string }>
+  >(() =>
+    Object.fromEntries(
+      (actividadesDeFalla.length ? actividadesDeFalla.map((a) => a.id) : [ENCABEZADO]).map((k) => [
+        k,
+        { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" },
+      ]),
+    ),
+  );
+
+  /** Una orden sin actividades de falla no pregunta nada de fallas. */
+  const pideFallas = actividadesDeFalla.length > 0 || esOrdenDeFalla;
+
+  function setFalla(clave: string, campo: "failureCodeId" | "rootCauseId" | "downtimeMinutes", valor: string) {
+    setFallas((f) => ({ ...f, [clave]: { ...f[clave], [campo]: valor } }));
+  }
 
   type Sugerencia = {
     failureCodeId: string | null; failureCodeEtiqueta: string | null;
@@ -73,10 +126,26 @@ export function WorkOrderActions({
 
     const s: Sugerencia = data.sugerencia;
     setSugerencia(s);
-    setCloseForm((f) => ({
+
+    /**
+     * La sugerencia solo se aplica sola cuando hay UNA falla que codificar.
+     *
+     * El modelo lee el texto del cierre completo, que no dice cual parrafo
+     * corresponde a cual reporte. Con dos o mas fallas, repartir su respuesta
+     * seria adivinar, y una causa puesta en la falla equivocada es peor que
+     * una casilla vacia: ensucia el patron que el analisis busca. Con varias,
+     * la sugerencia se muestra y el tecnico decide donde va.
+     */
+    const claves = Object.keys(fallas);
+    if (claves.length !== 1) return;
+    const unica = claves[0];
+    setFallas((f) => ({
       ...f,
-      failureCodeId: f.failureCodeId || (s.failureCodeId ?? ""),
-      rootCauseId: f.rootCauseId || (s.rootCauseId ?? ""),
+      [unica]: {
+        ...f[unica],
+        failureCodeId: f[unica].failureCodeId || (s.failureCodeId ?? ""),
+        rootCauseId: f[unica].rootCauseId || (s.rootCauseId ?? ""),
+      },
     }));
   }
 
@@ -178,36 +247,76 @@ export function WorkOrderActions({
             ) : null}
 
             <div className="grid gap-4">
-              <SelectCatalogo
-                catalogo="failure-codes"
-                etiqueta="Codigo de falla"
-                valor={closeForm.failureCodeId}
-                onChange={(v) => setCloseForm((f) => ({ ...f, failureCodeId: v }))}
-                opciones={opcionesFallas}
-                onOpcionesChange={setOpcionesFallas}
-                puedeCrear={puedeGestionarCatalogos}
-                vacioTexto="Sin codificar"
-                camposAlta={[
-                  { nombre: "code", etiqueta: "Codigo (ej. MEC-05)", requerido: true },
-                  { nombre: "description", etiqueta: "Descripcion de la falla", requerido: true },
-                ]}
-                ayuda="Alimenta el analisis de fallas repetidas"
-              />
-              <SelectCatalogo
-                catalogo="root-causes"
-                etiqueta="Causa raiz"
-                valor={closeForm.rootCauseId}
-                onChange={(v) => setCloseForm((f) => ({ ...f, rootCauseId: v }))}
-                opciones={opcionesCausas}
-                onOpcionesChange={setOpcionesCausas}
-                puedeCrear={puedeGestionarCatalogos}
-                vacioTexto="Sin determinar"
-                camposAlta={[
-                  { nombre: "code", etiqueta: "Codigo (ej. FILTRO-SATURADO)", requerido: true },
-                  { nombre: "description", etiqueta: "Por que fallo", requerido: true },
-                ]}
-                ayuda="Por que fallo, no que fallo. Es lo que permite atacar el patron."
-              />
+              {!pideFallas ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  Esta orden no tiene actividades correctivas, asi que no se pide codigo de falla.
+                  Una rutina preventiva que se ejecuto bien no es una falla.
+                </p>
+              ) : null}
+
+              {Object.keys(fallas).map((clave) => {
+                const act = actividadesDeFalla.find((a) => a.id === clave);
+                const valor = fallas[clave];
+                return (
+                  <div
+                    key={clave}
+                    className={actividadesDeFalla.length > 1 ? "rounded-lg border border-slate-200 p-3" : ""}
+                  >
+                    {act && actividadesDeFalla.length > 1 ? (
+                      <p className="mb-2 text-xs font-semibold text-slate-700">
+                        {act.title}
+                        {act.solicitud ? (
+                          <span className="ml-1.5 font-normal text-slate-500">· reporte {act.solicitud}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+
+                    <div className="grid gap-4">
+                      <SelectCatalogo
+                        catalogo="failure-codes"
+                        etiqueta="Codigo de falla"
+                        valor={valor.failureCodeId}
+                        onChange={(v) => setFalla(clave, "failureCodeId", v)}
+                        opciones={opcionesFallas}
+                        onOpcionesChange={setOpcionesFallas}
+                        puedeCrear={puedeGestionarCatalogos}
+                        vacioTexto="Sin codificar"
+                        camposAlta={[
+                          { nombre: "code", etiqueta: "Codigo (ej. MEC-05)", requerido: true },
+                          { nombre: "description", etiqueta: "Descripcion de la falla", requerido: true },
+                        ]}
+                        ayuda="Alimenta el analisis de fallas repetidas"
+                      />
+                      <SelectCatalogo
+                        catalogo="root-causes"
+                        etiqueta="Causa raiz"
+                        valor={valor.rootCauseId}
+                        onChange={(v) => setFalla(clave, "rootCauseId", v)}
+                        opciones={opcionesCausas}
+                        onOpcionesChange={setOpcionesCausas}
+                        puedeCrear={puedeGestionarCatalogos}
+                        vacioTexto="Sin determinar"
+                        camposAlta={[
+                          { nombre: "code", etiqueta: "Codigo (ej. FILTRO-SATURADO)", requerido: true },
+                          { nombre: "description", etiqueta: "Por que fallo", requerido: true },
+                        ]}
+                        ayuda="Por que fallo, no que fallo. Es lo que permite atacar el patron."
+                      />
+                      <div>
+                        <label className="label">Tiempo de paro del equipo (minutos)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="field"
+                          value={valor.downtimeMinutes}
+                          onChange={(e) => setFalla(clave, "downtimeMinutes", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
               <div>
                 <div className="mb-1 flex items-end justify-between gap-2">
                   <label className="label mb-0">Solucion aplicada</label>
@@ -294,16 +403,6 @@ export function WorkOrderActions({
                   </div>
                 ) : null}
               </div>
-              <div>
-                <label className="label">Tiempo de paro del equipo (minutos)</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="field"
-                  value={closeForm.downtimeMinutes}
-                  onChange={(e) => setCloseForm((f) => ({ ...f, downtimeMinutes: e.target.value }))}
-                />
-              </div>
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
@@ -314,9 +413,18 @@ export function WorkOrderActions({
                 onClick={() =>
                   move("COMPLETED", {
                     resolution: closeForm.resolution || undefined,
-                    rootCauseId: closeForm.rootCauseId || null,
-                    failureCodeId: closeForm.failureCodeId || null,
-                    downtimeMinutes: Number(closeForm.downtimeMinutes) || 0,
+                    /**
+                     * Una entrada por falla. Las que quedaron sin codificar se
+                     * mandan igual con el paro: el tecnico pudo no saber la
+                     * causa y aun asi el equipo estuvo parado, y ese dato no se
+                     * puede perder.
+                     */
+                    fallas: Object.entries(fallas).map(([clave, v]) => ({
+                      taskId: clave === ENCABEZADO ? null : clave,
+                      failureCodeId: v.failureCodeId || null,
+                      rootCauseId: v.rootCauseId || null,
+                      downtimeMinutes: Number(v.downtimeMinutes) || 0,
+                    })),
                   })
                 }
               >
