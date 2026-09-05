@@ -465,6 +465,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Genera órdenes demasiado seguido", porque: "Revise el intervalo del plan. Un plan llamado «mensual» con intervalo de 3 días va a generar cada tres días: manda el número, no el nombre." },
     ],
     preguntas: [
+      { pregunta: "¿Por qué el campo de activo dice «solo al catálogo»?", respuesta: "Porque un plan es un catálogo, no una propiedad de un equipo. «Preventivo mensual compresor» describe el trabajo; los compresores que lo siguen se asignan aparte, cada uno con su propio calendario. Si el plan es para un solo equipo, elíjalo aquí y queda creado y asignado de un golpe. Si va a servir a varios, déjelo en blanco y asígnelos en Equipos y sus planes." },
+      { pregunta: "Cree un plan y no genera órdenes. ¿Por qué?", respuesta: "Un plan solo genera para los equipos que tiene asignados. Si lo dejó en el catálogo sin asignar, no va a generar nada —es lo correcto, pero conviene saberlo. Vaya a Planes → Equipos y sus planes y asígnele los equipos." },
+      { pregunta: "¿El botón de generar plan con IA crea el plan?", respuesta: "No. Lee ese equipo —marca, modelo, historial, medidores— y le propone un borrador que llena el formulario. Usted revisa, ajusta y decide si lo guarda. Nada se guarda hasta que usted lo acepta." },
+
       {
         pregunta: "¿Cómo hago un plan «por tipo de equipo»?",
         respuesta:

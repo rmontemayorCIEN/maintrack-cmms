@@ -131,7 +131,7 @@ export function PlanDialog({
   const [form, setForm] = useState({
     name: inicial?.name ?? "",
     description: inicial?.description ?? "",
-    assetId: inicial?.assetId ?? assets[0]?.id ?? "",
+    assetId: inicial?.assetId ?? "",
     maintenanceType: inicial?.maintenanceType ?? "PREVENTIVE",
     triggerType: inicial?.triggerType ?? "CALENDAR",
     intervalDays: inicial?.intervalDays != null ? String(inicial.intervalDays) : "30",
@@ -325,15 +325,19 @@ export function PlanDialog({
             <input className="field" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
           <div>
-            <label className="label">Activo</label>
+            <label className="label">Asignar a un equipo</label>
             <SelectorBuscable
               valor={form.assetId}
               onCambio={(id) => set("assetId", id)}
-              vacio={null}
-              requerido
+              vacio="Solo al catalogo, sin asignar todavia"
               marcador="Busque por clave o nombre del equipo"
               opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
             />
+            <p className="mt-1 text-[0.6875rem] text-slate-500">
+              {form.assetId
+                ? "El plan queda asignado a ese equipo y empieza a generar ordenes."
+                : "El plan queda en el catalogo. Para que genere, asignelo en Equipos y sus planes."}
+            </p>
           </div>
           <div>
             <label className="label">Tipo</label>

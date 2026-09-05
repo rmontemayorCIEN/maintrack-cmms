@@ -3,11 +3,20 @@ import { prisma } from "@/lib/db";
 import { ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { crearTareas, esquemaTarea, validarRecursos } from "@/lib/plan-tasks";
+import { asignarPlan } from "@/lib/asignaciones";
 
 const schema = z.object({
   name: z.string().min(3),
   description: z.string().optional().nullable(),
-  assetId: z.string().min(1),
+  /**
+   * El equipo al que se le asigna, si se elige uno.
+   *
+   * Opcional a proposito: un plan es un catalogo —«Preventivo mensual
+   * compresor»— y los equipos que lo siguen se asignan aparte, cada uno con su
+   * propio calendario. Elegir uno aqui es el atajo comodo de crear y asignar
+   * de un golpe cuando el plan es para un solo equipo.
+   */
+  assetId: z.string().optional().nullable(),
   meterId: z.string().optional().nullable(),
   assignedToId: z.string().optional().nullable(),
   teamId: z.string().optional().nullable(),
@@ -60,6 +69,7 @@ export async function POST(request: Request) {
     const plan = await prisma.maintenancePlan.create({
       data: {
         ...rest,
+        assetId: rest.assetId || null,
         organizationId: orgId,
         meterId: rest.meterId || null,
         assignedToId: rest.assignedToId || null,
@@ -68,6 +78,26 @@ export async function POST(request: Request) {
         tasks: { create: crearTareas(tasks) },
       },
     });
+
+    /**
+     * La asignacion, que es lo que de verdad hace que el plan genere.
+     *
+     * El programador itera PlanAsset, no los planes. Sin esta linea el plan se
+     * ve bien en la lista, muestra fecha de vencimiento y no genera una sola
+     * orden nunca, sin avisar. Diez planes quedaron asi antes de detectarlo.
+     */
+    if (rest.assetId) {
+      await asignarPlan({
+        organizationId: orgId,
+        planId: plan.id,
+        equipos: [{
+          assetId: rest.assetId,
+          desde: parseDate(rest.nextDueDate),
+          meterId: rest.meterId || null,
+        }],
+        userId: user.id,
+      });
+    }
 
     await logAudit({
       organizationId: orgId,
