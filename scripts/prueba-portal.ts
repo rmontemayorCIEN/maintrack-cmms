@@ -51,7 +51,10 @@ async function main() {
   revisar("el folio es de la serie SS", r.numero.slice(0, 3), "SS-");
 
   const creada = await prisma.workRequest.findFirst({
-    where: { number: r.numero },
+    // Acotado a la organizacion: los folios son unicos POR empresa, asi que
+    // buscar solo por numero agarra la solicitud de otra cuenta en cuanto la
+    // base de desarrollo tiene mas de una. Es la misma regla del sistema.
+    where: { number: r.numero, organizationId: a.id },
     select: { organizationId: true, assetId: true, siteId: true, locationId: true, status: true, reporterNombre: true },
   });
   revisar("quedo en la empresa del token", creada!.organizationId === a.id, true);

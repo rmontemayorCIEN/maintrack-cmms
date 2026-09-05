@@ -9,7 +9,7 @@
  *   npx tsx scripts/prueba-alta-de-plan.ts
  */
 import { prisma } from "../lib/db";
-import { asignarPlan } from "../lib/asignaciones";
+import { altaDePlan } from "../lib/alta-de-plan";
 import { generateScheduledWorkOrders } from "../lib/scheduler";
 
 let fallos = 0;
@@ -35,21 +35,24 @@ async function main() {
   });
 
   try {
-    // ── Como lo hace el formulario: crear el plan y asignarlo ────────────────
+    // ── Por la MISMA funcion que usa el endpoint ────────────────────────────
+    // Antes esta prueba creaba el plan y lo asignaba por su cuenta, o sea
+    // replicaba al endpoint en vez de ejercitarlo. Por eso no detecto que el
+    // endpoint nunca asignaba: la prueba hacia lo correcto mientras el sistema
+    // hacia lo incorrecto, y las dos pasaban.
     const ayer = new Date(Date.now() - 86_400_000);
-    const plan = await prisma.maintenancePlan.create({
-      data: {
-        organizationId: org.id, name: "Preventivo de prueba", maintenanceType: "PREVENTIVE",
-        triggerType: "CALENDAR", intervalDays: 30, active: true, assetId: activo.id,
-        nextDueDate: ayer,
-        tasks: { create: [{ position: 0, title: "Revisar", taskType: "CHECK", required: true }] },
-      },
+    const base = {
+      maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 30,
+      leadTimeDays: 3, toleranceDays: 2, priority: "MEDIUM", estimatedHours: 1,
+      requiresShutdown: false, active: true,
+      tasks: [{ title: "Revisar", taskType: "CHECK", required: true, parts: [], labor: [], services: [] }],
+    };
+    const alta = await altaDePlan(org.id, user.id, {
+      ...base, name: "Preventivo de prueba",
+      assetId: activo.id, nextDueDate: ayer.toISOString(),
     });
-    await asignarPlan({
-      organizationId: org.id, planId: plan.id,
-      equipos: [{ assetId: activo.id, desde: ayer }],
-      userId: user.id,
-    });
+    if ("error" in alta) throw new Error(`No dio de alta: ${alta.error}`);
+    const plan = alta.plan;
 
     console.log("\nLa asignacion se crea con el plan");
     const asignaciones = await prisma.planAsset.findMany({ where: { planId: plan.id } });
@@ -72,14 +75,11 @@ async function main() {
 
     // ── Un plan de catalogo, sin equipo, NO genera y esta bien ───────────────
     console.log("\nUn plan de catalogo sin asignar no genera, y es correcto");
-    const catalogo = await prisma.maintenancePlan.create({
-      data: {
-        organizationId: org.id, name: "Plan de catalogo", maintenanceType: "PREVENTIVE",
-        triggerType: "CALENDAR", intervalDays: 30, active: true,
-        nextDueDate: ayer,
-        tasks: { create: [{ position: 0, title: "Algo", taskType: "CHECK", required: true }] },
-      },
+    const altaCatalogo = await altaDePlan(org.id, user.id, {
+      ...base, name: "Plan de catalogo", nextDueDate: ayer.toISOString(),
     });
+    if ("error" in altaCatalogo) throw new Error(`No dio de alta: ${altaCatalogo.error}`);
+    const catalogo = altaCatalogo.plan;
     const antes = await prisma.workOrder.count({ where: { organizationId: org.id } });
     await generateScheduledWorkOrders(org.id, { userId: user.id });
     const despues = await prisma.workOrder.count({ where: { organizationId: org.id } });

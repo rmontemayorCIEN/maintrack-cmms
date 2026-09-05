@@ -263,16 +263,36 @@ export async function seguimientoDe(tok: string) {
  * La liga se pierde en cuanto se cierra el navegador, y eso va a pasar. Se
  * pide el celular ademas del folio para que un folio adivinado no alcance.
  */
+/**
+ * Recupera la liga de seguimiento con folio y celular.
+ *
+ * El folio NO identifica una solicitud: es unico por empresa, asi que cada
+ * cuenta tiene su propio SS-000001. Y quien recupera no trae sesion ni empresa,
+ * porque es alguien de piso sin cuenta. El celular es lo que discrimina.
+ *
+ * Por eso se traen TODAS las que comparten folio y se filtra por telefono. Un
+ * findFirst tomaba la primera que apareciera —la de otra empresa— y devolvia
+ * null aunque los datos fueran correctos; en el peor caso, con dos telefonos
+ * iguales, habria entregado la liga de otra compania.
+ *
+ * Si aun asi quedan dos, se niega. Ante la duda no se entrega nada.
+ */
 export async function recuperarSeguimiento(folio: string, celular: string) {
   const limpio = (t: string) => t.replace(/\D/g, "");
-  const s = await prisma.workRequest.findFirst({
+  const digitos = limpio(celular);
+  if (!digitos) return null;
+
+  const candidatas = await prisma.workRequest.findMany({
     where: { number: folio.trim().toUpperCase() },
     select: { publicToken: true, reporterCelular: true },
   });
-  if (!s?.publicToken || !s.reporterCelular) return null;
+
   // Se comparan solo los digitos: nadie escribe el telefono igual dos veces.
-  if (limpio(s.reporterCelular) !== limpio(celular)) return null;
-  return s.publicToken;
+  const suyas = candidatas.filter(
+    (c) => c.publicToken && c.reporterCelular && limpio(c.reporterCelular) === digitos,
+  );
+  if (suyas.length !== 1) return null;
+  return suyas[0].publicToken;
 }
 
 

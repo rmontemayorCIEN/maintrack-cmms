@@ -2,8 +2,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
-import { crearTareas, esquemaTarea, validarRecursos } from "@/lib/plan-tasks";
-import { asignarPlan } from "@/lib/asignaciones";
+import { esquemaTarea } from "@/lib/plan-tasks";
+import { altaDePlan } from "@/lib/alta-de-plan";
 
 const schema = z.object({
   name: z.string().min(3),
@@ -54,50 +54,10 @@ export async function GET() {
 export async function POST(request: Request) {
   return withAuth("plan:write", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
-    const { tasks, ...rest } = input;
 
-    if (rest.triggerType === "CALENDAR" && !rest.intervalDays) {
-      return ok({ error: "Un plan por calendario requiere intervalo en dias" }, 422);
-    }
-    if (rest.triggerType === "METER" && (!rest.intervalMeter || !rest.meterId)) {
-      return ok({ error: "Un plan por medidor requiere medidor e intervalo" }, 422);
-    }
-
-    const problema = await validarRecursos(orgId, tasks);
-    if (problema) return ok({ error: problema }, 422);
-
-    const plan = await prisma.maintenancePlan.create({
-      data: {
-        ...rest,
-        assetId: rest.assetId || null,
-        organizationId: orgId,
-        meterId: rest.meterId || null,
-        assignedToId: rest.assignedToId || null,
-        teamId: rest.teamId || null,
-        nextDueDate: parseDate(rest.nextDueDate) ?? new Date(Date.now() + (rest.intervalDays ?? 30) * 86_400_000),
-        tasks: { create: crearTareas(tasks) },
-      },
-    });
-
-    /**
-     * La asignacion, que es lo que de verdad hace que el plan genere.
-     *
-     * El programador itera PlanAsset, no los planes. Sin esta linea el plan se
-     * ve bien en la lista, muestra fecha de vencimiento y no genera una sola
-     * orden nunca, sin avisar. Diez planes quedaron asi antes de detectarlo.
-     */
-    if (rest.assetId) {
-      await asignarPlan({
-        organizationId: orgId,
-        planId: plan.id,
-        equipos: [{
-          assetId: rest.assetId,
-          desde: parseDate(rest.nextDueDate),
-          meterId: rest.meterId || null,
-        }],
-        userId: user.id,
-      });
-    }
+    const r = await altaDePlan(orgId, user.id, input);
+    if ("error" in r) return ok({ error: r.error }, 422);
+    const plan = r.plan;
 
     await logAudit({
       organizationId: orgId,

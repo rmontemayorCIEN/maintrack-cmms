@@ -170,6 +170,122 @@ hoy, y se tratan como si fueran de paga. Pronto lo seran.
   quedaron mostrando fechas obsoletas y nadie lo habria notado.
 - **Decirlo cuando algo quedo mal**, antes de que lo encuentre el.
 
+## Antes de dar por bueno un cambio
+
+Esta lista sale de defectos reales de este proyecto, no de teoria. Cada punto
+costo encontrarlo tarde.
+
+### 1. Que la prueba ejercite el sistema, no lo imite
+
+El defecto mas caro fue este. La prueba del alta de planes creaba el plan y lo
+asignaba **por su cuenta**, replicando al endpoint en vez de llamarlo. El
+endpoint nunca asignaba. La prueba hacia lo correcto mientras el sistema hacia
+lo incorrecto, y las dos pasaban.
+
+**Regla:** si la ruta necesita sesion, saque su logica a una funcion de `lib/`
+y que la ruta y la prueba llamen **la misma**. Asi se hizo con `altaDePlan` y
+`armarOrden`. Una prueba que copia los pasos no prueba nada.
+
+### 2. Escribir el dato no es suficiente: alguien tiene que leerlo
+
+Un plan se creaba con `assetId` en el encabezado y se veia perfecto —con fecha
+de vencimiento y todo— pero el programador itera `PlanAsset` y nunca lo miraba.
+Diez planes que no generaron una sola orden, sin un solo aviso.
+
+**Regla:** al agregar un campo, pregunte quien lo lee. Si nadie, esta escribiendo
+un dato muerto. Al cambiar donde vive un dato, busque **todos** los lectores:
+
+```
+grep -rn "nombreDelCampo" app/ lib/ prisma/
+```
+
+### 3. Los defectos que callan son los peores
+
+Ninguno de los grandes de este proyecto reventó. El plan sin asignacion, el
+respaldo que no salia de la Mac, el gancho de secretos que dejaba pasar llaves:
+los tres se veian bien. **Lo que se ve bien y no funciona es peor que un error
+en pantalla.** Cuando algo deba pasar y no pase, tiene que decirlo.
+
+### 4. Contar la verdad, no una aproximacion comoda
+
+- El costo de una OT mezclada no se reparte entre sus fallas: se atribuye lo
+  que si se puede y lo demas queda como gasto general. Repartirlo con una regla
+  inventada da un numero preciso y falso.
+- Un preventivo bien ejecutado no es una falla. Codificarlo mete un evento que
+  nunca ocurrio en el Pareto y en el MTBF.
+- Si no se puede saber, se dice que no se sabe.
+
+### 5. Un criterio, un lugar
+
+`recurrencia.ts` filtraba a correctivo y seguridad mientras Reportes contaba
+cualquier OT con codigo. Dos numeros distintos para la misma pregunta y nadie
+podia decir cual servia. Ahora `lib/fallas.ts` lo decide una sola vez.
+
+**Regla:** si dos pantallas responden la misma pregunta, la respuesta vive en
+`lib/`. Copiarla es garantizar que se desincronicen.
+
+### 6. Probar los tres casos, no solo el que se arreglo
+
+- El caso nuevo funciona.
+- El caso viejo **sigue** funcionando (ordenes anteriores al cambio, planes de
+  un solo equipo, cuentas sin datos).
+- El caso que **no** debe pasar, no pasa. El gancho de secretos parecia servir
+  hasta que se probo con una llave falsa: la dejaba pasar.
+
+### 7. Verlo en pantalla, no solo en la base
+
+El modal de cierre guardaba bien y **se contradecia a la vista**: mostraba el
+aviso de que no se pedia codigo de falla y debajo dibujaba los campos. Ninguna
+prueba de datos lo iba a ver.
+
+**Regla:** todo cambio de interfaz se abre en el navegador antes de darlo por
+bueno.
+
+### 8. Trampas conocidas de este proyecto
+
+- **`npm run build` con el servidor de desarrollo corriendo** corrompe `.next` y
+  deja errores de modulo que no tienen nada que ver con el cambio. Deten el
+  servidor, borra `.next`, compila, vuelvelo a levantar.
+- **`npx prisma format` alinea columnas**, asi que cualquier anclaje de texto
+  exacto sobre el esquema falla despues. Anclar por nombre de modelo o regex.
+- **La base de desarrollo es SQLite local** y no comparte nada con produccion.
+  Las contrasenas reales no sirven ahi (`scripts/clave-de-desarrollo.ts`).
+- **Al insertar codigo, revisar el orden de declaracion.** Un bloque colocado
+  antes de lo que usa da `ReferenceError` en ejecucion y TypeScript no lo ve.
+
+### 9. Correr la suite COMPLETA, no las pruebas del cambio
+
+Durante toda una sesion se corrieron siete pruebas —las relacionadas con lo que
+se estaba tocando— y se dijo "todo pasa". Al correr las veinticuatro aparecio
+una fuga entre empresas en `recuperarSeguimiento`, que llevaba ahi desde el
+primer commit y no tenia nada que ver con el cambio del dia.
+
+**Regla:** `ls scripts/prueba-*.ts` y correrlas todas. Las que fallen por falta
+de llave de IA se nombran como tales; las demas se investigan.
+
+### 10. Acotar SIEMPRE por organizacion, tambien en las pruebas
+
+Los folios y numeros son unicos **por empresa**, no globales. Un
+`findFirst({ where: { number } })` agarra el registro de otra cuenta en cuanto
+hay mas de una, y en desarrollo hay cientos.
+
+Esto aparecio dos veces el mismo dia: en una prueba (molesto) y en
+`recuperarSeguimiento` de produccion (una fuga real entre empresas). La regla 7
+aplica al codigo Y a las pruebas.
+
+### El cierre, siempre
+
+```
+npx tsc --noEmit                                    # compila
+for f in scripts/prueba-*.ts; do npx tsx "$f"; done # TODAS, no solo las del cambio
+npm run build                                       # con el servidor detenido
+```
+
+Las cinco `*-real` fallan sin `ANTHROPIC_API_KEY`: son de funciones de IA y se
+corren con `./scripts/con-produccion.sh`, que trae la llave de Secret Manager.
+
+Y la ficha de ayuda de la pantalla que se toco. Es regla, no cortesia.
+
 ## Como trabajar aqui
 
 - **Verifica el orden de declaracion despues de insertar codigo.** Un bloque
