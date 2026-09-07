@@ -19,6 +19,7 @@ import { iaDeLaOrganizacion } from "@/lib/planes";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { WorkOrderActions } from "./actions";
 import { TaskList } from "./task-list";
+import { AgregarReporte } from "./agregar-reporte";
 import { LaborPanel } from "./labor-panel";
 import { PartsPanel } from "./parts-panel";
 import { RefaccionesDelPlan } from "./refacciones-plan";
@@ -91,6 +92,19 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
    * A que actividades se les puede cargar un gasto. Las liberadas quedan
    * fuera: no se hicieron, asi que no consumieron nada.
    */
+  /**
+   * Reportes de este equipo que nadie ha atendido, para poder sumarlos a esta
+   * orden sin salir de aqui. Si la orden ya esta cerrada no se ofrecen: lo que
+   * se reporte despues va en otra orden.
+   */
+  const reportesPendientes = ["COMPLETED", "CLOSED", "CANCELLED"].includes(wo.status) || !wo.assetId
+    ? []
+    : await prisma.workRequest.findMany({
+        where: { organizationId: user.organizationId, assetId: wo.assetId, status: "PENDING" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, number: true, title: true },
+      });
+
   const actividadesCargables = wo.tasks
     .filter((t) => !t.liberadaAt)
     .map((t) => ({
@@ -320,6 +334,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             <CardHeader
               title="Lista de verificacion"
               subtitle={`${doneTasks} de ${wo.tasks.length} tareas completadas`}
+              action={
+                canExecute && !["COMPLETED", "CLOSED", "CANCELLED"].includes(wo.status) ? (
+                  <AgregarReporte workOrderId={wo.id} pendientes={reportesPendientes} />
+                ) : null
+              }
             />
             <TaskList
               workOrderId={wo.id}

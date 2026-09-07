@@ -12,6 +12,7 @@ import { prisma } from "../lib/db";
 import { transitionWorkOrder } from "../lib/workorders";
 import { armarOrden } from "../lib/armar-ot";
 import { fallasCodificadas } from "../lib/fallas";
+import { tipoDeTrabajo } from "../lib/tipos-solicitud";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -196,6 +197,59 @@ async function main() {
     const fallas = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
     revisar("aunque se le ponga codigo, el apoyo no cuenta como falla",
       fallas.length === 0, `${fallas.length} falla(s)`);
+
+    // ── Sumar un reporte a una orden que YA existe ──────────────────────────
+    console.log("\nSe puede sumar un reporte a una orden ya creada");
+    const otViva = await prisma.workOrder.create({
+      data: {
+        organizationId: org.id, number: "OT-VIVA", title: "Preventivo en curso",
+        maintenanceType: "PREVENTIVE", status: "IN_PROGRESS", assetId: activo.id,
+        createdById: user.id,
+      },
+    });
+    const solSuelta = await nuevaSolicitud("SOL-X", "Fuga que nadie ha visto");
+
+    // Igual que hace el endpoint: la actividad y el amarre de la solicitud.
+    const pos = await prisma.workOrderTask.aggregate({
+      where: { workOrderId: otViva.id }, _max: { position: true },
+    });
+    await prisma.workOrderTask.create({
+      data: {
+        workOrderId: otViva.id, position: (pos._max.position ?? -1) + 1,
+        origen: "SOLICITUD", origenRequestId: solSuelta.id,
+        maintenanceType: tipoDeTrabajo(solSuelta.tipo),
+        title: solSuelta.title, taskType: "CHECK", required: true,
+      },
+    });
+    await prisma.workRequest.update({
+      where: { id: solSuelta.id },
+      data: { status: "CONVERTED", workOrderId: otViva.id, reviewedById: user.id, reviewedAt: new Date() },
+    });
+
+    const eX = await estadoDe(solSuelta.id);
+    revisar("el reporte queda ligado a la orden viva", eX.workOrderId === otViva.id && eX.status === "CONVERTED");
+    const tareasViva = await prisma.workOrderTask.count({ where: { workOrderId: otViva.id } });
+    revisar("la orden gano su actividad", tareasViva === 1, `${tareasViva}`);
+
+    // ── Un hallazgo levantado DESDE la orden nace ya ligado ─────────────────
+    console.log("\nUn hallazgo levantado desde la orden nace ya ligado");
+    const hallazgo = await prisma.workRequest.create({
+      data: {
+        organizationId: org.id, number: "SOL-H", title: "Encontre el reten vencido",
+        assetId: activo.id, tipo: "FALLA", priority: "HIGH",
+        status: "CONVERTED", workOrderId: otViva.id,
+        requestedById: user.id, reviewedById: user.id, reviewedAt: new Date(),
+      },
+    });
+    revisar("nace con folio propio", hallazgo.number.startsWith("SOL-"));
+    revisar("nace atendido, sin pasar por revision",
+      hallazgo.status === "CONVERTED" && hallazgo.workOrderId === otViva.id);
+
+    // Y si la orden se cancela, el hallazgo tambien se libera.
+    await transitionWorkOrder({ workOrderId: otViva.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
+    const eH = await estadoDe(hallazgo.id);
+    revisar("si la orden se cancela, el hallazgo vuelve a pendiente",
+      eH.status === "PENDING" && eH.workOrderId === null, eH.status);
 
   } finally {
     await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

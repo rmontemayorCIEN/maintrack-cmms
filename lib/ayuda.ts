@@ -837,6 +837,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "No veo el botón de analizar", porque: "El triage con IA se incluye en los planes con inteligencia artificial. La detección de riesgo, en cambio, funciona en todos los planes porque no usa IA." },
     ],
     preguntas: [
+      { pregunta: "¿Por qué la solicitud no me pregunta si es falla, mejora o apoyo?", respuesta: "Porque quien reporta casi nunca sabe la diferencia, y ponerle ese menú enfrente produce clasificaciones al azar o hace que no reporte. A quien reporta se le pregunta lo que sí sabe: qué pasa y qué tan urgente lo siente. La clasificación la hace usted al revisarla, con la IA proponiendo." },
+      { pregunta: "¿Qué diferencia hace clasificarla bien?", respuesta: "Decide cómo cuenta el trabajo. Una Falla entra al Pareto de modos de falla y al tiempo entre fallas. Una Mejora no. Un Apoyo —prestar manos a producción, mover algo— registra sus horas y su costo pero no cuenta como falla del equipo ni como mantenimiento planeado: si entrara como correctivo le diría que sus máquinas fallan más de lo que fallan." },
+      { pregunta: "Cancelé la orden de una solicitud. ¿Se perdió?", respuesta: "No. Al cancelar la orden, la solicitud vuelve a Pendiente y se puede volver a atender en otra. Si después reabre la orden cancelada, retoma sus solicitudes salvo las que alguien más ya haya tomado." },
+      { pregunta: "El técnico encontró algo más mientras trabajaba. ¿Cómo lo reporta?", respuesta: "Desde la misma orden, con «Agregar un reporte». Puede sumar uno que ya estaba esperando para ese equipo, o levantar uno nuevo ahí mismo. Queda con folio propio, en el listado de solicitudes y en el historial del equipo, ya ligado a la orden donde se va a atender." },
+
       { pregunta: "¿La IA cambia la solicitud sola?", respuesta: "No. Todo lo que propone es sugerencia; usted decide al aprobarla. Una solicitud mal clasificada por una máquina sin que nadie mire es peor que una sin clasificar." },
     ],
   },
