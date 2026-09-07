@@ -66,7 +66,7 @@ export function AccionesRequisicion({
     });
     const data = await res.json().catch(() => ({}));
     setOcupado(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible completar la operacion"); return; }
+    if (!res.ok) { setError(data.error ?? "No fue posible completar la operación"); return; }
     setModo(null);
     router.refresh();
   }

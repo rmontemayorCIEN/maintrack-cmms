@@ -57,7 +57,7 @@ export async function abrirConteo(params: {
       folio,
       warehouseId: params.warehouseId,
       responsableId: params.userId,
-      alcance: params.familia ? `Familia ${params.familia}` : "Todo el almacen",
+      alcance: params.familia ? `Familia ${params.familia}` : "Todo el almacén",
       nota: params.nota || null,
       renglones: {
         create: existencias.map((e) => ({ partId: e.partId, cantidadSistema: e.quantity })),
@@ -111,7 +111,7 @@ export async function cerrarConteo(params: {
   if (conteo.estado !== "ABIERTO") throw new ErrorDeConteo("El conteo ya esta cerrado");
 
   const contados = conteo.renglones.filter((r) => r.cantidadContada !== null);
-  if (!contados.length) throw new ErrorDeConteo("No se capturo ningun conteo todavia");
+  if (!contados.length) throw new ErrorDeConteo("No se capturo ningún conteo todavía");
 
   let ajustados = 0;
   let movidosDuranteElConteo = 0;

@@ -364,7 +364,7 @@ export async function consumePart(params: {
   const part = await prisma.part.findFirst({
     where: { id: params.partId, organizationId: params.organizationId },
   });
-  if (!part) throw new Error("Refaccion no encontrada");
+  if (!part) throw new Error("Refacción no encontrada");
   if (part.quantityOnHand < params.quantity) {
     throw new Error(`Existencia insuficiente: ${part.quantityOnHand} ${part.unit} disponibles`);
   }
@@ -375,7 +375,7 @@ export async function consumePart(params: {
   // del saldo y el kardex los hace aplicarMovimiento, que es el unico lugar que
   // sabe hacerlo bien.
   const almacen = params.warehouseId ?? (await almacenPorOmision(params.organizationId))?.id;
-  if (!almacen) throw new ErrorDeAlmacen("La cuenta no tiene ningun almacen activo");
+  if (!almacen) throw new ErrorDeAlmacen("La cuenta no tiene ningún almacén activo");
 
   const balance = await prisma.$transaction(async (tx) => {
     await tx.workOrderPart.create({

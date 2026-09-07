@@ -27,7 +27,7 @@ export const ESCALAS: Record<ClaveEscala, { nombre: string; descripcion: string;
 export const DENSIDADES: Record<ClaveDensidad, { nombre: string; descripcion: string; celda: string; tarjeta: string }> = {
   COMPACTA: {
     nombre: "Compacta",
-    descripcion: "Mas renglones a la vista. Util en tablas largas de refacciones u ordenes.",
+    descripcion: "Mas renglones a la vista. Útil en tablas largas de refacciones u órdenes.",
     celda: "0.45rem 0.7rem",
     tarjeta: "0.85rem",
   },

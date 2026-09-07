@@ -99,7 +99,7 @@ export async function registrarEquivalencia(params: {
   userId?: string | null;
 }) {
   if (params.partId === params.equivalenteId) {
-    throw new ErrorDeEquivalencia("Una refaccion no puede ser equivalente de si misma.");
+    throw new ErrorDeEquivalencia("Una refacción no puede ser equivalente de si misma.");
   }
 
   const refacciones = await prisma.part.findMany({
@@ -107,7 +107,7 @@ export async function registrarEquivalencia(params: {
     select: { id: true, code: true, name: true },
   });
   if (refacciones.length !== 2) {
-    throw new ErrorDeEquivalencia("Alguna de las dos refacciones no existe en su catalogo.", 404);
+    throw new ErrorDeEquivalencia("Alguna de las dos refacciones no existe en su catálogo.", 404);
   }
 
   const [a, b] = parCanonico(params.partId, params.equivalenteId);
@@ -115,7 +115,7 @@ export async function registrarEquivalencia(params: {
     where: { partAId_partBId: { partAId: a, partBId: b } },
     select: { id: true },
   });
-  if (ya) throw new ErrorDeEquivalencia("Esas dos refacciones ya estan relacionadas.", 409);
+  if (ya) throw new ErrorDeEquivalencia("Esas dos refacciones ya están relacionadas.", 409);
 
   return prisma.equivalenciaRefaccion.create({
     data: {

@@ -8,7 +8,7 @@ import { vistaGuardada } from "@/lib/vistas";
 import { TablaKardex, TIPOS, type FilaKardex } from "./tabla-kardex";
 import { FiltroRefaccion } from "./filtro-refaccion";
 
-export const metadata = { title: "Kardex de almacen" };
+export const metadata = { title: "Kardex de almacén" };
 export const dynamic = "force-dynamic";
 
 /** Los que suman existencia. El resto resta, salvo el ajuste que fija. */

@@ -57,7 +57,7 @@ export default async function ClientsPage() {
     <>
       <PageHeader
         title="Empresas cliente"
-        description="Alta y administracion de las empresas que usan la plataforma. Cada una tiene sus activos, usuarios y datos completamente aislados de las demas."
+        description="Alta y administración de las empresas que usan la plataforma. Cada una tiene sus activos, usuarios y datos completamente aislados de las demás."
         actions={
           <>
           <Link

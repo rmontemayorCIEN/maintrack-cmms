@@ -30,7 +30,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       where: { id, organizationId: orgId },
       select: { id: true, code: true, name: true },
     });
-    if (!previa) return fail("Refaccion no encontrada", 404);
+    if (!previa) return fail("Refacción no encontrada", 404);
 
     const input = schema.parse(await request.json());
 

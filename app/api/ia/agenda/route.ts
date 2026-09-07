@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       where: { id: orgId },
       select: { id: true, plan: true, iaComplemento: true, iaExtra: true },
     });
-    if (!org) return fail("Organizacion no encontrada", 404);
+    if (!org) return fail("Organización no encontrada", 404);
 
     const desde = input.desde
       ? new Date(`${input.desde}T00:00:00`)

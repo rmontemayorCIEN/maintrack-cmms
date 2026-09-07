@@ -306,7 +306,7 @@ export function TablaConfigurable<T extends { id: string }>({
                       <button type="button" onClick={() => mover(c.id, -1)} disabled={pos === 0}
                         className="rounded px-1 text-slate-400 hover:text-slate-700 disabled:opacity-25" title="Mover antes">↑</button>
                       <button type="button" onClick={() => mover(c.id, 1)} disabled={pos === seleccion.length - 1}
-                        className="rounded px-1 text-slate-400 hover:text-slate-700 disabled:opacity-25" title="Mover despues">↓</button>
+                        className="rounded px-1 text-slate-400 hover:text-slate-700 disabled:opacity-25" title="Mover después">↓</button>
                     </>
                   ) : null}
                 </div>

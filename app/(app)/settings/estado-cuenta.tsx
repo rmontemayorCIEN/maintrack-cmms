@@ -47,7 +47,7 @@ export function EstadoDeCuenta({
       {cargos.length === 0 ? (
         <EmptyState
           title="Sin cargos emitidos"
-          description="Aqui apareceran los cargos mensuales del servicio conforme se emitan."
+          description="Aquí apareceran los cargos mensuales del servicio conforme se emitan."
         />
       ) : (
         <Card padded={false}>

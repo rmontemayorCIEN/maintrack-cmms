@@ -34,7 +34,7 @@ export default async function MetersPage() {
 
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
         <Stat label="Medidores" value={meters.length} />
-        <Stat label="Sin lectura reciente" value={stale} tone={stale ? "warn" : "good"} hint="Mas de 7 dias" />
+        <Stat label="Sin lectura reciente" value={stale} tone={stale ? "warn" : "good"} hint="Mas de 7 días" />
         <Stat label="Planes por uso" value={meters.reduce((s, m) => s + m.plans.length, 0)} />
       </div>
 

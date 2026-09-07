@@ -28,12 +28,12 @@ import { contextoGeografico } from "../geografia";
 
 const EsquemaEntrevista = z.object({
   tipo: z.string().describe("Tipo de instalacion en una palabra: EDIFICIO, GIMNASIO, ESCUELA, HOSPITAL, HOTEL, FLOTILLA, PLANTA, CLUB, RESTAURANTE, BODEGA, OTRO."),
-  entendido: z.string().describe("En una frase, que entendio que es la instalacion. El usuario confirma o corrige."),
+  entendido: z.string().describe("En una frase, que entendio que es la instalación. El usuario confirma o corrige."),
   preguntas: z.array(
     z.object({
       clave: z.string().describe("Identificador corto sin espacios, ej. superficie."),
       pregunta: z.string().describe("Directa y contestable en pocas palabras."),
-      porQue: z.string().describe("Que cambia en el inventario segun la respuesta. Lo lee quien contesta."),
+      porQue: z.string().describe("Que cambia en el inventario según la respuesta. Lo lee quien contesta."),
       ejemplo: z.string().describe("Una respuesta de ejemplo, para que se entienda que se espera."),
     }),
   ).describe("Entre 4 y 6. Solo las que de verdad cambian la lista de equipos; no pregunte lo que puede asumir."),
@@ -70,7 +70,7 @@ export async function prepararEntrevista(
     userId: params.userId,
     funcion: "LEVANTAMIENTO",
     sistema: SISTEMA_ENTREVISTA,
-    instruccion: "Prepare la entrevista para levantar el inventario de activos de esta instalacion.",
+    instruccion: "Prepare la entrevista para levantar el inventario de activos de esta instalación.",
     contexto: {
       descripcionDeLaInstalacion: params.descripcion,
       tipoDeInstalacionRegistrado: contextoDeInstalacion(params.org ?? {}),
@@ -90,17 +90,17 @@ const EsquemaInventario = z.object({
       activos: z.array(
         z.object({
           nombre: z.string().describe("Como lo nombraria el personal de la instalacion. Incluya capacidad o medida si distingue al equipo. NO incluya el area ni el cuarto: eso va en ubicacion."),
-          categoria: z.string().describe("Codigo de categoria de activo del catalogo entregado, o uno nuevo corto en MAYUSCULAS si ninguno aplica."),
+          categoria: z.string().describe("Código de categoría de activo del catálogo entregado, o uno nuevo corto en MAYUSCULAS si ninguno aplica."),
           criticidad: z.enum(["A", "B", "C"]).describe("A si su falla detiene la operacion o compromete la seguridad; C si se puede vivir sin el unos dias."),
           ubicacion: z.string().describe("El area donde esta: Azotea, Cuarto de maquinas, Sotano, Cocina, Alberca… Un solo lugar. Si un mismo equipo se repite en areas distintas, sepárelo en una propuesta por area."),
           cantidad: z.number().describe("Cuantos equipos iguales se esperan. Si no hay elementos para saberlo, 1."),
-          porQue: z.string().describe("Que funcion cumple y que pasa si falla. Una frase. Es lo que justifica darlo de alta."),
+          porQue: z.string().describe("Que función cumple y que pasa si falla. Una frase. Es lo que justifica darlo de alta."),
         }),
       ),
     }),
-  ).describe("Agrupe por sistema. Es como se recorre la instalacion y como se asigna el trabajo."),
+  ).describe("Agrupe por sistema. Es como se recorre la instalación y como se asigna el trabajo."),
   nota: z.string().describe(
-    "Que asumio, que puede sobrar o faltar segun lo que encuentren en piso, y que conviene verificar primero.",
+    "Que asumio, que puede sobrar o faltar según lo que encuentren en piso, y que conviene verificar primero.",
   ),
 });
 
@@ -154,7 +154,7 @@ export async function generarInventario(
     funcion: "LEVANTAMIENTO",
     sistema: SISTEMA_INVENTARIO,
     instruccion:
-      "Proponga el inventario de activos mantenibles de esta instalacion, agrupado por sistema, a partir de la descripcion y de las respuestas de la entrevista.",
+      "Proponga el inventario de activos mantenibles de esta instalación, agrupado por sistema, a partir de la descripción y de las respuestas de la entrevista.",
     contexto: {
       instalacion: params.descripcion,
       tipo: params.tipo,

@@ -48,7 +48,7 @@ export function VistaGlosario({ terminos }: { terminos: TerminoGlosario[] }) {
             className="field pl-9"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar termino o definicion…"
+            placeholder="Buscar termino o definición…"
             autoComplete="off"
           />
           {busqueda ? (
@@ -89,7 +89,7 @@ export function VistaGlosario({ terminos }: { terminos: TerminoGlosario[] }) {
       {filtrados.length === 0 ? (
         <EmptyState
           title="Sin coincidencias"
-          description="Pruebe con otra palabra o quite el filtro de categoria."
+          description="Pruebe con otra palabra o quite el filtro de categoría."
         />
       ) : (
         <div className="grid gap-6">

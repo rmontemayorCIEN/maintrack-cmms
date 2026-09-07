@@ -29,7 +29,7 @@ const esquema = z.object({
   propuestas: z
     .array(
       z.object({
-        familia: textoIa(80, "El nombre EXACTO de la categoria, como viene en los datos."),
+        familia: textoIa(80, "El nombre EXACTO de la categoría, como viene en los datos."),
         orden: z.number().int().describe("1 es lo primero que conviene hacer."),
         porQue: textoIa(260, "Por que esta familia va en ese lugar. Con el dato que lo sostiene."),
         /**
@@ -43,13 +43,13 @@ const esquema = z.object({
         frecuenciaSugerida: textoIa(90, "Cada cuanto, en lenguaje llano. «Mensual», «cada 500 horas»."),
         actividadesTipicas: z
           .array(textoIa(110, "Una actividad del preventivo, en imperativo."))
-          .describe("Tres a seis, para que el usuario vea de que se trata. El detalle lo redacta despues el generador de planes."),
+          .describe("Tres a seis, para que el usuario vea de que se trata. El detalle lo redacta después el generador de planes."),
       }),
     )
-    .describe("De lo primero a lo ultimo. Solo familias que vengan en los datos."),
+    .describe("De lo primero a lo último. Solo familias que vengan en los datos."),
   noTodavia: textoIa(
     300,
-    "Que conviene NO planear todavia y por que. Null si no hay nada que dejar para despues.",
+    "Que conviene NO planear todavía y por que. Null si no hay nada que dejar para después.",
   ).nullable(),
 });
 
@@ -147,9 +147,9 @@ export async function proponerArranque(
       "- Las actividades que propongas son TIPICAS del tipo de equipo, no inventadas para impresionar. " +
       "Si no conoces el equipo, propon lo generico y dilo.\n" +
       "- Nada de torques, capacidades ni normas especificas: eso sale de la ficha del fabricante.\n" +
-      "- Si conviene dejar familias para despues, dilo en noTodavia. Arrancar con todo es como no arrancar.",
+      "- Si conviene dejar familias para después, dilo en noTodavia. Arrancar con todo es como no arrancar.",
     instruccion:
-      "Esta empresa tiene su catalogo de equipos cargado y le faltan planes preventivos. Dime por donde " +
+      "Esta empresa tiene su catálogo de equipos cargado y le faltan planes preventivos. Dime por donde " +
       "empezar, en que orden y por que, y como estructurar cada familia.",
     contexto: {
       resumen: {
@@ -158,9 +158,9 @@ export async function proponerArranque(
         sinPlan: cobertura.sinPlan.length,
       },
       comoLeerlo: {
-        correctivoUltimoAno: "Ordenes correctivas de los ultimos 12 meses en esa familia, con su costo y sus horas de paro. Donde mas se apaga fuego es donde mas falta preventivo.",
+        correctivoUltimoAno: "Órdenes correctivas de los últimos 12 meses en esa familia, con su costo y sus horas de paro. Donde mas se apaga fuego es donde mas falta preventivo.",
         modelos: "Modelos distintos dentro de la familia. Varios modelos suele significar que hace falta mas de un plan.",
-        criticos: "Equipos de criticidad A sin plan. Son los que paran la produccion.",
+        criticos: "Equipos de criticidad A sin plan. Son los que paran la producción.",
       },
       familias,
     },

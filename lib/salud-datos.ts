@@ -89,15 +89,15 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
       "Un activo sin plan solo genera trabajo correctivo: nunca se adelanta a la falla.",
       "/plans", 3, activos, activosConPlan),
 
-    revision("ot-con-causa", "Ordenes cerradas con causa raiz",
+    revision("ot-con-causa", "Órdenes cerradas con causa raiz",
       "Sin causa raiz no hay analisis de fallas: se repara lo mismo una y otra vez.",
       "/work-orders", 3, otCerradas, otConCausa),
 
-    revision("ot-con-horas", "Ordenes cerradas con horas registradas",
+    revision("ot-con-horas", "Órdenes cerradas con horas registradas",
       "Sin horas no hay costo de mano de obra ni productividad medible.",
       "/work-orders", 2, otCerradas, otConHoras),
 
-    revision("correctivas-con-falla", "Correctivas con codigo de falla",
+    revision("correctivas-con-falla", "Correctivas con código de falla",
       "Es lo que permite ver que modo de falla domina en la planta.",
       "/work-orders", 2, correctivas, correctivasConFalla),
 
@@ -105,16 +105,16 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
       "Sin mano de obra ni refacciones estimadas, el plan no se puede presupuestar ni preparar.",
       "/plans", 2, planes, planesConRecursos),
 
-    revision("refacciones-con-minimo", "Refacciones con minimo definido",
-      "El minimo es lo que dispara la alerta de reposicion. En cero, nunca avisa.",
+    revision("refacciones-con-minimo", "Refacciones con mínimo definido",
+      "El mínimo es lo que dispara la alerta de reposición. En cero, nunca avisa.",
       "/inventory", 2, refacciones, refaccionesConMinimo),
 
     revision("refacciones-con-costo", "Refacciones con costo unitario",
-      "Sin costo, el consumo de almacen no llega al costo de la orden.",
+      "Sin costo, el consumo de almacén no llega al costo de la orden.",
       "/inventory", 1, refacciones, refaccionesConCosto),
 
-    revision("activos-ubicados", "Activos con ubicacion precisa",
-      "Es como se filtra el trabajo por area y como se encuentra el equipo en piso.",
+    revision("activos-ubicados", "Activos con ubicación precisa",
+      "Es como se filtra el trabajo por área y como se encuentra el equipo en piso.",
       "/assets", 1, activos, activosUbicados),
 
     revision("activos-con-valor", "Activos con costo de reemplazo",

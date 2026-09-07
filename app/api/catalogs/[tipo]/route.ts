@@ -9,7 +9,7 @@ type Params = { params: Promise<{ tipo: string }> };
  *  los campos de seleccion de las pantallas de captura dependen de esto. */
 export async function GET(_request: Request, { params }: Params) {
   const { tipo } = await params;
-  if (!esCatalogoValido(tipo)) return fail("Catalogo desconocido", 404);
+  if (!esCatalogoValido(tipo)) return fail("Catálogo desconocido", 404);
 
   return withAuth(null, async ({ orgId }) => {
     const items = await CATALOGOS[tipo].listar(orgId);
@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: Params) {
 /** Alta. Requiere permiso de escritura de catalogos. */
 export async function POST(request: Request, { params }: Params) {
   const { tipo } = await params;
-  if (!esCatalogoValido(tipo)) return fail("Catalogo desconocido", 404);
+  if (!esCatalogoValido(tipo)) return fail("Catálogo desconocido", 404);
   const catalogo = CATALOGOS[tipo];
 
   return withAuth("settings:write", async ({ user, orgId }) => {
@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: Params) {
       const mensaje = error instanceof Error ? error.message : "";
       // El esquema declara codigos unicos por organizacion.
       if (mensaje.includes("Unique constraint") || mensaje.includes("UNIQUE")) {
-        return fail("Ya existe un registro con ese codigo en este catalogo", 409);
+        return fail("Ya existe un registro con ese código en este catálogo", 409);
       }
       throw error;
     }

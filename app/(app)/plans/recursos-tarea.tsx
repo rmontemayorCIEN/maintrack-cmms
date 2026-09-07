@@ -112,7 +112,7 @@ export function RecursosTarea({
         hayFilas={parts.length > 0}
         onAgregar={() => onParts([...parts, { partId: refacciones[0]?.id ?? "", quantity: "1" }])}
         deshabilitado={refacciones.length === 0}
-        aviso={refacciones.length === 0 ? "No hay refacciones en el almacen." : null}
+        aviso={refacciones.length === 0 ? "No hay refacciones en el almacén." : null}
       >
         {parts.map((linea, i) => {
           const ref = refacciones.find((r) => r.id === linea.partId);
@@ -122,7 +122,7 @@ export function RecursosTarea({
                 valor={linea.partId}
                 onCambio={(id) => onParts(parts.map((p, j) => (j === i ? { ...p, partId: id } : p)))}
                 vacio="Seleccione…"
-                marcador="Busque por clave o descripcion"
+                marcador="Busque por clave o descripción"
                 opciones={refacciones.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
               />
               <input
@@ -146,7 +146,7 @@ export function RecursosTarea({
         hayFilas={services.length > 0}
         onAgregar={() => onServices([...services, { serviceId: servicios[0]?.id ?? "", quantity: "1", nota: "" }])}
         deshabilitado={servicios.length === 0 && !puedeCrear}
-        aviso={servicios.length === 0 ? "No hay servicios externos en el catalogo." : null}
+        aviso={servicios.length === 0 ? "No hay servicios externos en el catálogo." : null}
         alta={
           puedeCrear ? (
             <AltaRapida

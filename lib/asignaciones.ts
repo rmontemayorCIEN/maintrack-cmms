@@ -79,7 +79,7 @@ export async function asignarPlan(params: {
     select: { id: true, code: true, criticality: true },
   });
   if (activos.length !== new Set(ids).size) {
-    throw new ErrorDeAsignacion("Alguno de los equipos no existe en su catalogo.", 404);
+    throw new ErrorDeAsignacion("Alguno de los equipos no existe en su catálogo.", 404);
   }
 
   const hoy = new Date();
@@ -176,6 +176,6 @@ export async function quitarAsignacion(organizationId: string, id: string) {
     where: { id, organizationId },
     select: { id: true, planId: true },
   });
-  if (!a) throw new ErrorDeAsignacion("Asignacion no encontrada", 404);
+  if (!a) throw new ErrorDeAsignacion("Asignación no encontrada", 404);
   await prisma.planAsset.delete({ where: { id: a.id } });
 }

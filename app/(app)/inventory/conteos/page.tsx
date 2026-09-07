@@ -8,7 +8,7 @@ import { ESTADOS_CONTEO, exactitud } from "@/lib/conteos";
 import { formatDateTime } from "@/lib/utils";
 import { NuevoConteo } from "./nuevo-conteo";
 
-export const metadata = { title: "Conteos ciclicos" };
+export const metadata = { title: "Conteos cíclicos" };
 export const dynamic = "force-dynamic";
 
 export default async function ConteosPage() {

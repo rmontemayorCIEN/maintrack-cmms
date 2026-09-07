@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     template: "%s · MainTrack CMMS",
   },
   description:
-    "Plataforma SaaS para la programacion y control de mantenimiento preventivo, correctivo y predictivo.",
+    "Plataforma SaaS para la programación y control de mantenimiento preventivo, correctivo y predictivo.",
 };
 
 export const viewport: Viewport = {

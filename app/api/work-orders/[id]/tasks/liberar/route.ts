@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         where: { id: input.bloqueadaPorPartId, organizationId: orgId },
         select: { id: true },
       });
-      if (!part) return fail("Refaccion no encontrada", 404);
+      if (!part) return fail("Refacción no encontrada", 404);
       partId = part.id;
     }
 

@@ -84,7 +84,7 @@ export function PartDialog({
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
-      setError(data.error ?? `No fue posible ${editando ? "guardar los cambios" : "registrar la refaccion"}`);
+      setError(data.error ?? `No fue posible ${editando ? "guardar los cambios" : "registrar la refacción"}`);
       return;
     }
     setOpen(false);
@@ -112,7 +112,7 @@ export function PartDialog({
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h3 className="text-base font-semibold text-slate-900">
-              {editando ? `Editar ${refaccion!.code}` : "Nueva refaccion"}
+              {editando ? `Editar ${refaccion!.code}` : "Nueva refacción"}
             </h3>
             {editando ? (
               <p className="mt-0.5 text-xs text-slate-500">

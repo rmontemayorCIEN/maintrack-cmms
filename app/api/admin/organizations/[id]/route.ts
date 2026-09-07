@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!org) return fail("Empresa no encontrada", 404);
 
   if (id === user.organizacionPropia.id) {
-    return fail("No puede suspender ni degradar su propia organizacion desde aqui", 403);
+    return fail("No puede suspender ni degradar su propia organización desde aquí", 403);
   }
 
   const input = schema.parse(await request.json());

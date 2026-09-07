@@ -25,10 +25,10 @@ const EsquemaRevision = z.object({
   resumen: z.string().describe("Dos frases para quien administra la cuenta: donde esta parado y que sigue."),
   observaciones: z.array(
     z.object({
-      titulo: z.string().describe("El hallazgo en una linea, concreto y con cifras."),
+      titulo: z.string().describe("El hallazgo en una línea, concreto y con cifras."),
       severidad: z.enum(["ALTA", "MEDIA", "BAJA"]),
       porQueImporta: z.string().describe("Que consecuencia tiene dejarlo asi. Sin esto no se entiende la prioridad."),
-      queHacer: z.string().describe("La accion concreta, con la pantalla donde se hace."),
+      queHacer: z.string().describe("La acción concreta, con la pantalla donde se hace."),
     }),
   ).describe("Entre 2 y 5, ordenadas de mas a menos importante. Solo lo que la lista de pasos NO alcanza a decir."),
   siguientePaso: z.string().describe("Si tuviera que hacer una sola cosa esta semana, cual y por que."),

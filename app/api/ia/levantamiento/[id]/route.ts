@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: Params) {
     const elegidos = intake.propuestas.filter(
       (p) => input.aceptados.includes(p.id) && p.estado !== "APLICADO",
     );
-    if (!elegidos.length) return fail("No hay propuestas pendientes en esa seleccion", 409);
+    if (!elegidos.length) return fail("No hay propuestas pendientes en esa selección", 409);
 
     const total = elegidos.reduce((s, p) => s + p.cantidad, 0);
     const cupo = await verificarCupo(orgId, user.organization.plan, "assets");

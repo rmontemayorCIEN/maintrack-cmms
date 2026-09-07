@@ -28,7 +28,7 @@ const EsquemaFotoArea = z.object({
   descripcionDeLoQueVe: z.string().describe("Que es el lugar, en una frase. Ayuda al usuario a confirmar que la foto es de donde cree."),
   equipos: z.array(
     z.object({
-      nombre: z.string().describe("Que equipo es, por su funcion y tipo. Sin marca ni capacidad si no se leen claramente."),
+      nombre: z.string().describe("Que equipo es, por su función y tipo. Sin marca ni capacidad si no se leen claramente."),
       cantidad: z.number().describe("Cuantos se ven de ese tipo."),
       confianza: z.enum(["SEGURO", "PROBABLE", "DUDOSO"]).describe(
         "SEGURO si se distingue sin duda; DUDOSO si es una silueta o esta parcialmente tapado.",
@@ -46,7 +46,7 @@ const SISTEMA = `Identificas equipos mantenibles en fotografias de instalaciones
 Reglas:
 
 1. Juzgue primero si la foto sirve. Si esta oscura, movida, demasiado lejos o no muestra equipos, digalo y explique como repetirla. Alguien esta parado ahi con el telefono: la instruccion tiene que poder seguirla en ese momento.
-2. Identifique por FUNCION y TIPO: "bomba centrifuga", "hidroneumatico", "calentador de paso", "tablero de distribucion", "manejadora". No invente marca, modelo ni capacidad. Si una etiqueta se lee con claridad, mencionela en el detalle; si no, no la adivine.
+2. Identifique por FUNCION y TIPO: "bomba centrifuga", "hidroneumatico", "calentador de paso", "tablero de distribución", "manejadora". No invente marca, modelo ni capacidad. Si una etiqueta se lee con claridad, mencionela en el detalle; si no, no la adivine.
 3. Marque su confianza honestamente. Una silueta a contraluz es DUDOSO, no PROBABLE.
 4. Solo equipos mantenibles: los que se descomponen y llevan rutina. Tuberia, cableado, muebles y herramienta suelta no van.
 5. Diga que quedo fuera de cuadro. Casi siempre falta algo detras de la camara, y decirlo lleva a una segunda foto que completa el area.

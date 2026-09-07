@@ -54,8 +54,8 @@ const ETIQUETAS: Record<string, string> = {
   address: "direccion", latitud: "latitud", longitud: "longitud",
   notasAcceso: "como se entra", email: "correo", phone: "telefono",
   unitCost: "costo unitario", minQuantity: "minimo", quantity: "cantidad",
-  hourlyRate: "tarifa por hora", leadTimeDays: "dias de entrega",
-  intervalDays: "cada cuantos dias", estimatedHours: "horas estimadas",
+  hourlyRate: "tarifa por hora", leadTimeDays: "días de entrega",
+  intervalDays: "cada cuantos días", estimatedHours: "horas estimadas",
 };
 
 /**

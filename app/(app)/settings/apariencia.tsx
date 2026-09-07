@@ -135,7 +135,7 @@ export function PanelApariencia({
       <Card>
         <CardHeader
           title="Densidad"
-          subtitle="Cuanto aire hay entre renglones. Tambien es personal."
+          subtitle="Cuanto aire hay entre renglones. También es personal."
         />
         <div className="grid gap-2 sm:grid-cols-3">
           {CLAVES_DENSIDAD.map((k) => (
@@ -173,7 +173,7 @@ export function PanelApariencia({
         <Card>
           <CardHeader
             title="Identidad de la empresa"
-            subtitle="El logotipo y el color los ve todo su equipo. A diferencia de lo de arriba, esto si es de la organizacion."
+            subtitle="El logotipo y el color los ve todo su equipo. A diferencia de lo de arriba, esto si es de la organización."
           />
 
           <p className="label">Color de acento</p>

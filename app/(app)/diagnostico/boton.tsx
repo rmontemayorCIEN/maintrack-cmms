@@ -23,7 +23,7 @@ export function BotonDiagnostico({ disponible, restantes }: { disponible: boolea
     const data = await res.json();
     setCargando(false);
     if (!res.ok || data.error) {
-      setError(data.error ?? "No fue posible generar el diagnostico");
+      setError(data.error ?? "No fue posible generar el diagnóstico");
       return;
     }
     router.refresh();

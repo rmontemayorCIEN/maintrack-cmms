@@ -43,7 +43,7 @@ export async function altaDePlan(
   const { tasks, ...rest } = entrada;
 
   if (rest.triggerType === "CALENDAR" && !rest.intervalDays) {
-    return { error: "Un plan por calendario requiere intervalo en dias" };
+    return { error: "Un plan por calendario requiere intervalo en días" };
   }
   if (rest.triggerType === "METER" && (!rest.intervalMeter || !rest.meterId)) {
     return { error: "Un plan por medidor requiere medidor e intervalo" };

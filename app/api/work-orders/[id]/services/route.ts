@@ -88,7 +88,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   return withAuth("workorder:execute", async ({ orgId }) => {
     const lineaId = new URL(request.url).searchParams.get("linea");
-    if (!lineaId) return fail("Falta la linea a eliminar", 422);
+    if (!lineaId) return fail("Falta la línea a eliminar", 422);
 
     const wo = await prisma.workOrder.findFirst({ where: { id, organizationId: orgId } });
     if (!wo) return fail("Orden de trabajo no encontrada", 404);
@@ -97,7 +97,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     const borradas = await prisma.workOrderService.deleteMany({ where: { id: lineaId, workOrderId: id } });
-    if (!borradas.count) return fail("Linea no encontrada", 404);
+    if (!borradas.count) return fail("Línea no encontrada", 404);
 
     const workOrder = await recalcWorkOrder(id);
     return ok({ workOrder });

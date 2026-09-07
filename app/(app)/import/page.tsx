@@ -24,7 +24,7 @@ export default async function ImportPage() {
     <>
       <PageHeader
         title="Importar datos"
-        description="Cargue su informacion desde Excel en vez de capturarla a mano. Cada tipo tiene su plantilla, y antes de guardar nada se muestra exactamente que va a pasar."
+        description="Cargue su información desde Excel en vez de capturarla a mano. Cada tipo tiene su plantilla, y antes de guardar nada se muestra exactamente que va a pasar."
       />
       <AsistenteImportacion tipos={tipos} />
     </>

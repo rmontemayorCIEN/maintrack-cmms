@@ -14,7 +14,7 @@ export const maxDuration = 300;
 export async function POST() {
   return withAuth("settings:write", async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("La funcion de inteligencia artificial no esta configurada en este servidor.", 503);
+      return fail("La función de inteligencia artificial no esta configurada en este servidor.", 503);
     }
 
     try {
@@ -30,12 +30,12 @@ export async function POST() {
         entity: "AiReport",
         entityId: r.reporte.id,
         action: "CREATED",
-        summary: "Diagnostico generado manualmente",
+        summary: "Diagnóstico generado manualmente",
       });
       return ok({ id: r.reporte.id }, 201);
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      const mensaje = error instanceof Error ? error.message : "No fue posible generar el diagnostico";
+      const mensaje = error instanceof Error ? error.message : "No fue posible generar el diagnóstico";
       return fail(mensaje, 502);
     }
   });

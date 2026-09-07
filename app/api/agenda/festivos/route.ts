@@ -65,7 +65,7 @@ export async function DELETE(request: Request) {
       where: { id, organizationId: orgId },
       select: { id: true, nombre: true, fecha: true },
     });
-    if (!festivo) return fail("Dia no encontrado", 404);
+    if (!festivo) return fail("Día no encontrado", 404);
 
     await prisma.diaFestivo.delete({ where: { id: festivo.id } });
     await logAudit({

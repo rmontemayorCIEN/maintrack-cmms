@@ -4,7 +4,7 @@
  * Cada llamada al modelo pertenece a una funcion, y cada funcion cuesta un
  * numero de "operaciones" de la bolsa mensual del cliente. Se cobra en
  * operaciones y no en tokens a proposito: un jefe de mantenimiento entiende
- * "40 analisis al mes"; nadie compra tokens.
+ * "40 análisis al mes"; nadie compra tokens.
  */
 
 export type ClaveFuncionIA =
@@ -22,7 +22,7 @@ export type DefinicionFuncionIA = {
 
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
   DIAGNOSTICO: {
-    nombre: "Diagnostico semanal",
+    nombre: "Diagnóstico semanal",
     descripcion:
       "Cada semana la IA revisa indicadores, backlog, costos y calidad de captura, y entrega hallazgos con evidencia, acciones y una matriz FODA.",
     operaciones: 1,
@@ -31,7 +31,7 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
   CIERRE_OT: {
     nombre: "Asistente de cierre de orden",
     descripcion:
-      "Al cerrar una orden, propone codigo de falla, causa raiz y refacciones a partir de lo que escribio el tecnico.",
+      "Al cerrar una orden, propone código de falla, causa raiz y refacciones a partir de lo que escribio el técnico.",
     operaciones: 1,
     disponible: true,
   },
@@ -45,33 +45,33 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
   REFACCIONES: {
     nombre: "Refacciones sugeridas por equipo",
     descripcion:
-      "Propone que refacciones conviene tener en almacen para un equipo, sobre todo cuando aun no hay consumo del cual deducirlo.",
+      "Propone que refacciones conviene tener en almacén para un equipo, sobre todo cuando aun no hay consumo del cual deducirlo.",
     operaciones: 1,
     disponible: true,
   },
   LEVANTAMIENTO: {
     nombre: "Levantamiento de inventario",
     descripcion:
-      "Entrevista sobre la instalacion y propone el inventario de activos completo, agrupado por sistema, listo para revisar y dar de alta.",
+      "Entrevista sobre la instalación y propone el inventario de activos completo, agrupado por sistema, listo para revisar y dar de alta.",
     operaciones: 3,
     disponible: true,
   },
   FOTO_AREA: {
     nombre: "Reconocimiento por fotografia",
     descripcion:
-      "De la foto de un cuarto de maquinas o un area identifica los equipos que se ven, para completar el levantamiento con lo que la entrevista no alcanzo.",
+      "De la foto de un cuarto de máquinas o un área identifica los equipos que se ven, para completar el levantamiento con lo que la entrevista no alcanzo.",
     operaciones: 1,
     disponible: true,
   },
   PLACA: {
     nombre: "Lectura de placa",
     descripcion:
-      "De la fotografia de la placa de un equipo extrae fabricante, modelo, serie y datos tecnicos, y avisa si la foto no sirve.",
+      "De la fotografia de la placa de un equipo extrae fabricante, modelo, serie y datos técnicos, y avisa si la foto no sirve.",
     operaciones: 1,
     disponible: true,
   },
   REVISION: {
-    nombre: "Revision de configuracion",
+    nombre: "Revisión de configuración",
     descripcion:
       "Revisa como quedo armada la cuenta y senala lo que una lista de verificacion no puede ver: cobertura desbalanceada, datos que no se conectan, escalas que no cuadran.",
     operaciones: 1,
@@ -113,14 +113,14 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     disponible: true,
   },
   DEDUPE: {
-    nombre: "Limpieza del catalogo",
+    nombre: "Limpieza del catálogo",
     descripcion:
       "Revisa las refacciones que parecen duplicadas y distingue las que son la misma pieza de las que solo se llaman parecido.",
     operaciones: 2,
     disponible: true,
   },
   RECURRENCIA: {
-    nombre: "Analisis de recurrencia",
+    nombre: "Análisis de recurrencia",
     descripcion:
       "Lee el historial de fallas de un equipo y explica el patron: que las une y si se esta tratando el sintoma en vez de la causa.",
     operaciones: 2,
@@ -129,14 +129,14 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
   TRIAGE: {
     nombre: "Triage de solicitudes",
     descripcion:
-      "Lee lo que reporto alguien que no es de mantenimiento —con su foto— y propone titulo, prioridad, tipo y posibles duplicados.",
+      "Lee lo que reporto alguien que no es de mantenimiento —con su foto— y propone título, prioridad, tipo y posibles duplicados.",
     operaciones: 1,
     disponible: true,
   },
   AYUDA: {
     nombre: "Ayuda con IA",
     descripcion:
-      "Dudas sobre como usar el sistema, contestadas con la documentacion y —cuando la pregunta es sobre su caso— con sus propios datos.",
+      "Dudas sobre como usar el sistema, contestadas con la documentación y —cuando la pregunta es sobre su caso— con sus propios datos.",
     operaciones: 1,
     disponible: true,
   },

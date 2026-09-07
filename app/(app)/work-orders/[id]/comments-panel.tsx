@@ -62,7 +62,7 @@ export function CommentsPanel({
             className="field"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Agregar una nota a la bitacora…"
+            placeholder="Agregar una nota a la bitácora…"
           />
           <Button type="submit" size="sm" disabled={loading || !body.trim()}>
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}

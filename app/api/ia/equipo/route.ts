@@ -13,7 +13,7 @@ export async function POST() {
       where: { id: orgId },
       select: { id: true, plan: true, iaComplemento: true, iaExtra: true },
     });
-    if (!org) return fail("Organizacion no encontrada", 404);
+    if (!org) return fail("Organización no encontrada", 404);
 
     const r = await revisarEquipo(org, { userId: user.id });
     if (!r.ok) return fail(r.motivo, 422);

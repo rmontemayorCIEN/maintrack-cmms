@@ -38,9 +38,9 @@ const CATALOGO: Record<ClaseDeFalla, Omit<Diagnostico, "clase">> = {
     urgente: true,
   },
   CONFIGURACION: {
-    titulo: "Falta configuracion para llamar al modelo",
+    titulo: "Falta configuración para llamar al modelo",
     queHacer:
-      "Revise que el servicio tenga ANTHROPIC_API_KEY y, si la llave esta ligada a su identidad, tambien ANTHROPIC_WORKSPACE_ID.",
+      "Revise que el servicio tenga ANTHROPIC_API_KEY y, si la llave esta ligada a su identidad, también ANTHROPIC_WORKSPACE_ID.",
     urgente: true,
   },
   LIMITE: {

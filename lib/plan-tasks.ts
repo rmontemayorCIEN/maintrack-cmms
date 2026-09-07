@@ -72,7 +72,7 @@ export async function validarRecursos(orgId: string, tareas: TareaDePlan[]): Pro
   ]);
 
   if (ne !== especialidades.length) return "Alguna especialidad ya no existe";
-  if (nr !== refacciones.length) return "Alguna refaccion ya no existe";
+  if (nr !== refacciones.length) return "Alguna refacción ya no existe";
   if (ns !== servicios.length) return "Algun servicio externo ya no existe";
   return null;
 }

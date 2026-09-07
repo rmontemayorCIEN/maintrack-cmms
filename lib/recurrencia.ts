@@ -50,7 +50,7 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
   if (!activo) return null;
 
   // Dias entre falla y falla. Con menos de dos fallas no hay intervalo que
-  // medir, y decir "cada 0 dias" seria peor que no decir nada.
+  // medir, y decir "cada 0 días" seria peor que no decir nada.
   const fechas = ordenes.map((o) => o.createdAt.getTime()).sort((a, b) => a - b);
   const intervalos: number[] = [];
   for (let i = 1; i < fechas.length; i++) intervalos.push(Math.round((fechas[i] - fechas[i - 1]) / DIA));

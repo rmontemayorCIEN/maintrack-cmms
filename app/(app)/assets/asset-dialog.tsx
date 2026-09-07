@@ -178,7 +178,7 @@ export function AssetDialog({
               )
             }
             puedeCrear={puedeGestionarCatalogos && Boolean(form.siteId)}
-            vacioTexto="Sin ubicacion"
+            vacioTexto="Sin ubicación"
             contextoAlta={{ siteId: form.siteId }}
             camposAlta={[
               { nombre: "code", etiqueta: "Codigo (ej. LIN-A)", requerido: true },
@@ -195,7 +195,7 @@ export function AssetDialog({
             opciones={opcionesCategorias}
             onOpcionesChange={setOpcionesCategorias}
             puedeCrear={puedeGestionarCatalogos}
-            vacioTexto="Sin categoria"
+            vacioTexto="Sin categoría"
             camposAlta={[
               { nombre: "code", etiqueta: "Codigo (ej. BOMB)", requerido: true },
               { nombre: "name", etiqueta: "Nombre de la familia", requerido: true },

@@ -254,7 +254,7 @@ export function Calendario({
                 {([
                   ["mes", "Mes", "/calendar"],
                   ["semana", "Semana", "/calendar?vista=semana"],
-                  ["dia", "Dia", "/calendar?vista=dia"],
+                  ["dia", "Día", "/calendar?vista=dia"],
                 ] as const).map(([clave, texto, destino], i) => (
                   <button
                     key={clave}

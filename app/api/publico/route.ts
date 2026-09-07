@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   try {
     input = schema.parse(await request.json());
   } catch {
-    return fail("Faltan datos o vienen incompletos. Revise el nombre, el celular y la descripcion.", 422);
+    return fail("Faltan datos o vienen incompletos. Revise el nombre, el celular y la descripción.", 422);
   }
 
   try {

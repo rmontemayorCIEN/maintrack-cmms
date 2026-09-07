@@ -165,7 +165,7 @@ export async function armarOrden(p: {
   const grupos = [p.asignaciones.length, p.reportes.length, p.backlog.length].filter((n) => n > 0);
   if (config && !config.otMultiOrigen && grupos.length > 1) {
     return {
-      error: "Esta organizacion arma una orden por cada origen. Elija de un solo grupo.",
+      error: "Esta organización arma una orden por cada origen. Elija de un solo grupo.",
       codigo: 400 as const,
     };
   }

@@ -158,7 +158,7 @@ export default async function PlansPage() {
         ? `Cada ${plan.intervalDays} dias`
         : plan.triggerType === "METER"
           ? `Cada ${formatNumber(plan.intervalMeter ?? 0, 0)} ${plan.meter?.unit ?? ""}`
-          : "Por condicion";
+          : "Por condición";
     return {
       id: plan.id,
       name: plan.name,

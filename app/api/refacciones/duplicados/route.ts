@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
 
     if (input.accion === "ANALIZAR") {
-      if (!iaConfigurada()) return fail("La limpieza del catalogo no esta configurada en este servidor.", 503);
+      if (!iaConfigurada()) return fail("La limpieza del catálogo no esta configurada en este servidor.", 503);
       try {
         const r = await juzgarDuplicados(
           {

@@ -28,17 +28,17 @@ function lunesNumero(anio: number, mes: number, n: number): Date {
  */
 export function festivosDeLey(anio: number): { fecha: Date; nombre: string }[] {
   const dias = [
-    { fecha: new Date(anio, 0, 1), nombre: "Ano nuevo" },
-    { fecha: lunesNumero(anio, 1, 1), nombre: "Dia de la Constitucion" },
-    { fecha: lunesNumero(anio, 2, 3), nombre: "Natalicio de Benito Juarez" },
-    { fecha: new Date(anio, 4, 1), nombre: "Dia del Trabajo" },
+    { fecha: new Date(anio, 0, 1), nombre: "Año nuevo" },
+    { fecha: lunesNumero(anio, 1, 1), nombre: "Día de la Constitución" },
+    { fecha: lunesNumero(anio, 2, 3), nombre: "Natalicio de Benito Juárez" },
+    { fecha: new Date(anio, 4, 1), nombre: "Día del Trabajo" },
     { fecha: new Date(anio, 8, 16), nombre: "Independencia de Mexico" },
-    { fecha: lunesNumero(anio, 10, 3), nombre: "Revolucion Mexicana" },
+    { fecha: lunesNumero(anio, 10, 3), nombre: "Revolución Mexicana" },
     { fecha: new Date(anio, 11, 25), nombre: "Navidad" },
   ];
   // Cada seis anios, la transmision del Poder Ejecutivo Federal.
   if ((anio - 2024) % 6 === 0) {
-    dias.push({ fecha: new Date(anio, 9, 1), nombre: "Transmision del Poder Ejecutivo" });
+    dias.push({ fecha: new Date(anio, 9, 1), nombre: "Transmisión del Poder Ejecutivo" });
   }
   return dias.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 }

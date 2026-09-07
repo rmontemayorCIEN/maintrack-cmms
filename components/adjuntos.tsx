@@ -140,7 +140,7 @@ export function Adjuntos({
         <div>
           <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
           <p className="text-xs text-slate-500">
-            {ayuda ?? "Fotos, videos y documentos. Maximo 200 MB por archivo."}
+            {ayuda ?? "Fotos, videos y documentos. Máximo 200 MB por archivo."}
           </p>
         </div>
         {editable ? (

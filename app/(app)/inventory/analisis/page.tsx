@@ -10,7 +10,7 @@ import { iaConfigurada } from "@/lib/ia/cliente";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { SugerenciasIa } from "./sugerencias";
 
-export const metadata = { title: "Analisis de almacen" };
+export const metadata = { title: "Análisis de almacén" };
 export const dynamic = "force-dynamic";
 
 /**
@@ -49,7 +49,7 @@ export default async function AnalisisAlmacenPage() {
   return (
     <>
       <PageHeader
-        title="Analisis de almacen"
+        title="Análisis de almacén"
         description="Que le falta, que sobra y que minimos no corresponden a su consumo real. Todo calculado sobre su kardex y sus planes: ni una sola estimacion."
         breadcrumb={
           <Link href="/inventory" className="inline-flex items-center gap-1 hover:text-brand-600">
@@ -75,7 +75,7 @@ export default async function AnalisisAlmacenPage() {
         <Stat
           label="Dinero que puede liberar"
           value={formatCurrency(t.dineroLiberable + t.valorInmovilizado, moneda)}
-          hint="Minimos inflados e inventario sin movimiento"
+          hint="Mínimos inflados e inventario sin movimiento"
           tone={t.dineroLiberable + t.valorInmovilizado > 0 ? "warn" : "good"}
         />
       </div>
@@ -137,7 +137,7 @@ export default async function AnalisisAlmacenPage() {
           <Card padded={false}>
             <div className="border-b border-slate-200 px-5 py-4">
               <CardHeader
-                title="Por debajo de su minimo"
+                title="Por debajo de su mínimo"
                 subtitle="Ordenadas por criticidad del equipo que las consume, y con el tiempo de entrega del proveedor."
                 action={<PackageX className="h-4 w-4 text-amber-500" />}
               />
@@ -184,7 +184,7 @@ export default async function AnalisisAlmacenPage() {
           <Card padded={false}>
             <div className="border-b border-slate-200 px-5 py-4">
               <CardHeader
-                title="Minimos que no corresponden al consumo"
+                title="Mínimos que no corresponden al consumo"
                 subtitle="El minimo util es el que alcanza para una intervencion completa y para cubrir el tiempo de entrega. Por debajo se arriesga un paro; muy por encima es dinero detenido en el anaquel."
               />
             </div>
@@ -233,7 +233,7 @@ export default async function AnalisisAlmacenPage() {
           {a.sinControl.length ? (
             <Card>
               <CardHeader
-                title="Se consumen sin minimo definido"
+                title="Se consumen sin mínimo definido"
                 subtitle="Salen del almacen pero nunca disparan alerta de reposicion: se van a acabar sin avisar."
                 action={<AlertTriangle className="h-4 w-4 text-amber-500" />}
               />

@@ -259,7 +259,7 @@ export function TaskList({
                       valor={partId}
                       onCambio={setPartId}
                       vacio="Sin especificar"
-                      marcador="Busque por clave o descripcion"
+                      marcador="Busque por clave o descripción"
                       opciones={refacciones.map((r) => ({ id: r.id, etiqueta: `${r.code} — ${r.name}` }))}
                     />
                     <p className="mt-1 text-xs text-slate-400">

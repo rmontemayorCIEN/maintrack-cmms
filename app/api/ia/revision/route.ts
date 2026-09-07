@@ -8,7 +8,7 @@ export const maxDuration = 180;
 export async function POST() {
   return withAuth("settings:write", async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("La funcion de inteligencia artificial no esta configurada en este servidor.", 503);
+      return fail("La función de inteligencia artificial no esta configurada en este servidor.", 503);
     }
     try {
       const r = await revisarConfiguracion(
@@ -19,7 +19,7 @@ export async function POST() {
       return ok({ revision: r.revision });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible revisar la configuracion", 502);
+      return fail(error instanceof Error ? error.message : "No fue posible revisar la configuración", 502);
     }
   });
 }

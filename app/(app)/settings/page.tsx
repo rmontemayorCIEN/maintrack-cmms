@@ -37,8 +37,8 @@ const DESCRIPCIONES: Record<Seccion, string> = {
   apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
-  jornada: "Horas de trabajo, dias laborables y capacidad de cada persona. De aqui sale si un dia del calendario cabe.",
-  suscripcion: "Plan contratado, consumo y carga inicial de informacion.",
+  jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
+  suscripcion: "Plan contratado, consumo y carga inicial de información.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
   usuarios: "Quien entra al sistema, con que rol y a que tarifa.",
   integracion: "Endpoints para conectar sistemas externos, IoT y tareas programadas.",
@@ -64,7 +64,7 @@ export default async function SettingsPage({
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organizacion", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
-    { clave: "ordenes", titulo: "Ordenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
+    { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
     { clave: "suscripcion", titulo: "Suscripcion", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
@@ -189,11 +189,11 @@ export default async function SettingsPage({
             editable={can(user.role, "settings:write")}
           />
           <Card>
-            <CardHeader title="Datos de la organizacion" subtitle={org.name} />
+            <CardHeader title="Datos de la organización" subtitle={org.name} />
             <dl className="grid gap-3 text-sm">
               <Row label="Identificador">{org.slug}</Row>
               <Row label="Giro">{org.industry ?? "Sin definir"}</Row>
-              <Row label="Tipo de instalacion">{instalacionDe(org.tipoInstalacion).nombre}</Row>
+              <Row label="Tipo de instalación">{instalacionDe(org.tipoInstalacion).nombre}</Row>
               <Row label="Zona horaria">{org.timezone}</Row>
               <Row label="Moneda">{org.currency}</Row>
               <Row label="Alta">{formatDate(org.createdAt)}</Row>
@@ -206,7 +206,7 @@ export default async function SettingsPage({
           <Card className="lg:col-span-2">
             <CardHeader
               title="Estructura fisica"
-              subtitle="Sitios y sus ubicaciones. El numero entre parentesis son los activos de cada una."
+              subtitle="Sitios y sus ubicaciones. El número entre parentesis son los activos de cada una."
               action={
                 can(user.role, "settings:write") ? (
                   <Link
@@ -219,7 +219,7 @@ export default async function SettingsPage({
               }
             />
             {sitios.length === 0 ? (
-              <EmptyState title="Sin sitios" description="Registre el primero desde Catalogos." />
+              <EmptyState title="Sin sitios" description="Registre el primero desde Catálogos." />
             ) : (
               <ul className="grid gap-2">
                 {sitios.map((sitio) => (
@@ -391,15 +391,15 @@ export default async function SettingsPage({
         <Card>
           <CardHeader
             title="Endpoints disponibles"
-            subtitle="Todos requieren sesion, salvo el programador, que usa su propio token."
+            subtitle="Todos requieren sesión, salvo el programador, que usa su propio token."
           />
           <div className="grid gap-3 text-xs md:grid-cols-2">
             <Endpoint method="GET" path="/api/cron/scheduler" description="Genera las OT preventivas vencidas de todas las organizaciones. Autenticacion: encabezado Authorization: Bearer CRON_SECRET. Programelo en Cloud Scheduler cada hora." />
             <Endpoint method="POST" path="/api/sensors/readings" description="Ingesta de lecturas de condicion (una o hasta 500 en lote). Evalua umbrales, actualiza la tendencia y abre alertas u ordenes predictivas." />
             <Endpoint method="POST" path="/api/readings" description="Registro de lectura de medidor (horas, km, ciclos). Recalcula el consumo diario y adelanta los planes por uso." />
-            <Endpoint method="GET" path="/api/work-orders" description="Consulta de ordenes con filtros por estado, tipo, activo y responsable." />
-            <Endpoint method="POST" path="/api/requests" description="Alta de solicitudes de servicio desde portales o sistemas de produccion." />
-            <Endpoint method="GET" path="/api/assets" description="Catalogo de activos, con busqueda por codigo, nombre o numero de serie." />
+            <Endpoint method="GET" path="/api/work-orders" description="Consulta de órdenes con filtros por estado, tipo, activo y responsable." />
+            <Endpoint method="POST" path="/api/requests" description="Alta de solicitudes de servicio desde portales o sistemas de producción." />
+            <Endpoint method="GET" path="/api/assets" description="Catalogo de activos, con busqueda por código, nombre o número de serie." />
           </div>
         </Card>
       ) : null}
@@ -412,7 +412,7 @@ export default async function SettingsPage({
           </div>
           {bitacora.length === 0 ? (
             <div className="px-5 pb-5">
-              <EmptyState title="Sin movimientos" description="Aqui apareceran las operaciones conforme se usen." />
+              <EmptyState title="Sin movimientos" description="Aquí apareceran las operaciones conforme se usen." />
             </div>
           ) : (
             <div className="table-wrap">

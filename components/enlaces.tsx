@@ -93,7 +93,7 @@ export function Enlaces({
         <div>
           <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
           <p className="text-xs text-slate-500">
-            {ayuda ?? "Manual en linea, ficha del proveedor, video del procedimiento, norma aplicable."}
+            {ayuda ?? "Manual en línea, ficha del proveedor, video del procedimiento, norma aplicable."}
           </p>
         </div>
         {editable ? (

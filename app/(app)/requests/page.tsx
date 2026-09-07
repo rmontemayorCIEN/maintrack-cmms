@@ -53,20 +53,20 @@ export default async function RequestsPage() {
     <>
       <PageHeader
         title="Solicitudes de servicio"
-        description="Reportes de falla levantados por produccion u operaciones. Al aprobarse se convierten en orden de trabajo correctiva."
+        description="Reportes de falla levantados por producción u operaciones. Al aprobarse se convierten en orden de trabajo correctiva."
         actions={<RequestDialog assets={assets} />}
       />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Stat label="Pendientes de revision" value={pending.length} tone={pending.length ? "warn" : "good"} />
+        <Stat label="Pendientes de revisión" value={pending.length} tone={pending.length ? "warn" : "good"} />
         <Stat label="Convertidas en OT" value={converted} />
-        <Stat label="Total historico" value={requests.length} />
+        <Stat label="Total histórico" value={requests.length} />
       </div>
 
       {requests.length === 0 ? (
         <EmptyState
           title="Sin solicitudes"
-          description="Cualquier usuario con rol de solicitante puede reportar una falla desde aqui."
+          description="Cualquier usuario con rol de solicitante puede reportar una falla desde aquí."
         />
       ) : (
         <Card padded={false}>

@@ -68,7 +68,7 @@ async function avisarACompras(params: {
         body:
           params.urgencia === "PARO"
             ? "Hay equipo parado esperando este material."
-            : "Mantenimiento necesita material que no hay en almacen.",
+            : "Mantenimiento necesita material que no hay en almacén.",
         link: `/compras/${params.requestId}`,
         kind: params.urgencia === "PARO" ? "CRITICAL" : "WARNING",
       }),
@@ -144,7 +144,7 @@ export async function autorizar(params: {
     where: { id: params.requestId, organizationId: params.organizationId },
     select: { id: true, folio: true, estado: true, solicitanteId: true },
   });
-  if (!req) throw new ErrorDeCompra("Requisicion de compra no encontrada");
+  if (!req) throw new ErrorDeCompra("Requisición de compra no encontrada");
   if (req.estado !== "SOLICITADA") {
     throw new ErrorDeCompra(`Ya esta ${ESTADOS_COMPRA[req.estado as EstadoCompra].toLowerCase()}`);
   }
@@ -188,9 +188,9 @@ export async function enCompra(params: {
     where: { id: params.requestId, organizationId: params.organizationId },
     select: { id: true, estado: true },
   });
-  if (!req) throw new ErrorDeCompra("Requisicion de compra no encontrada");
+  if (!req) throw new ErrorDeCompra("Requisición de compra no encontrada");
   if (!["SOLICITADA", "AUTORIZADA"].includes(req.estado)) {
-    throw new ErrorDeCompra("Solo se puede colocar una requisicion autorizada");
+    throw new ErrorDeCompra("Solo se puede colocar una requisición autorizada");
   }
   if (!params.ordenCompra.trim()) throw new ErrorDeCompra("Indique el folio de la orden de compra");
 
@@ -338,9 +338,9 @@ export async function registrarCotizacion(params: {
     where: { id: params.purchaseRequestId, organizationId: params.organizationId },
     select: { id: true, estado: true },
   });
-  if (!compra) throw new ErrorDeCompra("Requisicion de compra no encontrada");
+  if (!compra) throw new ErrorDeCompra("Requisición de compra no encontrada");
   if (["RECHAZADA", "CANCELADA", "CERRADA"].includes(compra.estado)) {
-    throw new ErrorDeCompra("No se pueden capturar cotizaciones sobre una requisicion cerrada");
+    throw new ErrorDeCompra("No se pueden capturar cotizaciones sobre una requisición cerrada");
   }
 
   const proveedor = await prisma.supplier.findFirst({
@@ -408,7 +408,7 @@ export async function elegirCotizacion(params: {
   if (!cotizaciones.length) throw new ErrorDeCompra("No hay cotizaciones que comparar");
 
   const elegida = cotizaciones.find((c) => c.id === params.quoteId);
-  if (!elegida) throw new ErrorDeCompra("Esa cotizacion no pertenece a esta requisicion");
+  if (!elegida) throw new ErrorDeCompra("Esa cotización no pertenece a esta requisición");
 
   const masBarata = cotizaciones.reduce((a, b) => (b.total < a.total ? b : a));
   if (elegida.id !== masBarata.id && !params.motivo?.trim()) {
@@ -461,12 +461,12 @@ export async function emitirOrdenDeCompra(params: {
       },
     },
   });
-  if (!compra) throw new ErrorDeCompra("Requisicion de compra no encontrada");
+  if (!compra) throw new ErrorDeCompra("Requisición de compra no encontrada");
   if (compra.estado !== "AUTORIZADA") {
-    throw new ErrorDeCompra("La orden se emite sobre una requisicion autorizada");
+    throw new ErrorDeCompra("La orden se emite sobre una requisición autorizada");
   }
   const ganadora = compra.cotizaciones[0];
-  if (!ganadora) throw new ErrorDeCompra("Primero elija la cotizacion ganadora en el comparativo");
+  if (!ganadora) throw new ErrorDeCompra("Primero elija la cotización ganadora en el comparativo");
 
   const folio = await siguienteFolio(params.organizationId, "ordenCompra");
 

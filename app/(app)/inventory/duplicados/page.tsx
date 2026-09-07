@@ -8,7 +8,7 @@ import { iaConfigurada } from "@/lib/ia/cliente";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { PanelDuplicados } from "./panel";
 
-export const metadata = { title: "Limpieza del catalogo" };
+export const metadata = { title: "Limpieza del catálogo" };
 export const dynamic = "force-dynamic";
 
 export default async function DuplicadosPage() {

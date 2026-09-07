@@ -47,7 +47,7 @@ export async function crearPuntoDeReporte(params: {
   }
   if (params.locationId) {
     const l = await prisma.location.findFirst({ where: { id: params.locationId, organizationId: params.organizationId }, select: { id: true } });
-    if (!l) throw new ErrorDePortal("La ubicacion indicada no existe");
+    if (!l) throw new ErrorDePortal("La ubicación indicada no existe");
   }
   if (params.siteId) {
     const st = await prisma.site.findFirst({ where: { id: params.siteId, organizationId: params.organizationId }, select: { id: true } });
@@ -140,7 +140,7 @@ export async function levantarSolicitud(params: {
   foto?: { base64: string; tipo: string } | null;
 }) {
   const punto = await contextoDelPunto(params.tokenPunto);
-  if (!punto) throw new ErrorDePortal("Este codigo ya no esta activo. Pida uno nuevo a mantenimiento.");
+  if (!punto) throw new ErrorDePortal("Este código ya no esta activo. Pida uno nuevo a mantenimiento.");
 
   const desde = new Date(Date.now() - VENTANA_MINUTOS * 60_000);
   const recientes = await prisma.workRequest.count({
@@ -148,7 +148,7 @@ export async function levantarSolicitud(params: {
   });
   if (recientes >= LIMITE_POR_PUNTO) {
     throw new ErrorDePortal(
-      "Se recibieron demasiados reportes de este punto en los ultimos minutos. Espere un momento antes de enviar otro.",
+      "Se recibieron demasiados reportes de este punto en los últimos minutos. Espere un momento antes de enviar otro.",
     );
   }
 

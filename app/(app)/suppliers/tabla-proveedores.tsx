@@ -44,7 +44,7 @@ const COLUMNAS: Columna<FilaProveedor>[] = [
   },
   { id: "direccion", etiqueta: "Direccion", texto: (p) => guion(p.address) },
   {
-    id: "entrega", etiqueta: "Dias de entrega", alineaDerecha: true, agrupable: true,
+    id: "entrega", etiqueta: "Días de entrega", alineaDerecha: true, agrupable: true,
     texto: (p) => `${p.leadTimeDays} d`,
   },
   { id: "refacciones", etiqueta: "Refacciones que surte", alineaDerecha: true, texto: (p) => String(p.refacciones) },
@@ -52,18 +52,18 @@ const COLUMNAS: Columna<FilaProveedor>[] = [
     // La columna que convierte la lista en una accion: a quien hay que
     // llamarle hoy. Agrupar por proveedor y mirar esta cifra es una orden de
     // compra por renglon.
-    id: "porComprar", etiqueta: "Bajo minimo", alineaDerecha: true,
+    id: "porComprar", etiqueta: "Bajo mínimo", alineaDerecha: true,
     texto: (p) => String(p.refaccionesBajoMinimo),
     pinta: (p) => p.refaccionesBajoMinimo
       ? <Badge tone="danger">{p.refaccionesBajoMinimo} por comprar</Badge>
       : <span className="text-slate-300">—</span>,
   },
   { id: "valorEnPiso", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.valorEnPiso, p.moneda) },
-  { id: "serviciosCatalogo", etiqueta: "Servicios en catalogo", alineaDerecha: true, texto: (p) => String(p.serviciosCatalogo) },
+  { id: "serviciosCatalogo", etiqueta: "Servicios en catálogo", alineaDerecha: true, texto: (p) => String(p.serviciosCatalogo) },
   { id: "serviciosPrestados", etiqueta: "Servicios prestados", alineaDerecha: true, texto: (p) => String(p.serviciosPrestados) },
   { id: "gasto", etiqueta: "Gasto acumulado", alineaDerecha: true, texto: (p) => formatCurrency(p.gastoAcumulado, p.moneda) },
   {
-    id: "ultimo", etiqueta: "Ultimo servicio",
+    id: "ultimo", etiqueta: "Último servicio",
     texto: (p) => (p.ultimoServicio ? new Date(p.ultimoServicio).toLocaleDateString("es-MX") : "—"),
   },
   {

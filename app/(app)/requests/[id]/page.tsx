@@ -158,7 +158,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               destino={{ workRequestId: solicitud.id }}
               editable={puedeAdjuntar}
               titulo="Fotos y evidencia del reporte"
-              ayuda="Una imagen del sintoma suele ahorrar una visita de diagnostico."
+              ayuda="Una imagen del síntoma suele ahorrar una visita de diagnóstico."
               adjuntos={solicitud.attachments.map((a) => ({
                 id: a.id, name: a.name, kind: a.kind, size: a.size,
                 mimeType: a.mimeType, createdAt: a.createdAt.toISOString(),
@@ -195,7 +195,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             {solicitud.reviewedBy ? (
               <>
                 <Fila label="Reviso">{solicitud.reviewedBy.name}</Fila>
-                <Fila label="Fecha de revision">{formatDateTime(solicitud.reviewedAt)}</Fila>
+                <Fila label="Fecha de revisión">{formatDateTime(solicitud.reviewedAt)}</Fila>
               </>
             ) : null}
             {solicitud.workOrder ? (

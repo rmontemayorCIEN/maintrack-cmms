@@ -80,7 +80,7 @@ async function analizar(tipo: keyof typeof IMPORTACIONES, contenido: string, org
 /** Vista previa: dice que pasaria, sin tocar la base. */
 export async function POST(request: Request, { params }: Params) {
   const { tipo } = await params;
-  if (!esImportacionValida(tipo)) return fail("Tipo de importacion desconocido", 404);
+  if (!esImportacionValida(tipo)) return fail("Tipo de importación desconocido", 404);
 
   return withAuth("settings:write", async ({ orgId }) => {
     const { contenido } = cuerpo.parse(await request.json());
@@ -93,7 +93,7 @@ export async function POST(request: Request, { params }: Params) {
 /** Ejecucion: inserta solo los renglones nuevos y validos. */
 export async function PUT(request: Request, { params }: Params) {
   const { tipo } = await params;
-  if (!esImportacionValida(tipo)) return fail("Tipo de importacion desconocido", 404);
+  if (!esImportacionValida(tipo)) return fail("Tipo de importación desconocido", 404);
   const def = IMPORTACIONES[tipo];
 
   return withAuth("settings:write", async ({ user, orgId }) => {

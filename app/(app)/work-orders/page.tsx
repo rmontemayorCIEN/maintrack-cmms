@@ -16,7 +16,7 @@ import { WorkOrderFilters } from "./filters";
 import { TablaOrdenes, type FilaOrden } from "./tabla-ordenes";
 import { vistaGuardada } from "@/lib/vistas";
 
-export const metadata = { title: "Ordenes de trabajo" };
+export const metadata = { title: "Órdenes de trabajo" };
 export const dynamic = "force-dynamic";
 
 type Search = Promise<Record<string, string | undefined>>;
@@ -111,7 +111,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
   return (
     <>
       <PageHeader
-        title="Ordenes de trabajo"
+        title="Órdenes de trabajo"
         description={`${workOrders.length} resultados · ${openCount} abiertas en total · costo listado ${formatCurrency(totalCost, user.organization.currency)}`}
         actions={
           <div className="flex gap-2">

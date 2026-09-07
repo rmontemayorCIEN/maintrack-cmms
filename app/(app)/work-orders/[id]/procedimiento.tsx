@@ -54,7 +54,7 @@ export function ProcedimientoIa({
     });
     const data = await res.json().catch(() => ({}));
     cual === "gen" ? setGenerando(false) : setAplicando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible completar la operacion"); return null; }
+    if (!res.ok) { setError(data.error ?? "No fue posible completar la operación"); return null; }
     return data;
   }
 

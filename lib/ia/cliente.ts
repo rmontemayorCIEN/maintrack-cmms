@@ -16,7 +16,7 @@ import { MODELO_PREDETERMINADO } from "./precios";
 
 export class IaNoConfigurada extends Error {
   constructor() {
-    super("La funcion de inteligencia artificial no esta configurada en este servidor.");
+    super("La función de inteligencia artificial no esta configurada en este servidor.");
   }
 }
 

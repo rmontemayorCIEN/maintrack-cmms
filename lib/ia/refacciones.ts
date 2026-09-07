@@ -23,12 +23,12 @@ const EsquemaRefacciones = z.object({
   refacciones: z.array(
     z.object({
       codigoSugerido: z.string().describe(
-        "Siga el patron de codificacion que ya usa la empresa en su catalogo. Corto y sin espacios.",
+        "Siga el patrón de codificación que ya usa la empresa en su catálogo. Corto y sin espacios.",
       ),
-      nombre: z.string().describe("Como lo pediria un almacenista. Incluya medida o especificacion si define la pieza."),
-      familia: z.string().describe("Codigo de familia del catalogo de la empresa. Solo de la lista entregada."),
-      unidad: z.string().describe("Codigo de unidad del catalogo de la empresa. Solo de la lista entregada."),
-      minimoSugerido: z.number().describe("Cuantas conviene tener siempre. Piense en una intervencion completa."),
+      nombre: z.string().describe("Como lo pediria un almacenista. Incluya medida o especificación si define la pieza."),
+      familia: z.string().describe("Código de familia del catálogo de la empresa. Solo de la lista entregada."),
+      unidad: z.string().describe("Código de unidad del catálogo de la empresa. Solo de la lista entregada."),
+      minimoSugerido: z.number().describe("Cuantas conviene tener siempre. Piense en una intervención completa."),
       criticidad: z.enum(["IMPRESCINDIBLE", "RECOMENDABLE", "OPCIONAL"]).describe(
         "IMPRESCINDIBLE si su falta detiene el equipo y no se consigue rapido; OPCIONAL si se compra el dia que se ocupa sin consecuencia.",
       ),
@@ -122,7 +122,7 @@ export async function sugerirRefacciones(
     funcion: "REFACCIONES",
     sistema: SISTEMA,
     instruccion:
-      "Proponga que refacciones conviene tener en almacen para este equipo, considerando lo que ya tienen y lo que su historial revela.",
+      "Proponga que refacciones conviene tener en almacén para este equipo, considerando lo que ya tienen y lo que su historial revela.",
     contexto: {
       instalacion: contextoDeInstalacion(empresa),
       activo: {

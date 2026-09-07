@@ -25,11 +25,11 @@ const esquema = z.object({
   propuestas: z
     .array(
       z.object({
-        codigoA: textoIa(40, "Codigo de la primera refaccion, exacto como viene en los datos."),
-        codigoB: textoIa(40, "Codigo de la segunda, exacto como viene en los datos."),
+        codigoA: textoIa(40, "Código de la primera refacción, exacto como viene en los datos."),
+        codigoB: textoIa(40, "Código de la segunda, exacto como viene en los datos."),
         tipo: z.enum(["EQUIVALENTE", "SUSTITUTO", "NO_EQUIVALEN"]),
-        porQue: textoIa(240, "La razon, concreta. Que dato del catalogo la sostiene."),
-        salvedad: textoIa(200, "La condicion para poder usarla, si el tipo es SUSTITUTO. Null si no aplica.").nullable(),
+        porQue: textoIa(240, "La razon, concreta. Que dato del catálogo la sostiene."),
+        salvedad: textoIa(200, "La condición para poder usarla, si el tipo es SUSTITUTO. Null si no aplica.").nullable(),
         confianza: z.enum(["ALTA", "MEDIA", "BAJA"]),
       }),
     )
@@ -134,7 +134,7 @@ export async function proponerEquivalencias(
   ]);
 
   if (refacciones.length < 2) {
-    return { ok: false, motivo: "Hacen falta al menos dos refacciones en el catalogo." };
+    return { ok: false, motivo: "Hacen falta al menos dos refacciones en el catálogo." };
   }
 
   const yaRelacionadas = new Set(existentes.map((e) => `${e.partAId}|${e.partBId}`));
@@ -144,7 +144,7 @@ export async function proponerEquivalencias(
     return {
       ok: false,
       motivo:
-        "No hay pares que compartan designacion en el catalogo. Sin ese dato en comun no hay forma seria de proponer una equivalencia.",
+        "No hay pares que compartan designación en el catálogo. Sin ese dato en común no hay forma sería de proponer una equivalencia.",
     };
   }
 
@@ -163,9 +163,9 @@ export async function proponerEquivalencias(
       "- EQUIVALENTE es la misma pieza con otra marca: misma designacion, mismas medidas, intercambiable sin condiciones.\n" +
       "- SUSTITUTO sirve pero con condicion. La salvedad es obligatoria ahi: sin ella alguien monta la pieza creyendo que hizo bien.\n" +
       "- Si los dos renglones parecen ser LA MISMA refaccion capturada dos veces —mismo codigo de fabricante, misma marca—, eso no es una equivalencia sino un duplicado: contestalo como NO_EQUIVALEN y dilo en el porQue.\n" +
-      "- Confianza ALTA solo cuando el catalogo lo sostiene solo. Ante la duda, BAJA.",
+      "- Confianza ALTA solo cuando el catálogo lo sostiene solo. Ante la duda, BAJA.",
     instruccion:
-      "Revisa estos pares del catalogo y di, para cada uno, si son la misma pieza de otra marca, si uno sirve como sustituto del otro, o si no equivalen.",
+      "Revisa estos pares del catálogo y di, para cada uno, si son la misma pieza de otra marca, si uno sirve como sustituto del otro, o si no equivalen.",
     contexto: {
       nota: "Todos los pares ya comparten al menos una designacion numerica; eso se verifico antes de llegar aqui.",
       pares: pares.map((p) => ({

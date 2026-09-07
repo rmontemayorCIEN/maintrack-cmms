@@ -15,7 +15,7 @@ type Propuesta = {
 type Paso = "DESCRIBIR" | "ENTREVISTA" | "FOTOS" | "GENERANDO" | "REVISAR" | "LISTO";
 
 const CRITICIDAD: Record<string, { texto: string; tono: "danger" | "warning" | "muted" }> = {
-  A: { texto: "A · critico", tono: "danger" },
+  A: { texto: "A · crítico", tono: "danger" },
   B: { texto: "B · importante", tono: "warning" },
   C: { texto: "C · secundario", tono: "muted" },
 };
@@ -336,7 +336,7 @@ export function AsistenteLevantamiento({
                           </div>
                           {p.porQue ? <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">{p.porQue}</p> : null}
                           <p className="mt-0.5 text-[0.6875rem] text-slate-400">
-                            {p.categoria ?? "sin categoria"}{p.ubicacion ? ` · ${p.ubicacion}` : ""}
+                            {p.categoria ?? "sin categoría"}{p.ubicacion ? ` · ${p.ubicacion}` : ""}
                           </p>
                         </div>
                       </label>

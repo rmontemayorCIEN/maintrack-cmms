@@ -77,7 +77,7 @@ export async function POST(request: Request, { params }: Params) {
       body: accion === "APLICAR"
         ? esComplemento
           ? `Tiene ${COMPLEMENTO_IA.operaciones} operaciones de IA al mes y todas las funciones disponibles.`
-          : "Los nuevos limites ya estan activos."
+          : "Los nuevos limites ya están activos."
         : "Contacte a su proveedor del servicio para mas detalles.",
       link: esComplemento ? "/diagnostico" : "/settings?s=suscripcion",
       kind: accion === "APLICAR" ? "SUCCESS" : "WARNING",

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
 
     const warehouseId = input.warehouseId || (await almacenPorOmision(orgId))?.id;
-    if (!warehouseId) return fail("La cuenta no tiene ningun almacen activo", 409);
+    if (!warehouseId) return fail("La cuenta no tiene ningún almacén activo", 409);
 
     try {
       const balance = await aplicarMovimiento({

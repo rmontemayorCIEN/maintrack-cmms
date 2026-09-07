@@ -69,8 +69,8 @@ export async function aplicarMovimiento(m: Movimiento, tx?: Cliente): Promise<nu
       select: { id: true, active: true, name: true },
     }),
   ]);
-  if (!part) throw new ErrorDeAlmacen("Refaccion no encontrada");
-  if (!almacen) throw new ErrorDeAlmacen("Almacen no encontrado");
+  if (!part) throw new ErrorDeAlmacen("Refacción no encontrada");
+  if (!almacen) throw new ErrorDeAlmacen("Almacén no encontrado");
   if (!almacen.active) throw new ErrorDeAlmacen(`El almacen ${almacen.name} esta inactivo`);
 
   // La existencia en este almacen nace en cero la primera vez que algo entra.
@@ -185,7 +185,7 @@ export async function traspasar(params: {
   renglones: Array<{ partId: string; cantidad: number }>;
 }) {
   if (params.origenId === params.destinoId) {
-    throw new ErrorDeAlmacen("El origen y el destino no pueden ser el mismo almacen");
+    throw new ErrorDeAlmacen("El origen y el destino no pueden ser el mismo almacén");
   }
   if (!params.renglones.length) throw new ErrorDeAlmacen("El traspaso no tiene renglones");
 
@@ -207,7 +207,7 @@ export async function traspasar(params: {
         where: { id: r.partId, organizationId: params.organizationId },
         select: { unitCost: true },
       });
-      if (!part) throw new ErrorDeAlmacen("Refaccion no encontrada en el traspaso");
+      if (!part) throw new ErrorDeAlmacen("Refacción no encontrada en el traspaso");
 
       await tx.stockTransferLine.create({
         data: { transferId: traspaso.id, partId: r.partId, quantity: r.cantidad, unitCost: part.unitCost },

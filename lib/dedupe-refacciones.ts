@@ -184,9 +184,9 @@ export async function fusionarRefacciones(params: {
     select: { id: true, code: true, name: true, unit: true, quantityOnHand: true, unitCost: true },
   });
   const sobreviviente = partes.find((p) => p.id === sobrevivienteId);
-  if (!sobreviviente) throw new ErrorDeFusion("La refaccion que sobrevive no existe");
+  if (!sobreviviente) throw new ErrorDeFusion("La refacción que sobrevive no existe");
   if (partes.length !== absorbidas.length + 1) {
-    throw new ErrorDeFusion("Alguna de las refacciones no pertenece a esta organizacion");
+    throw new ErrorDeFusion("Alguna de las refacciones no pertenece a esta organización");
   }
 
   const otras = partes.filter((p) => p.id !== sobrevivienteId);

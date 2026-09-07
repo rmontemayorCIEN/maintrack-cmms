@@ -73,7 +73,7 @@ const NAV: Array<{
     section: "El trabajo",
     clave: "trabajo",
     items: [
-      { href: "/work-orders", label: "Ordenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
+      { href: "/work-orders", label: "Órdenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
       { href: "/work-orders/armar", label: "Armar una orden", icon: <Wrench className="h-4 w-4" /> },
       { href: "/backlog", label: "Trabajo pendiente", icon: <PackageX className="h-4 w-4" /> },
       // "Personal" y no "Equipo": en el mismo menu, "equipos" son las maquinas.
@@ -95,7 +95,7 @@ const NAV: Array<{
     ],
   },
   {
-    section: "Almacen y compras",
+    section: "Almacén y compras",
     clave: "almacen",
     items: [
       { href: "/inventory", label: "Almacen", icon: <Boxes className="h-4 w-4" /> },
@@ -110,7 +110,7 @@ const NAV: Array<{
     items: [
       { href: "/reports", label: "Reportes", icon: <BarChart3 className="h-4 w-4" /> },
       { href: "/consulta", label: "Pregunte a sus datos", icon: <MessageCircleQuestion className="h-4 w-4" /> },
-      { href: "/diagnostico", label: "Diagnostico IA", icon: <Sparkles className="h-4 w-4" /> },
+      { href: "/diagnostico", label: "Diagnóstico IA", icon: <Sparkles className="h-4 w-4" /> },
     ],
   },
   {
@@ -274,7 +274,7 @@ export function Sidebar({
         type="button"
         onClick={() => setOpen(true)}
         className="fixed left-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white lg:hidden no-print"
-        aria-label="Abrir menu"
+        aria-label="Abrir menú"
       >
         <Menu className="h-4 w-4" />
       </button>
@@ -291,7 +291,7 @@ export function Sidebar({
               type="button"
               onClick={() => setOpen(false)}
               className="absolute right-2 top-3 grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"
-              aria-label="Cerrar menu"
+              aria-label="Cerrar menú"
             >
               <X className="h-4 w-4" />
             </button>

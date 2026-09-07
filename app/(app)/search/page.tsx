@@ -27,7 +27,7 @@ export default async function SearchPage({
     return (
       <>
         <PageHeader title="Busqueda" />
-        <EmptyState title="Escriba un termino" description="Busque ordenes de trabajo, activos o refacciones." />
+        <EmptyState title="Escriba un termino" description="Busque órdenes de trabajo, activos o refacciones." />
       </>
     );
   }
@@ -75,7 +75,7 @@ export default async function SearchPage({
       <PageHeader title={`Resultados para "${q}"`} description={`${total} coincidencias`} />
 
       {total === 0 ? (
-        <EmptyState title="Sin resultados" description="Pruebe con otro codigo, nombre o folio." />
+        <EmptyState title="Sin resultados" description="Pruebe con otro código, nombre o folio." />
       ) : (
         <div className="grid gap-4">
           {workOrders.length ? (
@@ -136,7 +136,7 @@ export default async function SearchPage({
                         <p className="truncate text-sm font-medium text-slate-800">
                           <span className="text-brand-600">{part.code}</span> · {part.name}
                         </p>
-                        <p className="text-xs text-slate-500">{part.category ?? "Sin categoria"}</p>
+                        <p className="text-xs text-slate-500">{part.category ?? "Sin categoría"}</p>
                       </div>
                       <Badge tone={part.quantityOnHand <= part.minQuantity ? "danger" : "muted"}>
                         {formatNumber(part.quantityOnHand, 0)} {part.unit}

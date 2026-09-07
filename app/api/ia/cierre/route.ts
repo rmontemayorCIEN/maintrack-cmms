@@ -20,7 +20,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   return withAuth("workorder:execute", async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("La funcion de inteligencia artificial no esta configurada en este servidor.", 503);
+      return fail("La función de inteligencia artificial no esta configurada en este servidor.", 503);
     }
     const input = schema.parse(await request.json());
 

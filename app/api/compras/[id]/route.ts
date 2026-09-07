@@ -47,12 +47,12 @@ export async function POST(request: Request, { params }: Params) {
       where: { id, organizationId: orgId },
       select: { id: true, folio: true, warehouseId: true, ordenCompra: true, solicitanteId: true },
     });
-    if (!compra) return fail("Requisicion de compra no encontrada", 404);
+    if (!compra) return fail("Requisición de compra no encontrada", 404);
 
     try {
       if (input.accion === "AUTORIZAR" || input.accion === "RECHAZAR") {
         if (compra.solicitanteId === user.id) {
-          return fail("No puede autorizar su propia requisicion. La firma otra persona.", 403);
+          return fail("No puede autorizar su propia requisición. La firma otra persona.", 403);
         }
         const r = await autorizar({
           organizationId: orgId, requestId: id, userId: user.id,

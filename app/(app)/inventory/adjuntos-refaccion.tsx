@@ -77,7 +77,7 @@ export function AdjuntosRefaccion({
             adjuntos={adjuntos}
             editable={editable}
             titulo={`Archivos de ${nombre}`}
-            ayuda="Foto de la pieza, ficha tecnica, numero de parte del fabricante."
+            ayuda="Foto de la pieza, ficha tecnica, número de parte del fabricante."
           />
               <div className="border-t border-slate-200 pt-4">
                 <Enlaces

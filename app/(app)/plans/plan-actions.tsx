@@ -20,7 +20,7 @@ export function PlanRowActions({ planId, active }: { planId: string; active: boo
   }
 
   async function remove() {
-    if (!confirm("¿Eliminar este plan? Las ordenes ya generadas se conservan.")) return;
+    if (!confirm("¿Eliminar este plan? Las órdenes ya generadas se conservan.")) return;
     setBusy(true);
     await fetch(`/api/plans/${planId}`, { method: "DELETE" });
     setBusy(false);

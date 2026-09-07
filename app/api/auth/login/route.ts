@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!valid) return fail("Credenciales incorrectas", 401);
-  if (user.organization.status === "SUSPENDED") return fail("La organizacion esta suspendida", 403);
+  if (user.organization.status === "SUSPENDED") return fail("La organización esta suspendida", 403);
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession({

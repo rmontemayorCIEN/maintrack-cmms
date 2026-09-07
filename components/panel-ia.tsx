@@ -51,7 +51,7 @@ export function PanelIa({
     const res = await fetch("/api/plan-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: "IA_AVANZADA", nota: "Solicitud del complemento desde Suscripcion" }),
+      body: JSON.stringify({ plan: "IA_AVANZADA", nota: "Solicitud del complemento desde Suscripción" }),
     });
     const data = await res.json();
     setOcupado(false);
@@ -64,7 +64,7 @@ export function PanelIa({
     <Card>
       <CardHeader
         title="Inteligencia artificial"
-        subtitle="Analiza su operacion y le dice que atender primero, con la evidencia de sus propios datos."
+        subtitle="Analiza su operación y le dice que atender primero, con la evidencia de sus propios datos."
         action={
           complementoActivo ? (
             <Badge tone="success">{complemento.nombre} activo</Badge>
@@ -87,7 +87,7 @@ export function PanelIa({
           <Progress value={porcentaje} tone={porcentaje >= 90 ? "bad" : porcentaje >= 70 ? "warn" : "good"} />
           <p className="mt-1 text-[0.6875rem] text-slate-500">
             {restantes === 0
-              ? "Se agotaron. Se renuevan el dia 1 del proximo mes."
+              ? "Se agotaron. Se renuevan el dia 1 del próximo mes."
               : `Quedan ${restantes}. Se renuevan el dia 1 del proximo mes.`}
           </p>
         </div>

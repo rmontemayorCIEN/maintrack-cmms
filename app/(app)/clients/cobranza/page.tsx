@@ -53,7 +53,7 @@ export default async function CobranzaPage({
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Por cobrar" value={formatCurrency(porCobrar, "MXN")} hint={`${pendientes.length} cargos pendientes`} tone={porCobrar > 0 ? "warn" : "good"} />
         <Stat label="Vencido" value={formatCurrency(vencido, "MXN")} tone={vencido > 0 ? "bad" : "good"} hint="Fuera de fecha limite" />
-        <Stat label="Cobrado historico" value={formatCurrency(cobrado, "MXN")} />
+        <Stat label="Cobrado histórico" value={formatCurrency(cobrado, "MXN")} />
         <Stat label="Empresas activas" value={empresas} hint="Sujetas a cargo mensual" />
       </div>
 

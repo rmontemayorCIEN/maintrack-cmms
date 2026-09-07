@@ -7,7 +7,7 @@ import { Activity, Loader2, ShieldCheck, TrendingUp, Wrench } from "lucide-react
 import { Button } from "@/components/ui";
 
 const DEMO = [
-  { email: "director@aceroindustrial.mx", role: "Propietario / Direccion" },
+  { email: "director@aceroindustrial.mx", role: "Propietario / Dirección" },
   { email: "supervisor@aceroindustrial.mx", role: "Supervisor de mantenimiento" },
   { email: "tecnico@aceroindustrial.mx", role: "Tecnico" },
 ];
@@ -31,7 +31,7 @@ export function LoginForm() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
-      setError(data.error ?? "No fue posible iniciar sesion");
+      setError(data.error ?? "No fue posible iniciar sesión");
       return;
     }
     router.push("/dashboard");
@@ -60,7 +60,7 @@ export function LoginForm() {
         <div className="relative grid gap-4 text-sm text-slate-300">
           <Feature icon={<Activity className="h-4 w-4" />} text="Indicadores MTTR, MTBF, disponibilidad y cumplimiento de PM" />
           <Feature icon={<TrendingUp className="h-4 w-4" />} text="Alertas predictivas con tendencia y fecha estimada de falla" />
-          <Feature icon={<ShieldCheck className="h-4 w-4" />} text="Multiempresa, roles, bitacora de auditoria y API REST" />
+          <Feature icon={<ShieldCheck className="h-4 w-4" />} text="Multiempresa, roles, bitácora de auditoria y API REST" />
         </div>
       </div>
 

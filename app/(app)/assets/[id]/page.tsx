@@ -222,7 +222,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <Stat
           label="Costo acumulado"
           value={formatCurrency(totalCost, currency)}
-          hint={asset.replacementCost ? `${formatNumber(ratio, 0)}% del valor de reposicion` : "Sin valor de reposicion"}
+          hint={asset.replacementCost ? `${formatNumber(ratio, 0)}% del valor de reposicion` : "Sin valor de reposición"}
           tone={ratio > 60 ? "bad" : ratio > 30 ? "warn" : "default"}
         />
       </div>
@@ -253,7 +253,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader
-            title="Codigo de reporte"
+            title="Código de reporte"
             subtitle="Pegado en el equipo, cualquiera reporta una falla sin cuenta"
           />
           <div className="mx-auto w-40 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
@@ -275,7 +275,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <Card>
           <CardHeader title="Ficha tecnica" />
           <dl className="grid gap-3 text-sm">
-            <Row label="Sitio / ubicacion">
+            <Row label="Sitio / ubicación">
               {[asset.site.name, asset.location?.name].filter(Boolean).join(" / ")}
               {(() => {
                 // El enlace, no un mapa incrustado: Google cobra por cada carga
@@ -295,10 +295,10 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             </Row>
             <Row label="Fabricante">{asset.manufacturer ?? "—"}</Row>
             <Row label="Modelo">{asset.model ?? "—"}</Row>
-            <Row label="Numero de serie">{asset.serialNumber ?? "—"}</Row>
+            <Row label="Número de serie">{asset.serialNumber ?? "—"}</Row>
             <Row label="Fecha de compra">{formatDate(asset.purchaseDate)}</Row>
-            <Row label="Costo de adquisicion">{formatCurrency(asset.purchaseCost, currency)}</Row>
-            <Row label="Costo de reposicion">{formatCurrency(asset.replacementCost, currency)}</Row>
+            <Row label="Costo de adquisición">{formatCurrency(asset.purchaseCost, currency)}</Row>
+            <Row label="Costo de reposición">{formatCurrency(asset.replacementCost, currency)}</Row>
             <Row label="Garantia">
               {asset.warrantyExpiry
                 ? asset.warrantyExpiry > new Date()
@@ -363,7 +363,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         </Card>
 
         <Card>
-          <CardHeader title="Monitoreo de condicion" subtitle="Estado predictivo" />
+          <CardHeader title="Monitoreo de condición" subtitle="Estado predictivo" />
           {asset.sensors.length === 0 ? (
             <p className="py-6 text-center text-xs text-slate-400">Sin puntos de monitoreo</p>
           ) : (
@@ -424,7 +424,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           destino={{ assetId: asset.id }}
           editable={can(user.role, "asset:write")}
           titulo="Manuales, planos y fotos"
-          ayuda="Manual del fabricante, diagramas, placa de datos, fotos de instalacion."
+          ayuda="Manual del fabricante, diagramas, placa de datos, fotos de instalación."
           adjuntos={adjuntos.map((a) => ({
               id: a.id, name: a.name, kind: a.kind, size: a.size,
               mimeType: a.mimeType, createdAt: a.createdAt.toISOString(),
@@ -437,7 +437,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         <Enlaces
           destino={{ assetId: asset.id }}
           editable={can(user.role, "asset:write")}
-          ayuda="Manual en linea del fabricante, refacciones del proveedor, video de procedimiento, norma aplicable."
+          ayuda="Manual en línea del fabricante, refacciones del proveedor, video de procedimiento, norma aplicable."
           enlaces={enlaces.map((l) => ({ id: l.id, title: l.title, url: l.url, note: l.note, createdAt: l.createdAt.toISOString() }))}
         />
       </Card>

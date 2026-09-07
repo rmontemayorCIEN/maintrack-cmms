@@ -16,7 +16,7 @@ const sugerir = z.object({
 export async function POST(request: Request) {
   return withAuth("inventory:write", async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("La funcion de inteligencia artificial no esta configurada en este servidor.", 503);
+      return fail("La función de inteligencia artificial no esta configurada en este servidor.", 503);
     }
     const input = sugerir.parse(await request.json());
 
@@ -65,7 +65,7 @@ export async function PUT(request: Request) {
 
     const nuevas = input.refacciones.filter((r) => !existentes.has(r.code.toUpperCase()));
     const omitidas = input.refacciones.length - nuevas.length;
-    if (!nuevas.length) return fail("Todas esas refacciones ya existen en su catalogo", 409);
+    if (!nuevas.length) return fail("Todas esas refacciones ya existen en su catálogo", 409);
 
     const creadas = await prisma.$transaction(
       nuevas.map((r) =>

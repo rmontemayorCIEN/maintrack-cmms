@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const technician = await prisma.user.findFirst({
       where: { id: technicianId, organizationId: orgId },
     });
-    if (!technician) return fail("Tecnico no encontrado", 404);
+    if (!technician) return fail("Técnico no encontrado", 404);
 
     await prisma.workOrderLabor.create({
       data: {

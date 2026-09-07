@@ -25,17 +25,17 @@ const EsquemaPlaca = z.object({
   comoMejorarla: z.string().describe(
     "La accion concreta a tomar: «acerquese a medio metro y encuadre solo la placa», «apague el flash e ilumine de lado», «limpie la placa con un trapo», «tome la foto de frente, no en angulo». Vacio si la foto esta bien.",
   ),
-  fabricante: z.string().describe("Marca. Vacio si no se lee."),
-  modelo: z.string().describe("Modelo o numero de parte. Vacio si no se lee."),
-  serie: z.string().describe("Numero de serie. Vacio si no se lee."),
+  fabricante: z.string().describe("Marca. Vacío si no se lee."),
+  modelo: z.string().describe("Modelo o número de parte. Vacío si no se lee."),
+  serie: z.string().describe("Número de serie. Vacío si no se lee."),
   datosTecnicos: z.array(
     z.object({
-      dato: z.string().describe("Potencia, Voltaje, Corriente, RPM, Caudal, Presion, Refrigerante, Año…"),
+      dato: z.string().describe("Potencia, Voltaje, Corriente, RPM, Caudal, Presión, Refrigerante, Año…"),
       valor: z.string().describe("Con su unidad, tal como aparece en la placa."),
     }),
   ).describe("Solo lo que se lea con claridad."),
   nota: z.string().describe(
-    "Que campos quedaron dudosos y por que. Si leyo algo con esfuerzo, digalo aqui en vez de darlo por bueno.",
+    "Que campos quedaron dudosos y por que. Si leyo algo con esfuerzo, digalo aquí en vez de darlo por bueno.",
   ),
 });
 

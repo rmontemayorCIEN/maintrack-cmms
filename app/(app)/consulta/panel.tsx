@@ -12,7 +12,7 @@ type Turno = {
 
 const NOMBRE_HERRAMIENTA: Record<string, string> = {
   indicadores: "Indicadores del periodo",
-  buscar_ordenes: "Ordenes de trabajo",
+  buscar_ordenes: "Órdenes de trabajo",
   costo_por_activo: "Costo por activo",
   consultar_activo: "Ficha del activo",
   consultar_almacen: "Almacen",
@@ -77,7 +77,7 @@ export function PanelConsulta({
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             className="field"
-            placeholder="Ej: ¿cuanto llevo gastado en el compresor este ano?"
+            placeholder="Ej: ¿cuánto llevo gastado en el compresor este año?"
             value={pregunta}
             onChange={(e) => setPregunta(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !cargando) preguntar(pregunta); }}

@@ -126,8 +126,8 @@ export function NewWorkOrderForm({
 
         <Card>
           <CardHeader
-            title="Lista de verificacion"
-            subtitle="Tareas que el tecnico debera completar antes de cerrar la orden"
+            title="Lista de verificación"
+            subtitle="Tareas que el técnico debera completar antes de cerrar la orden"
             action={
               <Button type="button" variant="secondary" size="sm" onClick={() => setTasks((t) => [...t, ""])}>
                 <Plus className="h-3.5 w-3.5" /> Agregar
@@ -146,7 +146,7 @@ export function NewWorkOrderForm({
                   <input
                     className="field"
                     value={task}
-                    placeholder="Ej. Verificar alineacion y torque de tornilleria"
+                    placeholder="Ej. Verificar alineación y torque de tornilleria"
                     onChange={(e) =>
                       setTasks((prev) => prev.map((t, i) => (i === index ? e.target.value : t)))
                     }

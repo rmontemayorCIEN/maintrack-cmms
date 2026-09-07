@@ -16,7 +16,7 @@ const CAMPOS = [
   { nombre: "contactName", etiqueta: "Contacto" },
   { nombre: "phone", etiqueta: "Telefono" },
   { nombre: "email", etiqueta: "Correo", tipo: "email" },
-  { nombre: "leadTimeDays", etiqueta: "Dias de entrega", tipo: "number", ayuda: "Lo que tarda en surtir" },
+  { nombre: "leadTimeDays", etiqueta: "Días de entrega", tipo: "number", ayuda: "Lo que tarda en surtir" },
   { nombre: "address", etiqueta: "Direccion", ancho: "sm:col-span-2" },
 ] as const;
 

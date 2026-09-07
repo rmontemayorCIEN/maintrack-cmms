@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!iaConfigurada()) return fail("La generacion de procedimientos no esta configurada en este servidor.", 503);
+    if (!iaConfigurada()) return fail("La generación de procedimientos no esta configurada en este servidor.", 503);
     try {
       const r = await generarProcedimiento(
         {

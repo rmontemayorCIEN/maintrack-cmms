@@ -15,7 +15,7 @@ import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
 export const MOTIVOS = {
   PREVENTIVO: "Mantenimiento preventivo",
   CORRECTIVO: "Mantenimiento correctivo",
-  MINIMO: "Reposicion de minimo",
+  MINIMO: "Reposición de mínimo",
   PROYECTO: "Proyecto especial",
 } as const;
 
@@ -61,7 +61,7 @@ async function cargar(tx: Cliente, id: string, organizationId: string) {
     where: { id, organizationId },
     include: { renglones: true },
   });
-  if (!req) throw new ErrorDeRequisicion("Requisicion no encontrada");
+  if (!req) throw new ErrorDeRequisicion("Requisición no encontrada");
   return req;
 }
 
@@ -104,7 +104,7 @@ export async function surtir(params: {
     for (const entrega of params.renglones) {
       if (entrega.cantidad <= 0) continue;
       const renglon = req.renglones.find((r) => r.id === entrega.lineId);
-      if (!renglon) throw new ErrorDeRequisicion("Renglon que no pertenece a esta requisicion");
+      if (!renglon) throw new ErrorDeRequisicion("Renglón que no pertenece a esta requisición");
 
       const pendiente = renglon.cantidadSolicitada - renglon.cantidadSurtida;
       if (entrega.cantidad > pendiente + 0.0001) {
@@ -176,12 +176,12 @@ export async function devolver(params: {
 }) {
   return prisma.$transaction(async (tx) => {
     const req = await cargar(tx, params.requestId, params.organizationId);
-    if (req.estado === "CANCELADA") throw new ErrorDeRequisicion("La requisicion esta cancelada");
+    if (req.estado === "CANCELADA") throw new ErrorDeRequisicion("La requisición esta cancelada");
 
     for (const dev of params.renglones) {
       if (dev.cantidad <= 0) continue;
       const renglon = req.renglones.find((r) => r.id === dev.lineId);
-      if (!renglon) throw new ErrorDeRequisicion("Renglon que no pertenece a esta requisicion");
+      if (!renglon) throw new ErrorDeRequisicion("Renglón que no pertenece a esta requisición");
 
       const enPoder = renglon.cantidadSurtida - renglon.cantidadDevuelta;
       if (dev.cantidad > enPoder + 0.0001) {
@@ -189,7 +189,7 @@ export async function devolver(params: {
           `De ${renglon.descripcion} solo hay ${enPoder} sin devolver y se intentan regresar ${dev.cantidad}`,
         );
       }
-      if (!renglon.partId) throw new ErrorDeRequisicion("Ese renglon no salio del almacen");
+      if (!renglon.partId) throw new ErrorDeRequisicion("Ese renglón no salio del almacén");
 
       await aplicarMovimiento(
         {
@@ -223,8 +223,8 @@ export async function cerrar(organizationId: string, requestId: string) {
     where: { id: requestId, organizationId },
     select: { id: true, estado: true },
   });
-  if (!req) throw new ErrorDeRequisicion("Requisicion no encontrada");
-  if (req.estado === "CANCELADA") throw new ErrorDeRequisicion("La requisicion esta cancelada");
+  if (!req) throw new ErrorDeRequisicion("Requisición no encontrada");
+  if (req.estado === "CANCELADA") throw new ErrorDeRequisicion("La requisición esta cancelada");
   return prisma.materialRequest.update({
     where: { id: req.id },
     data: { estado: "CERRADA", cerradaEl: new Date() },
@@ -237,10 +237,10 @@ export async function cancelar(organizationId: string, requestId: string) {
     where: { id: requestId, organizationId },
     include: { renglones: { select: { cantidadSurtida: true } } },
   });
-  if (!req) throw new ErrorDeRequisicion("Requisicion no encontrada");
+  if (!req) throw new ErrorDeRequisicion("Requisición no encontrada");
   if (req.renglones.some((r) => r.cantidadSurtida > 0)) {
     throw new ErrorDeRequisicion(
-      "Ya se surtio material contra esta requisicion. Devuelva lo entregado y cierrela en vez de cancelarla.",
+      "Ya se surtio material contra esta requisición. Devuelva lo entregado y cierrela en vez de cancelarla.",
     );
   }
   return prisma.materialRequest.update({ where: { id: req.id }, data: { estado: "CANCELADA" } });

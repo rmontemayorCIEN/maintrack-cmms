@@ -88,7 +88,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el codigo" };
+      if (!code) return { ok: false, motivo: "Falta el código" };
       if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
       return {
         ok: true, clave: code,
@@ -103,12 +103,12 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ────────────────────────────────────────────────────── Ubicaciones
   ubicaciones: {
     titulo: "Ubicaciones",
-    descripcion: "Areas, lineas o cuartos dentro de un sitio.",
+    descripcion: "Áreas, lineas o cuartos dentro de un sitio.",
     requisitos: "Los sitios deben existir.",
     columnas: [
       { nombre: "sitio", requerido: true, ejemplo: "P01", ayuda: "Codigo del sitio" },
       { nombre: "codigo", requerido: true, ejemplo: "LIN-A" },
-      { nombre: "nombre", requerido: true, ejemplo: "Linea de produccion A" },
+      { nombre: "nombre", requerido: true, ejemplo: "Línea de produccion A" },
       { nombre: "descripcion", ejemplo: "Nave norte" },
     ],
     contexto: async (orgId) => ({
@@ -116,7 +116,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     }),
     convertir: (f, ctx) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el codigo" };
+      if (!code) return { ok: false, motivo: "Falta el código" };
       if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
       const siteId = ctx.sitios.get(txt(f.sitio).toUpperCase());
       if (!siteId) return { ok: false, motivo: `El sitio "${txt(f.sitio)}" no existe` };
@@ -137,7 +137,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
 
   // ────────────────────────────────────────── Categorias de activo
   "categorias-activo": {
-    titulo: "Categorias de activo",
+    titulo: "Categorías de activo",
     descripcion: "Familias de equipo para agrupar y filtrar.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "BOMB" },
@@ -146,7 +146,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan codigo o nombre" };
+      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
       return { ok: true, clave: code, datos: { code, name: txt(f.nombre) } };
     },
     insertar: (orgId, d) => prisma.assetCategory.create({ data: { ...d, organizationId: orgId } as never }),
@@ -157,8 +157,8 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ────────────────────────────────────────────────────────── Activos
   activos: {
     titulo: "Activos",
-    descripcion: "El catalogo de equipos. Es la importacion mas importante y la que mas tiempo ahorra.",
-    requisitos: "Los sitios deben existir. Ubicaciones y categorias son opcionales, pero si se indican deben existir.",
+    descripcion: "El catálogo de equipos. Es la importación mas importante y la que mas tiempo ahorra.",
+    requisitos: "Los sitios deben existir. Ubicaciones y categorías son opcionales, pero si se indican deben existir.",
     recurso: "assets",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "BOM-101", ayuda: "TAG del equipo, no se puede repetir" },
@@ -171,7 +171,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "fabricante", ejemplo: "Grundfos" },
       { nombre: "modelo", ejemplo: "CR-15" },
       { nombre: "numero_serie", ejemplo: "SN-2019-1370" },
-      { nombre: "descripcion", ejemplo: "Bomba de alimentacion a caldera" },
+      { nombre: "descripcion", ejemplo: "Bomba de alimentación a caldera" },
       { nombre: "fecha_compra", ejemplo: "12/10/2023", ayuda: "dd/mm/aaaa" },
       { nombre: "costo_adquisicion", ejemplo: "95000" },
       { nombre: "costo_reposicion", ejemplo: "130000" },
@@ -266,8 +266,8 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
 
   // ──────────────────────────────────── Familias de refaccion
   "familias-refaccion": {
-    titulo: "Familias de refaccion",
-    descripcion: "Clasificacion de las refacciones del almacen.",
+    titulo: "Familias de refacción",
+    descripcion: "Clasificación de las refacciones del almacén.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "RODAMIENTOS" },
       { nombre: "nombre", requerido: true, ejemplo: "Rodamientos y baleros" },
@@ -275,7 +275,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan codigo o nombre" };
+      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
       return { ok: true, clave: code, datos: { code, name: txt(f.nombre) } };
     },
     insertar: (orgId, d) => prisma.partCategory.create({ data: { ...d, organizationId: orgId } as never }),
@@ -286,7 +286,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ──────────────────────────────────────────── Unidades de medida
   unidades: {
     titulo: "Unidades de medida",
-    descripcion: "Como se cuenta cada refaccion.",
+    descripcion: "Como se cuenta cada refacción.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "pza" },
       { nombre: "nombre", requerido: true, ejemplo: "Pieza" },
@@ -294,7 +294,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo);
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan codigo o nombre" };
+      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
       return { ok: true, clave: code.toUpperCase(), datos: { code, name: txt(f.nombre) } };
     },
     insertar: (orgId, d) => prisma.partUnit.create({ data: { ...d, organizationId: orgId } as never }),
@@ -305,13 +305,13 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ────────────────────────────────────────────────────── Refacciones
   refacciones: {
     titulo: "Refacciones",
-    descripcion: "El catalogo del almacen con sus existencias iniciales.",
+    descripcion: "El catálogo del almacén con sus existencias iniciales.",
     requisitos: "Las familias y unidades deben existir. El proveedor es opcional.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "ROD-6205" },
       { nombre: "nombre", requerido: true, ejemplo: "Rodamiento 6205-2RS" },
       { nombre: "unidad", requerido: true, ejemplo: "pza", ayuda: "Codigo de la unidad" },
-      { nombre: "familia", ejemplo: "RODAMIENTOS", ayuda: "Codigo de la familia" },
+      { nombre: "familia", ejemplo: "RODAMIENTOS", ayuda: "Código de la familia" },
       { nombre: "proveedor", ejemplo: "Refacciones Industriales del Norte", ayuda: "Nombre exacto" },
       { nombre: "descripcion", ejemplo: "Rodamiento rigido de bolas" },
       { nombre: "costo_unitario", ejemplo: "320" },
@@ -339,7 +339,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     }),
     convertir: (f, ctx) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el codigo" };
+      if (!code) return { ok: false, motivo: "Falta el código" };
       if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
 
       const unidad = ctx.unidadesTexto.get(txt(f.unidad).toUpperCase());
@@ -379,7 +379,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       // que quede asentada en un almacen concreto.
       if (datos.quantityOnHand > 0) {
         const almacen = await almacenPorOmision(orgId);
-        if (!almacen) throw new Error("La cuenta no tiene ningun almacen activo");
+        if (!almacen) throw new Error("La cuenta no tiene ningún almacén activo");
         await aplicarMovimiento({
           organizationId: orgId,
           partId: (part as { id: string }).id,
@@ -387,7 +387,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
           tipo: "IN",
           cantidad: datos.quantityOnHand,
           costoUnitario: datos.unitCost,
-          referencia: "Importacion inicial",
+          referencia: "Importación inicial",
         });
       }
       return part;
@@ -399,7 +399,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ──────────────────────────────────────────────────────────── Planes
   planes: {
     titulo: "Planes de mantenimiento",
-    descripcion: "Los planes preventivos por calendario. El programador empieza a generar ordenes en cuanto se importan.",
+    descripcion: "Los planes preventivos por calendario. El programador empieza a generar órdenes en cuanto se importan.",
     requisitos: "Los activos deben existir.",
     columnas: [
       { nombre: "nombre", requerido: true, ejemplo: "Lubricacion mensual de bomba" },
@@ -408,7 +408,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "prioridad", ejemplo: "MEDIUM", ayuda: "LOW, MEDIUM, HIGH o CRITICAL" },
       { nombre: "horas_estimadas", ejemplo: "2" },
       { nombre: "anticipacion_dias", ejemplo: "3" },
-      { nombre: "descripcion", ejemplo: "Ruta de lubricacion segun manual" },
+      { nombre: "descripcion", ejemplo: "Ruta de lubricación según manual" },
       { nombre: "requiere_paro", ejemplo: "NO", ayuda: "SI o NO" },
       { nombre: "primer_vencimiento", ejemplo: "15/09/2026", ayuda: "dd/mm/aaaa. Si se omite, se calcula" },
     ],
@@ -422,7 +422,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       if (!assetId) return { ok: false, motivo: `El activo "${txt(f.activo)}" no existe` };
 
       const dias = num(f.cada_dias);
-      if (!dias || dias < 1) return { ok: false, motivo: "La frecuencia en dias debe ser un numero mayor que cero" };
+      if (!dias || dias < 1) return { ok: false, motivo: "La frecuencia en días debe ser un número mayor que cero" };
 
       const prioridad = (txt(f.prioridad) || "MEDIUM").toUpperCase();
       if (!["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(prioridad)) {
@@ -458,7 +458,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
 
   // ────────────────────────────────────────────── Codigos de falla
   "codigos-falla": {
-    titulo: "Codigos de falla",
+    titulo: "Códigos de falla",
     descripcion: "Que fallo. Se usa al cerrar una orden correctiva.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "MEC-01" },
@@ -468,7 +468,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan codigo o descripcion" };
+      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan código o descripción" };
       return { ok: true, clave: code, datos: { code, description: txt(f.descripcion), category: txt(f.familia) || null } };
     },
     insertar: (orgId, d) => prisma.failureCode.create({ data: { ...d, organizationId: orgId } as never }),
@@ -479,16 +479,16 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ────────────────────────────────────────────────── Causas raiz
   "causas-raiz": {
     titulo: "Causas raiz",
-    descripcion: "Por que fallo. Alimenta el analisis de fallas repetidas.",
+    descripcion: "Por que fallo. Alimenta el análisis de fallas repetidas.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "LUB-NO-EJECUTADA" },
-      { nombre: "descripcion", requerido: true, ejemplo: "Ruta de lubricacion no ejecutada" },
+      { nombre: "descripcion", requerido: true, ejemplo: "Ruta de lubricación no ejecutada" },
       { nombre: "familia", ejemplo: "MANTENIMIENTO" },
     ],
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan codigo o descripcion" };
+      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan código o descripción" };
       return { ok: true, clave: code, datos: { code, description: txt(f.descripcion), category: txt(f.familia) || null } };
     },
     insertar: (orgId, d) => prisma.rootCause.create({ data: { ...d, organizationId: orgId } as never }),
@@ -508,7 +508,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async () => ({}),
     convertir: (f) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan codigo o nombre" };
+      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
       return {
         ok: true, clave: code,
         datos: { code, name: txt(f.nombre), hourlyRate: num(f.tarifa_hora) ?? 0 },
@@ -526,7 +526,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     requisitos: "Los proveedores, si va a indicar el habitual de cada servicio.",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "SRV-REB" },
-      { nombre: "nombre", requerido: true, ejemplo: "Rebobinado de motor electrico" },
+      { nombre: "nombre", requerido: true, ejemplo: "Rebobinado de motor eléctrico" },
       { nombre: "proveedor", ayuda: "Nombre tal como esta dado de alta", ejemplo: "Servicios Electromecanicos del Bajio" },
       { nombre: "unidad", ejemplo: "servicio" },
       { nombre: "costo_unitario", ejemplo: "14500" },
@@ -540,7 +540,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     }),
     convertir: (f, ctx) => {
       const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan codigo o nombre" };
+      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
       const proveedor = txt(f.proveedor);
       let supplierId: string | null = null;
       if (proveedor) {

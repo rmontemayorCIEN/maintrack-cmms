@@ -75,14 +75,14 @@ export async function POST(request: Request) {
       assetCategories: {
         create: [
           { name: "Equipo de proceso", code: "PROC" },
-          { name: "Equipo electrico", code: "ELEC" },
+          { name: "Equipo eléctrico", code: "ELEC" },
           { name: "Equipo de transporte", code: "TRAN" },
           { name: "Instalaciones", code: "INST" },
         ],
       },
       failureCodes: {
         create: [
-          { code: "MEC-01", description: "Desgaste mecanico", category: "MECANICO" },
+          { code: "MEC-01", description: "Desgaste mecánico", category: "MECANICO" },
           { code: "MEC-02", description: "Desalineacion", category: "MECANICO" },
           { code: "LUB-01", description: "Lubricacion deficiente", category: "MECANICO" },
           { code: "ELE-01", description: "Falla electrica", category: "ELECTRICO" },
@@ -96,8 +96,8 @@ export async function POST(request: Request) {
           { code: "SELLOS", name: "Sellos y retenes" },
           { code: "FILTROS", name: "Filtros" },
           { code: "LUBRICANTES", name: "Lubricantes y grasas" },
-          { code: "ELECTRICO", name: "Material electrico" },
-          { code: "TORNILLERIA", name: "Tornilleria y sujecion" },
+          { code: "ELECTRICO", name: "Material eléctrico" },
+          { code: "TORNILLERIA", name: "Tornilleria y sujeción" },
           { code: "OTRO", name: "Otros" },
         ],
       },

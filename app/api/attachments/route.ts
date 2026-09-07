@@ -106,7 +106,7 @@ export async function PUT(request: Request) {
 
     const tamanoReal = await verificarSubida(input.storagePath);
     if (tamanoReal === null) {
-      return fail("El archivo no llego al almacen. Intente subirlo de nuevo.", 409);
+      return fail("El archivo no llego al almacén. Intente subirlo de nuevo.", 409);
     }
 
     const ctx = contextoDe(input);

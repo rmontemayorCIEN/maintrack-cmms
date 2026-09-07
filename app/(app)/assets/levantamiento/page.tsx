@@ -66,7 +66,7 @@ export default async function LevantamientoPage() {
     <>
       <PageHeader
         title="Levantamiento de inventario asistido"
-        description="Describa la instalacion, conteste unas preguntas y obtenga el inventario de activos completo, listo para revisar. Lo que normalmente toma semanas de recorrido con libreta."
+        description="Describa la instalación, conteste unas preguntas y obtenga el inventario de activos completo, listo para revisar. Lo que normalmente toma semanas de recorrido con libreta."
         breadcrumb={
           <Link href="/assets" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Activos

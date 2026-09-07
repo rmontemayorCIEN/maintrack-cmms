@@ -146,7 +146,7 @@ export const ASSET_STATUS_COLORS: Record<string, string> = {
 };
 
 export const CRITICALITY_LABELS: Record<string, string> = {
-  A: "A - Critico",
+  A: "A - Crítico",
   B: "B - Importante",
   C: "C - Secundario",
 };
@@ -167,7 +167,7 @@ export const SENSOR_TYPE_LABELS: Record<string, string> = {
   TEMPERATURE: "Temperatura",
   PRESSURE: "Presion",
   CURRENT: "Corriente",
-  OIL: "Analisis de aceite",
+  OIL: "Análisis de aceite",
   ULTRASOUND: "Ultrasonido",
   FLOW: "Flujo",
   RPM: "Velocidad",

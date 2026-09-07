@@ -23,7 +23,7 @@ export default async function BoardPage() {
   return (
     <>
       <PageHeader
-        title="Tablero de ejecucion"
+        title="Tablero de ejecución"
         description="Arrastre las tarjetas para avanzar el flujo de trabajo. Solo se permiten transiciones validas."
       />
       <KanbanBoard

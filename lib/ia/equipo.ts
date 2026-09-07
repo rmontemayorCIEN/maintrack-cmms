@@ -7,7 +7,7 @@
  * que aporta el modelo es distinguir entre explicaciones que el mismo numero
  * admite.
  *
- * "Miguel se tarda 40% mas de lo estimado en electrico" puede ser que las
+ * "Miguel se tarda 40% mas de lo estimado en eléctrico" puede ser que las
  * estimaciones esten mal hechas, que le toquen siempre los equipos peores, o
  * que le falte una herramienta. Elegir entre esas lecturas no es una formula.
  */
@@ -30,17 +30,17 @@ const esquema = z.object({
           "TRABA_EXTERNA",
           "OTRO",
         ]),
-        titulo: textoIa(110, "El hallazgo en una linea."),
-        detalle: textoIa(320, "Que dato lo sostiene y por que importa para la operacion."),
+        titulo: textoIa(110, "El hallazgo en una línea."),
+        detalle: textoIa(320, "Que dato lo sostiene y por que importa para la operación."),
         personas: z.array(textoIa(80, "Nombre exacto, como viene en los datos.")),
         /**
          * Lo que hay que hacer. Va aparte del hallazgo porque un diagnostico
          * sin siguiente paso no le sirve a nadie que tenga que operar manana.
          */
-        queHacer: textoIa(240, "La accion concreta que resuelve o acota esto."),
+        queHacer: textoIa(240, "La acción concreta que resuelve o acota esto."),
       }),
     )
-    .describe("De lo mas importante a lo menos. Vacio si no hay nada que senalar."),
+    .describe("De lo mas importante a lo menos. Vacío si no hay nada que senalar."),
   reconocer: textoIa(
     280,
     "Algo que este saliendo bien y valga la pena decir en voz alta. Null si no hay nada claro.",
@@ -61,7 +61,7 @@ export async function revisarEquipo(
   if (datos.personas.length < 2) {
     return {
       ok: false,
-      motivo: "Hace falta mas de una persona en el equipo para que un analisis de reparto tenga sentido.",
+      motivo: "Hace falta mas de una persona en el equipo para que un análisis de reparto tenga sentido.",
     };
   }
   const conMovimiento = datos.personas.filter(
@@ -81,7 +81,7 @@ export async function revisarEquipo(
     comoLeerlo: {
       desviacion: "100 significa que el trabajo tomo exactamente lo estimado. 150 es que tomo la mitad mas.",
       base: "Cada indicador dice con cuantas ordenes se calculo. Con menos de tres viene en null a proposito: un porcentaje sacado de dos ordenes no dice nada de nadie.",
-      liberadas: "Actividades que la persona no pudo hacer y devolvio al backlog con motivo. SIN_REFACCION no es una traba suya, es del almacen.",
+      liberadas: "Actividades que la persona no pudo hacer y devolvio al backlog con motivo. SIN_REFACCION no es una traba suya, es del almacén.",
     },
     equipo: datos.personas.map((p) => ({
       nombre: p.nombre,
@@ -113,7 +113,7 @@ export async function revisarEquipo(
       "- Lo trabado por falta de material NUNCA es del tecnico: es del almacen o de compras. Dilo asi.\n" +
       "- Menciona a las personas por su nombre exacto, y solo a las que vengan en los datos.\n" +
       "- Si el equipo esta bien, dilo y no inventes hallazgos. Una lista vacia es respuesta valida.\n" +
-      "- Cada hallazgo trae que hacer. Un diagnostico sin siguiente paso no le sirve a nadie que tenga que operar manana.",
+      "- Cada hallazgo trae que hacer. Un diagnóstico sin siguiente paso no le sirve a nadie que tenga que operar mañana.",
     instruccion:
       "Revisa como esta trabajando este equipo: como esta repartida la carga, si el conocimiento esta concentrado en pocas personas, si las estimaciones estan sirviendo, quien esta apagando incendios, y que trabas no son de la gente sino del almacen o de compras.",
     contexto,

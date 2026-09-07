@@ -27,7 +27,7 @@ export function FiltroRefaccion({
         campo?.form?.requestSubmit();
       }}
       vacio="Todas"
-      marcador="Busque por clave o descripcion"
+      marcador="Busque por clave o descripción"
       opciones={refacciones}
     />
   );

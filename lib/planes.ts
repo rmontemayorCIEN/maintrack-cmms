@@ -69,8 +69,8 @@ export const COMPLEMENTO_IA = {
   descripcion:
     "Todas las funciones de inteligencia artificial, con 400 operaciones al mes sobre cualquier plan de pago.",
   incluye: [
-    "Diagnostico semanal con hallazgos, evidencia y matriz FODA",
-    "Asistente de cierre de ordenes de trabajo",
+    "Diagnóstico semanal con hallazgos, evidencia y matriz FODA",
+    "Asistente de cierre de órdenes de trabajo",
     "Generador de planes de mantenimiento",
     "Consulta en lenguaje natural sobre sus datos",
     "400 operaciones mensuales",
@@ -82,12 +82,12 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
     nombre: "Free",
     precioMensual: 0,
     moneda: "MXN",
-    descripcion: "Para probar el sistema con una linea o un area.",
+    descripcion: "Para probar el sistema con una línea o un área.",
     limites: { assets: 25, users: 3, sites: 1, sensors: 0, storageGb: 1 },
     incluye: [
       "Preventivo por calendario y por medidor",
-      "Ordenes de trabajo y solicitudes",
-      "Almacen de refacciones",
+      "Órdenes de trabajo y solicitudes",
+      "Almacén de refacciones",
       "Indicadores basicos",
       "1 GB para fotos y documentos",
     ],
@@ -105,8 +105,8 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
     incluye: [
       "Todo lo de Free",
       "Hasta 3 sitios",
-      "Reportes y exportacion a CSV",
-      "Bitacora de auditoria",
+      "Reportes y exportación a CSV",
+      "Bitácora de auditoria",
       "10 GB para fotos, videos y documentos",
     ],
     // La ayuda va en TODOS los planes, con su propia bolsa. Cobrar por poder
@@ -122,11 +122,11 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
     limites: { assets: 1000, users: 50, sites: 10, sensors: 50, storageGb: 100 },
     incluye: [
       "Todo lo de Starter",
-      "Mantenimiento predictivo y monitoreo de condicion",
-      "Alertas por tendencia y vida util remanente",
+      "Mantenimiento predictivo y monitoreo de condición",
+      "Alertas por tendencia y vida útil remanente",
       "API para integrar sistemas externos e IoT",
       "100 GB de archivos",
-      "Diagnostico semanal con inteligencia artificial",
+      "Diagnóstico semanal con inteligencia artificial",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
@@ -142,7 +142,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Todo lo de Professional",
       "Activos, usuarios y sitios sin limite",
       "Monitoreo predictivo sin limite",
-      "Diagnostico semanal y asistentes de IA",
+      "Diagnóstico semanal y asistentes de IA",
       "Soporte prioritario",
     ],
     ia: { operaciones: 80, funciones: ["DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200 },
@@ -294,7 +294,7 @@ export function estadoSuscripcion(org: {
     return {
       activa: false,
       soloLectura: true,
-      motivo: "Su periodo de prueba termino. Puede consultar su informacion, pero para seguir capturando hay que activar un plan.",
+      motivo: "Su periodo de prueba termino. Puede consultar su información, pero para seguir capturando hay que activar un plan.",
     };
   }
   return { activa: true, soloLectura: false, motivo: null };

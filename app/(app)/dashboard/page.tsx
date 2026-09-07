@@ -144,7 +144,7 @@ export default async function DashboardPage() {
               tone="danger"
               icon={<ShieldAlert className="h-4 w-4" />}
               title={`${criticalOpen} OT criticas abiertas`}
-              detail="Requieren atencion inmediata"
+              detail="Requieren atención inmediata"
             />
           )}
           {alerts.length > 0 && (
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
               tone="warning"
               icon={<AlertTriangle className="h-4 w-4" />}
               title={`${alerts.length} alertas predictivas activas`}
-              detail="Monitoreo de condicion fuera de umbral"
+              detail="Monitoreo de condición fuera de umbral"
             />
           )}
           {pendingRequests > 0 && (
@@ -162,7 +162,7 @@ export default async function DashboardPage() {
               tone="info"
               icon={<CalendarClock className="h-4 w-4" />}
               title={`${pendingRequests} solicitudes por revisar`}
-              detail="Pendientes de aprobacion"
+              detail="Pendientes de aprobación"
             />
           )}
         </div>
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
         <Stat
           label="MTTR"
           value={`${formatNumber(kpis.reliability.mttr, 1)} h`}
-          hint="Tiempo medio de reparacion"
+          hint="Tiempo medio de reparación"
           icon={<Timer className="h-4 w-4" />}
         />
         <Stat
@@ -227,12 +227,12 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader
             title="Carga de trabajo y costo"
-            subtitle="Ordenes creadas contra completadas por mes"
+            subtitle="Órdenes creadas contra completadas por mes"
           />
           <TrendChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Distribucion por tipo" subtitle="Ordenes del periodo" />
+          <CardHeader title="Distribución por tipo" subtitle="Órdenes del periodo" />
           <DonutChart data={typeData} />
         </Card>
       </div>
@@ -241,12 +241,12 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader
             title="Mezcla preventivo / predictivo / correctivo"
-            subtitle="Proporcion mensual — una mezcla sana favorece el trabajo planificado"
+            subtitle="Proporción mensual — una mezcla sana favorece el trabajo planificado"
           />
           <MixChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Activos con mayor costo" subtitle="Concentracion del gasto" />
+          <CardHeader title="Activos con mayor costo" subtitle="Concentración del gasto" />
           <CostRankingChart data={ranking} />
         </Card>
       </div>
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
           </div>
           {upcoming.length === 0 ? (
             <div className="px-5 pb-5">
-              <EmptyState title="Sin ordenes abiertas" description="Ejecute el programador para generar los preventivos del periodo." />
+              <EmptyState title="Sin órdenes abiertas" description="Ejecute el programador para generar los preventivos del periodo." />
             </div>
           ) : (
             <div className="table-wrap">
@@ -322,7 +322,7 @@ export default async function DashboardPage() {
           <Card>
             <CardHeader
               title="Alertas predictivas"
-              subtitle="Condicion fuera de parametro"
+              subtitle="Condición fuera de parámetro"
               action={
                 <Link href="/alerts" className="text-xs font-medium text-brand-600 hover:underline">
                   Ver
@@ -350,8 +350,8 @@ export default async function DashboardPage() {
 
           <Card>
             <CardHeader
-              title="Refacciones bajo minimo"
-              subtitle="Requieren reposicion"
+              title="Refacciones bajo mínimo"
+              subtitle="Requieren reposición"
               action={
                 <Link href="/inventory" className="text-xs font-medium text-brand-600 hover:underline">
                   Almacen

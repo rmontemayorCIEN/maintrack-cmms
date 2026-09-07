@@ -50,16 +50,16 @@ export default async function PredictivePage() {
     <>
       <PageHeader
         title="Mantenimiento predictivo"
-        description="Monitoreo de condicion por sensor. Cada lectura se compara contra umbrales y se proyecta la tendencia por regresion lineal para estimar la vida util remanente."
+        description="Monitoreo de condición por sensor. Cada lectura se compara contra umbrales y se proyecta la tendencia por regresión lineal para estimar la vida útil remanente."
         actions={editable ? <SensorDialog assets={assets} /> : null}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Puntos monitoreados" value={sensors.length} hint="Sensores activos" />
         <Stat label="En alerta" value={warning} tone={warning ? "warn" : "good"} hint="Sobre umbral de advertencia" />
-        <Stat label="En estado critico" value={critical} tone={critical ? "bad" : "good"} hint="Requieren intervencion" />
+        <Stat label="En estado crítico" value={critical} tone={critical ? "bad" : "good"} hint="Requieren intervención" />
         <Stat
-          label="Falla mas proxima"
+          label="Falla mas próxima"
           value={nearest?.trend.daysToThreshold != null ? `${nearest.trend.daysToThreshold} d` : "—"}
           hint={nearest ? `${nearest.sensor.asset.code} · ${nearest.sensor.name}` : "Sin tendencias adversas"}
           tone={nearest && (nearest.trend.daysToThreshold ?? 99) < 15 ? "bad" : "default"}
@@ -70,7 +70,7 @@ export default async function PredictivePage() {
         <div className="mt-6">
           <EmptyState
             title="Sin puntos de monitoreo"
-            description="Registre sensores de vibracion, temperatura, corriente, presion o analisis de aceite para habilitar el analisis predictivo."
+            description="Registre sensores de vibración, temperatura, corriente, presión o análisis de aceite para habilitar el análisis predictivo."
           />
         </div>
       ) : (

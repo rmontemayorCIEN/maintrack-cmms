@@ -50,7 +50,7 @@ export default async function DiagnosticoPage() {
   return (
     <>
       <PageHeader
-        title="Diagnostico de la operacion"
+        title="Diagnóstico de la operación"
         description="Cada semana el sistema revisa sus indicadores, su backlog, sus costos y la calidad de su captura, y entrega los hallazgos con la evidencia que los sostiene."
         actions={
           puedeGenerar ? (
@@ -148,8 +148,8 @@ export default async function DiagnosticoPage() {
               <div className="min-w-0">
                 <div className="mb-1.5 flex items-center gap-2">
                   <Badge tone={COLOR_SEMAFORO[reporte.contenido.semaforo]}>
-                    {reporte.contenido.semaforo === "BIEN" ? "Sin pendientes criticos"
-                      : reporte.contenido.semaforo === "ATENCION" ? "Requiere atencion" : "En riesgo"}
+                    {reporte.contenido.semaforo === "BIEN" ? "Sin pendientes críticos"
+                      : reporte.contenido.semaforo === "ATENCION" ? "Requiere atención" : "En riesgo"}
                   </Badge>
                   <span className="text-[0.6875rem] text-slate-400">
                     {formatDateTime(reporte.creadoEl)} · periodo {reporte.desde.toISOString().slice(0, 10)} al {reporte.hasta.toISOString().slice(0, 10)}
@@ -163,7 +163,7 @@ export default async function DiagnosticoPage() {
           <Card>
             <CardHeader
               title="Hallazgos"
-              subtitle="Cada uno con la cifra que lo sostiene y la accion que le corresponde."
+              subtitle="Cada uno con la cifra que lo sostiene y la acción que le corresponde."
             />
             <ul className="grid gap-3">
               {reporte.contenido.hallazgos.map((h, i) => (
@@ -193,7 +193,7 @@ export default async function DiagnosticoPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Matriz FODA" subtitle="El resumen para direccion." />
+            <CardHeader title="Matriz FODA" subtitle="El resumen para dirección." />
             <div className="grid gap-3 md:grid-cols-2">
               <Cuadrante titulo="Fortalezas" tono="border-emerald-200 bg-emerald-50/40" puntos={reporte.contenido.foda.fortalezas} />
               <Cuadrante titulo="Oportunidades" tono="border-blue-200 bg-blue-50/40" puntos={reporte.contenido.foda.oportunidades} />

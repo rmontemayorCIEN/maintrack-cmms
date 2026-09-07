@@ -76,7 +76,7 @@ export function RequestDialog({ assets }: { assets: Array<{ id: string; code: st
             adjuntos={[]}
             editable
             titulo="Foto de la falla"
-            ayuda="Opcional. Una imagen del sintoma suele ahorrar una visita de diagnostico."
+            ayuda="Opcional. Una imagen del síntoma suele ahorrar una visita de diagnóstico."
           />
 
           <div className="mt-5 flex justify-end">
@@ -115,7 +115,7 @@ export function RequestDialog({ assets }: { assets: Array<{ id: string; code: st
               className="field min-h-24"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              placeholder="Cuando comenzo, si el equipo sigue operando, ruidos o sintomas observados…"
+              placeholder="Cuando comenzo, si el equipo sigue operando, ruidos o síntomas observados…"
             />
           </div>
           <div>

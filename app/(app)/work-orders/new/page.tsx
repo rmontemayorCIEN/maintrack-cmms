@@ -15,7 +15,7 @@ export default async function NewWorkOrderPage() {
         <PageHeader title="Nueva orden de trabajo" />
         <EmptyState
           title="Sin permisos"
-          description="Su rol no permite crear ordenes de trabajo. Puede levantar una solicitud de servicio."
+          description="Su rol no permite crear órdenes de trabajo. Puede levantar una solicitud de servicio."
         />
       </>
     );
@@ -43,7 +43,7 @@ export default async function NewWorkOrderPage() {
       <PageHeader
         title="Nueva orden de trabajo"
         description="Registre un trabajo correctivo, preventivo, predictivo o de mejora."
-        breadcrumb="Operacion / Ordenes de trabajo"
+        breadcrumb="Operación / Órdenes de trabajo"
       />
       <NewWorkOrderForm
         assets={assets}

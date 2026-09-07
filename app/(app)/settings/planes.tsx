@@ -217,7 +217,7 @@ export function FichasPlanes({
               className="field min-h-20"
               value={nota}
               onChange={(e) => setNota(e.target.value)}
-              placeholder="Ej. Vamos a dar de alta la segunda planta el proximo mes."
+              placeholder="Ej. Vamos a dar de alta la segunda planta el próximo mes."
             />
 
             {error ? (

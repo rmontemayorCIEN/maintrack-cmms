@@ -20,22 +20,22 @@ import { puedeUsarIa, type OrgConIa } from "./consumo";
 
 const EsquemaCierre = z.object({
   codigoFalla: z.string().describe(
-    "Codigo de falla del catalogo que mejor describe QUE fallo. Cadena vacia si ninguno aplica o si el trabajo no fue correctivo.",
+    "Código de falla del catálogo que mejor describe QUE fallo. Cadena vacía si ninguno aplica o si el trabajo no fue correctivo.",
   ),
   causaRaiz: z.string().describe(
     "Codigo de causa raiz del catalogo que explica POR QUE fallo. Cadena vacia si el texto no da elementos para determinarla; no adivine.",
   ),
   refacciones: z.array(
     z.object({
-      codigo: z.string().describe("Codigo de la refaccion, tal como aparece en el catalogo."),
+      codigo: z.string().describe("Código de la refacción, tal como aparece en el catálogo."),
       cantidad: z.number().describe("Cantidad que se desprende del texto. Si no lo dice, 1."),
       motivo: z.string().describe("La parte del texto que sugiere que se uso, en pocas palabras."),
     }),
-  ).describe("Solo las que el texto realmente sugiera. Vacio si no menciona ninguna."),
+  ).describe("Solo las que el texto realmente sugiera. Vacío si no menciona ninguna."),
   confianza: z.enum(["ALTA", "MEDIA", "BAJA"]).describe(
     "ALTA si el texto es explicito; BAJA si esta infiriendo de indicios sueltos.",
   ),
-  nota: z.string().describe("Una frase explicando en que se baso. La lee el tecnico antes de aceptar."),
+  nota: z.string().describe("Una frase explicando en que se baso. La lee el técnico antes de aceptar."),
 });
 
 const SISTEMA = `Eres un tecnico de mantenimiento con experiencia, ayudando a otro a cerrar bien una orden de trabajo.
@@ -103,7 +103,7 @@ export async function sugerirCierre(
     funcion: "CIERRE_OT",
     sistema: SISTEMA,
     instruccion:
-      "Interprete lo que escribio el tecnico al cerrar esta orden y proponga la codificacion, eligiendo de los catalogos de la empresa.",
+      "Interprete lo que escribio el técnico al cerrar esta orden y proponga la codificación, eligiendo de los catálogos de la empresa.",
     contexto: {
       orden: {
         numero: wo.number,

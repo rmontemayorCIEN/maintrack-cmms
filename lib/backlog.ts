@@ -15,7 +15,7 @@ import { prisma } from "./db";
 import { equivalentesDe } from "./equivalencias";
 
 export const MOTIVOS_LIBERACION = {
-  SIN_REFACCION: "No habia la refaccion",
+  SIN_REFACCION: "No había la refacción",
   SIN_MANO_DE_OBRA: "No hubo quien lo hiciera",
   SERVICIO_EXTERNO: "Requiere servicio externo",
   SIN_ACCESO: "No se pudo parar o entrar al equipo",

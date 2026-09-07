@@ -19,7 +19,7 @@ const PATRONES: Patron[] = [
     palabras: /\b(gas|huele a gas|olor a gas|fuga de gas|huevo podrido|azufre)\b/i,
   },
   {
-    que: "riesgo electrico",
+    que: "riesgo eléctrico",
     // Por proximidad y no por palabras pegadas: la gente escribe "el cable
     // esta pelado", "los cables quedaron expuestos", no "cable pelado".
     palabras: /(\b(cable|cables|alambre|contacto|apagador|tablero)\b.{0,30}\b(pelad\w*|expuest\w*|descubiert\w*|sin forro|chispe\w*)|hace corto|corto ?circuito|chispa|chispas|\bda toque\b|descarga electrica|electrocut\w*)/i,
@@ -37,7 +37,7 @@ const PATRONES: Patron[] = [
     palabras: /\b(lastim\w+|herid\w+|golpe\w+|accidente|atrapad\w+|se corto|sangr\w+)\b/i,
   },
   {
-    que: "agua sobre instalacion electrica",
+    que: "agua sobre instalación electrica",
     palabras: /\b(agua.{0,30}(electric|contacto|tablero|cable)|(electric|contacto|tablero|cable).{0,30}(mojad|agua|inund))\w*/i,
   },
   {

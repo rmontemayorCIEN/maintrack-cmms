@@ -22,15 +22,15 @@ import { contextoGeografico } from "../geografia";
 
 const EsquemaPlan = z.object({
   nombre: z.string().describe("Corto y reconocible, con la frecuencia adentro. Ej: «Preventivo mensual compresor GA-75»."),
-  descripcion: z.string().describe("Una linea sobre el alcance del plan."),
+  descripcion: z.string().describe("Una línea sobre el alcance del plan."),
   tipoMantenimiento: z.enum(["PREVENTIVE", "INSPECTION", "PREDICTIVE"]),
   cadaCuantosDias: z.number().describe("Frecuencia en dias. Use valores de calendario reales: 7, 15, 30, 60, 90, 180, 365."),
   prioridad: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
   requiereParo: z.boolean().describe("Si el equipo debe detenerse para ejecutarlo."),
-  notasSeguridad: z.string().describe("LOTO, permisos, EPP, riesgos especificos de este equipo. Vacio si no aplica."),
+  notasSeguridad: z.string().describe("LOTO, permisos, EPP, riesgos especificos de este equipo. Vacío si no aplica."),
   actividades: z.array(
     z.object({
-      titulo: z.string().describe("Una accion concreta y verificable. No «revisar el equipo»."),
+      titulo: z.string().describe("Una acción concreta y verificable. No «revisar el equipo»."),
       tipo: z.enum(["CHECK", "MEASURE", "TEXT", "REPLACE"]).describe(
         "CHECK se marca hecho; MEASURE captura un numero con unidad y rango; REPLACE es cambio de componente; TEXT es una observacion escrita.",
       ),
@@ -39,17 +39,17 @@ const EsquemaPlan = z.object({
       maximo: z.number().nullable().describe("Solo para MEASURE. Null si no aplica."),
       manoDeObra: z.array(
         z.object({
-          especialidad: z.string().describe("Codigo de especialidad del catalogo."),
+          especialidad: z.string().describe("Código de especialidad del catálogo."),
           personas: z.number(),
           horas: z.number().describe("Horas por persona para esta actividad."),
         }),
       ),
       refacciones: z.array(
-        z.object({ codigo: z.string().describe("Codigo del catalogo de refacciones."), cantidad: z.number() }),
+        z.object({ codigo: z.string().describe("Código del catálogo de refacciones."), cantidad: z.number() }),
       ),
       servicios: z.array(
         z.object({
-          codigo: z.string().describe("Codigo del catalogo de servicios externos."),
+          codigo: z.string().describe("Código del catálogo de servicios externos."),
           cantidad: z.number(),
           nota: z.string(),
         }),
@@ -165,7 +165,7 @@ export async function generarPlan(
     funcion: "PLAN",
     sistema: SISTEMA,
     instruccion:
-      "Redacte el plan de mantenimiento preventivo de este equipo, usando unicamente los catalogos de la empresa.",
+      "Redacte el plan de mantenimiento preventivo de este equipo, usando unicamente los catálogos de la empresa.",
     contexto: {
       instalacion: contextoDeInstalacion(
         await db.organization.findUniqueOrThrow({

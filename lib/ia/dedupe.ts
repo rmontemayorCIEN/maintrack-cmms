@@ -18,14 +18,14 @@ import { candidatosDuplicados } from "../dedupe-refacciones";
 const Esquema = z.object({
   grupos: z.array(
     z.object({
-      codigos: z.array(z.string()).describe("Los codigos de las refacciones que SI son la misma pieza."),
+      codigos: z.array(z.string()).describe("Los códigos de las refacciones que SI son la misma pieza."),
       sobreviviente: z.string().describe(
         "El codigo que conviene conservar: el mas descriptivo y completo, no el mas corto ni el mas viejo.",
       ),
       nombreSugerido: z.string().describe(
-        "Como deberia llamarse la refaccion consolidada, con su medida y sus caracteristicas relevantes.",
+        "Como debería llamarse la refacción consolidada, con su medida y sus caracteristicas relevantes.",
       ),
-      porQue: z.string().describe("Por que son la misma pieza, en una linea."),
+      porQue: z.string().describe("Por que son la misma pieza, en una línea."),
       confianza: z.enum(["ALTA", "MEDIA", "BAJA"]),
     }),
   ),
@@ -68,7 +68,7 @@ export async function juzgarDuplicados(
 
   const candidatos = await candidatosDuplicados(org.id);
   if (!candidatos.length) {
-    return { ok: false, motivo: "No se encontraron refacciones parecidas. El catalogo esta limpio." };
+    return { ok: false, motivo: "No se encontraron refacciones parecidas. El catálogo esta limpio." };
   }
 
   const r = await analizarConIa({

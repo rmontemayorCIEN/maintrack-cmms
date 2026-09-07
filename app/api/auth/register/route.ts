@@ -57,14 +57,14 @@ export async function POST(request: Request) {
       assetCategories: {
         create: [
           { name: "Equipo de proceso", code: "PROC" },
-          { name: "Equipo electrico", code: "ELEC" },
+          { name: "Equipo eléctrico", code: "ELEC" },
           { name: "Equipo de transporte", code: "TRAN" },
           { name: "Instalaciones", code: "INST" },
         ],
       },
       failureCodes: {
         create: [
-          { code: "MEC-01", description: "Desgaste mecanico", category: "MECANICO" },
+          { code: "MEC-01", description: "Desgaste mecánico", category: "MECANICO" },
           { code: "ELE-01", description: "Falla electrica", category: "ELECTRICO" },
           { code: "LUB-01", description: "Lubricacion deficiente", category: "MECANICO" },
           { code: "OPE-01", description: "Error de operacion", category: "OPERACION" },

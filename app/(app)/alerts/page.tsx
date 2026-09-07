@@ -46,7 +46,7 @@ export default async function AlertsPage() {
       {open.length === 0 ? (
         <EmptyState
           title="Sin alertas activas"
-          description="Todos los puntos monitoreados se encuentran dentro de parametro."
+          description="Todos los puntos monitoreados se encuentran dentro de parámetro."
         />
       ) : (
         <div className="grid gap-3">

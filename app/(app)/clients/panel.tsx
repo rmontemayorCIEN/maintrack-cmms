@@ -288,7 +288,7 @@ export function PanelClientes({
                             <p className="truncate font-medium text-slate-800">{org.name}</p>
                             <p className="truncate text-xs text-slate-500">
                               {org.industry ?? org.slug}
-                              {propia ? " · su organizacion" : ""}
+                              {propia ? " · su organización" : ""}
                             </p>
                             <select
                               className="mt-1 w-full max-w-44 rounded-md border border-slate-200 px-1.5 py-0.5 text-[0.6875rem] text-slate-600"

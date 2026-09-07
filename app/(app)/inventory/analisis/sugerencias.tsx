@@ -103,8 +103,8 @@ export function SugerenciasIa({
   return (
     <Card className="mt-4">
       <CardHeader
-        title="Que refacciones deberia tener — propuesta de IA"
-        subtitle="Para equipos sin historial de consumo, donde el kardex no tiene de donde deducir. Esto es criterio sobre el tipo de equipo, no un calculo sobre sus datos."
+        title="Que refacciones debería tener — propuesta de IA"
+        subtitle="Para equipos sin historial de consumo, donde el kardex no tiene de donde deducir. Esto es criterio sobre el tipo de equipo, no un cálculo sobre sus datos."
         action={<Sparkles className="h-4 w-4 text-brand-400" />}
       />
 

@@ -10,7 +10,7 @@ import { logAudit } from "@/lib/audit";
 export async function GET(request: Request) {
   return withAuth(null, async ({ orgId }) => {
     const partId = new URL(request.url).searchParams.get("partId");
-    if (!partId) return fail("Falta la refaccion", 400);
+    if (!partId) return fail("Falta la refacción", 400);
     return ok({ equivalencias: await equivalentesDe(orgId, partId) });
   });
 }

@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: Params) {
  * se puede ir sin dejar hueco.
  */
 const ATADURAS = [
-  { campo: "workOrders", singular: "orden de trabajo", plural: "ordenes de trabajo" },
+  { campo: "workOrders", singular: "orden de trabajo", plural: "órdenes de trabajo" },
   { campo: "plans", singular: "plan de mantenimiento", plural: "planes de mantenimiento" },
   { campo: "meters", singular: "medidor", plural: "medidores" },
   { campo: "sensors", singular: "sensor", plural: "sensores" },

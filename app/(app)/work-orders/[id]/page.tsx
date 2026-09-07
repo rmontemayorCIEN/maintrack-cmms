@@ -332,7 +332,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         <div className="grid content-start gap-4 lg:col-span-2">
           <Card>
             <CardHeader
-              title="Lista de verificacion"
+              title="Lista de verificación"
               subtitle={`${doneTasks} de ${wo.tasks.length} tareas completadas`}
               action={
                 canExecute && !["COMPLETED", "CLOSED", "CANCELLED"].includes(wo.status) ? (
@@ -520,7 +520,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               destino={{ workOrderId: wo.id }}
               editable={canExecute}
               titulo="Evidencia del trabajo"
-              ayuda="Fotos del antes y despues, video del sintoma, reporte del proveedor."
+              ayuda="Fotos del antes y después, video del síntoma, reporte del proveedor."
               adjuntos={wo.attachments.map((a) => ({
                 id: a.id, name: a.name, kind: a.kind, size: a.size,
                 mimeType: a.mimeType, createdAt: a.createdAt.toISOString(),
@@ -604,15 +604,15 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
           {wo.completedAt ? (
             <Card>
-              <CardHeader title="Cierre tecnico" />
+              <CardHeader title="Cierre técnico" />
               <dl className="grid gap-3 text-sm">
-                <Row label="Codigo de falla">
+                <Row label="Código de falla">
                   {wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}
                 </Row>
                 <Row label="Causa raiz">
                   {wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}
                 </Row>
-                <Row label="Solucion aplicada">{wo.resolution ?? "—"}</Row>
+                <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
               </dl>
             </Card>
           ) : null}

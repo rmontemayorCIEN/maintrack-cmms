@@ -49,9 +49,9 @@ async function main() {
   console.log("\nEL PAR NO SE DUPLICA\n");
   await registrarEquivalencia({ organizationId: org.id, partId: skf.id, equivalenteId: nsk.id, tipo: "EQUIVALENTE" });
   await seRechaza("el mismo par otra vez",
-    () => registrarEquivalencia({ organizationId: org.id, partId: skf.id, equivalenteId: nsk.id, tipo: "EQUIVALENTE" }), "ya estan");
+    () => registrarEquivalencia({ organizationId: org.id, partId: skf.id, equivalenteId: nsk.id, tipo: "EQUIVALENTE" }), "ya están");
   await seRechaza("el mismo par AL REVES",
-    () => registrarEquivalencia({ organizationId: org.id, partId: nsk.id, equivalenteId: skf.id, tipo: "EQUIVALENTE" }), "ya estan");
+    () => registrarEquivalencia({ organizationId: org.id, partId: nsk.id, equivalenteId: skf.id, tipo: "EQUIVALENTE" }), "ya están");
   await seRechaza("consigo misma",
     () => registrarEquivalencia({ organizationId: org.id, partId: skf.id, equivalenteId: skf.id, tipo: "EQUIVALENTE" }), "si misma");
   await seRechaza("con una de otra organizacion",

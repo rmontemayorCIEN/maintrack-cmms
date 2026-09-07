@@ -38,7 +38,7 @@ export async function PUT(request: Request) {
 
     // Cota de seguridad: el cuerpo viene del navegador y la columna es texto.
     const serializado = JSON.stringify(vistas);
-    if (serializado.length > 8000) return fail("La configuracion de vistas es demasiado grande", 413);
+    if (serializado.length > 8000) return fail("La configuración de vistas es demasiado grande", 413);
 
     await prisma.user.update({ where: { id: user.id }, data: { vistasTabla: serializado } });
     return ok({ success: true });

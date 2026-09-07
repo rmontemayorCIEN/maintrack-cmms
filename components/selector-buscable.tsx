@@ -69,7 +69,7 @@ export function SelectorBuscable({
     return opciones.filter((o) => {
       const texto = sinAcentos(`${o.etiqueta} ${o.detalle ?? ""} ${o.alias ?? ""}`);
       // Todas las palabras, en cualquier orden: "bomba 001" encuentra
-      // "BOM-001 — Bomba hidroneumatica".
+      // "BOM-001 — Bomba hidroneumática".
       return palabras.every((p) => texto.includes(p));
     });
   }, [opciones, consulta]);
@@ -140,7 +140,7 @@ export function SelectorBuscable({
           <span
             role="button"
             tabIndex={-1}
-            aria-label="Quitar seleccion"
+            aria-label="Quitar selección"
             onClick={(e) => { e.stopPropagation(); onCambio(""); }}
             className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >

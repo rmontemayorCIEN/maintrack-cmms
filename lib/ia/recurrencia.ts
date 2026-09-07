@@ -28,7 +28,7 @@ const Esquema = z.object({
     "True cuando las intervenciones atacan la consecuencia y no el origen: cambiar la misma pieza una y otra vez sin corregir lo que la destruye.",
   ),
   porQue: z.string().describe(
-    "En que se basa. Cite los folios concretos que sostienen la conclusion. Sin folios no es un analisis, es una opinion.",
+    "En que se basa. Cite los folios concretos que sostienen la conclusión. Sin folios no es un análisis, es una opinion.",
   ),
   acciones: z.array(z.string()).describe(
     "Que hacer, en orden, maximo cuatro. Concreto y ejecutable por un tecnico: verificar alineamiento, medir vibracion en tal punto, revisar la puesta a tierra. No 'dar mantenimiento'.",
@@ -37,7 +37,7 @@ const Esquema = z.object({
     "Que dato hubiera cambiado el analisis y no esta: causas raiz sin llenar, resoluciones vacias, lecturas que nadie tomo. Null si el expediente alcanza.",
   ),
   confianza: z.enum(["ALTA", "MEDIA", "BAJA"]).describe(
-    "BAJA cuando las resoluciones estan vacias o son de una linea. Es preferible decir que no alcanza a inventar un diagnostico.",
+    "BAJA cuando las resoluciones están vacias o son de una línea. Es preferible decir que no alcanza a inventar un diagnóstico.",
   ),
 });
 
@@ -50,7 +50,7 @@ Le entregan las cifras YA CALCULADAS —cuantas fallas, cada cuanto, cuanto cost
 Como trabaja:
 
 1. NO recalcule ni corrija las cifras que le dan. Su aporte es lo que el texto dice y los numeros no.
-2. Busque el hilo comun entre las resoluciones, aunque cada tecnico lo haya escrito distinto. "Se cambio el balero", "ruido en la chumacera", "vibracion alta" pueden ser el mismo problema descrito por tres personas.
+2. Busque el hilo comun entre las resoluciones, aunque cada tecnico lo haya escrito distinto. "Se cambio el balero", "ruido en la chumacera", "vibración alta" pueden ser el mismo problema descrito por tres personas.
 3. Distinga sintoma de causa. Cambiar el mismo balero cuatro veces en un año no es mala suerte: algo lo esta destruyendo, y casi siempre es alineamiento, lubricacion, sobrecarga o montaje.
 4. Cite folios. Una conclusion sin folios que la sostengan no sirve para convencer a nadie.
 5. Si las resoluciones estan vacias o dicen "listo" y nada mas, la confianza es BAJA y hay que decirlo. Es preferible admitir que el expediente no alcanza a inventar un diagnostico que despues mande a alguien a desarmar un equipo sano.

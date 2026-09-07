@@ -137,7 +137,7 @@ export function Topbar({
             type="button"
             onClick={logout}
             className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"
-            title="Cerrar sesion"
+            title="Cerrar sesión"
           >
             <LogOut className="h-4 w-4 text-slate-500" />
           </button>

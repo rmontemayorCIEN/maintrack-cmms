@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const dias = input.intervalDays !== undefined ? input.intervalDays : existing.intervalDays;
     const medidor = input.meterId !== undefined ? input.meterId : existing.meterId;
     const intervaloMedidor = input.intervalMeter !== undefined ? input.intervalMeter : existing.intervalMeter;
-    if (trigger === "CALENDAR" && !dias) return fail("Un plan por calendario requiere intervalo en dias", 422);
+    if (trigger === "CALENDAR" && !dias) return fail("Un plan por calendario requiere intervalo en días", 422);
     if (trigger === "METER" && (!intervaloMedidor || !medidor)) {
       return fail("Un plan por medidor requiere medidor e intervalo", 422);
     }

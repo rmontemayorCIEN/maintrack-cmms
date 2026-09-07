@@ -113,7 +113,7 @@ export function TablaRefacciones({
     },
     {
       id: "estado", etiqueta: "Situacion", agrupable: true,
-      texto: (p) => (p.quantityOnHand === 0 ? "Agotada" : bajoMinimo(p) ? "Bajo minimo" : "Surtida"),
+      texto: (p) => (p.quantityOnHand === 0 ? "Agotada" : bajoMinimo(p) ? "Bajo mínimo" : "Surtida"),
       pinta: (p) =>
         p.quantityOnHand === 0
           ? <Badge tone="danger">Agotada</Badge>

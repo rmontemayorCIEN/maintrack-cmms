@@ -60,9 +60,9 @@ export function TraspasoDialog({
       .filter((r) => r.partId && Number(r.cantidad) > 0)
       .map((r) => ({ partId: r.partId, cantidad: Number(r.cantidad) }));
 
-    if (!validos.length) { setError("Agregue al menos un renglon con cantidad"); return; }
+    if (!validos.length) { setError("Agregue al menos un renglón con cantidad"); return; }
     if (!destinoEfectivo || origenId === destinoEfectivo) {
-      setError("El origen y el destino no pueden ser el mismo almacen");
+      setError("El origen y el destino no pueden ser el mismo almacén");
       return;
     }
 

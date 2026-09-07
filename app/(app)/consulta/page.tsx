@@ -18,7 +18,7 @@ export default async function ConsultaPage() {
     <>
       <PageHeader
         title="Pregunte a sus datos"
-        description="Escriba la pregunta como se la haria a su jefe de mantenimiento. El sistema consulta su propia informacion y responde con las cifras."
+        description="Escriba la pregunta como se la haria a su jefe de mantenimiento. El sistema consulta su propia información y responde con las cifras."
       />
       <PanelConsulta
         disponible={iaConfigurada() && entitlement.funciones.includes("BUSQUEDA")}

@@ -23,8 +23,8 @@ import { puedeUsarIa, type OrgConIa } from "./consumo";
 const Esquema = z.object({
   pasos: z.array(
     z.object({
-      titulo: textoIa(180, "La accion, en imperativo y concreta. «Verificar alineamiento del acoplamiento», no «revisar el equipo»."),
-      detalle: textoIa(500, "Como se hace, si no es obvio. Null cuando el titulo basta.").nullable(),
+      titulo: textoIa(180, "La acción, en imperativo y concreta. «Verificar alineamiento del acoplamiento», no «revisar el equipo»."),
+      detalle: textoIa(500, "Como se hace, si no es obvio. Null cuando el título basta.").nullable(),
       tipo: z.enum(["CHECK", "MEASURE", "REPLACE", "TEXT"]).describe(
         "MEASURE cuando hay que anotar un numero; REPLACE cuando se cambia una pieza; TEXT cuando hay que describir lo encontrado; CHECK para lo demas.",
       ),
@@ -38,14 +38,14 @@ const Esquema = z.object({
   seguridad: z.array(textoIa(280, "Un punto de seguridad.")).describe(
     "Maximo seis puntos, de lo que hay que hacer ANTES de tocar el equipo: bloqueo y etiquetado, corte de energia, purga, equipo de proteccion, permisos. Concreto para este equipo.",
   ),
-  herramientas: z.array(textoIa(90, "Una herramienta o instrumento.")).describe("Lo que hay que bajar, maximo diez. Incluya instrumentos de medicion si algun paso los pide."),
+  herramientas: z.array(textoIa(90, "Una herramienta o instrumento.")).describe("Lo que hay que bajar, máximo diez. Incluya instrumentos de medición si algun paso los pide."),
   refaccionesProbables: z.array(
     z.object({
-      codigo: z.string().describe("El codigo EXACTO del catalogo entregado. No invente ninguno."),
-      porQue: textoIa(200, "Por que podria hacer falta."),
+      codigo: z.string().describe("El código EXACTO del catálogo entregado. No invente ninguno."),
+      porQue: textoIa(200, "Por que podría hacer falta."),
     }),
-  ).describe("Maximo seis, y solo las que de verdad podrian hacer falta."),
-  advertencia: textoIa(500, "Lo que puede salir mal en esta reparacion en particular. Null si no hay nada que destacar.").nullable(),
+  ).describe("Máximo seis, y solo las que de verdad podrian hacer falta."),
+  advertencia: textoIa(500, "Lo que puede salir mal en esta reparación en particular. Null si no hay nada que destacar.").nullable(),
 });
 
 export type Procedimiento = z.infer<typeof Esquema>;
@@ -56,7 +56,7 @@ El tecnico sabe hacer su oficio; lo que necesita es que alguien le ordene el tra
 
 Como trabaja:
 
-1. La seguridad va primero y es especifica de ESTE equipo. "Usar equipo de proteccion" no sirve; "bloquear el interruptor del tablero y verificar ausencia de tension antes de abrir la caja de conexiones" si.
+1. La seguridad va primero y es especifica de ESTE equipo. "Usar equipo de protección" no sirve; "bloquear el interruptor del tablero y verificar ausencia de tensión antes de abrir la caja de conexiones" si.
 2. Los pasos son acciones, en imperativo, en el orden en que se ejecutan. Empiece asegurando el equipo y termine probandolo.
 3. Cuando un paso implique anotar un numero, marquelo como medicion y ponga su rango esperado. Un tecnico que mide sin saber contra que solo esta apuntando cifras.
 4. Las refacciones SOLO pueden salir del catalogo que se le entrega, con su codigo exacto. Si lo que hace falta no esta en el catalogo, no lo ponga: mencionelo en la advertencia.
@@ -91,7 +91,7 @@ export async function generarProcedimiento(
   });
   if (!orden) return { ok: false, motivo: "Orden de trabajo no encontrada" };
   if (!orden.asset) {
-    return { ok: false, motivo: "La orden no tiene activo asignado. Sin saber a que equipo se le hace, el procedimiento seria generico." };
+    return { ok: false, motivo: "La orden no tiene activo asignado. Sin saber a que equipo se le hace, el procedimiento sería generico." };
   }
 
   // Lo que ya se hizo en este mismo equipo. Es lo que separa un procedimiento

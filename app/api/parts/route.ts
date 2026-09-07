@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
     if (input.quantityOnHand > 0) {
       const almacen = await almacenPorOmision(orgId);
-      if (!almacen) return fail("La cuenta no tiene ningun almacen activo", 409);
+      if (!almacen) return fail("La cuenta no tiene ningún almacén activo", 409);
       await aplicarMovimiento({
         organizationId: orgId,
         partId: part.id,

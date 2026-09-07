@@ -132,19 +132,19 @@ export async function puestaEnMarcha(
   const pasos: Paso[] = [
     paso({
       clave: "empresa",
-      titulo: "Identificar la instalacion",
+      titulo: "Identificar la instalación",
       porQue: "Define los ejemplos de captura y el contexto con el que el sistema le sugiere planes y refacciones.",
       hecho: org.tipoInstalacion && org.tipoInstalacion !== "OTRO" ? 1 : 0,
       meta: 1,
-      falta: "Falta indicar que tipo de instalacion es. Pidalo a su proveedor del servicio.",
+      falta: "Falta indicar que tipo de instalación es. Pidalo a su proveedor del servicio.",
       enlace: "/settings?s=organizacion",
-      textoEnlace: "Ver la organizacion",
+      textoEnlace: "Ver la organización",
       peso: 1,
     }),
     paso({
       clave: "estructura",
       titulo: "Sitios y ubicaciones",
-      porQue: "Es como se filtra el trabajo por area y como el tecnico encuentra el equipo en piso.",
+      porQue: "Es como se filtra el trabajo por área y como el técnico encuentra el equipo en piso.",
       hecho: sitios > 0 ? Math.min(ubicaciones, 3) + 1 : 0,
       meta: 4,
       falta: sitios === 0
@@ -157,11 +157,11 @@ export async function puestaEnMarcha(
     paso({
       clave: "equipo",
       titulo: "Su equipo de trabajo",
-      porQue: "Sin tecnicos dados de alta no hay a quien asignar ordenes ni de donde salga el costo de mano de obra.",
+      porQue: "Sin técnicos dados de alta no hay a quien asignar órdenes ni de donde salga el costo de mano de obra.",
       hecho: Math.min(usuarios, 2) + (tecnicos > 0 ? 1 : 0),
       meta: 3,
       falta: tecnicos === 0
-        ? "Falta dar de alta al menos un tecnico o supervisor."
+        ? "Falta dar de alta al menos un técnico o supervisor."
         : "Agregue al resto de su equipo para poder repartir el trabajo.",
       enlace: "/settings?s=usuarios",
       textoEnlace: "Agregar usuarios",
@@ -169,19 +169,19 @@ export async function puestaEnMarcha(
     }),
     paso({
       clave: "catalogos",
-      titulo: "Catalogos base",
-      porQue: "Alimentan los campos de seleccion. Sin ellos se captura texto libre y despues nada se puede agrupar ni comparar.",
+      titulo: "Catálogos base",
+      porQue: "Alimentan los campos de selección. Sin ellos se captura texto libre y después nada se puede agrupar ni comparar.",
       hecho: [categorias, especialidades, familias, codigosFalla, causas].filter((n) => n > 0).length,
       meta: 5,
       falta: [
-        categorias === 0 ? "categorias de activo" : null,
+        categorias === 0 ? "categorías de activo" : null,
         especialidades === 0 ? "especialidades" : null,
-        familias === 0 ? "familias de refaccion" : null,
-        codigosFalla === 0 ? "codigos de falla" : null,
+        familias === 0 ? "familias de refacción" : null,
+        codigosFalla === 0 ? "códigos de falla" : null,
         causas === 0 ? "causas raiz" : null,
       ].filter(Boolean).join(", ") || "",
       enlace: "/catalogs",
-      textoEnlace: "Ir a catalogos",
+      textoEnlace: "Ir a catálogos",
       peso: 2,
     }),
     paso({
@@ -191,7 +191,7 @@ export async function puestaEnMarcha(
       hecho: Math.min(activos, 5) + (activos > 0 && activosUbicados === activos ? 1 : 0),
       meta: 6,
       falta: activos === 0
-        ? "Todavia no hay activos. El levantamiento asistido arma el inventario completo a partir de una descripcion."
+        ? "Todavía no hay activos. El levantamiento asistido arma el inventario completo a partir de una descripción."
         : activosUbicados < activos
           ? `${activos - activosUbicados} de ${activos} activos no tienen ubicacion asignada.`
           : "Agregue el resto de los equipos que mantiene.",
@@ -202,11 +202,11 @@ export async function puestaEnMarcha(
     paso({
       clave: "planes",
       titulo: "Planes de mantenimiento",
-      porQue: "Es lo que convierte el sistema en preventivo. Sin planes solo registra las fallas despues de que ocurren.",
+      porQue: "Es lo que convierte el sistema en preventivo. Sin planes solo registra las fallas después de que ocurren.",
       hecho: activos === 0 ? 0 : activosConPlan,
       meta: metaActivosConPlan,
       falta: planes === 0
-        ? "Ningun activo tiene plan. El generador de IA redacta uno completo a partir del equipo."
+        ? "Ningún activo tiene plan. El generador de IA redacta uno completo a partir del equipo."
         : `${activosConPlan} de ${activos} activos tienen plan. Priorice los de criticidad A.`,
       enlace: "/plans",
       textoEnlace: planes === 0 ? "Crear el primer plan" : "Ver planes",
@@ -214,15 +214,15 @@ export async function puestaEnMarcha(
     }),
     paso({
       clave: "almacen",
-      titulo: "Almacen de refacciones",
-      porQue: "Con minimo y costo capturados, el sistema avisa cuando reponer y carga el consumo al costo de la orden.",
+      titulo: "Almacén de refacciones",
+      porQue: "Con mínimo y costo capturados, el sistema avisa cuando reponer y carga el consumo al costo de la orden.",
       hecho: Math.min(refaccionesCompletas, 5),
       meta: 5,
       falta: refacciones === 0
-        ? "Todavia no hay refacciones. Puede importarlas desde Excel o pedirle sugerencias a la IA por equipo."
+        ? "Todavía no hay refacciones. Puede importarlas desde Excel o pedirle sugerencias a la IA por equipo."
         : `${refacciones - refaccionesCompletas} de ${refacciones} refacciones no tienen minimo o costo capturado.`,
       enlace: "/inventory",
-      textoEnlace: refacciones === 0 ? "Dar de alta refacciones" : "Revisar almacen",
+      textoEnlace: refacciones === 0 ? "Dar de alta refacciones" : "Revisar almacén",
       peso: 2,
     }),
     paso({
@@ -232,10 +232,10 @@ export async function puestaEnMarcha(
       hecho: Math.min(ordenesCerradas, 3),
       meta: 3,
       falta: ordenesCerradas === 0
-        ? "Ejecute el programador para generar las primeras ordenes preventivas, o levante una manual."
+        ? "Ejecute el programador para generar las primeras órdenes preventivas, o levante una manual."
         : `Lleva ${ordenesCerradas} ordenes cerradas. Con tres empiezan a tener sentido los indicadores.`,
       enlace: "/work-orders",
-      textoEnlace: "Ver ordenes de trabajo",
+      textoEnlace: "Ver órdenes de trabajo",
       peso: 2,
     }),
   ];

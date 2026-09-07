@@ -120,7 +120,7 @@ export function LectorPlaca({
         subtitle={
           yaTieneDatos
             ? "Este equipo ya tiene datos de placa. Una lectura nueva los reemplaza."
-            : "Tome la foto de la placa metalica del equipo y se llenan marca, modelo y numero de serie."
+            : "Tome la foto de la placa metalica del equipo y se llenan marca, modelo y número de serie."
         }
         action={<Camera className="h-4 w-4 text-slate-400" />}
       />
@@ -195,7 +195,7 @@ export function LectorPlaca({
               <dl className="grid gap-1.5 rounded-lg border border-slate-200 p-3 text-xs">
                 <Dato etiqueta="Fabricante" valor={lectura.fabricante} />
                 <Dato etiqueta="Modelo" valor={lectura.modelo} />
-                <Dato etiqueta="Numero de serie" valor={lectura.serie} />
+                <Dato etiqueta="Número de serie" valor={lectura.serie} />
                 {lectura.datosTecnicos.map((d) => <Dato key={d.dato} etiqueta={d.dato} valor={d.valor} />)}
               </dl>
 

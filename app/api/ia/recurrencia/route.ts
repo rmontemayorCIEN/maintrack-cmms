@@ -13,7 +13,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   return withAuth(null, async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("El analisis de recurrencia no esta configurado en este servidor.", 503);
+      return fail("El análisis de recurrencia no esta configurado en este servidor.", 503);
     }
     const input = schema.parse(await request.json());
 

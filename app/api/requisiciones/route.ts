@@ -28,13 +28,13 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
 
     const warehouseId = input.warehouseId || (await almacenPorOmision(orgId))?.id;
-    if (!warehouseId) return fail("La cuenta no tiene ningun almacen activo", 409);
+    if (!warehouseId) return fail("La cuenta no tiene ningún almacén activo", 409);
 
     const almacen = await prisma.warehouse.findFirst({
       where: { id: warehouseId, organizationId: orgId },
       select: { id: true },
     });
-    if (!almacen) return fail("Almacen no encontrado", 404);
+    if (!almacen) return fail("Almacén no encontrado", 404);
 
     // Una requisicion sin OT ni activo produce un costo que despues nadie
     // puede atribuir a nada. Se exige al menos uno de los dos.

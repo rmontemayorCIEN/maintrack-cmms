@@ -17,8 +17,8 @@ export const metadata = { title: "Reportes" };
 export const dynamic = "force-dynamic";
 
 const PERIODS = [
-  { days: 30, label: "30 dias" },
-  { days: 90, label: "90 dias" },
+  { days: 30, label: "30 días" },
+  { days: 90, label: "90 días" },
   { days: 180, label: "6 meses" },
   { days: 365, label: "12 meses" },
 ];
@@ -77,9 +77,9 @@ export default async function ReportsPage({
   // Antiguedad del backlog: cuanto tiempo llevan abiertas las ordenes.
   const now = Date.now();
   const buckets = [
-    { label: "0-7 dias", min: 0, max: 7 },
-    { label: "8-30 dias", min: 8, max: 30 },
-    { label: "31-90 dias", min: 31, max: 90 },
+    { label: "0-7 días", min: 0, max: 7 },
+    { label: "8-30 días", min: 8, max: 30 },
+    { label: "31-90 días", min: 31, max: 90 },
     { label: "Mas de 90", min: 91, max: Infinity },
   ].map((bucket) => {
     const items = backlogAging.filter((wo) => {
@@ -142,10 +142,10 @@ export default async function ReportsPage({
           <Stat
             label="Tiempo de respuesta"
             value={`${formatNumber(kpis.reliability.avgResponseHours, 1)} h`}
-            hint="De creacion a inicio"
+            hint="De creación a inicio"
           />
           <Stat
-            label="Precision de estimacion"
+            label="Precisión de estimación"
             value={`${formatNumber(kpis.reliability.estimateAccuracy, 0)}%`}
             hint="Horas estimadas vs reales"
           />
@@ -184,18 +184,18 @@ export default async function ReportsPage({
           <TrendChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Distribucion por tipo" />
+          <CardHeader title="Distribución por tipo" />
           <DonutChart data={typeData} />
         </Card>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader title="Evolucion de la mezcla de mantenimiento" subtitle="Objetivo: reducir la proporcion correctiva" />
+          <CardHeader title="Evolución de la mezcla de mantenimiento" subtitle="Objetivo: reducir la proporcion correctiva" />
           <MixChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Distribucion por prioridad" />
+          <CardHeader title="Distribución por prioridad" />
           <DonutChart data={priorityData} />
         </Card>
       </div>
@@ -249,7 +249,7 @@ export default async function ReportsPage({
 
         <div className="grid content-start gap-4">
           <Card>
-            <CardHeader title="Antiguedad del backlog" subtitle="Ordenes abiertas por rango de edad" />
+            <CardHeader title="Antiguedad del backlog" subtitle="Órdenes abiertas por rango de edad" />
             <ul className="grid gap-3">
               {buckets.map((bucket) => (
                 <li key={bucket.label}>

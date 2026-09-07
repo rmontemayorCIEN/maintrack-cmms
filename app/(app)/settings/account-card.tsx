@@ -129,7 +129,7 @@ export function AccountCard({
               <KeyRound className="h-4 w-4 text-slate-400" /> Cambiar contraseña
             </span>
           }
-          subtitle="Se pide la actual para evitar que alguien con su sesion abierta lo deje fuera"
+          subtitle="Se pide la actual para evitar que alguien con su sesión abierta lo deje fuera"
         />
         <form onSubmit={cambiarClave} className="grid gap-4">
           <div>

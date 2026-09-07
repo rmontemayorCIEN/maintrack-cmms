@@ -362,7 +362,7 @@ export function GestorCatalogos({
           <div className="px-5 py-6">
             <EmptyState
               title={`Sin ${def.titulo.toLowerCase()}`}
-              description={editable ? "Agregue el primero con el boton de arriba." : "Pida a un administrador que los registre."}
+              description={editable ? "Agregue el primero con el botón de arriba." : "Pida a un administrador que los registre."}
             />
           </div>
         ) : (

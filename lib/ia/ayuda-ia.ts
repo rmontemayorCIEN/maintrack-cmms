@@ -11,7 +11,7 @@ import { ROLE_LABELS } from "../constants";
  * mas. Por eso puede contestar las dos clases de pregunta que aparecen cuando
  * alguien se atora:
  *
- *   "¿Como cierro una orden?"            -> sale de la documentacion
+ *   "¿Cómo cierro una orden?"            -> sale de la documentacion
  *   "¿Por que MI plan no genera nada?"   -> mira sus planes reales
  *
  * La segunda es la que ningun manual contesta, y es justo la que la gente

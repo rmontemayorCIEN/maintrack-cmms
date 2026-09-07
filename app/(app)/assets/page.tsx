@@ -108,8 +108,8 @@ export default async function AssetsPage({
   return (
     <>
       <PageHeader
-        title="Catalogo de activos"
-        description="Jerarquia de equipos con criticidad, estado operativo y valor de reposicion."
+        title="Catálogo de activos"
+        description="Jerarquia de equipos con criticidad, estado operativo y valor de reposición."
         actions={
           can(user.role, "asset:write") ? (
             <>
@@ -134,7 +134,7 @@ export default async function AssetsPage({
         <Stat label="Activos registrados" value={assets.length} />
         <Stat label="Criticidad A" value={criticalA} hint="Equipos de mayor impacto" />
         <Stat label="Fuera de servicio" value={down} tone={down ? "bad" : "good"} />
-        <Stat label="Valor de reposicion" value={formatCurrency(totalValue, user.organization.currency)} />
+        <Stat label="Valor de reposición" value={formatCurrency(totalValue, user.organization.currency)} />
       </div>
 
       <form className="mb-4 flex flex-wrap items-center gap-2">

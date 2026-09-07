@@ -59,7 +59,7 @@ export function PanelPuestaEnMarcha({
     const res = await fetch("/api/catalogs/estandar", { method: "POST" });
     const data = await res.json();
     setSembrando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible cargar los catalogos"); return; }
+    if (!res.ok) { setError(data.error ?? "No fue posible cargar los catálogos"); return; }
     setAviso(`Se cargaron ${data.total} registros en sus catalogos. Revise y quite lo que no aplique a su operacion.`);
     router.refresh();
   }
@@ -69,7 +69,7 @@ export function PanelPuestaEnMarcha({
     const res = await fetch("/api/ia/revision", { method: "POST" });
     const data = await res.json();
     setRevisando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible revisar la configuracion"); return; }
+    if (!res.ok) { setError(data.error ?? "No fue posible revisar la configuración"); return; }
     setRevision(data.revision);
   }
 

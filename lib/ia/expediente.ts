@@ -123,7 +123,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       dias,
       desde: desde.toISOString().slice(0, 10),
       hasta: hasta.toISOString().slice(0, 10),
-      nota: "Los campos «cambio» son variacion porcentual contra el periodo inmediato anterior de la misma duracion.",
+      nota: "Los campos «cambio» son variación porcentual contra el periodo inmediato anterior de la misma duración.",
     },
 
     calidadDeCaptura: {
@@ -241,7 +241,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
           costoUnitario: Math.round(p.unitCost),
           // En el minimo exacto el faltante es cero y aun asi hay que resurtir:
           // cualquier consumo la deja sin existencia.
-          estado: p.quantityOnHand < p.minQuantity ? "por debajo del minimo" : "justo en el minimo",
+          estado: p.quantityOnHand < p.minQuantity ? "por debajo del mínimo" : "justo en el mínimo",
         }))
         .slice(0, 10),
       articulosSinMovimientoEn180Dias: sinMovimiento,

@@ -13,7 +13,7 @@ export type Pestana = { clave: string; titulo: string; icono: React.ReactNode };
 export function Pestanas({ activa, pestanas }: { activa: string; pestanas: Pestana[] }) {
   return (
     <div className="mb-5 -mx-1 overflow-x-auto">
-      <nav className="flex min-w-max gap-1 border-b border-slate-200 px-1" aria-label="Secciones de configuracion">
+      <nav className="flex min-w-max gap-1 border-b border-slate-200 px-1" aria-label="Secciones de configuración">
         {pestanas.map((p) => {
           const seleccionada = p.clave === activa;
           return (

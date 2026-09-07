@@ -38,7 +38,7 @@ const generar = z.object({
 export async function POST(request: Request) {
   return withAuth("asset:write", async ({ user, orgId }) => {
     if (!iaConfigurada()) {
-      return fail("La funcion de inteligencia artificial no esta configurada en este servidor.", 503);
+      return fail("La función de inteligencia artificial no esta configurada en este servidor.", 503);
     }
     const cuerpo = await request.json();
     const org = {

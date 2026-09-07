@@ -22,18 +22,18 @@ const esquema = z.object({
   movimientos: z
     .array(
       z.object({
-        orden: textoIa(20, "El numero de la orden, exactamente como viene en los datos."),
-        aFecha: textoIa(10, "La fecha propuesta en formato AAAA-MM-DD. Solo de los dias laborables disponibles."),
-        aResponsable: textoIa(80, "A quien pasarla, si conviene cambiarla de persona. Vacio si se queda con quien esta.").nullable(),
+        orden: textoIa(20, "El número de la orden, exactamente como viene en los datos."),
+        aFecha: textoIa(10, "La fecha propuesta en formato AAAA-MM-DD. Solo de los días laborables disponibles."),
+        aResponsable: textoIa(80, "A quien pasarla, si conviene cambiarla de persona. Vacío si se queda con quien esta.").nullable(),
         porQue: textoIa(240, "La razon, concreta y en una frase."),
       }),
     )
-    .describe("Lo que conviene mover, de lo mas urgente a lo menos. Vacio si la semana esta bien como esta."),
+    .describe("Lo que conviene mover, de lo mas urgente a lo menos. Vacío si la semana esta bien como esta."),
   agrupaciones: z
     .array(
       z.object({
-        activo: textoIa(90, "El codigo del equipo, exactamente como viene en los datos."),
-        ordenes: z.array(textoIa(20, "Numero de orden.")),
+        activo: textoIa(90, "El código del equipo, exactamente como viene en los datos."),
+        ordenes: z.array(textoIa(20, "Número de orden.")),
         porQue: textoIa(240, "Por que conviene hacerlas en una sola visita."),
       }),
     )
@@ -41,7 +41,7 @@ const esquema = z.object({
   noMover: z
     .array(
       z.object({
-        orden: textoIa(20, "Numero de orden."),
+        orden: textoIa(20, "Número de orden."),
         porQue: textoIa(200, "Por que esta no se debe recorrer aunque el dia este cargado."),
       }),
     )
@@ -108,7 +108,7 @@ export async function revisarSemana(
   ]);
 
   if (!ordenes.length) {
-    return { ok: false, motivo: "No hay ordenes abiertas en esa semana. No hay nada que revisar." };
+    return { ok: false, motivo: "No hay órdenes abiertas en esa semana. No hay nada que revisar." };
   }
 
   const dias = Array.from({ length: 7 }, (_, i) => {
@@ -166,7 +166,7 @@ export async function revisarSemana(
     equipo: {
       personas: equipo.length,
       capacidadPorDiaLaborable: Number(capacidadEquipo.toFixed(1)),
-      nota: "capacidadDelEquipo es lo que rinde el equipo completo ese dia. horasLibres es lo que queda sin usar. Un dia sin ordenes tiene el equipo entero disponible, no cero.",
+      nota: "capacidadDelEquipo es lo que rinde el equipo completo ese dia. horasLibres es lo que queda sin usar. Un dia sin órdenes tiene el equipo entero disponible, no cero.",
     },
     diasLaborablesDisponibles: disponibles,
     ordenesVencidasDeAntes: vencidas,

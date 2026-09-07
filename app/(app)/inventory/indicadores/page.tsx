@@ -5,7 +5,7 @@ import { Card, PageHeader, Stat } from "@/components/ui";
 import { indicadoresDeAlmacen } from "@/lib/indicadores-almacen";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
-export const metadata = { title: "Indicadores de almacen" };
+export const metadata = { title: "Indicadores de almacén" };
 export const dynamic = "force-dynamic";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);

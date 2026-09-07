@@ -159,7 +159,7 @@ export default async function ConsumoIaPage({
           tone={ingresoIa > 0 ? "good" : "default"}
         />
         <Stat
-          label="Costo historico acumulado"
+          label="Costo histórico acumulado"
           value={formatoUsd(historico._sum.costoUsd ?? 0)}
           hint={`${formatNumber(historico._count._all, 0)} llamadas · ${formatNumber(((historico._sum.inputTokens ?? 0) + (historico._sum.outputTokens ?? 0)) / 1000, 0)}k tokens`}
         />
@@ -188,7 +188,7 @@ export default async function ConsumoIaPage({
       {filas.every((f) => !f.consumo) ? (
         <EmptyState
           title="Sin consumo registrado en este periodo"
-          description="Cuando se genere el primer diagnostico apareceran aqui los tokens y el costo de cada cuenta."
+          description="Cuando se genere el primer diagnóstico apareceran aquí los tokens y el costo de cada cuenta."
         />
       ) : (
         <Card padded={false}>
@@ -262,7 +262,7 @@ export default async function ConsumoIaPage({
       <Card className="mt-5">
         <CardHeader
           title="Como se cuenta"
-          subtitle="Para que los numeros de arriba se puedan defender frente a un cliente."
+          subtitle="Para que los números de arriba se puedan defender frente a un cliente."
         />
         <div className="grid gap-2 text-xs text-slate-600">
           <p>

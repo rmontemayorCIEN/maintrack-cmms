@@ -41,7 +41,7 @@ export function PartsPanel({
     setLoading(false);
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error ?? "No fue posible cargar la refaccion");
+      setError(data.error ?? "No fue posible cargar la refacción");
       return;
     }
     setQuantity("1");

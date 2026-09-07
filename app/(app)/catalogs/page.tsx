@@ -48,8 +48,8 @@ export default async function CatalogsPage({
   return (
     <>
       <PageHeader
-        title="Catalogos maestros"
-        description="Las listas que alimentan los campos de seleccion de todo el sistema. Lo que se da de alta aqui aparece de inmediato en las pantallas de captura."
+        title="Catálogos maestros"
+        description="Las listas que alimentan los campos de selección de todo el sistema. Lo que se da de alta aquí aparece de inmediato en las pantallas de captura."
       />
       <GestorCatalogos
         definiciones={definiciones}

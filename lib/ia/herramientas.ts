@@ -52,7 +52,7 @@ export const HERRAMIENTAS = [
     input_schema: {
       type: "object" as const,
       properties: {
-        dias: { type: "number", description: "Cuantos dias hacia atras. 30, 90, 180 o 365. Por omision 90." },
+        dias: { type: "number", description: "Cuantos días hacia atrás. 30, 90, 180 o 365. Por omision 90." },
       },
       required: [] as string[],
       additionalProperties: false,
@@ -61,12 +61,12 @@ export const HERRAMIENTAS = [
   {
     name: "buscar_ordenes",
     description:
-      "Busca ordenes de trabajo y devuelve el conteo, el costo sumado, las horas y una muestra. Uselo para «cuantas ordenes», «cuanto costo», «que trabajos hubo en tal equipo».",
+      "Busca órdenes de trabajo y devuelve el conteo, el costo sumado, las horas y una muestra. Uselo para «cuantas órdenes», «cuanto costo», «que trabajos hubo en tal equipo».",
     input_schema: {
       type: "object" as const,
       properties: {
-        dias: { type: "number", description: "Ventana hacia atras en dias. Por omision 90." },
-        codigoActivo: { type: "string", description: "Codigo del activo, ej. CMP-301. Omitir para toda la planta." },
+        dias: { type: "number", description: "Ventana hacia atrás en días. Por omision 90." },
+        codigoActivo: { type: "string", description: "Código del activo, ej. CMP-301. Omitir para toda la planta." },
         tipo: { type: "string", enum: ["PREVENTIVE", "CORRECTIVE", "PREDICTIVE", "INSPECTION"] },
         estado: { type: "string", enum: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CLOSED", "CANCELLED"] },
         soloVencidas: { type: "boolean", description: "Solo las que pasaron su fecha compromiso sin cerrarse." },
@@ -78,11 +78,11 @@ export const HERRAMIENTAS = [
   {
     name: "costo_por_activo",
     description:
-      "Los activos ordenados por lo que costaron en el periodo, con sus horas de paro y su numero de ordenes. Uselo para «que equipo me cuesta mas», «cual da mas problemas».",
+      "Los activos ordenados por lo que costaron en el periodo, con sus horas de paro y su número de órdenes. Uselo para «que equipo me cuesta mas», «cual da mas problemas».",
     input_schema: {
       type: "object" as const,
       properties: {
-        dias: { type: "number", description: "Ventana hacia atras en dias. Por omision 365." },
+        dias: { type: "number", description: "Ventana hacia atrás en días. Por omision 365." },
         limite: { type: "number", description: "Cuantos devolver. Por omision 10." },
       },
       required: [] as string[],
@@ -96,7 +96,7 @@ export const HERRAMIENTAS = [
     input_schema: {
       type: "object" as const,
       properties: {
-        codigo: { type: "string", description: "Codigo del activo, ej. CMP-301." },
+        codigo: { type: "string", description: "Código del activo, ej. CMP-301." },
       },
       required: ["codigo"],
       additionalProperties: false,
@@ -109,7 +109,7 @@ export const HERRAMIENTAS = [
     input_schema: {
       type: "object" as const,
       properties: {
-        buscar: { type: "string", description: "Texto para filtrar por codigo o nombre. Omitir para el panorama completo." },
+        buscar: { type: "string", description: "Texto para filtrar por código o nombre. Omitir para el panorama completo." },
       },
       required: [] as string[],
       additionalProperties: false,
@@ -122,7 +122,7 @@ export const HERRAMIENTAS = [
     input_schema: {
       type: "object" as const,
       properties: {
-        dias: { type: "number", description: "Ventana hacia atras. Por omision 180." },
+        dias: { type: "number", description: "Ventana hacia atrás. Por omision 180." },
       },
       required: [] as string[],
       additionalProperties: false,

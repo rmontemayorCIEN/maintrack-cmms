@@ -138,7 +138,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   locations: {
     titulo: "Ubicaciones",
     singular: "ubicacion",
-    descripcion: "Areas, lineas o cuartos dentro de un sitio.",
+    descripcion: "Áreas, lineas o cuartos dentro de un sitio.",
     campos: [
       { nombre: "siteId", etiqueta: "Sitio", tipo: "select", requerido: true, opcionesDe: "sites" },
       { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true },
@@ -196,7 +196,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   warehouses: {
     titulo: "Almacenes",
     singular: "almacen",
-    descripcion: "Donde vive la existencia. Casi siempre uno general y subalmacenes por planta o linea.",
+    descripcion: "Donde vive la existencia. Casi siempre uno general y subalmacenes por planta o línea.",
     campos: [
       { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto y estable: ALM-GEN, ALM-L1" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
@@ -249,7 +249,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       // El general es el destino por omision de toda entrada y el que recibio
       // la existencia al migrar. Sin el, un alta de refaccion no sabria donde
       // poner lo que llega.
-      if (almacen?.esGeneral) return "Es el almacen general de la cuenta y no se puede borrar.";
+      if (almacen?.esGeneral) return "Es el almacén general de la cuenta y no se puede borrar.";
 
       const conSaldo = await prisma.partStock.count({
         where: { warehouseId: id, organizationId: orgId, quantity: { gt: 0 } },
@@ -268,7 +268,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   },
 
   categories: {
-    titulo: "Categorias de activo",
+    titulo: "Categorías de activo",
     singular: "categoria",
     descripcion: "Familias de equipo. Sirven para agrupar y para filtrar reportes.",
     campos: [
@@ -297,9 +297,9 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
 
   // ----------------------------------------------------- Codigos de falla
   "failure-codes": {
-    titulo: "Codigos de falla",
-    singular: "codigo de falla",
-    descripcion: "Clasificacion de causas al cerrar una orden correctiva. Alimenta el analisis de fallas repetidas.",
+    titulo: "Códigos de falla",
+    singular: "código de falla",
+    descripcion: "Clasificación de causas al cerrar una orden correctiva. Alimenta el análisis de fallas repetidas.",
     campos: [
       { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "ej. MEC-01" },
       { nombre: "description", etiqueta: "Descripcion", tipo: "texto", requerido: true },
@@ -350,14 +350,14 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   suppliers: {
     titulo: "Proveedores",
     singular: "proveedor",
-    descripcion: "Quien surte las refacciones del almacen.",
+    descripcion: "Quien surte las refacciones del almacén.",
     oculto: true,
     campos: [
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "contactName", etiqueta: "Contacto", tipo: "texto" },
       { nombre: "email", etiqueta: "Correo", tipo: "texto" },
       { nombre: "phone", etiqueta: "Telefono", tipo: "texto" },
-      { nombre: "leadTimeDays", etiqueta: "Dias de entrega", tipo: "numero", ayuda: "Tiempo tipico de resurtido" },
+      { nombre: "leadTimeDays", etiqueta: "Días de entrega", tipo: "numero", ayuda: "Tiempo tipico de resurtido" },
     ],
     crear: z.object({
       name: texto(2),
@@ -396,7 +396,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   teams: {
     titulo: "Cuadrillas",
     singular: "cuadrilla",
-    descripcion: "Grupos de trabajo a los que se asignan ordenes y planes.",
+    descripcion: "Grupos de trabajo a los que se asignan órdenes y planes.",
     campos: [
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "description", etiqueta: "Descripcion", tipo: "texto" },
@@ -418,7 +418,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       prisma.team.updateMany({ where: { id, organizationId: orgId }, data: d as never }),
     bloqueoDeBorrado: async (orgId, id) => {
       const ots = await prisma.workOrder.count({ where: { teamId: id, organizationId: orgId } });
-      if (ots) return `La cuadrilla tiene ${plural(ots, "orden asignada", "ordenes asignadas")}.`;
+      if (ots) return `La cuadrilla tiene ${plural(ots, "orden asignada", "órdenes asignadas")}.`;
       return null;
     },
     borrar: (orgId, id) => prisma.team.deleteMany({ where: { id, organizationId: orgId } }),
@@ -426,9 +426,9 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
 
   // ------------------------------------------- Categorias de refaccion
   "part-categories": {
-    titulo: "Familias de refaccion",
+    titulo: "Familias de refacción",
     singular: "familia",
-    descripcion: "Clasificacion de las refacciones del almacen. Evita que la misma familia se capture escrita de tres formas distintas.",
+    descripcion: "Clasificación de las refacciones del almacén. Evita que la misma familia se capture escrita de tres formas distintas.",
     campos: [
       { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Es lo que se guarda en la refaccion" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
@@ -545,8 +545,8 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       {
         nombre: "category", etiqueta: "Familia", tipo: "select",
         opciones: [
-          { valor: "MANTENIMIENTO", etiqueta: "Practica de mantenimiento" },
-          { valor: "INSTALACION", etiqueta: "Instalacion o montaje" },
+          { valor: "MANTENIMIENTO", etiqueta: "Práctica de mantenimiento" },
+          { valor: "INSTALACION", etiqueta: "Instalación o montaje" },
           { valor: "OPERACION", etiqueta: "Operacion" },
           { valor: "DESGASTE", etiqueta: "Desgaste normal" },
           { valor: "AMBIENTE", etiqueta: "Ambiente" },

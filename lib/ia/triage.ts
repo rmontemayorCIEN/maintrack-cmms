@@ -27,7 +27,7 @@ const Esquema = z.object({
     "CRITICAL si hay riesgo a personas o el equipo esta detenido; LOW si es cosmetico o puede esperar semanas.",
   ),
   tipo: z.enum(["CORRECTIVE", "PREVENTIVE", "INSPECTION", "SAFETY", "IMPROVEMENT"]).describe(
-    "SAFETY cuando lo que se reporta es una condicion insegura mas que una falla.",
+    "SAFETY cuando lo que se reporta es una condición insegura mas que una falla.",
   ),
   resumen: z.string().describe(
     "Dos o tres lineas para quien va a atender: que se reporto, que se ve en la foto si la hay, y que conviene llevar. Sin repetir el titulo.",

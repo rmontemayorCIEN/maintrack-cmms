@@ -31,10 +31,10 @@ export type DefinicionInstalacion = {
 
 export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
   PLANTA: {
-    nombre: "Planta de produccion",
+    nombre: "Planta de producción",
     sustantivo: "la planta",
     ejemplo:
-      "Planta metalmecanica de 4,000 m2 en Apodaca. Nave de produccion con tornos y centros de maquinado, cuarto de compresores, subestacion propia y almacen. Opera dos turnos, seis dias.",
+      "Planta metalmecanica de 4,000 m2 en Apodaca. Nave de producción con tornos y centros de maquinado, cuarto de compresores, subestación propia y almacén. Opera dos turnos, seis días.",
     contextoIa:
       "Domina el equipo de produccion y sus servicios auxiliares: aire comprimido, energia electrica, agua de enfriamiento, extraccion. El paro de linea es la consecuencia que ordena las prioridades.",
   },
@@ -42,7 +42,7 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     nombre: "Edificio corporativo",
     sustantivo: "el edificio",
     ejemplo:
-      "Edificio de oficinas de ocho niveles y 6,000 m2 en Monterrey. Dos elevadores, aire acondicionado central con chiller en azotea, subestacion, planta de emergencia y estacionamiento en sotano con extraccion.",
+      "Edificio de oficinas de ocho niveles y 6,000 m2 en Monterrey. Dos elevadores, aire acondicionado central con chiller en azotea, subestación, planta de emergencia y estacionamiento en sotano con extracción.",
     contextoIa:
       "Dominan climatizacion, transporte vertical, suministro electrico e hidrosanitario. La ocupacion y el confort mandan; la falla se mide en gente incomoda o evacuada, no en produccion perdida.",
   },
@@ -52,7 +52,7 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     ejemplo:
       "Plaza comercial de 12,000 m2 con 40 locales, dos niveles. Aire acondicionado central, tres escaleras electricas, dos elevadores, planta de emergencia, sistema contra incendio y estacionamiento techado.",
     contextoIa:
-      "Dominan climatizacion de areas comunes, transporte vertical, contra incendio e iluminacion. Todo lo que se mantiene esta a la vista del publico y en horario de operacion extendido.",
+      "Dominan climatización de áreas comunes, transporte vertical, contra incendio e iluminación. Todo lo que se mantiene esta a la vista del publico y en horario de operación extendido.",
   },
   HOSPITAL: {
     nombre: "Hospital o clinica",
@@ -66,15 +66,15 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     nombre: "Escuela o campus",
     sustantivo: "el campus",
     ejemplo:
-      "Campus universitario de tres edificios y 15,000 m2. Aulas con minisplits, laboratorios, cafeteria, gimnasio, cisterna con hidroneumatico, subestacion y canchas con iluminacion.",
+      "Campus universitario de tres edificios y 15,000 m2. Aulas con minisplits, laboratorios, cafeteria, gimnasio, cisterna con hidroneumático, subestación y canchas con iluminación.",
     contextoIa:
-      "Instalacion dispersa en varios edificios, con uso concentrado en horario escolar y ventanas de mantenimiento en periodos vacacionales. Dominan climatizacion, hidrosanitario y seguridad.",
+      "Instalación dispersa en varios edificios, con uso concentrado en horario escolar y ventanas de mantenimiento en periodos vacacionales. Dominan climatización, hidrosanitario y seguridad.",
   },
   DEPORTIVO: {
     nombre: "Club o centro deportivo",
     sustantivo: "el club",
     ejemplo:
-      "Club deportivo de 3,000 m2 en Monterrey. Dos niveles, alberca semiolimpica techada, area de pesas y cardio, canchas de padel, vestidores con vapor y sauna, cafeteria y estacionamiento.",
+      "Club deportivo de 3,000 m2 en Monterrey. Dos niveles, alberca semiolimpica techada, área de pesas y cardio, canchas de padel, vestidores con vapor y sauna, cafeteria y estacionamiento.",
     contextoIa:
       "La alberca y su cuarto de maquinas suelen ser el nucleo del inventario: bombas, filtros, calentamiento y dosificacion quimica. Se suman vapor, sauna, climatizacion y equipo de gimnasio. Horario extendido los siete dias.",
   },
@@ -84,7 +84,7 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     ejemplo:
       "Hotel de 120 habitaciones y cinco niveles. Alberca, restaurante con cocina industrial, lavanderia propia, calderas para agua caliente, chillers, dos elevadores y planta de emergencia.",
     contextoIa:
-      "Opera 24 horas sin ventana de paro comoda. Dominan agua caliente sanitaria, climatizacion por habitacion, lavanderia y cocina. La falla se percibe de inmediato en la experiencia del huesped.",
+      "Opera 24 horas sin ventana de paro comoda. Dominan agua caliente sanitaria, climatización por habitación, lavanderia y cocina. La falla se percibe de inmediato en la experiencia del huesped.",
   },
   RESTAURANTE: {
     nombre: "Restaurante o cadena de alimentos",
@@ -92,15 +92,15 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     ejemplo:
       "Restaurante de 300 m2 con cocina industrial: dos estufas, freidoras, plancha, campana con extraccion y sistema de supresion, camaras de refrigeracion y congelacion, y aire acondicionado.",
     contextoIa:
-      "Dominan refrigeracion, cocina industrial y extraccion. La cadena de frio y el sistema de supresion de la campana son criticos por inocuidad y por normatividad, no solo por operacion.",
+      "Dominan refrigeración, cocina industrial y extracción. La cadena de frio y el sistema de supresión de la campana son críticos por inocuidad y por normatividad, no solo por operación.",
   },
   BODEGA: {
-    nombre: "Bodega o centro de distribucion",
+    nombre: "Bodega o centro de distribución",
     sustantivo: "la bodega",
     ejemplo:
-      "Centro de distribucion de 8,000 m2 con doce andenes. Montacargas electricos con sala de carga, rampas niveladoras, sistema contra incendio, iluminacion en altura y oficinas administrativas.",
+      "Centro de distribución de 8,000 m2 con doce andenes. Montacargas electricos con sala de carga, rampas niveladoras, sistema contra incendio, iluminación en altura y oficinas administrativas.",
     contextoIa:
-      "Dominan manejo de materiales —montacargas, andenes, transportadores—, contra incendio e iluminacion en altura. Si hay camaras frias, la refrigeracion se vuelve lo mas critico.",
+      "Dominan manejo de materiales —montacargas, andenes, transportadores—, contra incendio e iluminación en altura. Si hay camaras frias, la refrigeración se vuelve lo mas crítico.",
   },
   FLOTILLA: {
     nombre: "Flotilla de vehiculos",
@@ -114,13 +114,13 @@ export const INSTALACIONES: Record<ClaveInstalacion, DefinicionInstalacion> = {
     nombre: "Residencia o condominio",
     sustantivo: "la propiedad",
     ejemplo:
-      "Casa de dos niveles y 450 m2 en Monterrey. Alberca de 40 m3, cisterna con hidroneumatico, calentadores de paso, minisplits en recamaras, riego automatico, porton electrico y planta de emergencia.",
+      "Casa de dos niveles y 450 m2 en Monterrey. Alberca de 40 m3, cisterna con hidroneumático, calentadores de paso, minisplits en recamaras, riego automático, porton eléctrico y planta de emergencia.",
     contextoIa:
       "Escala pequena pero variedad alta: alberca, hidroneumatico, agua caliente, climatizacion, riego y accesos. El dueño rara vez conoce marcas y capacidades, asi que conviene proponer por funcion y marcar todo para verificar en piso.",
   },
   OTRO: {
     nombre: "Otro",
-    sustantivo: "la instalacion",
+    sustantivo: "la instalación",
     ejemplo:
       "Describa el lugar: giro, superficie aproximada, niveles, areas principales y horario de operacion.",
     contextoIa: "",

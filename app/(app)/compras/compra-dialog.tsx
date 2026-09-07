@@ -86,7 +86,7 @@ export function CompraDialog({
         cantidadSolicitada: Number(r.cantidad),
         costoEstimado: Number(r.costo) || 0,
       }));
-    if (!validos.length) { setError("Agregue al menos un renglon con cantidad"); return; }
+    if (!validos.length) { setError("Agregue al menos un renglón con cantidad"); return; }
 
     setGuardando(true); setError(null);
     const res = await fetch("/api/compras", {
@@ -99,7 +99,7 @@ export function CompraDialog({
     });
     const data = await res.json().catch(() => ({}));
     setGuardando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible crear la requisicion"); return; }
+    if (!res.ok) { setError(data.error ?? "No fue posible crear la requisición"); return; }
     setAbierto(false);
     router.push(`/compras/${data.id}`);
   }
@@ -162,7 +162,7 @@ export function CompraDialog({
                         if (id) buscarEquivalentes(id);
                       }}
                       vacio="Del catálogo…"
-                      marcador="Busque por clave o descripcion"
+                      marcador="Busque por clave o descripción"
                       opciones={refacciones.map((d) => ({ id: d.id, etiqueta: `${d.code} — ${d.name}` }))}
                     />
                     {r.partId && equivalentes[r.partId]?.length ? (

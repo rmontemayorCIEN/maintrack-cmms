@@ -116,7 +116,7 @@ export function RequisicionDialog({
         descripcion: r.partId ? `${porId.get(r.partId)?.code} — ${porId.get(r.partId)?.name}` : r.descripcion.trim(),
         cantidadSolicitada: Number(r.cantidad),
       }));
-    if (!validos.length) { setError("Agregue al menos un renglon con cantidad"); return; }
+    if (!validos.length) { setError("Agregue al menos un renglón con cantidad"); return; }
 
     setGuardando(true); setError(null);
     const res = await fetch("/api/requisiciones", {
@@ -128,7 +128,7 @@ export function RequisicionDialog({
     });
     const data = await res.json().catch(() => ({}));
     setGuardando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible crear la requisicion"); return; }
+    if (!res.ok) { setError(data.error ?? "No fue posible crear la requisición"); return; }
     setAbierto(false);
     router.push(`/requisiciones/${data.id}`);
   }
@@ -174,7 +174,7 @@ export function RequisicionDialog({
                     valor={workOrderId}
                     onCambio={(id) => { setWorkOrderId(id); setAssetId(""); setError(null); }}
                     vacio="Sin orden"
-                    marcador="Busque por folio o titulo"
+                    marcador="Busque por folio o título"
                     opciones={ordenes.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
                   />
                 )}
@@ -235,7 +235,7 @@ export function RequisicionDialog({
                           if (id) buscarEquivalentes(id);
                         }}
                         vacio="Del catálogo…"
-                        marcador="Busque por clave o descripcion"
+                        marcador="Busque por clave o descripción"
                         opciones={refacciones.map((d) => ({
                           id: d.id,
                           etiqueta: `${d.code} — ${d.name}`,

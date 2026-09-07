@@ -178,7 +178,7 @@ export function Armador({
           <Grupo
             icono={<PackageX className="h-3.5 w-3.5" />}
             titulo="Quedo pendiente"
-            vacio="Nada quedo trabado en ordenes anteriores."
+            vacio="Nada quedo trabado en órdenes anteriores."
             cuantos={disponible.backlog.length}
           >
             {disponible.backlog.map((b) => (

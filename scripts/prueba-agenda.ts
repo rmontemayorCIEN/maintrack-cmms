@@ -20,20 +20,20 @@ const buscar = (anio: number, nombre: string) =>
   iso(festivosDeLey(anio).find((f) => f.nombre.includes(nombre))!.fecha);
 
 console.log("\nFESTIVOS DE LEY, CONTRA FECHAS REALES\n");
-revisar("2026: Constitucion es el 1er lunes de feb", buscar(2026, "Constitucion"), "2026-02-02");
-revisar("2026: Juarez es el 3er lunes de marzo", buscar(2026, "Juarez"), "2026-03-16");
-revisar("2026: Revolucion es el 3er lunes de nov", buscar(2026, "Revolucion"), "2026-11-16");
-revisar("2025: Constitucion", buscar(2025, "Constitucion"), "2025-02-03");
-revisar("2025: Juarez", buscar(2025, "Juarez"), "2025-03-17");
-revisar("2025: Revolucion", buscar(2025, "Revolucion"), "2025-11-17");
-revisar("2027: Constitucion", buscar(2027, "Constitucion"), "2027-02-01");
-revisar("las fijas no se mueven", [buscar(2026, "Ano nuevo"), buscar(2026, "Trabajo"), buscar(2026, "Navidad")],
+revisar("2026: Constitucion es el 1er lunes de feb", buscar(2026, "Constitución"), "2026-02-02");
+revisar("2026: Juarez es el 3er lunes de marzo", buscar(2026, "Juárez"), "2026-03-16");
+revisar("2026: Revolucion es el 3er lunes de nov", buscar(2026, "Revolución"), "2026-11-16");
+revisar("2025: Constitucion", buscar(2025, "Constitución"), "2025-02-03");
+revisar("2025: Juarez", buscar(2025, "Juárez"), "2025-03-17");
+revisar("2025: Revolucion", buscar(2025, "Revolución"), "2025-11-17");
+revisar("2027: Constitucion", buscar(2027, "Constitución"), "2027-02-01");
+revisar("las fijas no se mueven", [buscar(2026, "Año nuevo"), buscar(2026, "Trabajo"), buscar(2026, "Navidad")],
   ["2026-01-01", "2026-05-01", "2026-12-25"]);
 revisar("transmision del poder solo cada 6 anios",
-  [2024, 2025, 2026, 2030].map((a) => festivosDeLey(a).some((f) => f.nombre.includes("Transmision"))),
+  [2024, 2025, 2026, 2030].map((a) => festivosDeLey(a).some((f) => f.nombre.includes("Transmisión"))),
   [true, false, false, true]);
 revisar("todos los lunes de ley caen en lunes",
-  ["Constitucion", "Juarez", "Revolucion"].map((n) =>
+  ["Constitución", "Juárez", "Revolución"].map((n) =>
     diaSemanaIso(festivosDeLey(2026).find((f) => f.nombre.includes(n))!.fecha)),
   [1, 1, 1]);
 

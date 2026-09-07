@@ -124,7 +124,7 @@ export function PanelCobranza({
       {cargos.length === 0 ? (
         <EmptyState
           title="Sin cargos"
-          description="Emita los del periodo con el boton de arriba."
+          description="Emita los del periodo con el botón de arriba."
         />
       ) : (
         <Card padded={false}>

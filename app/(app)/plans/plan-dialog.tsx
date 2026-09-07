@@ -47,16 +47,16 @@ const vacia = (t: Partial<Task>): Task => ({
 });
 
 const PRESETS: Record<string, { intervalDays: number; tasks: Task[] }> = {
-  "Lubricacion mensual": {
+  "Lubricación mensual": {
     intervalDays: 30,
     tasks: [
       vacia({ title: "Inspeccionar nivel y estado del lubricante" }),
-      vacia({ title: "Aplicar grasa segun especificacion" }),
+      vacia({ title: "Aplicar grasa según especificación" }),
       vacia({ title: "Registrar temperatura de chumacera", taskType: "MEASURE", unit: "°C", maxValue: "70" }),
       vacia({ title: "Observaciones", taskType: "TEXT", required: false }),
     ],
   },
-  "Inspeccion electrica trimestral": {
+  "Inspección electrica trimestral": {
     intervalDays: 90,
     tasks: [
       vacia({ title: "Verificar apriete de conexiones (LOTO aplicado)" }),
@@ -68,10 +68,10 @@ const PRESETS: Record<string, { intervalDays: number; tasks: Task[] }> = {
   "Servicio mayor anual": {
     intervalDays: 365,
     tasks: [
-      vacia({ title: "Desmontaje e inspeccion de componentes" }),
+      vacia({ title: "Desmontaje e inspección de componentes" }),
       vacia({ title: "Cambio de rodamientos y sellos", taskType: "REPLACE" }),
-      vacia({ title: "Alineacion laser", taskType: "MEASURE", unit: "mm", maxValue: "0.05" }),
-      vacia({ title: "Prueba de operacion y registro de vibracion", taskType: "MEASURE", unit: "mm/s", maxValue: "4.5" }),
+      vacia({ title: "Alineación laser", taskType: "MEASURE", unit: "mm", maxValue: "0.05" }),
+      vacia({ title: "Prueba de operación y registro de vibración", taskType: "MEASURE", unit: "mm/s", maxValue: "4.5" }),
     ],
   },
 };
@@ -287,7 +287,7 @@ export function PlanDialog({
             <p className="mt-0.5 text-xs text-slate-500">
               {borrador
                 ? "Lo redacto la inteligencia artificial a partir del equipo y su historial. Nada se guarda hasta que usted lo confirme: revise frecuencia, actividades y recursos antes de crearlo."
-                : "Define la frecuencia, las actividades y los recursos que cada una requiere. El programador generara la OT con la anticipacion indicada."}
+                : "Define la frecuencia, las actividades y los recursos que cada una requiere. El programador generara la OT con la anticipación indicada."}
             </p>
           </div>
           <button type="button" onClick={cerrar} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">
@@ -329,14 +329,14 @@ export function PlanDialog({
             <SelectorBuscable
               valor={form.assetId}
               onCambio={(id) => set("assetId", id)}
-              vacio="Solo al catalogo, sin asignar todavia"
+              vacio="Solo al catálogo, sin asignar todavía"
               marcador="Busque por clave o nombre del equipo"
               opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
             />
             <p className="mt-1 text-[0.6875rem] text-slate-500">
               {form.assetId
-                ? "El plan queda asignado a ese equipo y empieza a generar ordenes."
-                : "El plan queda en el catalogo. Para que genere, asignelo en Equipos y sus planes."}
+                ? "El plan queda asignado a ese equipo y empieza a generar órdenes."
+                : "El plan queda en el catálogo. Para que genere, asignelo en Equipos y sus planes."}
             </p>
           </div>
           <div>
@@ -464,7 +464,7 @@ export function PlanDialog({
                     <div className="grid gap-2 md:grid-cols-[1fr_130px_90px_90px_90px_32px]">
                       <input
                         className="field"
-                        placeholder="Descripcion de la actividad"
+                        placeholder="Descripción de la actividad"
                         value={task.title}
                         onChange={(e) => cambiarTarea(index, { title: e.target.value })}
                       />

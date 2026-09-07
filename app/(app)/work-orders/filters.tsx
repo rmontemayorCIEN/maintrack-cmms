@@ -32,7 +32,7 @@ export function WorkOrderFilters({
         onKeyDown={(e) => {
           if (e.key === "Enter") update("q", (e.target as HTMLInputElement).value);
         }}
-        placeholder="Buscar folio o descripcion…"
+        placeholder="Buscar folio o descripción…"
         className="field max-w-56"
       />
       <select className="field max-w-44" value={params.get("status") ?? ""} onChange={(e) => update("status", e.target.value)}>

@@ -169,7 +169,7 @@ export function WorkOrderActions({
     setCargandoRefaccion(null);
     if (!res.ok) {
       const data = await res.json();
-      setErrorIa(data.error ?? "No fue posible cargar la refaccion");
+      setErrorIa(data.error ?? "No fue posible cargar la refacción");
       return;
     }
     setRefaccionesCargadas((prev) => [...prev, partId]);
@@ -284,7 +284,7 @@ export function WorkOrderActions({
                     <div className="grid gap-4">
                       <SelectCatalogo
                         catalogo="failure-codes"
-                        etiqueta="Codigo de falla"
+                        etiqueta="Código de falla"
                         valor={valor.failureCodeId}
                         onChange={(v) => setFalla(clave, "failureCodeId", v)}
                         opciones={opcionesFallas}
@@ -293,9 +293,9 @@ export function WorkOrderActions({
                         vacioTexto="Sin codificar"
                         camposAlta={[
                           { nombre: "code", etiqueta: "Codigo (ej. MEC-05)", requerido: true },
-                          { nombre: "description", etiqueta: "Descripcion de la falla", requerido: true },
+                          { nombre: "description", etiqueta: "Descripción de la falla", requerido: true },
                         ]}
-                        ayuda="Alimenta el analisis de fallas repetidas"
+                        ayuda="Alimenta el análisis de fallas repetidas"
                       />
                       <SelectCatalogo
                         catalogo="root-causes"
@@ -310,7 +310,7 @@ export function WorkOrderActions({
                           { nombre: "code", etiqueta: "Codigo (ej. FILTRO-SATURADO)", requerido: true },
                           { nombre: "description", etiqueta: "Por que fallo", requerido: true },
                         ]}
-                        ayuda="Por que fallo, no que fallo. Es lo que permite atacar el patron."
+                        ayuda="Por que fallo, no que fallo. Es lo que permite atacar el patrón."
                       />
                       <div>
                         <label className="label">Tiempo de paro del equipo (minutos)</label>
@@ -338,7 +338,7 @@ export function WorkOrderActions({
                       title={
                         closeForm.resolution.trim().length < 10
                           ? "Escriba primero que hizo, aunque sea en pocas palabras"
-                          : "La IA propone codigo de falla, causa raiz y refacciones"
+                          : "La IA propone código de falla, causa raiz y refacciones"
                       }
                       className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[0.6875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-40"
                     >

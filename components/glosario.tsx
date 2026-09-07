@@ -74,7 +74,7 @@ function TerminoMarcado({ termino, texto }: { termino: TerminoGlosario; texto: s
       <button
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAbierto((v) => !v); }}
-        title="Ver definicion"
+        title="Ver definición"
         aria-expanded={abierto}
         className="cursor-help border-b border-dotted border-slate-400 font-inherit text-inherit transition-colors hover:border-brand-500 hover:text-brand-700"
       >

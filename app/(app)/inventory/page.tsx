@@ -113,7 +113,7 @@ export default async function InventoryPage({
   });
 
   // Los indicadores describen lo que se esta viendo. Con un almacen elegido,
-  // "bajo minimo" significa bajo minimo AHI, que es la pregunta que se hace
+  // "bajo mínimo" significa bajo minimo AHI, que es la pregunta que se hace
   // quien esta parado en ese almacen.
   const lowCount = filas.filter((f) => f.quantityOnHand <= f.minQuantity).length;
   const outOfStock = filas.filter((f) => f.quantityOnHand === 0).length;
@@ -122,8 +122,8 @@ export default async function InventoryPage({
   return (
     <>
       <PageHeader
-        title={almacenActivo ? `Almacen · ${almacenActivo.name}` : "Almacen de refacciones"}
-        description="Existencias, puntos de reorden y movimientos. El consumo en ordenes de trabajo descuenta automaticamente del inventario."
+        title={almacenActivo ? `Almacen · ${almacenActivo.name}` : "Almacén de refacciones"}
+        description="Existencias, puntos de reorden y movimientos. El consumo en órdenes de trabajo descuenta automáticamente del inventario."
         actions={
           <>
           <Link
@@ -210,7 +210,7 @@ export default async function InventoryPage({
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="SKU activos" value={parts.length} />
-        <Stat label="Bajo minimo" value={lowCount} tone={lowCount ? "warn" : "good"} />
+        <Stat label="Bajo mínimo" value={lowCount} tone={lowCount ? "warn" : "good"} />
         <Stat label="Sin existencia" value={outOfStock} tone={outOfStock ? "bad" : "good"} />
         <Stat label="Valor del inventario" value={formatCurrency(inventoryValue, currency)} />
       </div>
@@ -230,7 +230,7 @@ export default async function InventoryPage({
       </form>
 
       {filtered.length === 0 ? (
-        <EmptyState title="Sin refacciones" description="Registre su catalogo de refacciones y consumibles." />
+        <EmptyState title="Sin refacciones" description="Registre su catálogo de refacciones y consumibles." />
       ) : (
         <TablaRefacciones
           refacciones={filas}
