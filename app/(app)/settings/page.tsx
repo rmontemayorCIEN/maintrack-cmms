@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users } from "lucide-react";
+import { Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users , ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -24,17 +24,19 @@ import { UserRowActions } from "./user-actions";
 import { Pestanas, type Pestana } from "./pestanas";
 import { ConfiguracionCompras } from "./compras";
 import { ConfiguracionJornada } from "./jornada";
+import { ConfiguracionOrdenes } from "./ordenes";
 
 export const metadata = { title: "Configuracion" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
   cuenta: "Sus datos de acceso al sistema.",
   apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
+  ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, dias laborables y capacidad de cada persona. De aqui sale si un dia del calendario cabe.",
   suscripcion: "Plan contratado, consumo y carga inicial de informacion.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
@@ -62,6 +64,7 @@ export default async function SettingsPage({
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organizacion", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
+    { clave: "ordenes", titulo: "Ordenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
     { clave: "suscripcion", titulo: "Suscripcion", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
@@ -156,6 +159,14 @@ export default async function SettingsPage({
             id: f.id, nombre: f.nombre, deLey: f.deLey, fecha: f.fecha.toISOString(),
           }))}
           personas={jornadaDatos.personas}
+          editable={can(user.role, "settings:write")}
+        />
+      ) : null}
+
+      {activa === "ordenes" ? (
+        <ConfiguracionOrdenes
+          multiOrigen={org.otMultiOrigen}
+          horizonteDias={org.otHorizonteDias}
           editable={can(user.role, "settings:write")}
         />
       ) : null}

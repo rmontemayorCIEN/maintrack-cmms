@@ -13,15 +13,36 @@ import { logAudit } from "@/lib/audit";
  * viaje en vez de tres. Esto es lo que alimenta el armador de ordenes.
  */
 export async function trabajoDisponible(organizationId: string, assetId: string) {
+  /**
+   * El horizonte lo decide la organizacion, no el codigo.
+   *
+   * Adelantar de mas gasta el mantenimiento antes de tiempo; adelantar de menos
+   * obliga a un segundo viaje. Donde esta el punto depende de la planta, asi
+   * que es parametro.
+   */
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { otHorizonteDias: true, otMultiOrigen: true },
+  });
+  const horizonte = org?.otHorizonteDias ?? 0;
+
   const [asignaciones, reportes, pendientes] = await Promise.all([
     /**
-     * Los planes asignados a ESE equipo. Se ofrecen todos, no solo los
-     * vencidos: si el tecnico ya va a bajar, adelantar el preventivo que
-     * vence en cuatro dias sale mas barato que un segundo viaje. La pantalla
-     * marca cual ya toca y cual se estaria adelantando.
+     * Los planes asignados a ESE equipo que ya vencieron o vencen dentro del
+     * horizonte configurado. Mas alla de ese plazo no se ofrecen: adelantar un
+     * preventivo que vence en tres meses es tirar vida util del servicio.
+     *
+     * Los que no tienen fecha se ofrecen siempre —nunca se han ejecutado y no
+     * hay de donde calcular vencimiento.
      */
     prisma.planAsset.findMany({
-      where: { organizationId, assetId, active: true },
+      where: {
+        organizationId, assetId, active: true,
+        OR: [
+          { nextDueDate: null },
+          { nextDueDate: { lte: new Date(Date.now() + horizonte * 86_400_000) } },
+        ],
+      },
       select: {
         id: true, nextDueDate: true, nextDueMeter: true, lastCompletedAt: true,
         plan: {
@@ -56,6 +77,9 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
   const hoy = new Date();
 
   return {
+    /** Como esta configurada la organizacion, para que la pantalla obedezca. */
+    multiOrigen: org?.otMultiOrigen ?? true,
+    horizonteDias: horizonte,
     planes: asignaciones
       .filter((a) => a.plan.tasks.length > 0)
       .map((a) => ({
@@ -125,6 +149,25 @@ export async function armarOrden(p: {
     select: { id: true, siteId: true, locationId: true },
   });
   if (!asset) return { error: "Activo no encontrado", codigo: 404 as const };
+
+  /**
+   * El apagador se respeta AQUI, no solo escondiendo botones.
+   *
+   * Una pantalla que oculta opciones no impide que alguien mande la peticion
+   * a mano. Si la organizacion decidio una orden por origen, el servidor lo
+   * hace cumplir.
+   */
+  const config = await prisma.organization.findUnique({
+    where: { id: p.organizationId },
+    select: { otMultiOrigen: true },
+  });
+  const grupos = [p.asignaciones.length, p.reportes.length, p.backlog.length].filter((n) => n > 0);
+  if (config && !config.otMultiOrigen && grupos.length > 1) {
+    return {
+      error: "Esta organizacion arma una orden por cada origen. Elija de un solo grupo.",
+      codigo: 400 as const,
+    };
+  }
 
   // Todo se lee acotado a la organizacion y al activo: un id de otra cuenta
   // o de otro equipo no debe poder colarse en la orden.

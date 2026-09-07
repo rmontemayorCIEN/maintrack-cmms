@@ -321,6 +321,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "El equipo no tiene nada que ofrecer", porque: "No tiene planes asignados, ni fallas reportadas, ni pendientes. Para asignarle un plan vaya a Planes → Equipos y sus planes." },
     ],
     preguntas: [
+      { pregunta: "¿Por qué no aparece un plan que sí tiene el equipo?", respuesta: "Porque vence más allá del plazo que configuró. En Configuración → Órdenes de trabajo se define cuánto se puede adelantar un preventivo. En cero solo se ofrece lo ya vencido. Adelantar de más gasta el mantenimiento antes de tiempo, así que conviene un plazo corto salvo que la planta pare pocas veces al año." },
+      { pregunta: "Marco algo de un grupo y se borra lo de otro. ¿Por qué?", respuesta: "Porque su organización tiene apagada la opción de juntar varios orígenes en una orden: cada origen lleva su propia orden. Se cambia en Configuración → Órdenes de trabajo." },
+
       { pregunta: "¿En qué se diferencia de «Nueva orden»?", respuesta: "«Nueva orden» captura un trabajo suelto a mano. «Armar» parte de lo que el sistema ya sabe que se le debe a ese equipo y lo junta. Si solo va a levantar un correctivo que nadie reportó, use Nueva orden." },
       { pregunta: "¿Qué pasa con el preventivo si lo adelanto?", respuesta: "El plan de ESE equipo avanza desde la fecha en que se hizo, no desde la que tocaba. Los demás equipos del mismo plan siguen su propio calendario." },
     ],

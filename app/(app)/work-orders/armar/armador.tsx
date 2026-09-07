@@ -31,8 +31,24 @@ export function Armador({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function alternar(lista: string[], set: (v: string[]) => void, id: string) {
-    set(lista.includes(id) ? lista.filter((x) => x !== id) : [...lista, id]);
+  /**
+   * Con la mezcla apagada, elegir de un grupo limpia los otros.
+   *
+   * Es mas claro que deshabilitar casillas: el usuario ve que su seleccion se
+   * mueve y entiende la regla sin leer nada. El servidor la hace cumplir de
+   * todos modos.
+   */
+  function alternar(cual: "plan" | "reporte" | "backlog", id: string) {
+    const listas = { plan: planes, reporte: reportes, backlog: pendientes };
+    const setters = { plan: setPlanes, reporte: setReportes, backlog: setPendientes };
+    const actual = listas[cual];
+    const nueva = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
+    setters[cual](nueva);
+    if (!disponible?.multiOrigen && nueva.length) {
+      for (const otro of ["plan", "reporte", "backlog"] as const) {
+        if (otro !== cual) setters[otro]([]);
+      }
+    }
   }
 
   /**
@@ -106,6 +122,13 @@ export function Armador({
         </p>
       ) : (
         <>
+          {!disponible.multiOrigen ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[0.6875rem] text-amber-800">
+              Esta organizacion arma una orden por cada origen. Al elegir de un grupo se
+              limpia lo marcado en los otros. Se cambia en Configuracion.
+            </p>
+          ) : null}
+
           <Grupo
             icono={<CalendarClock className="h-3.5 w-3.5" />}
             titulo="Mantenimiento preventivo"
@@ -116,7 +139,7 @@ export function Armador({
               <Fila
                 key={p.asignacionId}
                 marcado={planes.includes(p.asignacionId)}
-                onMarcar={() => alternar(planes, setPlanes, p.asignacionId)}
+                onMarcar={() => alternar("plan", p.asignacionId)}
                 titulo={p.nombre}
                 detalle={`${p.actividades.length} actividad(es)${p.horasEstimadas ? ` · ${p.horasEstimadas} h` : ""}`}
                 señal={
@@ -140,7 +163,7 @@ export function Armador({
               <Fila
                 key={r.id}
                 marcado={reportes.includes(r.id)}
-                onMarcar={() => alternar(reportes, setReportes, r.id)}
+                onMarcar={() => alternar("reporte", r.id)}
                 titulo={r.title}
                 detalle={`${r.number} · reportada el ${new Date(r.createdAt).toLocaleDateString("es-MX")}`}
                 señal={
@@ -162,7 +185,7 @@ export function Armador({
               <Fila
                 key={b.id}
                 marcado={pendientes.includes(b.id)}
-                onMarcar={() => alternar(pendientes, setPendientes, b.id)}
+                onMarcar={() => alternar("backlog", b.id)}
                 titulo={b.title}
                 detalle={`De ${b.deLaOrden} · ${b.diasEsperando} dia(s) esperando`}
                 señal={

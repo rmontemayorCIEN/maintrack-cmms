@@ -195,6 +195,59 @@ async function main() {
     revisar("los dos registraron su ejecucion", !!d1.lastCompletedAt && !!d2.lastCompletedAt);
     void antes1; void antes2;
 
+    // ── Los parametros de la organizacion mandan de verdad ──────────────────
+    console.log("\nEl horizonte decide que planes se ofrecen");
+    const plan3 = await prisma.maintenancePlan.create({
+      data: {
+        organizationId: org.id, name: "Anual lejano", maintenanceType: "PREVENTIVE",
+        triggerType: "CALENDAR", intervalDays: 365, active: true,
+        tasks: { create: [{ position: 0, title: "Algo", taskType: "CHECK", required: true }] },
+      },
+    });
+    await prisma.planAsset.create({
+      data: {
+        organizationId: org.id, planId: plan3.id, assetId: activo.id, active: true,
+        // Vence en 60 dias: dentro de un horizonte amplio, fuera de uno corto.
+        nextDueDate: new Date(Date.now() + 60 * 86_400_000),
+      },
+    });
+
+    await prisma.organization.update({ where: { id: org.id }, data: { otHorizonteDias: 0 } });
+    const conCero = await trabajoDisponible(org.id, activo.id);
+    revisar("con horizonte 0 no ofrece el que vence en 60 dias",
+      !conCero.planes.some((x) => x.planId === plan3.id), `${conCero.planes.length} plan(es)`);
+
+    await prisma.organization.update({ where: { id: org.id }, data: { otHorizonteDias: 90 } });
+    const conNoventa = await trabajoDisponible(org.id, activo.id);
+    revisar("con horizonte 90 si lo ofrece",
+      conNoventa.planes.some((x) => x.planId === plan3.id), `${conNoventa.planes.length} plan(es)`);
+
+    console.log("\nEl apagador de varios origenes se hace cumplir en el servidor");
+    await prisma.organization.update({ where: { id: org.id }, data: { otMultiOrigen: false } });
+    const nuevoReporte = await prisma.workRequest.create({
+      data: {
+        organizationId: org.id, number: "SOL-9", title: "Otra fuga",
+        assetId: activo.id, status: "PENDING", priority: "MEDIUM",
+      },
+    });
+    const asigPlan3 = await prisma.planAsset.findFirstOrThrow({ where: { planId: plan3.id } });
+    const mezclado = await armarOrden({
+      organizationId: org.id, userId: user.id, assetId: activo.id,
+      title: "Mezcla no permitida",
+      asignaciones: [asigPlan3.id], reportes: [nuevoReporte.id], backlog: [],
+    });
+    revisar("rechaza mezclar cuando esta apagado", "error" in mezclado,
+      "error" in mezclado ? "rechazado" : "SE COLO");
+
+    const unSoloOrigen = await armarOrden({
+      organizationId: org.id, userId: user.id, assetId: activo.id,
+      title: "Un solo origen si",
+      asignaciones: [], reportes: [nuevoReporte.id], backlog: [],
+    });
+    revisar("pero un solo origen si pasa", !("error" in unSoloOrigen));
+
+    await prisma.organization.update({ where: { id: org.id }, data: { otMultiOrigen: true } });
+
     console.log("\nEl backlog y los reportes ya no se ofrecen dos veces");
     const despues = await trabajoDisponible(org.id, activo.id);
     revisar("ya no hay reportes pendientes", despues.reportes.length === 0, `${despues.reportes.length}`);
