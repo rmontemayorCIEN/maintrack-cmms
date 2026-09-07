@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -11,10 +11,12 @@ import {
   Boxes,
   Building2,
   CalendarDays,
+  ChevronRight,
   ClipboardList,
   Cpu,
   Factory,
   Gauge,
+  Rocket,
   Inbox,
   UsersRound,
   PackageX,
@@ -34,34 +36,63 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV: Array<{ section: string; items: Array<{ href: string; label: string; icon: React.ReactNode }> }> = [
+/**
+ * El menu, ordenado por el dia de quien lo usa, no por como esta hecho el
+ * sistema.
+ *
+ * El orden responde a las preguntas en el orden en que aparecen: como voy, que
+ * me llego, que tengo que hacer, sobre que equipos, con que material, como me
+ * fue. La configuracion va al final a proposito: se toca las primeras semanas
+ * y casi nunca despues, asi que arriba solo estorbaria todos los dias.
+ */
+const NAV: Array<{
+  section: string;
+  /** Para recordar si el grupo quedo abierto o cerrado. */
+  clave: string;
+  items: Array<{ href: string; label: string; icon: React.ReactNode }>;
+}> = [
   {
-    section: "Operacion",
+    section: "Como voy",
+    clave: "inicio",
     items: [
       { href: "/dashboard", label: "Panel de control", icon: <Gauge className="h-4 w-4" /> },
-      { href: "/puesta-en-marcha", label: "Puesta en marcha", icon: <ListChecks className="h-4 w-4" /> },
-      { href: "/work-orders", label: "Ordenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
-      { href: "/backlog", label: "Trabajo pendiente", icon: <PackageX className="h-4 w-4" /> },
-      { href: "/equipo", label: "Equipo", icon: <UsersRound className="h-4 w-4" /> },
       { href: "/board", label: "Tablero", icon: <KanbanSquare className="h-4 w-4" /> },
       { href: "/calendar", label: "Calendario", icon: <CalendarDays className="h-4 w-4" /> },
-      { href: "/requests", label: "Solicitudes", icon: <Inbox className="h-4 w-4" /> },
-      { href: "/requests/puntos", label: "Puntos de reporte QR", icon: <QrCode className="h-4 w-4" /> },
     ],
   },
   {
-    section: "Mantenimiento",
+    section: "Lo que llega",
+    clave: "entradas",
     items: [
-      { href: "/plans", label: "Planes preventivos", icon: <Wrench className="h-4 w-4" /> },
-      { href: "/predictive", label: "Predictivo", icon: <Activity className="h-4 w-4" /> },
+      { href: "/requests", label: "Solicitudes", icon: <Inbox className="h-4 w-4" /> },
+      { href: "/requests/puntos", label: "Puntos de reporte QR", icon: <QrCode className="h-4 w-4" /> },
       { href: "/alerts", label: "Alertas", icon: <AlertTriangle className="h-4 w-4" /> },
     ],
   },
   {
-    section: "Activos y recursos",
+    section: "El trabajo",
+    clave: "trabajo",
+    items: [
+      { href: "/work-orders", label: "Ordenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
+      { href: "/work-orders/armar", label: "Armar una orden", icon: <Wrench className="h-4 w-4" /> },
+      { href: "/backlog", label: "Trabajo pendiente", icon: <PackageX className="h-4 w-4" /> },
+      { href: "/equipo", label: "Equipo", icon: <UsersRound className="h-4 w-4" /> },
+    ],
+  },
+  {
+    section: "Equipos y planes",
+    clave: "activos",
     items: [
       { href: "/assets", label: "Activos", icon: <Factory className="h-4 w-4" /> },
       { href: "/meters", label: "Medidores", icon: <Cpu className="h-4 w-4" /> },
+      { href: "/plans", label: "Planes preventivos", icon: <ListChecks className="h-4 w-4" /> },
+      { href: "/predictive", label: "Predictivo", icon: <Activity className="h-4 w-4" /> },
+    ],
+  },
+  {
+    section: "Almacen y compras",
+    clave: "almacen",
+    items: [
       { href: "/inventory", label: "Almacen", icon: <Boxes className="h-4 w-4" /> },
       { href: "/requisiciones", label: "Requisiciones", icon: <ClipboardList className="h-4 w-4" /> },
       { href: "/compras", label: "Compras", icon: <ShoppingCart className="h-4 w-4" /> },
@@ -69,18 +100,28 @@ const NAV: Array<{ section: string; items: Array<{ href: string; label: string; 
     ],
   },
   {
-    section: "Analisis",
+    section: "Como me fue",
+    clave: "analisis",
     items: [
+      { href: "/reports", label: "Reportes", icon: <BarChart3 className="h-4 w-4" /> },
       { href: "/consulta", label: "Pregunte a sus datos", icon: <MessageCircleQuestion className="h-4 w-4" /> },
       { href: "/diagnostico", label: "Diagnostico IA", icon: <Sparkles className="h-4 w-4" /> },
-      { href: "/reports", label: "Reportes", icon: <BarChart3 className="h-4 w-4" /> },
+    ],
+  },
+  {
+    section: "Configuracion",
+    clave: "config",
+    items: [
+      { href: "/puesta-en-marcha", label: "Puesta en marcha", icon: <Rocket className="h-4 w-4" /> },
       { href: "/catalogs", label: "Catalogos", icon: <Library className="h-4 w-4" /> },
       { href: "/import", label: "Importar datos", icon: <Upload className="h-4 w-4" /> },
       { href: "/glossary", label: "Glosario", icon: <BookOpen className="h-4 w-4" /> },
-      { href: "/settings", label: "Configuracion", icon: <Settings className="h-4 w-4" /> },
+      { href: "/settings", label: "Ajustes", icon: <Settings className="h-4 w-4" /> },
     ],
   },
 ];
+
+const LLAVE_ABIERTOS = "mt_menu_abiertos";
 
 export function Sidebar({
   orgName,
@@ -96,6 +137,40 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  /**
+   * Que grupos estan abiertos.
+   *
+   * Arranca con todos abiertos: un menu que se abre cerrado esconde lo que el
+   * usuario todavia no sabe que existe. Quien ya lo conoce cierra lo que no
+   * usa y el navegador se lo recuerda.
+   */
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(NAV.map((g) => [g.clave, true])),
+  );
+
+  // Se lee despues del primer dibujado: en el servidor no hay localStorage, y
+  // leerlo durante el render daria una pantalla distinta a la del cliente.
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(LLAVE_ABIERTOS);
+      if (guardado) setAbiertos((a) => ({ ...a, ...JSON.parse(guardado) }));
+    } catch {
+      // Navegador sin almacenamiento o en privado: se queda con todo abierto.
+    }
+  }, []);
+
+  function alternarGrupo(clave: string) {
+    setAbiertos((a) => {
+      const siguiente = { ...a, [clave]: !a[clave] };
+      try {
+        localStorage.setItem(LLAVE_ABIERTOS, JSON.stringify(siguiente));
+      } catch {
+        // Si no se puede guardar, al menos funciona en esta sesion.
+      }
+      return siguiente;
+    });
+  }
 
   const content = (
     <div className="flex h-full flex-col">
@@ -120,6 +195,7 @@ export function Sidebar({
               ...NAV,
               {
                 section: "Plataforma",
+                clave: "plataforma",
                 items: [
                   { href: "/clients", label: "Empresas cliente", icon: <Building2 className="h-4 w-4" /> },
                 ],
@@ -127,11 +203,32 @@ export function Sidebar({
             ]
           : NAV
         ).map((group) => (
-          <div key={group.section} className="mb-5">
-            <p className="mb-1.5 px-2 text-[0.625rem] font-semibold uppercase tracking-wider text-slate-400">
-              {group.section}
-            </p>
-            <ul className="grid gap-0.5">
+          <div key={group.section} className="mb-3">
+            {/* El grupo que contiene la pagina actual se muestra abierto
+                aunque este cerrado: esconder donde esta parado el usuario
+                seria desorientarlo. */}
+            {(() => {
+              const tieneLaActual = group.items.some(
+                (i) => pathname === i.href || pathname.startsWith(`${i.href}/`),
+              );
+              const abierto = abiertos[group.clave] !== false || tieneLaActual;
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => alternarGrupo(group.clave)}
+                    className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-100"
+                    aria-expanded={abierto}
+                  >
+                    <ChevronRight
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform",
+                        abierto && "rotate-90",
+                      )}
+                    />
+                    {group.section}
+                  </button>
+                  <ul className={cn("grid gap-0.5", !abierto && "hidden")}>
               {group.items.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
@@ -152,7 +249,10 @@ export function Sidebar({
                   </li>
                 );
               })}
-            </ul>
+                  </ul>
+                </>
+              );
+            })()}
           </div>
         ))}
       </nav>
