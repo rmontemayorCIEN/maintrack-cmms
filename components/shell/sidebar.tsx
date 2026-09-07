@@ -76,14 +76,19 @@ const NAV: Array<{
       { href: "/work-orders", label: "Ordenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
       { href: "/work-orders/armar", label: "Armar una orden", icon: <Wrench className="h-4 w-4" /> },
       { href: "/backlog", label: "Trabajo pendiente", icon: <PackageX className="h-4 w-4" /> },
-      { href: "/equipo", label: "Equipo", icon: <UsersRound className="h-4 w-4" /> },
+      // "Personal" y no "Equipo": en el mismo menu, "equipos" son las maquinas.
+      // Tampoco "Mano de obra", que es la linea de costo y no las personas —si
+      // manana hay una pantalla de costo de mano de obra, se llamaria asi.
+      { href: "/equipo", label: "Personal", icon: <UsersRound className="h-4 w-4" /> },
     ],
   },
   {
     section: "Equipos y planes",
     clave: "activos",
     items: [
-      { href: "/assets", label: "Activos", icon: <Factory className="h-4 w-4" /> },
+      // "Activo" es jerga de CMMS; en piso se dice equipo. El glosario mismo
+      // define activo usando la palabra equipo, asi que se ponen las dos.
+      { href: "/assets", label: "Activos / Equipos", icon: <Factory className="h-4 w-4" /> },
       { href: "/meters", label: "Medidores", icon: <Cpu className="h-4 w-4" /> },
       { href: "/plans", label: "Planes preventivos", icon: <ListChecks className="h-4 w-4" /> },
       { href: "/predictive", label: "Predictivo", icon: <Activity className="h-4 w-4" /> },

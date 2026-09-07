@@ -211,7 +211,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
   },
 
   "/equipo": {
-    titulo: "Equipo de mantenimiento",
+    titulo: "Personal de mantenimiento",
     que: "Cómo está repartido el trabajo, en qué se va el tiempo y qué está trabando la operación.",
     hacer: [
       "Ver qué trae asignado cada quien y su carga de los próximos 15 días",

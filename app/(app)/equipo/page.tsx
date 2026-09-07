@@ -4,7 +4,7 @@ import { cargaDelEquipo } from "@/lib/personal";
 import { PageHeader } from "@/components/ui";
 import { PanelEquipo } from "./panel";
 
-export const metadata = { title: "Equipo de mantenimiento" };
+export const metadata = { title: "Personal de mantenimiento" };
 export const dynamic = "force-dynamic";
 
 /**
@@ -25,7 +25,7 @@ export default async function EquipoPage() {
   return (
     <>
       <PageHeader
-        title={veTodo ? "Equipo de mantenimiento" : "Mi carga de trabajo"}
+        title={veTodo ? "Personal de mantenimiento" : "Mi carga de trabajo"}
         description={
           veTodo
             ? "Cómo está repartido el trabajo, en qué se va el tiempo y qué está trabando la operación."
