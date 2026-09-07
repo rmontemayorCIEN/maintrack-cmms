@@ -222,7 +222,7 @@ export function Sidebar({
                   <button
                     type="button"
                     onClick={() => alternarGrupo(group.clave)}
-                    className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-100"
+                    className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[0.8125rem] font-bold uppercase tracking-wide text-slate-800 hover:bg-slate-100"
                     aria-expanded={abierto}
                   >
                     <ChevronRight
