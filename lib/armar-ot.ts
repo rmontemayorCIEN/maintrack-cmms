@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
+import { tipoDeTrabajo } from "@/lib/tipos-solicitud";
 
 /**
  * Que trabajo hay disponible para un equipo, de todos los origenes.
@@ -193,7 +194,7 @@ export async function armarOrden(p: {
     }),
     prisma.workRequest.findMany({
       where: { id: { in: p.reportes }, organizationId: p.organizationId, status: "PENDING" },
-      select: { id: true, number: true, title: true, description: true, priority: true },
+      select: { id: true, number: true, title: true, description: true, priority: true, tipo: true },
     }),
     prisma.workOrderTask.findMany({
       where: {
@@ -283,7 +284,7 @@ export async function armarOrden(p: {
       workOrderId: orden.id, position: posicion++,
       title: r.title, description: r.description, taskType: "CHECK", required: true,
       origen: "SOLICITUD", origenRequestId: r.id,
-      maintenanceType: "CORRECTIVE",
+      maintenanceType: tipoDeTrabajo(r.tipo),
     });
   }
   for (const b of delBacklog) {

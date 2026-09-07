@@ -4,18 +4,35 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui";
+import { TIPOS_SOLICITUD, esTipoValido, type ClaveTipoSolicitud } from "@/lib/tipos-solicitud";
 
 export function ReviewActions({
   requestId,
   technicians,
+  tipoActual,
+  tipoSugerido,
 }: {
   requestId: string;
   technicians: Array<{ id: string; name: string }>;
+  /** Lo que ya se haya clasificado, si alguien la reviso antes. */
+  tipoActual?: string | null;
+  /** Lo que propuso la IA en el triage, si corrio. */
+  tipoSugerido?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<"APPROVE" | "REJECT" | null>(null);
   const [loading, setLoading] = useState(false);
   const [assignedToId, setAssignedToId] = useState("");
+  /**
+   * Quien revisa clasifica, no quien reporta.
+   *
+   * De aqui sale si el trabajo cuenta como falla: un apoyo o una mejora que
+   * entren como correctivo inflan el Pareto y hacen creer que los equipos
+   * fallan mas de lo que fallan.
+   */
+  const [tipo, setTipo] = useState<string>(
+    tipoActual ?? (esTipoValido(tipoSugerido) ? tipoSugerido : "FALLA"),
+  );
   const [notes, setNotes] = useState("");
 
   async function submit() {
@@ -27,6 +44,7 @@ export function ReviewActions({
         action: open,
         reviewNotes: notes || undefined,
         assignedToId: assignedToId || null,
+        tipo,
       }),
     });
     const data = await res.json();
@@ -67,6 +85,34 @@ export function ReviewActions({
               {open === "APPROVE" ? "Aprobar y generar orden" : "Rechazar solicitud"}
             </h3>
             <div className="mt-4 grid gap-4">
+              {open === "APPROVE" ? (
+                <div>
+                  <label className="label">De que se trata</label>
+                  <select className="field" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                    {Object.entries(TIPOS_SOLICITUD).map(([clave, t]) => (
+                      <option key={clave} value={clave}>{t.etiqueta}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+                    {TIPOS_SOLICITUD[tipo as ClaveTipoSolicitud]?.descripcion}
+                    {tipo === "APOYO" ? (
+                      <span className="mt-1 block text-slate-600">
+                        Se registran sus horas y su costo, pero no cuenta como falla del equipo.
+                      </span>
+                    ) : null}
+                  </p>
+                  {esTipoValido(tipoSugerido) && tipoSugerido !== tipo ? (
+                    <button
+                      type="button"
+                      onClick={() => setTipo(tipoSugerido)}
+                      className="mt-1.5 text-[0.6875rem] text-brand-700 underline"
+                    >
+                      La IA propuso «{TIPOS_SOLICITUD[tipoSugerido].etiqueta}». Usar esa.
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
               {open === "APPROVE" ? (
                 <div>
                   <label className="label">Asignar a</label>

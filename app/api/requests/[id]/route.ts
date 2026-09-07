@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit, notify } from "@/lib/audit";
+import { tipoDeTrabajo } from "@/lib/tipos-solicitud";
 
 const schema = z.object({
   action: z.enum(["APPROVE", "REJECT"]),
@@ -17,6 +18,8 @@ const schema = z.object({
    * como una actividad mas, con su propio tipo, no como orden aparte.
    */
   workOrderId: z.string().optional().nullable(),
+  /** Como lo clasifico quien reviso: FALLA | MEJORA | APOYO | OTRO. */
+  tipo: z.enum(["FALLA", "MEJORA", "APOYO", "OTRO"]).optional(),
 });
 
 /** Aprobar una solicitud la convierte en orden de trabajo correctiva. */
@@ -88,7 +91,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           number,
           title: workRequest.title,
           description: workRequest.description,
-          maintenanceType: "CORRECTIVE",
+          // Del tipo de la solicitud, no a fuego: una mejora o un apoyo no
+          // deben entrar como falla y ensuciar el Pareto.
+          maintenanceType: tipoDeTrabajo(input.tipo ?? workRequest.tipo),
           status: input.assignedToId ? "ASSIGNED" : "OPEN",
           priority: workRequest.priority,
           assetId: workRequest.assetId,
@@ -113,7 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         position: (ultima._max.position ?? -1) + 1,
         origen: "SOLICITUD",
         origenRequestId: workRequest.id,
-        maintenanceType: "CORRECTIVE",
+        maintenanceType: tipoDeTrabajo(input.tipo ?? workRequest.tipo),
         title: workRequest.title,
         description: workRequest.description,
         taskType: "CHECK",
@@ -127,6 +132,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       where: { id },
       data: {
         status: "CONVERTED",
+        tipo: input.tipo ?? workRequest.tipo,
         reviewedById: user.id,
         reviewedAt: new Date(),
         reviewNotes: input.reviewNotes,

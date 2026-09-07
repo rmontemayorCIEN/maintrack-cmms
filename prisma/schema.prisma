@@ -847,6 +847,16 @@ model WorkRequest {
   /// Se calcula en codigo y sin IA a proposito: tiene que ser instantaneo. Un
   /// "huele a gas" no puede esperar a que alguien abra la bandeja, y el
   /// reportante tampoco puede esperar a un modelo con el dedo en Enviar.
+  /// Que clase de solicitud es: FALLA | MEJORA | APOYO | OTRO.
+  ///
+  /// La pone QUIEN REVISA, no quien reporta. Un operador de piso no distingue
+  /// una mejora de un apoyo, y ponerle ese menu enfrente produce basura o hace
+  /// que no reporte. Al reportante se le pregunta lo que si sabe: que pasa y
+  /// que tan urgente lo siente.
+  ///
+  /// Nula mientras nadie la ha revisado. De aqui sale el tipo de mantenimiento
+  /// de la actividad al convertirla, y por lo tanto si cuenta como falla.
+  tipo          String?
   riesgo        String    @default("NINGUNO")
   riesgoMotivo  String?
   /// Lo que propuso la IA al abrir la bandeja. Se guarda para no volver a

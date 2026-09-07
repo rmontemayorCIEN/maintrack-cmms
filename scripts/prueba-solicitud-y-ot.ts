@@ -11,6 +11,7 @@
 import { prisma } from "../lib/db";
 import { transitionWorkOrder } from "../lib/workorders";
 import { armarOrden } from "../lib/armar-ot";
+import { fallasCodificadas } from "../lib/fallas";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -150,6 +151,52 @@ async function main() {
     await prisma.workOrder.delete({ where: { id: r6.orden.id } });
     e = await estadoDe(sol4.id);
     revisar("queda pendiente y sin orden", e.status === "PENDING" && e.workOrderId === null);
+    // ── El tipo de la solicitud decide el tipo del trabajo ──────────────────
+    console.log("\nEl tipo de la solicitud decide como cuenta el trabajo");
+    const esperado: Array<[string, string]> = [
+      ["FALLA", "CORRECTIVE"],
+      ["MEJORA", "IMPROVEMENT"],
+      ["APOYO", "SUPPORT"],
+      ["OTRO", "CORRECTIVE"],
+    ];
+    for (const [i, [tipo, esperada]] of esperado.entries()) {
+      const sx = await prisma.workRequest.create({
+        data: {
+          organizationId: org.id, number: `SOL-T${i}`, title: `Prueba ${tipo}`,
+          assetId: activo.id, status: "PENDING", priority: "MEDIUM", tipo,
+        },
+      });
+      const rx = await armarOrden({
+        organizationId: org.id, userId: user.id, assetId: activo.id,
+        title: `Orden ${tipo}`, asignaciones: [], reportes: [sx.id], backlog: [],
+      });
+      if ("error" in rx) throw new Error(rx.error);
+      const t = await prisma.workOrderTask.findFirstOrThrow({
+        where: { workOrderId: rx.orden.id }, select: { maintenanceType: true },
+      });
+      revisar(`${tipo} entra como ${esperada}`, t.maintenanceType === esperada, `${t.maintenanceType}`);
+    }
+
+    // ── Y un apoyo NO cuenta como falla ─────────────────────────────────────
+    console.log("\nUn apoyo no ensucia el analisis de fallas");
+    const codigo = await prisma.failureCode.create({
+      data: { organizationId: org.id, code: "X-1", description: "Lo que sea" },
+    });
+    const apoyo = await prisma.workOrder.findFirstOrThrow({
+      where: { organizationId: org.id, title: "Orden APOYO" }, select: { id: true },
+    });
+    const tApoyo = await prisma.workOrderTask.findFirstOrThrow({ where: { workOrderId: apoyo.id } });
+    await prisma.workOrderTask.update({
+      where: { id: tApoyo.id }, data: { failureCodeId: codigo.id, done: true, completedAt: new Date() },
+    });
+    await transitionWorkOrder({ workOrderId: apoyo.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({
+      workOrderId: apoyo.id, to: "COMPLETED", userId: user.id, organizationId: org.id, fallas: [],
+    });
+    const fallas = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
+    revisar("aunque se le ponga codigo, el apoyo no cuenta como falla",
+      fallas.length === 0, `${fallas.length} falla(s)`);
+
   } finally {
     await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
     await prisma.organization.delete({ where: { id: org.id } });

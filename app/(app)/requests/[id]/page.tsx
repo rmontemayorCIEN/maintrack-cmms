@@ -96,7 +96,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         }
         actions={
           solicitud.status === "PENDING" && can(user.role, "request:review") ? (
-            <ReviewActions requestId={solicitud.id} technicians={tecnicos} />
+            <ReviewActions requestId={solicitud.id} technicians={tecnicos} tipoActual={solicitud.tipo} tipoSugerido={solicitud.iaTipo} />
           ) : null
         }
       />

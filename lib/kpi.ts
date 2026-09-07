@@ -96,8 +96,17 @@ export async function computeKpis(organizationId: string, range: KpiRange = defa
   const otherCost = workOrders.reduce((s, w) => s + w.otherCost, 0);
   const totalCost = laborCost + partsCost + serviceCost + otherCost;
 
-  const plannedWork = closed.filter((w) => w.maintenanceType !== "CORRECTIVE").length;
-  const plannedRatio = closed.length ? (plannedWork / closed.length) * 100 : 0;
+  /**
+   * Trabajo planeado contra no planeado.
+   *
+   * Los apoyos quedan fuera de LOS DOS lados: prestar manos a produccion no es
+   * mantenimiento planeado ni una falla, y meterlo en cualquiera de los dos
+   * mueve el indicador sin que haya cambiado nada del mantenimiento. Se cuenta
+   * su costo y sus horas en otro lado, que es donde importa.
+   */
+  const deMantenimiento = closed.filter((w) => w.maintenanceType !== "SUPPORT");
+  const plannedWork = deMantenimiento.filter((w) => w.maintenanceType !== "CORRECTIVE").length;
+  const plannedRatio = deMantenimiento.length ? (plannedWork / deMantenimiento.length) * 100 : 0;
 
   const wrenchTime = closed.reduce((s, w) => s + (w.actualHours || 0), 0);
   const estimateAccuracy = (() => {

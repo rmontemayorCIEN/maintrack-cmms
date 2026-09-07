@@ -38,6 +38,16 @@ export const MAINTENANCE_TYPE_LABELS: Record<string, string> = {
   INSPECTION: "Inspeccion",
   SAFETY: "Seguridad",
   IMPROVEMENT: "Mejora",
+  /**
+   * Apoyo: prestar manos a produccion, mover un equipo, una maniobra.
+   *
+   * Consume horas y cuesta dinero, asi que se registra —si el equipo se va la
+   * mitad del tiempo en apoyos, la capacidad tiene que reflejarlo. Pero NO es
+   * una falla del equipo: queda fuera del Pareto, del MTBF y del indicador de
+   * preventivo contra correctivo. Contarlo como correctivo diria que las
+   * maquinas fallan mas de lo que fallan.
+   */
+  SUPPORT: "Apoyo",
 };
 
 export const MAINTENANCE_TYPE_COLORS: Record<string, string> = {
@@ -46,7 +56,8 @@ export const MAINTENANCE_TYPE_COLORS: Record<string, string> = {
   PREDICTIVE: "bg-violet-100 text-violet-700 border-violet-200",
   INSPECTION: "bg-emerald-100 text-emerald-700 border-emerald-200",
   SAFETY: "bg-red-100 text-red-700 border-red-200",
-  IMPROVEMENT: "bg-slate-100 text-slate-700 border-slate-200",
+  IMPROVEMENT: "bg-teal-100 text-teal-700 border-teal-200",
+  SUPPORT: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
 export const WO_STATUS = {
