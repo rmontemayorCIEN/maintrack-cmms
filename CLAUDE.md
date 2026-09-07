@@ -179,13 +179,45 @@ hoy, y se tratan como si fueran de paga. Pronto lo seran.
 - **Al cambiar un proceso, revisar todo lo que lee esos datos**, no solo lo que
   se toco. Los defectos aparecen en la pantalla de al lado: cuando el
   calendario paso a vivir en la asignacion, la proyeccion y la lista de planes
-  quedaron mostrando fechas obsoletas y nadie lo habria notado.
+  quedaron mostrando fechas obsoletas y nadie lo habria notado. Como se hace
+  esa revision esta en «"Se ve bien" no es haber probado», mas abajo.
 - **Decirlo cuando algo quedo mal**, antes de que lo encuentre el.
 
 ## Antes de dar por bueno un cambio
 
 Esta lista sale de defectos reales de este proyecto, no de teoria. Cada punto
 costo encontrarlo tarde.
+
+### 0. "Se ve bien" no es haber probado
+
+Es la regla que manda sobre todas las demas, y la que mas caro ha salido
+romper. Un cambio que compila, que se ve correcto en pantalla y que hace lo que
+se pidio **todavia no esta probado**. Falta lo unico que importa: que no haya
+descompuesto otra cosa.
+
+Casi ningun defecto de este proyecto se anuncio. El plan que nunca generaba
+ordenes se veia perfecto en la lista, con su fecha de vencimiento. La solicitud
+que quedaba muerta al cancelar la OT se veia normal. El respaldo escribia
+diligentemente en una carpeta que no salia de la Mac. Los tres pasaban la
+prueba de "se ve bien".
+
+**Que hacer, siempre, sin excepcion:**
+
+1. `npx tsc --noEmit` — compila.
+2. **TODAS** las pruebas, no las del cambio: `for f in scripts/prueba-*.ts; do npx tsx "$f"; done`
+3. Si toco interfaz, abrirla en el navegador. Guardar bien no es mostrar bien.
+4. Preguntarse **quien mas lee lo que toque**, y probar eso tambien:
+   `grep -rn "loQueCambie" app/ lib/`
+
+**Prueba cruzada:** el cambio de acentos toco 900 cadenas y compilaba; dos
+pruebas de otros modulos fallaron porque comparaban contra textos que habian
+cambiado. Nada en la pantalla lo habria mostrado. Tres veces en esa misma tarea
+se acentuaron identificadores —una variable, un tipo, el nombre de una
+propiedad— y las tres las detuvo el typecheck. Sin correr la verificacion
+completa, los tres habrian llegado a produccion.
+
+Cuando algo pase la revision y aun asi se sienta incierto, decirlo antes de
+publicar. Es mas barato preguntar que corregir en vivo.
 
 ### 1. Que la prueba ejercite el sistema, no lo imite
 
