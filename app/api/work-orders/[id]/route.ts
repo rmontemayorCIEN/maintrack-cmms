@@ -126,6 +126,17 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (["COMPLETED", "CLOSED"].includes(existing.status)) {
       return fail("No se puede eliminar una OT completada; use cancelar", 409);
     }
+    /**
+     * Antes de borrar, liberar las solicitudes que atendia.
+     *
+     * La relacion no cascadea: al borrar la orden, workOrderId queda apuntando
+     * a algo que ya no existe y la solicitud se vuelve inatendible. Mismo caso
+     * que al cancelar.
+     */
+    await prisma.workRequest.updateMany({
+      where: { workOrderId: id },
+      data: { status: "PENDING", workOrderId: null, reviewedAt: null, reviewedById: null },
+    });
     await prisma.workOrder.delete({ where: { id } });
     await logAudit({
       organizationId: orgId,

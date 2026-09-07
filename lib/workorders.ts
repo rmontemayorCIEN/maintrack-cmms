@@ -176,6 +176,44 @@ export async function transitionWorkOrder(params: {
   }
   if (params.to === "CLOSED") data.closedAt = now;
 
+  /**
+   * Cancelar una orden LIBERA las solicitudes que atendia.
+   *
+   * Sin esto la solicitud se quedaba marcada como "convertida en OT" apuntando
+   * a una orden cancelada, y ya no se podia volver a atender: el sistema decia
+   * que estaba en una orden abierta —la que se acababa de cancelar. El reporte
+   * quedaba muerto sin que nadie lo notara, que es peor que perderlo, porque
+   * quien lo levanto cree que va en camino.
+   *
+   * La actividad se queda en la orden cancelada como historia de lo que se
+   * penso hacer. Lo que se libera es la solicitud.
+   */
+  if (params.to === "CANCELLED") {
+    await prisma.workRequest.updateMany({
+      where: { workOrderId: wo.id, status: "CONVERTED" },
+      data: { status: "PENDING", workOrderId: null, reviewedAt: null, reviewedById: null },
+    });
+  }
+
+  /**
+   * Reabrir una orden cancelada vuelve a tomar sus solicitudes, pero solo las
+   * que siguen libres: si alguien ya las atendio en otra orden mientras tanto,
+   * arrebatarselas dejaria dos ordenes creyendo que atienden el mismo reporte.
+   */
+  if (params.to === "OPEN" && wo.status === "CANCELLED") {
+    const suyas = await prisma.workOrderTask.findMany({
+      where: { workOrderId: wo.id, origenRequestId: { not: null } },
+      select: { origenRequestId: true },
+    });
+    const ids = suyas.map((t) => t.origenRequestId!).filter(Boolean);
+    if (ids.length) {
+      await prisma.workRequest.updateMany({
+        where: { id: { in: ids }, status: "PENDING", workOrderId: null },
+        data: { status: "CONVERTED", workOrderId: wo.id },
+      });
+    }
+  }
+
   const updated = await prisma.workOrder.update({ where: { id: wo.id }, data });
 
   if (params.to === "COMPLETED") {
