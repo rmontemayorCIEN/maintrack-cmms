@@ -69,7 +69,7 @@ export default async function BacklogPage() {
                   <p className="text-xl font-semibold text-slate-800">
                     {items.length ? Math.max(...items.map((i) => i.diasEsperando)) : 0}
                   </p>
-                  <p className="text-xs text-slate-500">dias de la mas vieja</p>
+                  <p className="text-xs text-slate-500">días de la mas vieja</p>
                 </div>
               </div>
             </Card>

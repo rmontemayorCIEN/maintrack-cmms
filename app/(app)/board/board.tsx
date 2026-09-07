@@ -118,7 +118,7 @@ export function KanbanBoard({ workOrders }: { workOrders: Item[] }) {
                 })}
                 {column.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-[0.6875rem] text-slate-400">
-                    Vacio
+                    Vacío
                   </p>
                 ) : null}
               </div>

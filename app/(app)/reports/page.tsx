@@ -272,7 +272,7 @@ export default async function ReportsPage({
 
           <Card padded={false}>
             <div className="px-5 py-4">
-              <h3 className="text-sm font-semibold text-slate-900">Productividad por tecnico</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Productividad por técnico</h3>
               <p className="text-xs text-slate-500">Horas cargadas en el periodo</p>
             </div>
             {byTechnician.length === 0 ? (
@@ -282,7 +282,7 @@ export default async function ReportsPage({
                 <table className="data">
                   <thead>
                     <tr>
-                      <th>Tecnico</th>
+                      <th>Técnico</th>
                       <th className="text-right">OT</th>
                       <th className="text-right">Horas</th>
                       <th className="text-right">Costo MO</th>
@@ -312,8 +312,8 @@ export default async function ReportsPage({
 
           <Card padded={false}>
             <div className="px-5 py-4">
-              <h3 className="text-sm font-semibold text-slate-900">Analisis de modos de falla</h3>
-              <p className="text-xs text-slate-500">Codigos de falla registrados al cierre</p>
+              <h3 className="text-sm font-semibold text-slate-900">Análisis de modos de falla</h3>
+              <p className="text-xs text-slate-500">Códigos de falla registrados al cierre</p>
             </div>
             {failureCodes.length === 0 ? (
               <p className="px-5 pb-6 text-center text-xs text-slate-400">
@@ -324,7 +324,7 @@ export default async function ReportsPage({
                 <table className="data">
                   <thead>
                     <tr>
-                      <th>Codigo</th>
+                      <th>Código</th>
                       <th className="text-right">Eventos</th>
                       <th className="text-right">Paro</th>
                       <th className="text-right">Costo</th>

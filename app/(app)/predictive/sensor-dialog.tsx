@@ -81,7 +81,7 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
           <div>
             <h3 className="text-base font-semibold text-slate-900">Nuevo punto de monitoreo</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Al superar el umbral critico se genera automaticamente una OT predictiva.
+              Al superar el umbral crítico se genera automaticamente una OT predictiva.
             </p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">
@@ -122,11 +122,11 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
             <input type="number" step="0.01" className="field" value={form.warningThreshold} onChange={(e) => set("warningThreshold", e.target.value)} />
           </div>
           <div>
-            <label className="label">Umbral critico</label>
+            <label className="label">Umbral crítico</label>
             <input type="number" step="0.01" className="field" value={form.criticalThreshold} onChange={(e) => set("criticalThreshold", e.target.value)} />
           </div>
           <div>
-            <label className="label">Direccion de la falla</label>
+            <label className="label">Dirección de la falla</label>
             <select className="field" value={form.direction} onChange={(e) => set("direction", e.target.value)}>
               <option value="ABOVE">Falla al subir</option>
               <option value="BELOW">Falla al bajar</option>

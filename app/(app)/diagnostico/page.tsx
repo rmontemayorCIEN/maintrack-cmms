@@ -64,7 +64,7 @@ export default async function DiagnosticoPage() {
 
       {entitlement.funciones.includes("DIAGNOSTICO") && !iaConfigurada() ? (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-          La generacion con inteligencia artificial aun no esta habilitada en este servidor. El indice de
+          La generación con inteligencia artificial aun no esta habilitada en este servidor. El indice de
           captura de abajo funciona igual; el diagnostico aparecera en cuanto su proveedor la active.
         </div>
       ) : null}
@@ -136,8 +136,8 @@ export default async function DiagnosticoPage() {
             <Sparkles className="h-7 w-7 text-slate-300" />
             <p className="text-sm font-semibold text-slate-800">Aun no hay diagnostico</p>
             <p className="mx-auto max-w-lg text-xs text-slate-500">
-              El primero se genera automaticamente el proximo lunes. Si no quiere esperar, puede generarlo ahora
-              con el boton de arriba.
+              El primero se genera automaticamente el próximo lunes. Si no quiere esperar, puede generarlo ahora
+              con el botón de arriba.
             </p>
           </div>
         </Card>
@@ -177,7 +177,7 @@ export default async function DiagnosticoPage() {
                     <span className="font-medium text-slate-500">Evidencia · </span>{h.evidencia}
                   </p>
                   <p className="mt-1 text-xs text-slate-700">
-                    <span className="font-medium text-slate-500">Accion · </span>{h.accion}
+                    <span className="font-medium text-slate-500">Acción · </span>{h.accion}
                   </p>
                   {h.enlace ? (
                     <Link
@@ -204,8 +204,8 @@ export default async function DiagnosticoPage() {
 
           <p className="flex items-start gap-1.5 text-[0.6875rem] text-slate-500">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            Los numeros los calcula el sistema sobre su base de datos; la inteligencia artificial solo los
-            interpreta. Aun asi, verifique en la pantalla correspondiente antes de tomar una decision de gasto.
+            Los números los calcula el sistema sobre su base de datos; la inteligencia artificial solo los
+            interpreta. Aun asi, verifique en la pantalla correspondiente antes de tomar una decisión de gasto.
           </p>
         </div>
       )}

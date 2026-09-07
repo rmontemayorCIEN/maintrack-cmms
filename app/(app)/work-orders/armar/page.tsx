@@ -58,7 +58,7 @@ export default async function ArmarOrdenPage({
           href="/work-orders"
           className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Ordenes de trabajo
+          <ArrowLeft className="h-3.5 w-3.5" /> Órdenes de trabajo
         </Link>
         <h1 className="mt-1 text-xl font-semibold text-slate-900">Armar una orden</h1>
         <p className="text-xs text-slate-500">

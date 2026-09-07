@@ -60,7 +60,7 @@ export function UserDialog() {
           <div>
             <h3 className="text-base font-semibold text-slate-900">Nuevo usuario</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              La tarifa por hora se usa para costear la mano de obra en las ordenes.
+              La tarifa por hora se usa para costear la mano de obra en las órdenes.
             </p>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">

@@ -25,7 +25,7 @@ const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 
 const FIJAS: Columna<FilaActivo>[] = [
   {
-    id: "code", etiqueta: "Codigo", texto: (a) => a.code,
+    id: "code", etiqueta: "Código", texto: (a) => a.code,
     pinta: (a) => <Link href={`/assets/${a.id}`} className="font-medium text-brand-600 hover:underline">{a.code}</Link>,
   },
   {
@@ -42,9 +42,9 @@ const FIJAS: Columna<FilaActivo>[] = [
 ];
 
 const COLUMNAS: Columna<FilaActivo>[] = [
-  { id: "categoria", etiqueta: "Categoria", agrupable: true, texto: (a) => guion(a.categoria) },
+  { id: "categoria", etiqueta: "Categoría", agrupable: true, texto: (a) => guion(a.categoria) },
   { id: "sitio", etiqueta: "Sitio", agrupable: true, texto: (a) => guion(a.sitio) },
-  { id: "ubicacion", etiqueta: "Ubicacion", agrupable: true, texto: (a) => guion(a.ubicacion) },
+  { id: "ubicacion", etiqueta: "Ubicación", agrupable: true, texto: (a) => guion(a.ubicacion) },
   {
     id: "criticidad", etiqueta: "Criticidad", agrupable: true,
     texto: (a) => CRITICALITY_LABELS[a.criticality] ?? a.criticality,
@@ -64,7 +64,7 @@ const COLUMNAS: Columna<FilaActivo>[] = [
   { id: "medidores", etiqueta: "Medidores", alineaDerecha: true, texto: (a) => String(a.medidores) },
   { id: "sensores", etiqueta: "Sensores", alineaDerecha: true, texto: (a) => String(a.sensores) },
   {
-    id: "garantia", etiqueta: "Garantia",
+    id: "garantia", etiqueta: "Garantía",
     texto: (a) => (a.warrantyExpiry ? (new Date(a.warrantyExpiry) > new Date() ? "Vigente" : "Vencida") : "—"),
     pinta: (a) =>
       a.warrantyExpiry
@@ -76,7 +76,7 @@ const COLUMNAS: Columna<FilaActivo>[] = [
   { id: "costoReemplazo", etiqueta: "Costo de reemplazo", alineaDerecha: true, texto: (a) => (a.replacementCost ? formatCurrency(a.replacementCost) : "—") },
   { id: "costoCompra", etiqueta: "Costo de compra", alineaDerecha: true, texto: (a) => (a.purchaseCost ? formatCurrency(a.purchaseCost) : "—") },
   { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => (a.commissionedAt ? formatDate(new Date(a.commissionedAt)) : "—") },
-  { id: "vidaUtil", etiqueta: "Vida util (años)", alineaDerecha: true, texto: (a) => (a.expectedLifeYears ? `${a.expectedLifeYears}` : "—") },
+  { id: "vidaUtil", etiqueta: "Vida útil (años)", alineaDerecha: true, texto: (a) => (a.expectedLifeYears ? `${a.expectedLifeYears}` : "—") },
 ];
 
 /** La vista de fabrica: lo que se necesita para decidir a que equipo ir hoy. */

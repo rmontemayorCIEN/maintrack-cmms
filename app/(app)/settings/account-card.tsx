@@ -94,7 +94,7 @@ export function AccountCard({
           <div>
             <label className="label">Correo de acceso</label>
             <input className="field" type="email" value={perfil.email} onChange={(e) => setPerfil((p) => ({ ...p, email: e.target.value }))} required />
-            <p className="mt-1 text-[0.6875rem] text-slate-500">Es su usuario para iniciar sesion.</p>
+            <p className="mt-1 text-[0.6875rem] text-slate-500">Es su usuario para iniciar sesión.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>

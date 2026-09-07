@@ -98,7 +98,7 @@ const NAV: Array<{
     section: "Almacén y compras",
     clave: "almacen",
     items: [
-      { href: "/inventory", label: "Almacen", icon: <Boxes className="h-4 w-4" /> },
+      { href: "/inventory", label: "Almacén", icon: <Boxes className="h-4 w-4" /> },
       { href: "/requisiciones", label: "Requisiciones", icon: <ClipboardList className="h-4 w-4" /> },
       { href: "/compras", label: "Compras", icon: <ShoppingCart className="h-4 w-4" /> },
       { href: "/suppliers", label: "Proveedores", icon: <Truck className="h-4 w-4" /> },
@@ -114,11 +114,11 @@ const NAV: Array<{
     ],
   },
   {
-    section: "Configuracion",
+    section: "Configuración",
     clave: "config",
     items: [
       { href: "/puesta-en-marcha", label: "Puesta en marcha", icon: <Rocket className="h-4 w-4" /> },
-      { href: "/catalogs", label: "Catalogos", icon: <Library className="h-4 w-4" /> },
+      { href: "/catalogs", label: "Catálogos", icon: <Library className="h-4 w-4" /> },
       { href: "/import", label: "Importar datos", icon: <Upload className="h-4 w-4" /> },
       { href: "/glossary", label: "Glosario", icon: <BookOpen className="h-4 w-4" /> },
       { href: "/settings", label: "Ajustes", icon: <Settings className="h-4 w-4" /> },

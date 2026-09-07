@@ -204,7 +204,7 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="text-sm font-semibold text-slate-900">Vista previa</h3>
               <p className="mt-0.5 text-xs text-slate-500">
-                Todavia no se ha guardado nada. Esto es lo que pasaria al confirmar.
+                Todavía no se ha guardado nada. Esto es lo que pasaria al confirmar.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Badge tone="success">{totales.nuevos} se importarian</Badge>

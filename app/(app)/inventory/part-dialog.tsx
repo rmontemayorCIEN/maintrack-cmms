@@ -101,7 +101,7 @@ export function PartDialog({
       </button>
     ) : (
       <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus className="h-3.5 w-3.5" /> Nueva refaccion
+        <Plus className="h-3.5 w-3.5" /> Nueva refacción
       </Button>
     );
   }
@@ -116,7 +116,7 @@ export function PartDialog({
             </h3>
             {editando ? (
               <p className="mt-0.5 text-xs text-slate-500">
-                La existencia no se edita aqui: se mueve con entradas, salidas y ajustes.
+                La existencia no se edita aquí: se mueve con entradas, salidas y ajustes.
               </p>
             ) : null}
           </div>
@@ -127,7 +127,7 @@ export function PartDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Codigo</label>
+            <label className="label">Código</label>
             <input className="field" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase())} required disabled={editando} />
           </div>
           <div>
@@ -135,7 +135,7 @@ export function PartDialog({
             <input className="field" value={form.name} onChange={(e) => set("name", e.target.value)} required />
           </div>
           <div className="sm:col-span-2">
-            <label className="label">Descripcion</label>
+            <label className="label">Descripción</label>
             <input className="field" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
           <SelectCatalogo
@@ -149,7 +149,7 @@ export function PartDialog({
             vacioTexto="Sin familia"
             claveValor="code"
             camposAlta={[
-              { nombre: "code", etiqueta: "Codigo (ej. RETENES)", requerido: true },
+              { nombre: "code", etiqueta: "Código (ej. RETENES)", requerido: true },
               { nombre: "name", etiqueta: "Nombre de la familia", requerido: true },
             ]}
           />
@@ -165,7 +165,7 @@ export function PartDialog({
             requerido
             claveValor="code"
             camposAlta={[
-              { nombre: "code", etiqueta: "Codigo corto (ej. galon)", requerido: true },
+              { nombre: "code", etiqueta: "Código corto (ej. galon)", requerido: true },
               { nombre: "name", etiqueta: "Nombre completo", requerido: true },
             ]}
           />
@@ -180,15 +180,15 @@ export function PartDialog({
             </div>
           ) : null}
           <div>
-            <label className="label">Minimo (punto de reorden)</label>
+            <label className="label">Mínimo (punto de reorden)</label>
             <input type="number" min="0" step="0.5" className="field" value={form.minQuantity} onChange={(e) => set("minQuantity", e.target.value)} />
           </div>
           <div>
-            <label className="label">Maximo</label>
+            <label className="label">Máximo</label>
             <input type="number" min="0" step="0.5" className="field" value={form.maxQuantity} onChange={(e) => set("maxQuantity", e.target.value)} />
           </div>
           <div>
-            <label className="label">Ubicacion en almacen</label>
+            <label className="label">Ubicación en almacén</label>
             <input className="field" value={form.bin} onChange={(e) => set("bin", e.target.value)} placeholder="Ej. A-03-2" />
           </div>
           <SelectCatalogo

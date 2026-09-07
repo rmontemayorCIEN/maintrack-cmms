@@ -124,8 +124,8 @@ export function Armador({
         <>
           {!disponible.multiOrigen ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[0.6875rem] text-amber-800">
-              Esta organizacion arma una orden por cada origen. Al elegir de un grupo se
-              limpia lo marcado en los otros. Se cambia en Configuracion.
+              Esta organización arma una orden por cada origen. Al elegir de un grupo se
+              limpia lo marcado en los otros. Se cambia en Configuración.
             </p>
           ) : null}
 
@@ -206,7 +206,7 @@ export function Armador({
               </p>
 
               <div>
-                <label className="label">Titulo</label>
+                <label className="label">Título</label>
                 <input
                   className="field"
                   value={titulo}
@@ -235,7 +235,7 @@ export function Armador({
                     <option value="LOW">Baja</option>
                     <option value="MEDIUM">Media</option>
                     <option value="HIGH">Alta</option>
-                    <option value="CRITICAL">Critica</option>
+                    <option value="CRITICAL">Crítica</option>
                   </select>
                 </div>
               </div>

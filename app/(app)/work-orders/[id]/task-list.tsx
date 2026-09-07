@@ -106,7 +106,7 @@ export function TaskList({
   if (!tasks.length) {
     return (
       <p className="rounded-lg border border-dashed border-slate-200 px-3 py-8 text-center text-xs text-slate-400">
-        Esta orden no tiene lista de verificacion.
+        Esta orden no tiene lista de verificación.
       </p>
     );
   }
@@ -254,7 +254,7 @@ export function TaskList({
 
                 {motivo === "SIN_REFACCION" && refacciones.length ? (
                   <>
-                    <label className="label mt-3 block">Cual refaccion falto</label>
+                    <label className="label mt-3 block">Cual refacción falto</label>
                     <SelectorBuscable
                       valor={partId}
                       onCambio={setPartId}

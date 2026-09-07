@@ -240,10 +240,10 @@ export function AsistenteLevantamiento({
       {/* ──────────────────────────────── Paso 3: fotos (opcional) */}
       {paso === "FOTOS" ? (
         <Card>
-          <p className="text-sm font-semibold text-slate-800">Paso 3 · Fotografie las areas (opcional)</p>
+          <p className="text-sm font-semibold text-slate-800">Paso 3 · Fotografie las áreas (opcional)</p>
           <p className="mt-1 text-xs text-slate-600">
-            Si esta parado en la instalacion, tome una foto de cada cuarto tecnico. Lo que la entrevista no
-            alcanzo a describir, la camara lo muestra: cada equipo reconocido entra al inventario aunque no
+            Si esta parado en la instalación, tome una foto de cada cuarto técnico. Lo que la entrevista no
+            alcanzo a describir, la cámara lo muestra: cada equipo reconocido entra al inventario aunque no
             se haya mencionado. <strong>Si no tiene fotos a la mano, puede saltarse este paso.</strong>
           </p>
           <div className="mt-3">
@@ -277,8 +277,8 @@ export function AsistenteLevantamiento({
           <Card>
             <p className="text-sm font-semibold text-slate-800">Paso 4 · Revise lo propuesto</p>
             <p className="mt-1 text-xs text-slate-600">
-              Nada se ha creado todavia. Desmarque lo que no exista en la instalacion y corrija las cantidades.
-              Es mas facil agregar despues lo que falte que borrar lo que sobre.
+              Nada se ha creado todavía. Desmarque lo que no exista en la instalación y corrija las cantidades.
+              Es mas facil agregar después lo que falte que borrar lo que sobre.
             </p>
             {nota ? (
               <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -350,7 +350,7 @@ export function AsistenteLevantamiento({
           <Card>
             <p className="text-sm font-semibold text-slate-800">Paso 5 · Donde se dan de alta</p>
             <p className="mt-1 text-xs text-slate-600">
-              Los activos se crean en el sitio que elija, con codigo consecutivo y <strong>sin datos de placa</strong>:
+              Los activos se crean en el sitio que elija, con código consecutivo y <strong>sin datos de placa</strong>:
               marca, modelo y serie se capturan en piso con la foto de la placa. Cada uno queda con una nota que
               dice que falta verificarlo.
             </p>
@@ -362,14 +362,14 @@ export function AsistenteLevantamiento({
                 </select>
               </div>
               <div>
-                <label className="label">Ubicacion (opcional)</label>
+                <label className="label">Ubicación (opcional)</label>
                 <select className="field" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-                  <option value="">Sin ubicacion</option>
+                  <option value="">Sin ubicación</option>
                   {ubicacionesDelSitio.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="label">Prefijo del codigo</label>
+                <label className="label">Prefijo del código</label>
                 <input className="field" value={prefijo} maxLength={6} onChange={(e) => setPrefijo(e.target.value.toUpperCase())} />
                 <p className="mt-1 text-[0.6875rem] text-slate-500">Quedaran como {prefijo || "ACT"}-001, {prefijo || "ACT"}-002…</p>
               </div>
@@ -400,10 +400,10 @@ export function AsistenteLevantamiento({
                 <ClipboardList className="h-3.5 w-3.5" /> Lo que sigue
               </p>
               <ol className="mt-1.5 grid gap-1 text-xs text-slate-600">
-                <li><strong>1.</strong> Recorra la instalacion y confirme cada activo: los que no existan, dese de baja.</li>
+                <li><strong>1.</strong> Recorra la instalación y confirme cada activo: los que no existan, dese de baja.</li>
                 <li><strong>2.</strong> Fotografie la placa de cada equipo para llenar marca, modelo y serie.</li>
                 <li><strong>3.</strong> Genere los planes de mantenimiento con IA desde la pantalla de Planes.</li>
-                <li><strong>4.</strong> Revise que refacciones conviene tener, en Almacen → Analisis.</li>
+                <li><strong>4.</strong> Revise que refacciones conviene tener, en Almacén → Análisis.</li>
               </ol>
             </div>
             <Button className="mt-4" onClick={() => router.push("/assets")}>

@@ -53,7 +53,7 @@ export function RegisterForm() {
       </div>
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Cree su espacio de trabajo</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Se creara una organizacion independiente con su usuario como propietario. Prueba de 30 dias.
+        Se creara una organización independiente con su usuario como propietario. Prueba de 30 días.
       </p>
 
       <form onSubmit={submit} className="mt-6 grid gap-4">
@@ -70,7 +70,7 @@ export function RegisterForm() {
           </select>
         </div>
         <div>
-          <label className="label">Tipo de instalacion</label>
+          <label className="label">Tipo de instalación</label>
           <select className="field" value={form.tipoInstalacion} onChange={(e) => set("tipoInstalacion", e.target.value)}>
             {CLAVES_INSTALACION.map((c) => (
               <option key={c} value={c}>{INSTALACIONES[c].nombre}</option>
@@ -103,7 +103,7 @@ export function RegisterForm() {
 
       <p className="mt-6 text-center text-xs text-slate-500">
         ¿Ya tiene cuenta?{" "}
-        <Link href="/login" className="font-medium text-brand-600 hover:underline">Inicie sesion</Link>
+        <Link href="/login" className="font-medium text-brand-600 hover:underline">Inicie sesión</Link>
       </p>
     </div>
   );

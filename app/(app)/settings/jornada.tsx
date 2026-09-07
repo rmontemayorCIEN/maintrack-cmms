@@ -103,12 +103,12 @@ export function ConfiguracionJornada({
       <Card>
         <p className="text-sm font-semibold text-slate-800">Jornada de trabajo</p>
         <p className="mt-0.5 text-xs text-slate-500">
-          De aqui sale si un dia del calendario cabe, y en que fechas puede programar el programador.
+          De aquí sale si un dia del calendario cabe, y en que fechas puede programar el programador.
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Horas de trabajo al dia</label>
+            <label className="label">Horas de trabajo al día</label>
             <input
               type="number" step="0.5" min="1" max="24"
               className="field max-w-28"
@@ -122,7 +122,7 @@ export function ConfiguracionJornada({
           </div>
 
           <div>
-            <label className="label">Dias que se trabajan</label>
+            <label className="label">Días que se trabajan</label>
             <div className="flex flex-wrap gap-1">
               {SEMANA.map((d) => {
                 const activo = dias.includes(d.n);
@@ -188,7 +188,7 @@ export function ConfiguracionJornada({
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-sm font-semibold text-slate-800">Dias no laborables</p>
+            <p className="text-sm font-semibold text-slate-800">Días no laborables</p>
             <p className="mt-0.5 text-xs text-slate-500">
               Los de ley vienen cargados. Agregue los suyos: aniversario de la planta, vacaciones,
               o lo que su empresa cierre.
@@ -221,7 +221,7 @@ export function ConfiguracionJornada({
 
         {festivos.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
-            No hay dias no laborables registrados.
+            No hay días no laborables registrados.
           </p>
         ) : (
           <ul className="mt-3 grid gap-1">

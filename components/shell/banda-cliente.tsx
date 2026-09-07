@@ -26,7 +26,7 @@ export function BandaCliente({ nombreCliente }: { nombreCliente: string }) {
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-amber-300 bg-amber-100 px-4 py-2 text-amber-950 lg:px-6 no-print">
       <Building2 className="h-4 w-4 shrink-0" />
       <p className="text-xs font-medium">
-        Esta viendo los datos de <strong>{nombreCliente}</strong>, no los de su organizacion.
+        Esta viendo los datos de <strong>{nombreCliente}</strong>, no los de su organización.
       </p>
       <button
         type="button"

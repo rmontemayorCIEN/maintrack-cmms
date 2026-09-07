@@ -53,7 +53,7 @@ const COLUMNAS: Columna<FilaRequisicion>[] = [
     texto: (r) => URGENCIAS[r.urgencia as keyof typeof URGENCIAS] ?? r.urgencia,
     pinta: (r) => <Badge tone={TONO_URGENCIA[r.urgencia] ?? "muted"}>{URGENCIAS[r.urgencia as keyof typeof URGENCIAS] ?? r.urgencia}</Badge>,
   },
-  { id: "almacen", etiqueta: "Almacen", agrupable: true, texto: (r) => r.almacen },
+  { id: "almacen", etiqueta: "Almacén", agrupable: true, texto: (r) => r.almacen },
   { id: "solicitante", etiqueta: "Solicito", agrupable: true, texto: (r) => guion(r.solicitante) },
   { id: "motivo", etiqueta: "Motivo", agrupable: true, texto: (r) => MOTIVOS[r.motivo as keyof typeof MOTIVOS] ?? r.motivo },
   { id: "orden", etiqueta: "Orden de trabajo", agrupable: true, texto: (r) => guion(r.orden) },

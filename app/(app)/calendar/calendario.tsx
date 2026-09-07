@@ -318,7 +318,7 @@ export function Calendario({
               return c ? (
                 <DetalleDia dia={c} ordenes={delDia(dia)} proyecciones={proyeccionesDe(dia)} sinMarco />
               ) : (
-                <p className="py-10 text-center text-xs text-slate-400">Sin informacion para ese dia.</p>
+                <p className="py-10 text-center text-xs text-slate-400">Sin información para ese dia.</p>
               );
             })()}
           </div>
@@ -424,8 +424,8 @@ export function Calendario({
         {Object.entries(MAINTENANCE_TYPE_LABELS).map(([k, v]) => (
           <Badge key={k} className={MAINTENANCE_TYPE_COLORS[k]}>{v}</Badge>
         ))}
-        <span className="inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-[0.6875rem]">◇ Proyeccion del plan</span>
-        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] text-amber-900">Dia sobrecargado</span>
+        <span className="inline-flex items-center gap-1 rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-[0.6875rem]">◇ Proyección del plan</span>
+        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] text-amber-900">Día sobrecargado</span>
         <span className="text-slate-400">Jornada base: {horasJornada} h</span>
       </div>
 

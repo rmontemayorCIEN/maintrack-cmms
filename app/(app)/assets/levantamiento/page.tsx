@@ -79,8 +79,8 @@ export default async function LevantamientoPage() {
           <div className="py-8 text-center">
             <p className="text-sm font-semibold text-slate-800">El levantamiento asistido no esta activo</p>
             <p className="mx-auto mt-1 max-w-lg text-xs text-slate-500">
-              Se incluye en el plan Enterprise y en el complemento IA Avanzada. Tambien se ofrece como servicio
-              de implementacion: su proveedor lo ejecuta con usted en una sesion.
+              Se incluye en el plan Enterprise y en el complemento IA Avanzada. También se ofrece como servicio
+              de implementación: su proveedor lo ejecuta con usted en una sesión.
             </p>
           </div>
         </Card>
@@ -90,7 +90,7 @@ export default async function LevantamientoPage() {
             <p className="text-sm font-semibold text-slate-800">Primero de de alta un sitio</p>
             <p className="mx-auto mt-1 max-w-lg text-xs text-slate-500">
               Los activos tienen que nacer en algun lado. Cree la planta, edificio o sucursal en
-              Catalogos → Sitios y regrese aqui.
+              Catálogos → Sitios y regrese aquí.
             </p>
             <Link href="/catalogs?tipo=sites" className="mt-3 inline-block text-xs font-medium text-brand-600 hover:underline">
               Ir a Sitios
@@ -102,7 +102,7 @@ export default async function LevantamientoPage() {
           {activos > 0 ? (
             <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               Esta cuenta ya tiene {activos} activos. El levantamiento <strong>agrega</strong>, no reemplaza:
-              revise que no proponga equipos que ya estan registrados antes de dar de alta.
+              revise que no proponga equipos que ya están registrados antes de dar de alta.
             </p>
           ) : null}
           <AsistenteLevantamiento

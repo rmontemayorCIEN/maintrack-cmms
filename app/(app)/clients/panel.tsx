@@ -163,7 +163,7 @@ export function PanelClientes({
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          Al dar de alta una empresa se crean tambien sus catalogos base y el usuario responsable.
+          Al dar de alta una empresa se crean también sus catálogos base y el usuario responsable.
         </p>
         {!creando ? (
           <Button size="sm" onClick={() => { setCreando(true); setError(null); }}>
@@ -186,7 +186,7 @@ export function PanelClientes({
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Nueva empresa cliente</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  El responsable entrara con el correo y la contraseña que defina aqui, y podra cambiarlos despues desde Configuracion.
+                  El responsable entrara con el correo y la contraseña que defina aquí, y podra cambiarlos después desde Configuración.
                 </p>
               </div>
               <button type="button" onClick={() => setCreando(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">
@@ -205,14 +205,14 @@ export function PanelClientes({
                 <input className="field" value={form.industry} onChange={(e) => set("industry", e.target.value)} placeholder="Manufactura, alimentos…" />
               </div>
               <div>
-                <label className="label">Tipo de instalacion</label>
+                <label className="label">Tipo de instalación</label>
                 <select className="field" value={form.tipoInstalacion} onChange={(e) => set("tipoInstalacion", e.target.value)}>
                   {CLAVES_INSTALACION.map((c) => (
                     <option key={c} value={c}>{INSTALACIONES[c].nombre}</option>
                   ))}
                 </select>
                 <p className="mt-1 text-[0.6875rem] text-slate-500">
-                  Define los ejemplos de captura y le da contexto a la IA. Se puede cambiar despues.
+                  Define los ejemplos de captura y le da contexto a la IA. Se puede cambiar después.
                 </p>
               </div>
               <div>
@@ -222,7 +222,7 @@ export function PanelClientes({
                 </select>
               </div>
               <div>
-                <label className="label">Dias de prueba</label>
+                <label className="label">Días de prueba</label>
                 <input type="number" min="0" max="365" className="field" value={form.trialDays} onChange={(e) => set("trialDays", e.target.value)} />
                 <p className="mt-1 text-[0.6875rem] text-slate-500">0 = activa de inmediato</p>
               </div>

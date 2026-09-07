@@ -17,10 +17,10 @@ export default async function RegisterPage() {
           <h1 className="text-xl font-semibold text-slate-900">Registro cerrado</h1>
           <p className="mt-2 text-sm text-slate-500">
             Esta instancia no permite crear organizaciones nuevas. Solicite su acceso al
-            administrador, que puede darlo de alta desde Configuracion.
+            administrador, que puede darlo de alta desde Configuración.
           </p>
           <Link href="/login" className="mt-6 inline-block text-sm font-medium text-brand-600 hover:underline">
-            Volver al inicio de sesion
+            Volver al inicio de sesión
           </Link>
         </div>
       </div>

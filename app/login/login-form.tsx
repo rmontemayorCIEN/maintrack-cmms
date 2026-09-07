@@ -54,7 +54,7 @@ export function LoginForm() {
           </p>
           <p className="mt-4 max-w-md text-sm text-slate-300">
             Programe planes por calendario o por medidor, controle el backlog de fallas y
-            anticipe averias con monitoreo de condicion y proyeccion de vida util.
+            anticipe averias con monitoreo de condición y proyección de vida útil.
           </p>
         </div>
         <div className="relative grid gap-4 text-sm text-slate-300">
@@ -72,7 +72,7 @@ export function LoginForm() {
             </span>
             MainTrack CMMS
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesion</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h1>
           <p className="mt-1 text-sm text-slate-500">Acceda a su espacio de trabajo.</p>
 
           <form onSubmit={submit} className="mt-6 grid gap-4">
@@ -110,7 +110,7 @@ export function LoginForm() {
           </form>
 
           <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-700">Cuentas de demostracion</p>
+            <p className="text-xs font-semibold text-slate-700">Cuentas de demostración</p>
             <p className="mt-1 text-[0.6875rem] text-slate-500">Contraseña para todas: <code className="rounded bg-slate-100 px-1">demo1234</code></p>
             <div className="mt-3 grid gap-1.5">
               {DEMO.map((account) => (

@@ -26,7 +26,7 @@ import { ConfiguracionCompras } from "./compras";
 import { ConfiguracionJornada } from "./jornada";
 import { ConfiguracionOrdenes } from "./ordenes";
 
-export const metadata = { title: "Configuracion" };
+export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
 const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
@@ -62,14 +62,14 @@ export default async function SettingsPage({
   const pestanas: Pestana[] = [
     { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
-    { clave: "organizacion", titulo: "Organizacion", icono: <Building2 className="h-4 w-4" /> },
+    { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
-    { clave: "suscripcion", titulo: "Suscripcion", icono: <CreditCard className="h-4 w-4" /> },
+    { clave: "suscripcion", titulo: "Suscripción", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
-    { clave: "integracion", titulo: "Integracion", icono: <Plug className="h-4 w-4" /> },
-    { clave: "auditoria", titulo: "Auditoria", icono: <History className="h-4 w-4" /> },
+    { clave: "integracion", titulo: "Integración", icono: <Plug className="h-4 w-4" /> },
+    { clave: "auditoria", titulo: "Auditoría", icono: <History className="h-4 w-4" /> },
   ];
 
   // Cada pestaña consulta solo lo suyo. Antes la pantalla lanzaba ocho
@@ -293,7 +293,7 @@ export default async function SettingsPage({
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-brand-900">Importar desde Excel</p>
                   <p className="text-xs text-brand-800/80">
-                    Activos, refacciones, planes y catalogos, con plantilla y vista previa.
+                    Activos, refacciones, planes y catálogos, con plantilla y vista previa.
                   </p>
                 </div>
               </Link>
@@ -352,7 +352,7 @@ export default async function SettingsPage({
               <thead>
                 <tr>
                   <th>Nombre</th><th>Correo</th><th>Rol</th><th>Puesto</th>
-                  <th className="text-right">Tarifa/h</th><th>Ultimo acceso</th><th>Estado</th>
+                  <th className="text-right">Tarifa/h</th><th>Último acceso</th><th>Estado</th>
                   {canManage ? <th /> : null}
                 </tr>
               </thead>
@@ -407,7 +407,7 @@ export default async function SettingsPage({
       {activa === "auditoria" && bitacora ? (
         <Card padded={false}>
           <div className="px-5 py-4">
-            <h3 className="text-sm font-semibold text-slate-900">Bitacora de auditoria</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Bitácora de auditoría</h3>
             <p className="text-xs text-slate-500">Ultimas {bitacora.length} operaciones registradas</p>
           </div>
           {bitacora.length === 0 ? (
@@ -418,7 +418,7 @@ export default async function SettingsPage({
             <div className="table-wrap">
               <table className="data">
                 <thead>
-                  <tr><th>Fecha</th><th>Usuario</th><th>Entidad</th><th>Accion</th><th>Detalle</th></tr>
+                  <tr><th>Fecha</th><th>Usuario</th><th>Entidad</th><th>Acción</th><th>Detalle</th></tr>
                 </thead>
                 <tbody>
                   {bitacora.map((entrada) => (

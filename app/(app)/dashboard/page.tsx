@@ -255,7 +255,7 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2" padded={false}>
           <div className="flex items-center justify-between px-5 py-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Proximas ordenes</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Proximas órdenes</h3>
               <p className="text-xs text-slate-500">Backlog ordenado por fecha compromiso</p>
             </div>
             <Link href="/work-orders" className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
@@ -272,7 +272,7 @@ export default async function DashboardPage() {
                 <thead>
                   <tr>
                     <th>Folio</th>
-                    <th>Descripcion</th>
+                    <th>Descripción</th>
                     <th>Tipo</th>
                     <th>Prioridad</th>
                     <th>Estado</th>
@@ -354,7 +354,7 @@ export default async function DashboardPage() {
               subtitle="Requieren reposición"
               action={
                 <Link href="/inventory" className="text-xs font-medium text-brand-600 hover:underline">
-                  Almacen
+                  Almacén
                 </Link>
               }
             />

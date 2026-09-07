@@ -53,7 +53,7 @@ export default async function AnalisisAlmacenPage() {
         description="Que le falta, que sobra y que minimos no corresponden a su consumo real. Todo calculado sobre su kardex y sus planes: ni una sola estimacion."
         breadcrumb={
           <Link href="/inventory" className="inline-flex items-center gap-1 hover:text-brand-600">
-            <ArrowLeft className="h-3 w-3" /> Almacen
+            <ArrowLeft className="h-3 w-3" /> Almacén
           </Link>
         }
       />
@@ -83,10 +83,10 @@ export default async function AnalisisAlmacenPage() {
       {!hayHallazgos ? (
         <Card>
           <div className="py-8 text-center">
-            <p className="text-sm font-semibold text-slate-800">El almacen esta en orden</p>
+            <p className="text-sm font-semibold text-slate-800">El almacén esta en orden</p>
             <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-              No hay refacciones bajo minimo, los planes tienen con que ejecutarse y los minimos corresponden
-              al consumo. Vuelva a revisar despues de unas semanas de movimiento.
+              No hay refacciones bajo mínimo, los planes tienen con que ejecutarse y los mínimos corresponden
+              al consumo. Vuelva a revisar después de unas semanas de movimiento.
             </p>
           </div>
         </Card>
@@ -105,7 +105,7 @@ export default async function AnalisisAlmacenPage() {
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Refaccion</th><th>Planes que la piden</th>
+                    <th>Refacción</th><th>Planes que la piden</th>
                     <th className="text-right">Existencia</th><th className="text-right">Piden</th><th className="text-right">Surtir</th>
                   </tr>
                 </thead>
@@ -146,7 +146,7 @@ export default async function AnalisisAlmacenPage() {
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Refaccion</th><th className="text-right">Hay</th><th className="text-right">Minimo</th>
+                    <th>Refacción</th><th className="text-right">Hay</th><th className="text-right">Mínimo</th>
                     <th className="text-right">Faltan</th><th>Proveedor</th><th className="text-right">Reponer</th>
                   </tr>
                 </thead>
@@ -192,7 +192,7 @@ export default async function AnalisisAlmacenPage() {
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Refaccion</th><th className="text-right">Minimo</th><th className="text-right">Sugerido</th>
+                    <th>Refacción</th><th className="text-right">Mínimo</th><th className="text-right">Sugerido</th>
                     <th className="text-right">Consumo</th><th className="text-right">Entrega</th><th className="text-right">Efecto</th>
                   </tr>
                 </thead>
@@ -296,7 +296,7 @@ export default async function AnalisisAlmacenPage() {
       />
 
       <p className="mt-5 max-w-3xl text-xs text-slate-500">
-        <strong className="text-slate-700">Estos numeros salen de sus datos, no de un modelo.</strong>{" "}
+        <strong className="text-slate-700">Estos números salen de sus datos, no de un modelo.</strong>{" "}
         El consumo se mide sobre las salidas de los ultimos seis meses, el tiempo de entrega viene de cada
         proveedor y lo que piden los planes sale de los recursos capturados en sus actividades. Si algo no
         cuadra, el kardex de cada refaccion tiene el movimiento que lo explica.

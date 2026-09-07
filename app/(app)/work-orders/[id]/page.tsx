@@ -260,7 +260,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         title={`${wo.number} — ${wo.title}`}
         breadcrumb={
           <Link href="/work-orders" className="inline-flex items-center gap-1 hover:text-brand-600">
-            <ArrowLeft className="h-3 w-3" /> Ordenes de trabajo
+            <ArrowLeft className="h-3 w-3" /> Órdenes de trabajo
           </Link>
         }
         description={wo.description ?? undefined}

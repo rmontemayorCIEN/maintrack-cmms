@@ -56,7 +56,7 @@ export function RecursosTarea({
               catalogo="specialties"
               titulo="Nueva especialidad"
               campos={[
-                { nombre: "code", etiqueta: "Codigo (ej. MEC)", requerido: true },
+                { nombre: "code", etiqueta: "Código (ej. MEC)", requerido: true },
                 { nombre: "name", etiqueta: "Nombre", requerido: true },
                 { nombre: "hourlyRate", etiqueta: "Tarifa por hora" },
               ]}
@@ -101,7 +101,7 @@ export function RecursosTarea({
           );
         })}
         {labor.length ? (
-          <p className="text-[0.6875rem] text-slate-400">Personas × horas por persona. La tarifa sale del catalogo de especialidades.</p>
+          <p className="text-[0.6875rem] text-slate-400">Personas × horas por persona. La tarifa sale del catálogo de especialidades.</p>
         ) : null}
       </Bloque>
 
@@ -153,7 +153,7 @@ export function RecursosTarea({
               catalogo="external-services"
               titulo="Nuevo servicio externo"
               campos={[
-                { nombre: "code", etiqueta: "Codigo (ej. SRV-REB)", requerido: true },
+                { nombre: "code", etiqueta: "Código (ej. SRV-REB)", requerido: true },
                 { nombre: "name", etiqueta: "Nombre", requerido: true },
                 { nombre: "unit", etiqueta: "Unidad (servicio, hora…)" },
                 { nombre: "unitCost", etiqueta: "Costo unitario" },

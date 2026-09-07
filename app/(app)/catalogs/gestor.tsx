@@ -288,7 +288,7 @@ export function GestorCatalogos({
                         {(() => {
                           const par = leerCoordenadas(form[campo.nombre] ?? "");
                           if (par === "invalido") {
-                            return <p className="mt-1 text-[0.6875rem] text-amber-700">Se esperan dos numeros separados por coma. Revise que no se haya perdido el signo menos.</p>;
+                            return <p className="mt-1 text-[0.6875rem] text-amber-700">Se esperan dos números separados por coma. Revise que no se haya perdido el signo menos.</p>;
                           }
                           return par ? (
                             <a
@@ -446,7 +446,7 @@ export function GestorCatalogos({
       </Card>
 
       <p className="mt-4 max-w-3xl text-xs text-slate-500">
-        <strong className="text-slate-700">Criticidad, estados y prioridades no aparecen aqui.</strong>{" "}
+        <strong className="text-slate-700">Criticidad, estados y prioridades no aparecen aquí.</strong>{" "}
         Son listas fijas del sistema: la criticidad A/B/C sostiene el calculo de indicadores y el
         escalamiento de las alertas predictivas, y los estados definen el flujo permitido de una
         orden de trabajo. Volverlas editables romperia esa logica.

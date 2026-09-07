@@ -53,7 +53,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
       </section>
 
       <section className="mb-5">
-        <h2 className="mb-1 text-sm font-bold uppercase">Descripcion</h2>
+        <h2 className="mb-1 text-sm font-bold uppercase">Descripción</h2>
         <p className="whitespace-pre-wrap border border-slate-300 p-3 text-sm">{wo.description || "—"}</p>
       </section>
 
@@ -74,7 +74,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
       ) : null}
 
       <section className="mb-5">
-        <h2 className="mb-2 text-sm font-bold uppercase">Lista de verificacion</h2>
+        <h2 className="mb-2 text-sm font-bold uppercase">Lista de verificación</h2>
         {wo.tasks.length === 0 ? (
           <p className="text-sm">Sin tareas.</p>
         ) : (

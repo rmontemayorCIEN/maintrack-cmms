@@ -119,7 +119,7 @@ export default async function PredictivePage() {
 
                 <div className="mt-3 grid gap-2">
                   <div className="flex items-center justify-between text-[0.6875rem] text-slate-500">
-                    <span>Consumo del umbral critico</span>
+                    <span>Consumo del umbral crítico</span>
                     <span className="tabular-nums">{formatNumber(usage, 0)}%</span>
                   </div>
                   <Progress value={usage} tone={usage >= 100 ? "bad" : usage >= 75 ? "warn" : "good"} />

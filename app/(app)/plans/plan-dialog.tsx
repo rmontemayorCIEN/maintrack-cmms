@@ -321,7 +321,7 @@ export function PlanDialog({
             <input className="field" value={form.name} onChange={(e) => set("name", e.target.value)} required minLength={3} />
           </div>
           <div className="md:col-span-2">
-            <label className="label">Descripcion</label>
+            <label className="label">Descripción</label>
             <input className="field" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
           <div>
@@ -343,7 +343,7 @@ export function PlanDialog({
             <label className="label">Tipo</label>
             <select className="field" value={form.maintenanceType} onChange={(e) => set("maintenanceType", e.target.value)}>
               <option value="PREVENTIVE">Preventivo</option>
-              <option value="INSPECTION">Inspeccion</option>
+              <option value="INSPECTION">Inspección</option>
               <option value="PREDICTIVE">Predictivo (ruta)</option>
             </select>
           </div>
@@ -356,7 +356,7 @@ export function PlanDialog({
           </div>
           {form.triggerType === "CALENDAR" ? (
             <div>
-              <label className="label">Cada cuantos dias</label>
+              <label className="label">Cada cuantos días</label>
               <input type="number" min="1" className="field" value={form.intervalDays} onChange={(e) => set("intervalDays", e.target.value)} required />
             </div>
           ) : (
@@ -382,7 +382,7 @@ export function PlanDialog({
             </>
           )}
           <div>
-            <label className="label">Anticipacion (dias)</label>
+            <label className="label">Anticipación (días)</label>
             <input type="number" min="0" className="field" value={form.leadTimeDays} onChange={(e) => set("leadTimeDays", e.target.value)} />
           </div>
           <div>
@@ -473,8 +473,8 @@ export function PlanDialog({
                         value={task.taskType}
                         onChange={(e) => cambiarTarea(index, { taskType: e.target.value })}
                       >
-                        <option value="CHECK">Verificacion</option>
-                        <option value="MEASURE">Medicion</option>
+                        <option value="CHECK">Verificación</option>
+                        <option value="MEASURE">Medición</option>
                         <option value="TEXT">Texto</option>
                         <option value="REPLACE">Reemplazo</option>
                       </select>

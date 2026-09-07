@@ -225,7 +225,7 @@ export function PanelApariencia({
               ) : null}
             </div>
             <p className="mt-1.5 text-[0.6875rem] text-slate-500">
-              PNG con fondo transparente, de unos 400 px de ancho. Se muestra arriba del menu y en los reportes
+              PNG con fondo transparente, de unos 400 px de ancho. Se muestra arriba del menú y en los reportes
               que imprima.
             </p>
           </div>

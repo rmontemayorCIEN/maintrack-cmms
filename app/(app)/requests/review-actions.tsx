@@ -125,7 +125,7 @@ export function ReviewActions({
                 </div>
               ) : null}
               <div>
-                <label className="label">Notas de revision</label>
+                <label className="label">Notas de revisión</label>
                 <textarea className="field min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
             </div>

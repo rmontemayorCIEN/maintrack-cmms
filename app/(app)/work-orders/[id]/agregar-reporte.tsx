@@ -138,7 +138,7 @@ export function AgregarReporte({
                 <option value="LOW">Baja</option>
                 <option value="MEDIUM">Media</option>
                 <option value="HIGH">Alta</option>
-                <option value="CRITICAL">Critica</option>
+                <option value="CRITICAL">Crítica</option>
               </select>
             </div>
           </div>

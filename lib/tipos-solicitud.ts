@@ -19,7 +19,7 @@ export const TIPOS_SOLICITUD = {
   },
   APOYO: {
     etiqueta: "Apoyo",
-    descripcion: "Prestar manos: mover algo, una maniobra, ayudar a produccion.",
+    descripcion: "Prestar manos: mover algo, una maniobra, ayudar a producción.",
     /**
      * Consume horas y cuesta, pero no es una falla del equipo ni mantenimiento
      * planeado. Queda fuera de los dos lados del indicador.

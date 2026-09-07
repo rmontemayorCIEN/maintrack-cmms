@@ -75,7 +75,7 @@ export function PartsPanel({
 
       {editable ? (
         catalog.length === 0 ? (
-          <p className="text-[0.6875rem] text-slate-400">No hay refacciones con existencia en el almacen.</p>
+          <p className="text-[0.6875rem] text-slate-400">No hay refacciones con existencia en el almacén.</p>
         ) : (
           <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
             <select className="field" value={partId} onChange={(e) => setPartId(e.target.value)}>

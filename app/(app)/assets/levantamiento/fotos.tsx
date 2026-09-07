@@ -95,9 +95,9 @@ export function PasoFotos({
       <div className="rounded-lg border border-dashed border-slate-300 p-4">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">Como tomar las fotos</p>
         <ul className="mt-1.5 grid gap-0.5 text-xs text-slate-600">
-          <li>· Una foto por area: cuarto de maquinas, azotea, subestacion, cocina, cuarto de bombas.</li>
+          <li>· Una foto por área: cuarto de máquinas, azotea, subestación, cocina, cuarto de bombas.</li>
           <li>· Parese en la puerta y abarque el cuarto completo. Si es grande, dos fotos desde esquinas opuestas.</li>
-          <li>· Encienda la luz. Un cuarto de maquinas a oscuras no se puede leer.</li>
+          <li>· Encienda la luz. Un cuarto de máquinas a oscuras no se puede leer.</li>
           <li>· Incluya el piso: las bases de bombas y tanques ayudan a identificarlos.</li>
         </ul>
 
@@ -115,7 +115,7 @@ export function PasoFotos({
           </Button>
         </div>
         <p className="mt-1 text-[0.6875rem] text-slate-400">
-          Cada foto consume 1 operacion de IA. Puede seleccionar varias a la vez.
+          Cada foto consume 1 operación de IA. Puede seleccionar varias a la vez.
         </p>
       </div>
 

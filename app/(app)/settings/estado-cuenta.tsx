@@ -115,7 +115,7 @@ export function EstadoDeCuenta({
             <p className="text-sm font-medium text-slate-800">Sobre su comprobante fiscal</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-600">
               Las notas de cobro de esta pantalla sirven para control del servicio y se pueden
-              guardar como PDF desde el boton de impresion. El CFDI, que es el documento valido
+              guardar como PDF desde el botón de impresión. El CFDI, que es el documento valido
               para efectos fiscales, lo emite su proveedor por separado.
             </p>
           </div>

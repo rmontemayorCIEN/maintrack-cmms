@@ -127,7 +127,7 @@ export function SelectCatalogo({
       {abierto ? (
         <div className="mt-2 grid gap-2 rounded-lg border border-brand-200 bg-brand-50/50 p-2.5">
           <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-brand-700">
-            Nueva opcion
+            Nueva opción
           </p>
           {camposAlta.map((campo) => (
             <input

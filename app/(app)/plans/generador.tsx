@@ -117,7 +117,7 @@ export function GeneradorPlan({
           <div>
             <h3 className="text-base font-semibold text-slate-900">Redactar un plan con IA</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Toma los datos del equipo, su historial de fallas y sus catalogos, y propone el plan completo.
+              Toma los datos del equipo, su historial de fallas y sus catálogos, y propone el plan completo.
               Usted lo revisa antes de crearlo.
             </p>
           </div>
@@ -147,7 +147,7 @@ export function GeneradorPlan({
               maxLength={600}
             />
             <p className="mt-1 text-[0.6875rem] text-slate-500">
-              Condiciones de operacion, exigencias del fabricante o normas que deba cumplir.
+              Condiciones de operación, exigencias del fabricante o normas que deba cumplir.
             </p>
           </div>
         </div>

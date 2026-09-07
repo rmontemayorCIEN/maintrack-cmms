@@ -11,7 +11,7 @@ import { vistaGuardada } from "@/lib/vistas";
 import { MovementForm } from "./movement-form";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
 
-export const metadata = { title: "Almacen" };
+export const metadata = { title: "Almacén" };
 export const dynamic = "force-dynamic";
 
 export default async function InventoryPage({
@@ -166,7 +166,7 @@ export default async function InventoryPage({
             href="/inventory/analisis"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
-            <LineChart className="h-3.5 w-3.5" /> Analisis
+            <LineChart className="h-3.5 w-3.5" /> Análisis
           </Link>
           {editable ? (
             <PartDialog
@@ -182,7 +182,7 @@ export default async function InventoryPage({
 
       {almacenes.length > 1 ? (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[0.6875rem] font-medium uppercase tracking-wide text-slate-500">Almacen</span>
+          <span className="mr-1 text-[0.6875rem] font-medium uppercase tracking-wide text-slate-500">Almacén</span>
           <Link
             href={`/inventory${params.low === "1" ? "?low=1" : ""}`}
             className={`rounded-lg border px-2.5 py-1 text-xs transition ${
@@ -219,7 +219,7 @@ export default async function InventoryPage({
         <input name="q" defaultValue={params.q ?? ""} className="field max-w-64" placeholder="Buscar refaccion…" />
         <label className="flex items-center gap-2 text-xs text-slate-600">
           <input type="checkbox" name="low" value="1" defaultChecked={params.low === "1"} className="h-4 w-4 rounded border-slate-300" />
-          Solo bajo minimo
+          Solo bajo mínimo
         </label>
         <button type="submit" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
           Filtrar

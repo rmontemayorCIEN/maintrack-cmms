@@ -239,7 +239,7 @@ export function WorkOrderActions({
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">Cierre tecnico</h3>
+                <h3 className="text-base font-semibold text-slate-900">Cierre técnico</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
                   Registre el resultado del trabajo para alimentar los indicadores de confiabilidad.
                 </p>
@@ -259,7 +259,7 @@ export function WorkOrderActions({
             <div className="grid gap-4">
               {!pideFallas ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  Esta orden no tiene actividades correctivas, asi que no se pide codigo de falla.
+                  Esta orden no tiene actividades correctivas, asi que no se pide código de falla.
                   Una rutina preventiva que se ejecuto bien no es una falla.
                 </p>
               ) : null}
@@ -292,7 +292,7 @@ export function WorkOrderActions({
                         puedeCrear={puedeGestionarCatalogos}
                         vacioTexto="Sin codificar"
                         camposAlta={[
-                          { nombre: "code", etiqueta: "Codigo (ej. MEC-05)", requerido: true },
+                          { nombre: "code", etiqueta: "Código (ej. MEC-05)", requerido: true },
                           { nombre: "description", etiqueta: "Descripción de la falla", requerido: true },
                         ]}
                         ayuda="Alimenta el análisis de fallas repetidas"
@@ -307,7 +307,7 @@ export function WorkOrderActions({
                         puedeCrear={puedeGestionarCatalogos}
                         vacioTexto="Sin determinar"
                         camposAlta={[
-                          { nombre: "code", etiqueta: "Codigo (ej. FILTRO-SATURADO)", requerido: true },
+                          { nombre: "code", etiqueta: "Código (ej. FILTRO-SATURADO)", requerido: true },
                           { nombre: "description", etiqueta: "Por que fallo", requerido: true },
                         ]}
                         ayuda="Por que fallo, no que fallo. Es lo que permite atacar el patrón."
@@ -329,7 +329,7 @@ export function WorkOrderActions({
 
               <div>
                 <div className="mb-1 flex items-end justify-between gap-2">
-                  <label className="label mb-0">Solucion aplicada</label>
+                  <label className="label mb-0">Solución aplicada</label>
                   {iaDisponible ? (
                     <button
                       type="button"

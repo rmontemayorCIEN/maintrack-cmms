@@ -42,7 +42,7 @@ const COLUMNAS: Columna<FilaProveedor>[] = [
       ? <a href={`mailto:${p.email}`} className="text-brand-600 hover:underline">{p.email}</a>
       : "—",
   },
-  { id: "direccion", etiqueta: "Direccion", texto: (p) => guion(p.address) },
+  { id: "direccion", etiqueta: "Dirección", texto: (p) => guion(p.address) },
   {
     id: "entrega", etiqueta: "Días de entrega", alineaDerecha: true, agrupable: true,
     texto: (p) => `${p.leadTimeDays} d`,

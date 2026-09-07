@@ -42,9 +42,9 @@ export function ConfiguracionOrdenes({
     <Card>
       <div className="grid gap-5">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Como se arman las ordenes</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Como se arman las órdenes</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            De aqui sale que puede juntar el generador de ordenes y que tanto se puede
+            De aquí sale que puede juntar el generador de órdenes y que tanto se puede
             adelantar un preventivo.
           </p>
         </div>
@@ -62,7 +62,7 @@ export function ConfiguracionOrdenes({
               Una orden puede juntar trabajo de varios origenes
             </span>
             <span className="mt-0.5 block text-[0.6875rem] leading-relaxed text-slate-500">
-              El tecnico baja a la bomba por el preventivo del mes y de paso atiende la fuga
+              El técnico baja a la bomba por el preventivo del mes y de paso atiende la fuga
               que reportaron: todo en una orden, en un viaje. Cada actividad conserva de donde
               vino, asi que los indicadores no se mezclan.
               <br />
@@ -73,7 +73,7 @@ export function ConfiguracionOrdenes({
         </label>
 
         <div>
-          <label className="label">Cuanto se puede adelantar un preventivo (dias)</label>
+          <label className="label">Cuanto se puede adelantar un preventivo (días)</label>
           <input
             type="number"
             min="0"
@@ -84,9 +84,9 @@ export function ConfiguracionOrdenes({
             onChange={(e) => setDias(e.target.value)}
           />
           <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
-            Al armar una orden se ofrecen los planes que vencen dentro de este plazo, ademas
-            de los ya vencidos. Si el tecnico ya va a bajar, adelantar el que vence en unos
-            dias sale mas barato que un segundo viaje.
+            Al armar una orden se ofrecen los planes que vencen dentro de este plazo, además
+            de los ya vencidos. Si el técnico ya va a bajar, adelantar el que vence en unos
+            días sale mas barato que un segundo viaje.
             <br />
             En cero solo se ofrece lo que ya vencio. Adelantar de mas gasta el mantenimiento
             antes de tiempo, asi que conviene un plazo corto salvo que la planta pare pocas

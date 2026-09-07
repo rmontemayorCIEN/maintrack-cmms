@@ -122,7 +122,7 @@ export function AssetDialog({
             </h3>
             {puedeGestionarCatalogos ? (
               <p className="mt-0.5 text-xs text-slate-500">
-                Use el <strong>+</strong> junto a Sitio, Ubicacion o Categoria para agregar opciones sin salir de aqui.
+                Use el <strong>+</strong> junto a Sitio, Ubicación o Categoria para agregar opciones sin salir de aquí.
               </p>
             ) : null}
           </div>
@@ -133,16 +133,16 @@ export function AssetDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label">Codigo (TAG)</label>
+            <label className="label">Código (TAG)</label>
             <input className="field" value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase())} placeholder="Ej. BOM-101" required disabled={editando} />
-            {editando ? <p className="mt-1 text-[0.6875rem] text-slate-500">El codigo identifica al activo en el historial y no se cambia.</p> : null}
+            {editando ? <p className="mt-1 text-[0.6875rem] text-slate-500">El código identifica al activo en el historial y no se cambia.</p> : null}
           </div>
           <div>
             <label className="label">Nombre</label>
             <input className="field" value={form.name} onChange={(e) => set("name", e.target.value)} required />
           </div>
           <div className="sm:col-span-2">
-            <label className="label">Descripcion</label>
+            <label className="label">Descripción</label>
             <input className="field" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
           <SelectCatalogo
@@ -155,7 +155,7 @@ export function AssetDialog({
             puedeCrear={puedeGestionarCatalogos}
             requerido
             camposAlta={[
-              { nombre: "code", etiqueta: "Codigo (ej. P02)", requerido: true },
+              { nombre: "code", etiqueta: "Código (ej. P02)", requerido: true },
               { nombre: "name", etiqueta: "Nombre de la planta", requerido: true },
               { nombre: "city", etiqueta: "Ciudad" },
             ]}
@@ -181,8 +181,8 @@ export function AssetDialog({
             vacioTexto="Sin ubicación"
             contextoAlta={{ siteId: form.siteId }}
             camposAlta={[
-              { nombre: "code", etiqueta: "Codigo (ej. LIN-A)", requerido: true },
-              { nombre: "name", etiqueta: "Nombre del area", requerido: true },
+              { nombre: "code", etiqueta: "Código (ej. LIN-A)", requerido: true },
+              { nombre: "name", etiqueta: "Nombre del área", requerido: true },
             ]}
             ayuda="Se agrega dentro del sitio seleccionado"
           />
@@ -197,7 +197,7 @@ export function AssetDialog({
             puedeCrear={puedeGestionarCatalogos}
             vacioTexto="Sin categoría"
             camposAlta={[
-              { nombre: "code", etiqueta: "Codigo (ej. BOMB)", requerido: true },
+              { nombre: "code", etiqueta: "Código (ej. BOMB)", requerido: true },
               { nombre: "name", etiqueta: "Nombre de la familia", requerido: true },
             ]}
           />
@@ -218,7 +218,7 @@ export function AssetDialog({
             <input className="field" value={form.model} onChange={(e) => set("model", e.target.value)} />
           </div>
           <div>
-            <label className="label">Numero de serie</label>
+            <label className="label">Número de serie</label>
             <input className="field" value={form.serialNumber} onChange={(e) => set("serialNumber", e.target.value)} />
           </div>
           <div>
@@ -234,15 +234,15 @@ export function AssetDialog({
             <input type="date" className="field" value={form.purchaseDate} onChange={(e) => set("purchaseDate", e.target.value)} />
           </div>
           <div>
-            <label className="label">Fin de garantia</label>
+            <label className="label">Fin de garantía</label>
             <input type="date" className="field" value={form.warrantyExpiry} onChange={(e) => set("warrantyExpiry", e.target.value)} />
           </div>
           <div>
-            <label className="label">Costo de adquisicion</label>
+            <label className="label">Costo de adquisición</label>
             <input type="number" min="0" className="field" value={form.purchaseCost} onChange={(e) => set("purchaseCost", e.target.value)} />
           </div>
           <div>
-            <label className="label">Costo de reposicion</label>
+            <label className="label">Costo de reposición</label>
             <input type="number" min="0" className="field" value={form.replacementCost} onChange={(e) => set("replacementCost", e.target.value)} />
           </div>
         </div>

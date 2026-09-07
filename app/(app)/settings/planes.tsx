@@ -75,7 +75,7 @@ export function FichasPlanes({
     <>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Niveles de suscripcion</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Niveles de suscripción</h3>
           <p className="text-xs text-slate-500">Precios mensuales en {moneda}, sin IVA.</p>
         </div>
       </div>

@@ -82,11 +82,11 @@ export function NewWorkOrderForm({
           <CardHeader title="Datos generales" />
           <div className="grid gap-4">
             <div>
-              <label className="label">Titulo del trabajo</label>
+              <label className="label">Título del trabajo</label>
               <input className="field" value={form.title} onChange={(e) => set("title", e.target.value)} required minLength={3} placeholder="Ej. Cambio de rodamiento en bomba P-101" />
             </div>
             <div>
-              <label className="label">Descripcion / sintoma reportado</label>
+              <label className="label">Descripción / síntoma reportado</label>
               <textarea className="field min-h-24" value={form.description} onChange={(e) => set("description", e.target.value)} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -225,7 +225,7 @@ export function NewWorkOrderForm({
               vacioTexto="Sin cuadrilla"
               camposAlta={[
                 { nombre: "name", etiqueta: "Nombre de la cuadrilla", requerido: true },
-                { nombre: "description", etiqueta: "Descripcion" },
+                { nombre: "description", etiqueta: "Descripción" },
               ]}
             />
           </div>

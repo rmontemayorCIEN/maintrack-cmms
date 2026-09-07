@@ -146,7 +146,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             {solicitud.reviewNotes ? (
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">
-                  Nota de revision
+                  Nota de revisión
                 </p>
                 <p className="mt-1 text-sm text-slate-700">{solicitud.reviewNotes}</p>
               </div>

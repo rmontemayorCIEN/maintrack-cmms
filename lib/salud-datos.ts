@@ -147,5 +147,5 @@ export function nivelSalud(indice: number) {
   if (indice >= 85) return { etiqueta: "Solida", tono: "success" as const };
   if (indice >= 65) return { etiqueta: "Aceptable", tono: "info" as const };
   if (indice >= 40) return { etiqueta: "Incompleta", tono: "warning" as const };
-  return { etiqueta: "Critica", tono: "danger" as const };
+  return { etiqueta: "Crítica", tono: "danger" as const };
 }

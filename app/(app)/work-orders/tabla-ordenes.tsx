@@ -32,7 +32,7 @@ const FIJAS: Columna<FilaOrden>[] = [
     pinta: (w) => <Link href={`/work-orders/${w.id}`} className="font-medium text-brand-600 hover:underline">{w.number}</Link>,
   },
   {
-    id: "descripcion", etiqueta: "Descripcion",
+    id: "descripcion", etiqueta: "Descripción",
     texto: (w) => `${w.title} ${w.activoCodigo ?? ""} ${w.activo ?? ""}`,
     pinta: (w) => (
       <div className="max-w-72">
@@ -82,7 +82,7 @@ const COLUMNAS: Columna<FilaOrden>[] = [
   },
   { id: "activo", etiqueta: "Activo", agrupable: true, texto: (w) => guion(w.activo) },
   { id: "sitio", etiqueta: "Sitio", agrupable: true, texto: (w) => guion(w.sitio) },
-  { id: "ubicacion", etiqueta: "Ubicacion", agrupable: true, texto: (w) => guion(w.ubicacion) },
+  { id: "ubicacion", etiqueta: "Ubicación", agrupable: true, texto: (w) => guion(w.ubicacion) },
   { id: "cuadrilla", etiqueta: "Cuadrilla", agrupable: true, texto: (w) => guion(w.cuadrilla) },
   { id: "creadaPor", etiqueta: "Creada por", agrupable: true, texto: (w) => guion(w.creadaPor) },
   { id: "modoFalla", etiqueta: "Modo de falla", agrupable: true, texto: (w) => guion(w.modoFalla) },

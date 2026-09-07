@@ -57,9 +57,9 @@ export function TablaRefacciones({
   const catalogo = refacciones.map((r) => ({ id: r.id, code: r.code, name: r.name }));
 
   const FIJAS: Columna<FilaRefaccion>[] = [
-    { id: "code", etiqueta: "Codigo", texto: (p) => p.code, pinta: (p) => <span className="font-medium text-slate-700">{p.code}</span> },
+    { id: "code", etiqueta: "Código", texto: (p) => p.code, pinta: (p) => <span className="font-medium text-slate-700">{p.code}</span> },
     {
-      id: "name", etiqueta: "Refaccion",
+      id: "name", etiqueta: "Refacción",
       texto: (p) => `${p.name} ${p.description ?? ""} ${p.category ?? ""}`,
       pinta: (p) => (
         <div className="max-w-64">
@@ -83,7 +83,7 @@ export function TablaRefacciones({
   ];
 
   const COLUMNAS: Columna<FilaRefaccion>[] = [
-    { id: "ubicacion", etiqueta: "Ubicacion", agrupable: true, texto: (p) => guion(p.bin) },
+    { id: "ubicacion", etiqueta: "Ubicación", agrupable: true, texto: (p) => guion(p.bin) },
     { id: "proveedor", etiqueta: "Proveedor", agrupable: true, texto: (p) => guion(p.proveedor) },
     { id: "familia", etiqueta: "Familia", agrupable: true, texto: (p) => guion(p.category) },
     {
@@ -117,12 +117,12 @@ export function TablaRefacciones({
       pinta: (p) =>
         p.quantityOnHand === 0
           ? <Badge tone="danger">Agotada</Badge>
-          : bajoMinimo(p) ? <Badge tone="warning">Bajo minimo</Badge> : <Badge tone="success">Surtida</Badge>,
+          : bajoMinimo(p) ? <Badge tone="warning">Bajo mínimo</Badge> : <Badge tone="success">Surtida</Badge>,
     },
     { id: "costoUnit", etiqueta: "Costo unit.", alineaDerecha: true, texto: (p) => formatCurrency(p.unitCost, p.moneda) },
     { id: "valor", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.quantityOnHand * p.unitCost, p.moneda) },
-    { id: "minimo", etiqueta: "Minimo", alineaDerecha: true, texto: (p) => formatNumber(p.minQuantity, 0) },
-    { id: "maximo", etiqueta: "Maximo", alineaDerecha: true, texto: (p) => formatNumber(p.maxQuantity, 0) },
+    { id: "minimo", etiqueta: "Mínimo", alineaDerecha: true, texto: (p) => formatNumber(p.minQuantity, 0) },
+    { id: "maximo", etiqueta: "Máximo", alineaDerecha: true, texto: (p) => formatNumber(p.maxQuantity, 0) },
     { id: "unidad", etiqueta: "Unidad", agrupable: true, texto: (p) => p.unit },
     { id: "adjuntos", etiqueta: "Adjuntos", alineaDerecha: true, texto: (p) => String(p.adjuntos.length + p.enlaces.length) },
   ];

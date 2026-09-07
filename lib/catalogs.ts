@@ -75,13 +75,13 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "sitio",
     descripcion: "Plantas, naves o centros de trabajo donde viven los activos.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. P01" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. P01" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
-      { nombre: "city", etiqueta: "Ciudad", tipo: "texto", ayuda: "El sistema deduce de aqui el clima para ajustar las frecuencias de mantenimiento" },
-      { nombre: "address", etiqueta: "Direccion", tipo: "texto" },
+      { nombre: "city", etiqueta: "Ciudad", tipo: "texto", ayuda: "El sistema deduce de aquí el clima para ajustar las frecuencias de mantenimiento" },
+      { nombre: "address", etiqueta: "Dirección", tipo: "texto" },
       {
         nombre: "coordenadas", etiqueta: "Coordenadas", tipo: "coordenadas",
-        ayuda: "Opcional. En Google Maps: clic derecho sobre el punto y elija la primera opcion; pegue aqui los dos numeros tal como los copio",
+        ayuda: "Opcional. En Google Maps: clic derecho sobre el punto y elija la primera opcion; pegue aquí los dos números tal como los copio",
       },
       { nombre: "notasAcceso", etiqueta: "Como se entra", tipo: "textarea", ayuda: "Caseta, horario, si pasa trailer, donde esta el anden. Lo que necesita saber quien llega por primera vez" },
     ],
@@ -141,9 +141,9 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     descripcion: "Áreas, lineas o cuartos dentro de un sitio.",
     campos: [
       { nombre: "siteId", etiqueta: "Sitio", tipo: "select", requerido: true, opcionesDe: "sites" },
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
-      { nombre: "description", etiqueta: "Descripcion", tipo: "texto" },
+      { nombre: "description", etiqueta: "Descripción", tipo: "texto" },
     ],
     crear: z.object({
       siteId: z.string().min(1),
@@ -198,9 +198,9 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "almacen",
     descripcion: "Donde vive la existencia. Casi siempre uno general y subalmacenes por planta o línea.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto y estable: ALM-GEN, ALM-L1" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y estable: ALM-GEN, ALM-L1" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
-      { nombre: "siteId", etiqueta: "Sitio", tipo: "select", opcionesDe: "sites", ayuda: "En que instalacion esta fisicamente" },
+      { nombre: "siteId", etiqueta: "Sitio", tipo: "select", opcionesDe: "sites", ayuda: "En que instalación esta fisicamente" },
       { nombre: "notas", etiqueta: "Notas", tipo: "textarea", ayuda: "Horario, quien tiene llave, restricciones de acceso" },
     ],
     crear: z.object({
@@ -272,7 +272,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "categoria",
     descripcion: "Familias de equipo. Sirven para agrupar y para filtrar reportes.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
     ],
     crear: z.object({ code: texto(1, 20), name: texto(2) }),
@@ -301,17 +301,17 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "código de falla",
     descripcion: "Clasificación de causas al cerrar una orden correctiva. Alimenta el análisis de fallas repetidas.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "ej. MEC-01" },
-      { nombre: "description", etiqueta: "Descripcion", tipo: "texto", requerido: true },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "ej. MEC-01" },
+      { nombre: "description", etiqueta: "Descripción", tipo: "texto", requerido: true },
       {
         nombre: "category", etiqueta: "Familia", tipo: "select",
         opciones: [
-          { valor: "MECANICO", etiqueta: "Mecanico" },
-          { valor: "ELECTRICO", etiqueta: "Electrico" },
-          { valor: "HIDRAULICO", etiqueta: "Hidraulico" },
+          { valor: "MECANICO", etiqueta: "Mecánico" },
+          { valor: "ELECTRICO", etiqueta: "Eléctrico" },
+          { valor: "HIDRAULICO", etiqueta: "Hidráulico" },
           { valor: "NEUMATICO", etiqueta: "Neumatico" },
           { valor: "INSTRUMENTACION", etiqueta: "Instrumentacion" },
-          { valor: "OPERACION", etiqueta: "Operacion" },
+          { valor: "OPERACION", etiqueta: "Operación" },
           { valor: "OTRO", etiqueta: "Otro" },
         ],
       },
@@ -399,7 +399,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     descripcion: "Grupos de trabajo a los que se asignan órdenes y planes.",
     campos: [
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
-      { nombre: "description", etiqueta: "Descripcion", tipo: "texto" },
+      { nombre: "description", etiqueta: "Descripción", tipo: "texto" },
     ],
     crear: z.object({ name: texto(2), description: texto(0, 200).optional().nullable() }),
     editar: z.object({ name: texto(2).optional(), description: texto(0, 200).nullable().optional() }),
@@ -430,7 +430,7 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "familia",
     descripcion: "Clasificación de las refacciones del almacén. Evita que la misma familia se capture escrita de tres formas distintas.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Es lo que se guarda en la refaccion" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Es lo que se guarda en la refacción" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
     ],
     crear: z.object({ code: texto(1, 40), name: texto(2) }),
@@ -486,9 +486,9 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   "part-units": {
     titulo: "Unidades de medida",
     singular: "unidad",
-    descripcion: "Como se cuenta cada refaccion: piezas, litros, metros. El codigo es lo que aparece en las pantallas.",
+    descripcion: "Como se cuenta cada refacción: piezas, litros, metros. El código es lo que aparece en las pantallas.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto: pza, lt, kg" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto: pza, lt, kg" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
     ],
     crear: z.object({ code: texto(1, 12), name: texto(2) }),
@@ -538,20 +538,20 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   "root-causes": {
     titulo: "Causas raiz",
     singular: "causa raiz",
-    descripcion: "Por que fallo, no que fallo. El codigo de falla describe el sintoma; la causa raiz, el origen. Separarlos permite atacar patrones en vez de repetir reparaciones.",
+    descripcion: "Por que fallo, no que fallo. El código de falla describe el síntoma; la causa raiz, el origen. Separarlos permite atacar patrones en vez de repetir reparaciones.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "ej. LUB-NO-EJECUTADA" },
-      { nombre: "description", etiqueta: "Descripcion", tipo: "texto", requerido: true },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "ej. LUB-NO-EJECUTADA" },
+      { nombre: "description", etiqueta: "Descripción", tipo: "texto", requerido: true },
       {
         nombre: "category", etiqueta: "Familia", tipo: "select",
         opciones: [
           { valor: "MANTENIMIENTO", etiqueta: "Práctica de mantenimiento" },
           { valor: "INSTALACION", etiqueta: "Instalación o montaje" },
-          { valor: "OPERACION", etiqueta: "Operacion" },
+          { valor: "OPERACION", etiqueta: "Operación" },
           { valor: "DESGASTE", etiqueta: "Desgaste normal" },
           { valor: "AMBIENTE", etiqueta: "Ambiente" },
           { valor: "EXTERNO", etiqueta: "Causa externa" },
-          { valor: "DISENO", etiqueta: "Diseño o seleccion" },
+          { valor: "DISENO", etiqueta: "Diseño o selección" },
           { valor: "OTRO", etiqueta: "Otro" },
         ],
       },
@@ -590,8 +590,8 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
     singular: "especialidad",
     descripcion: "Los oficios del personal de mantenimiento y su tarifa por hora. Sirven para estimar la mano de obra de cada actividad de un plan.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. MEC" },
-      { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true, ayuda: "Mecanico, Electricista, Instrumentista…" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. MEC" },
+      { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true, ayuda: "Mecánico, Electricista, Instrumentista…" },
       { nombre: "hourlyRate", etiqueta: "Tarifa por hora", tipo: "numero", ayuda: "Costo interno de la hora-hombre" },
     ],
     crear: z.object({
@@ -626,14 +626,14 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   "external-services": {
     titulo: "Servicios externos",
     singular: "servicio externo",
-    descripcion: "Trabajos que se subcontratan a un proveedor: rebobinado, balanceo, analisis de aceite, maniobras, calibracion certificada. Es el tercer costo de una orden, junto a mano de obra propia y refacciones.",
+    descripcion: "Trabajos que se subcontratan a un proveedor: rebobinado, balanceo, análisis de aceite, maniobras, calibracion certificada. Es el tercer costo de una orden, junto a mano de obra propia y refacciones.",
     campos: [
-      { nombre: "code", etiqueta: "Codigo", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. SRV-REB" },
+      { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y unico, ej. SRV-REB" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "supplierId", etiqueta: "Proveedor habitual", tipo: "select", opcionesDe: "suppliers" },
       { nombre: "unit", etiqueta: "Unidad", tipo: "texto", ayuda: "servicio, hora, jornada, m2…" },
       { nombre: "unitCost", etiqueta: "Costo unitario", tipo: "numero", ayuda: "Referencia para presupuestar el plan" },
-      { nombre: "description", etiqueta: "Descripcion", tipo: "texto" },
+      { nombre: "description", etiqueta: "Descripción", tipo: "texto" },
     ],
     crear: z.object({
       code: texto(1, 30),

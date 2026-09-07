@@ -145,7 +145,7 @@ export function PanelIa({
 
           {!planDePago ? (
             <p className="mt-2.5 text-[0.6875rem] text-brand-900/70">
-              Se contrata sobre un plan de pago. Suba de plan primero y despues active el complemento.
+              Se contrata sobre un plan de pago. Suba de plan primero y después active el complemento.
             </p>
           ) : solicitudPendiente || listo ? (
             <p className="mt-2.5 text-[0.6875rem] font-medium text-brand-900">

@@ -242,7 +242,7 @@ export function RevisarSemana({ semana }: { semana: string }) {
           ) : null}
 
           <p className="mt-4 border-t border-slate-100 pt-2 text-[0.6875rem] text-slate-400">
-            Nada cambia hasta que usted lo aplique. Cada movimiento aplicado queda en la bitacora, y la
+            Nada cambia hasta que usted lo aplique. Cada movimiento aplicado queda en la bitácora, y la
             fecha se vuelve a verificar contra su calendario laboral antes de guardarse.
           </p>
         </Card>

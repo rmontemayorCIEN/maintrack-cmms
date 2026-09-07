@@ -110,7 +110,7 @@ export function TablaPlanes({
       pinta: (p) => <Badge className={PRIORITY_COLORS[p.priority]}>{PRIORITY_LABELS[p.priority]}</Badge>,
     },
     {
-      id: "proximo", etiqueta: "Proximo",
+      id: "proximo", etiqueta: "Próximo",
       texto: (p) => (p.nextDueDate ? dueLabel(new Date(p.nextDueDate)).text : "—"),
       pinta: (p) => {
         if (!p.nextDueDate) return "—";
@@ -142,8 +142,8 @@ export function TablaPlanes({
     },
     { id: "ultimoCierre", etiqueta: "Último cierre", texto: (p) => (p.lastCompletedAt ? new Date(p.lastCompletedAt).toLocaleDateString("es-MX") : "—") },
     { id: "ultimaGeneracion", etiqueta: "Última generación", texto: (p) => (p.lastGeneratedAt ? new Date(p.lastGeneratedAt).toLocaleDateString("es-MX") : "—") },
-    { id: "tolerancia", etiqueta: "Tolerancia (dias)", alineaDerecha: true, texto: (p) => String(p.toleranciaDias) },
-    { id: "anticipacion", etiqueta: "Anticipacion (dias)", alineaDerecha: true, texto: (p) => String(p.anticipacionDias) },
+    { id: "tolerancia", etiqueta: "Tolerancia (días)", alineaDerecha: true, texto: (p) => String(p.toleranciaDias) },
+    { id: "anticipacion", etiqueta: "Anticipacion (días)", alineaDerecha: true, texto: (p) => String(p.anticipacionDias) },
     { id: "enlaces", etiqueta: "Referencias", alineaDerecha: true, texto: (p) => String(p.enlaces.length) },
   ];
 

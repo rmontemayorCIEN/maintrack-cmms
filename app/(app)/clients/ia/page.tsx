@@ -128,7 +128,7 @@ export default async function ConsumoIaPage({
                   </p>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-[0.6875rem] text-slate-500 hover:text-slate-700">
-                      Ver el detalle tecnico
+                      Ver el detalle técnico
                     </summary>
                     <code className="mt-1 block break-all rounded bg-white/60 px-2 py-1 text-[0.625rem] text-slate-600">
                       {f.ejemplo}
@@ -145,7 +145,7 @@ export default async function ConsumoIaPage({
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           <strong className="font-semibold">La IA no esta configurada en este servidor.</strong> Falta la variable
           <code className="mx-1 rounded bg-amber-100 px-1">ANTHROPIC_API_KEY</code>. Mientras no exista, las
-          funciones de IA quedan visibles pero no ejecutan, y aqui no se registrara consumo.
+          funciones de IA quedan visibles pero no ejecutan, y aquí no se registrara consumo.
         </div>
       ) : null}
 
@@ -266,14 +266,14 @@ export default async function ConsumoIaPage({
         />
         <div className="grid gap-2 text-xs text-slate-600">
           <p>
-            <strong className="text-slate-800">Operacion</strong> es la unidad que se le cobra al cliente. Cada
-            funcion cuesta un numero fijo de operaciones, sin importar cuantos tokens haya usado: asi el cliente
+            <strong className="text-slate-800">Operación</strong> es la unidad que se le cobra al cliente. Cada
+            función cuesta un número fijo de operaciones, sin importar cuantos tokens haya usado: asi el cliente
             puede planear su consumo.
           </p>
           <p>
             <strong className="text-slate-800">Costo real</strong> es lo que factura Anthropic por esa llamada,
             calculado con la tarifa del modelo al momento de ejecutarla y guardado junto al registro. No se
-            recalcula despues, para que un cambio de precios no altere el historico.
+            recalcula después, para que un cambio de precios no altere el historico.
           </p>
           <p>
             <strong className="text-slate-800">Costo / ingreso</strong> compara el costo del mes contra lo que
