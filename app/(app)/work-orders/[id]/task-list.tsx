@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronRight, ExternalLink, PackageX, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, PackageX, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ORIGENES, ORDEN_DE_GRUPOS, TONOS, origenValido, type ClaveOrigen } from "@/lib/origenes-actividad";
@@ -65,22 +65,48 @@ export function TaskList({
    * puede cambiar solo porque la pantalla las reagrupe.
    */
   const grupos = useMemo(() => {
-    const porOrigen = new Map<ClaveOrigen, Array<{ task: Task; indice: number }>>();
+    /**
+     * Los grupos son TRAMOS CONTIGUOS del mismo origen, no una bolsa por
+     * origen.
+     *
+     * Asi la numeracion siempre asciende, aunque el gestor reordene. Si decide
+     * «tres pasos del plan, luego atender la fuga, luego el resto del plan»,
+     * la pantalla muestra exactamente eso —y «Del plan preventivo» aparece dos
+     * veces. No es un defecto: es la secuencia que el eligio.
+     */
+    const tramos: Array<{ clave: ClaveOrigen; items: Array<{ task: Task; indice: number }> }> = [];
     tasks.forEach((task, i) => {
       const clave = origenValido(task.origen);
-      porOrigen.set(clave, [...(porOrigen.get(clave) ?? []), { task, indice: i }]);
+      const ultimo = tramos[tramos.length - 1];
+      if (ultimo && ultimo.clave === clave) ultimo.items.push({ task, indice: i });
+      else tramos.push({ clave, items: [{ task, indice: i }] });
     });
-    // Por la posicion de su primera actividad, no por urgencia: la lista se
-    // ejecuta de arriba abajo y reordenarla mueve los pasos de seguridad.
-    return [...porOrigen.entries()]
-      .map(([c, items]) => ({ clave: c, ...ORIGENES[c], items }))
-      .sort((a, b) =>
-        a.items[0].indice - b.items[0].indice ||
-        ORDEN_DE_GRUPOS.indexOf(a.clave) - ORDEN_DE_GRUPOS.indexOf(b.clave));
+    return tramos.map((t, n) => ({ ...t, id: `${t.clave}-${n}`, ...ORIGENES[t.clave] }));
   }, [tasks]);
 
   /** Con un solo origen no hay nada que distinguir: va la lista sola. */
   const agrupar = grupos.length > 1;
+
+  /**
+   * Mueve una actividad un lugar. El servidor decide si se puede.
+   *
+   * Se pregunta alla y no aqui porque la regla —no pasar por encima de lo ya
+   * resuelto— tiene que valer aunque la peticion venga de otro lado.
+   */
+  async function mover(task: Task, direccion: "ARRIBA" | "ABAJO") {
+    setError(null);
+    const res = await fetch(`/api/work-orders/${workOrderId}/tasks/orden`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: task.id, direccion }),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      setError(d.error ?? "No fue posible mover la actividad");
+      return;
+    }
+    startTransition(() => router.refresh());
+  }
 
   function abrirLiberar(task: Task) {
     setLiberando(task);
@@ -145,16 +171,16 @@ export function TaskList({
 
   return (
     <>
-      {(agrupar ? grupos : [{ clave: "TODO" as const, etiqueta: "", ayuda: "", tono: "gris", items: tasks.map((task, indice) => ({ task, indice })) }]).map((g) => {
+      {(agrupar ? grupos : [{ clave: "TODO" as const, id: "TODO", etiqueta: "", ayuda: "", tono: "gris", items: tasks.map((task, indice) => ({ task, indice })) }]).map((g) => {
         const tono = TONOS[g.tono];
-        const abierto = !plegados[g.clave];
+        const abierto = !plegados[g.id];
         const hechas = g.items.filter((x) => x.task.done || x.task.liberadaAt).length;
         return (
-        <div key={g.clave} className={agrupar ? cn("rounded-lg border", tono.borde) : undefined}>
+        <div key={g.id} className={agrupar ? cn("rounded-lg border", tono.borde) : undefined}>
           {agrupar ? (
             <button
               type="button"
-              onClick={() => setPlegados((p) => ({ ...p, [g.clave]: !p[g.clave] }))}
+              onClick={() => setPlegados((p) => ({ ...p, [g.id]: !p[g.id] }))}
               className={cn("flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left", tono.fondo)}
               aria-expanded={abierto}
             >
@@ -195,6 +221,33 @@ export function TaskList({
           >
             {task.done ? <Check className="h-3.5 w-3.5" /> : null}
           </button>
+
+          {/* Reordenar: el plan y la IA proponen, el gestor decide. Se ocultan
+              en lo ya resuelto, que se queda donde paso. */}
+          {editable && !task.done && !task.liberadaAt && tasks.length > 1 ? (
+            <span className="mt-0.5 grid shrink-0 gap-0.5">
+              <button
+                type="button"
+                onClick={() => mover(task, "ARRIBA")}
+                disabled={index === 0}
+                className="grid h-4 w-4 place-items-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:invisible"
+                aria-label="Subir un lugar"
+                title="Subir un lugar"
+              >
+                <ChevronUp className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => mover(task, "ABAJO")}
+                disabled={index === tasks.length - 1}
+                className="grid h-4 w-4 place-items-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-600 disabled:invisible"
+                aria-label="Bajar un lugar"
+                title="Bajar un lugar"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </span>
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
