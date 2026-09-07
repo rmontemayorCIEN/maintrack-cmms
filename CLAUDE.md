@@ -119,7 +119,19 @@ npm run actualizar -- --sin-migrar
 incluso si truena. La llave de IA la trae de Secret Manager sin pasar por la
 terminal.
 
-### Publicar: siempre `npm run deploy`
+### Publicar: `npm run actualizar` cuando hay migraciones
+
+**`npm run deploy` publica el codigo pero NO aplica migraciones.** Si el cambio
+trae una migracion pendiente y se usa `deploy`, el codigo nuevo sale a pedir
+columnas que la base todavia no tiene y la pantalla truena con un P2022. Ya
+paso: se publico la revision 00108 y el detalle de ordenes quedo caido.
+
+- **Con migraciones pendientes → `npm run actualizar`.** Corre las pruebas,
+  migra, publica y verifica, en ese orden.
+- **Sin migraciones → `npm run deploy`** basta.
+
+Para saber si hay pendientes: comparar `prisma/migrations` contra lo ultimo que
+se aplico. Ante la duda, `actualizar` sirve para los dos casos.
 
 Nunca un `gcloud run deploy` a mano. El servicio de produccion, el que ven los
 clientes, se llama **`maintrack-cmms`** (no `cmms`).
