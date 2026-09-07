@@ -197,7 +197,9 @@ export async function aplicarProcedimiento(params: {
         minValue: paso.tipo === "MEASURE" ? paso.minimo : null,
         maxValue: paso.tipo === "MEASURE" ? paso.maximo : null,
         required: true,
-        origen: "MANUAL",
+        // "IA" y no "MANUAL": en la lista de verificacion hay que poder
+        // distinguir un paso que propuso el modelo de uno que alguien capturo.
+        origen: "IA",
         maintenanceType: orden.maintenanceType,
       })),
     }),

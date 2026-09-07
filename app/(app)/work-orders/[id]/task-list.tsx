@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, PackageX, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { Check, ChevronRight, ExternalLink, PackageX, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { ORIGENES, ORDEN_DE_GRUPOS, TONOS, origenValido, type ClaveOrigen } from "@/lib/origenes-actividad";
 import { MOTIVOS_LIBERACION } from "@/lib/backlog";
 import { SelectorBuscable } from "@/components/selector-buscable";
 
@@ -26,6 +28,10 @@ type Task = {
   motivoLiberacion: string | null;
   motivoDetalle: string | null;
   bloqueadaPorPartId: string | null;
+  /** De donde vino: PLAN | SOLICITUD | IA | BACKLOG | ALERTA | MANUAL. */
+  origen: string;
+  /** El folio del reporte que la origino, si vino de uno. */
+  solicitud: string | null;
 };
 
 type Refaccion = { id: string; code: string; name: string };
@@ -49,6 +55,32 @@ export function TaskList({
   const [partId, setPartId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [plegados, setPlegados] = useState<Record<string, boolean>>({});
+
+  /**
+   * Las actividades agrupadas por origen.
+   *
+   * Se guarda el indice ORIGINAL de cada una: la numeracion que ve el tecnico
+   * —1, 2, 3…— es la del papel impreso y la que menciona por radio, asi que no
+   * puede cambiar solo porque la pantalla las reagrupe.
+   */
+  const grupos = useMemo(() => {
+    const porOrigen = new Map<ClaveOrigen, Array<{ task: Task; indice: number }>>();
+    tasks.forEach((task, i) => {
+      const clave = origenValido(task.origen);
+      porOrigen.set(clave, [...(porOrigen.get(clave) ?? []), { task, indice: i }]);
+    });
+    // Por la posicion de su primera actividad, no por urgencia: la lista se
+    // ejecuta de arriba abajo y reordenarla mueve los pasos de seguridad.
+    return [...porOrigen.entries()]
+      .map(([c, items]) => ({ clave: c, ...ORIGENES[c], items }))
+      .sort((a, b) =>
+        a.items[0].indice - b.items[0].indice ||
+        ORDEN_DE_GRUPOS.indexOf(a.clave) - ORDEN_DE_GRUPOS.indexOf(b.clave));
+  }, [tasks]);
+
+  /** Con un solo origen no hay nada que distinguir: va la lista sola. */
+  const agrupar = grupos.length > 1;
 
   function abrirLiberar(task: Task) {
     setLiberando(task);
@@ -113,8 +145,30 @@ export function TaskList({
 
   return (
     <>
-      <ul className="grid gap-2">
-      {tasks.map((task, index) => (
+      {(agrupar ? grupos : [{ clave: "TODO" as const, etiqueta: "", ayuda: "", tono: "gris", items: tasks.map((task, indice) => ({ task, indice })) }]).map((g) => {
+        const tono = TONOS[g.tono];
+        const abierto = !plegados[g.clave];
+        const hechas = g.items.filter((x) => x.task.done || x.task.liberadaAt).length;
+        return (
+        <div key={g.clave} className={agrupar ? cn("rounded-lg border", tono.borde) : undefined}>
+          {agrupar ? (
+            <button
+              type="button"
+              onClick={() => setPlegados((p) => ({ ...p, [g.clave]: !p[g.clave] }))}
+              className={cn("flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left", tono.fondo)}
+              aria-expanded={abierto}
+            >
+              <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 transition-transform", tono.texto, abierto && "rotate-90")} />
+              <span className="min-w-0 flex-1">
+                <span className={cn("block text-xs font-semibold", tono.texto)}>{g.etiqueta}</span>
+                <span className="block text-[0.6875rem] leading-snug text-slate-500">{g.ayuda}</span>
+              </span>
+              <span className="shrink-0 text-[0.6875rem] tabular-nums text-slate-500">{hechas} de {g.items.length}</span>
+            </button>
+          ) : null}
+          {abierto ? (
+          <ul className={cn("grid gap-2", agrupar && "p-2")}>
+          {g.items.map(({ task, indice: index }) => (
         <li
           key={task.id}
           className={cn(
@@ -224,8 +278,12 @@ export function TaskList({
             ) : null}
           </div>
         </li>
-      ))}
-      </ul>
+          ))}
+          </ul>
+          ) : null}
+        </div>
+        );
+      })}
 
       {/* Al portal: la barra superior usa backdrop-blur y eso la vuelve bloque
           contenedor de cualquier `fixed` que viva dentro del shell. */}

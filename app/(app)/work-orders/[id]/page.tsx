@@ -75,7 +75,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         id: true, name: true, kind: true, size: true, mimeType: true, createdAt: true,
         uploadedBy: { select: { name: true } },
       } },
-      requests: { select: { number: true } },
+      requests: { select: { id: true, number: true } },
     },
   });
   if (!wo) notFound();
@@ -324,7 +324,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Link>
         ) : null}
         {wo.requests.map((r) => (
-          <Badge key={r.number} tone="info">Desde solicitud {r.number}</Badge>
+          // El folio lleva al reporte: es la pregunta que sigue —quien lo
+          // reporto, cuando, con que foto— y estaba a tres pantallas.
+          <Link key={r.number} href={`/requests/${r.id}`} className="no-underline">
+            <Badge tone="info" className="hover:bg-sky-100">
+              Desde solicitud {r.number}
+            </Badge>
+          </Link>
         ))}
       </div>
 
@@ -356,6 +362,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 motivoLiberacion: t.motivoLiberacion,
                 motivoDetalle: t.motivoDetalle,
                 bloqueadaPorPartId: t.bloqueadaPorPartId,
+                origen: t.origen,
+                solicitud: t.origenRequest?.number ?? null,
                 done: t.done,
                 resultNumber: t.resultNumber,
                 resultText: t.resultText,
