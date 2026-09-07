@@ -37,7 +37,13 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const asset = await prisma.asset.findUnique({ where: { id }, select: { code: true, name: true } });
+  // Acotado a la organizacion: el nombre de un equipo ajeno no debe asomarse
+  // ni en el titulo de la pestania.
+  const user = await requireUser();
+  const asset = await prisma.asset.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { code: true, name: true },
+  });
   return { title: asset ? `${asset.code} — ${asset.name}` : "Activo" };
 }
 

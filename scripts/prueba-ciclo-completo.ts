@@ -22,7 +22,12 @@ function revisar(e: string, real: unknown, esperado: unknown) {
   if (!bien) fallas++;
   console.log(`  ${bien ? "ok   " : "FALLA"} ${e.padEnd(56)} ${JSON.stringify(real)}${bien ? "" : ` (esperado ${JSON.stringify(esperado)})`}`);
 }
-const iso = (d: Date | null | undefined) => d ? d.toISOString().slice(0, 10) : null;
+// La fecha se compara en hora LOCAL: el sistema la calcula asi (addDays usa
+// setDate) y toISOString() es UTC, que corre el dia despues de las 18:00.
+const iso = (d: Date | null | undefined) =>
+  d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    : null;
 
 async function main() {
   const suf = Date.now();

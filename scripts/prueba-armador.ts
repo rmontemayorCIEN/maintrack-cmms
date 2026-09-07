@@ -6,6 +6,7 @@
  */
 import { prisma } from "../lib/db";
 import { armarOrden, trabajoDisponible } from "../lib/armar-ot";
+import { transitionWorkOrder } from "../lib/workorders";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -111,6 +112,88 @@ async function main() {
     revisar("2 son correctivas", tareas.filter((t) => t.maintenanceType === "CORRECTIVE").length === 2);
     revisar("cada reporte quedo ligado a su actividad", tareas.filter((t) => t.origenRequestId).length === 2);
     revisar("el pendiente encadena con el original", tareas.some((t) => t.retomaDeTaskId === backlogIds[0]));
+
+    // ── Al cerrar, TODOS los planes que aportaron deben avanzar ─────────────
+    console.log("\nAl cerrar avanzan los planes que aportaron trabajo");
+    const antesDe = await prisma.planAsset.findFirstOrThrow({
+      where: { planId: plan.id, assetId: activo.id },
+      select: { nextDueDate: true, lastCompletedAt: true },
+    });
+    // Se marcan las actividades como hechas: un plan no avanza por trabajo sin hacer.
+    await prisma.workOrderTask.updateMany({
+      where: { workOrderId: orden.id }, data: { done: true, completedAt: new Date() },
+    });
+    // Por los estados reales, no saltandoselos: OPEN → IN_PROGRESS → COMPLETED.
+    await transitionWorkOrder({ workOrderId: orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({
+      workOrderId: orden.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
+      resolution: "Todo hecho", fallas: [],
+    });
+    const despuesDe = await prisma.planAsset.findFirstOrThrow({
+      where: { planId: plan.id, assetId: activo.id },
+      select: { nextDueDate: true, lastCompletedAt: true },
+    });
+    revisar(
+      "el plan avanzo aunque la OT no traiga planId en el encabezado",
+      !!despuesDe.lastCompletedAt && despuesDe.nextDueDate?.getTime() !== antesDe.nextDueDate?.getTime(),
+      `${antesDe.nextDueDate?.toISOString().slice(0,10)} → ${despuesDe.nextDueDate?.toISOString().slice(0,10)}`,
+    );
+    const enca = await prisma.workOrder.findUniqueOrThrow({ where: { id: orden.id }, select: { planId: true } });
+    revisar("con un solo plan, el encabezado lo lleva", enca.planId === plan.id, `planId=${enca.planId ? "si" : "null"}`);
+
+    // ── Dos planes en una orden: el encabezado no alcanza para ambos ─────────
+    console.log("\nCon DOS planes, avanzan los dos");
+    const plan2 = await prisma.maintenancePlan.create({
+      data: {
+        organizationId: org.id, name: "Inspeccion trimestral", maintenanceType: "INSPECTION",
+        triggerType: "CALENDAR", intervalDays: 90, estimatedHours: 1, active: true,
+        tasks: { create: [{ position: 0, title: "Termografia", taskType: "CHECK", required: true }] },
+      },
+    });
+    const asig2 = await prisma.planAsset.create({
+      data: {
+        organizationId: org.id, planId: plan2.id, assetId: activo.id, active: true,
+        nextDueDate: new Date(Date.now() - 86_400_000),
+      },
+    });
+    const asig1 = await prisma.planAsset.findFirstOrThrow({ where: { planId: plan.id, assetId: activo.id } });
+    const antes1 = asig1.nextDueDate, antes2 = asig2.nextDueDate;
+
+    const r2 = await armarOrden({
+      organizationId: org.id, userId: user.id, assetId: activo.id,
+      title: "Los dos planes de un viaje",
+      asignaciones: [asig1.id, asig2.id], reportes: [], backlog: [],
+    });
+    if ("error" in r2) throw new Error(`No armo: ${r2.error}`);
+
+    const enca2 = await prisma.workOrder.findUniqueOrThrow({ where: { id: r2.orden.id }, select: { planId: true } });
+    revisar("con dos planes el encabezado queda nulo, no miente", enca2.planId === null, `planId=${enca2.planId}`);
+
+    await prisma.workOrderTask.updateMany({ where: { workOrderId: r2.orden.id }, data: { done: true, completedAt: new Date() } });
+    await transitionWorkOrder({ workOrderId: r2.orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({
+      workOrderId: r2.orden.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
+      resolution: "Los dos", fallas: [],
+    });
+
+    /**
+     * Se comprueba contra el INTERVALO, no contra "cambio algo".
+     *
+     * Comparar antes/despues pasaba por una diferencia de horas aunque la
+     * fecha fuera la misma: una prueba que se aprueba sola. Cada plan debe
+     * quedar a su propio intervalo desde hoy —30 dias uno, 90 el otro— y esos
+     * numeros distintos son la evidencia de que cada uno avanzo por su cuenta.
+     */
+    const d1 = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig1.id }, select: { nextDueDate: true, lastCompletedAt: true } });
+    const d2 = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig2.id }, select: { nextDueDate: true, lastCompletedAt: true } });
+    const diasDesdeHoy = (f: Date | null) =>
+      f ? Math.round((f.getTime() - Date.now()) / 86_400_000) : null;
+    const cerca = (n: number | null, esperado: number) => n !== null && Math.abs(n - esperado) <= 4;
+
+    revisar("el plan de 30 dias quedo a ~30 dias", cerca(diasDesdeHoy(d1.nextDueDate), 30), `${diasDesdeHoy(d1.nextDueDate)} dias`);
+    revisar("el plan de 90 dias quedo a ~90 dias", cerca(diasDesdeHoy(d2.nextDueDate), 90), `${diasDesdeHoy(d2.nextDueDate)} dias`);
+    revisar("los dos registraron su ejecucion", !!d1.lastCompletedAt && !!d2.lastCompletedAt);
+    void antes1; void antes2;
 
     console.log("\nEl backlog y los reportes ya no se ofrecen dos veces");
     const despues = await trabajoDisponible(org.id, activo.id);

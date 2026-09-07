@@ -251,7 +251,31 @@ export async function transitionWorkOrder(params: {
     // quedaria mal para siempre y nadie se enteraria.
     await recalcWorkOrder(wo.id);
 
-    if (wo.planId) await rollForwardPlan(wo.planId, now, wo.meterValue, wo.assetId);
+    /**
+     * Avanzar TODOS los planes que aportaron trabajo, no solo el del encabezado.
+     *
+     * Una orden mezclada puede traer actividades de dos planes distintos, y el
+     * planId de arriba solo alcanza para uno: el segundo plan se quedaba sin
+     * avanzar y volvia a vencer como si no se hubiera hecho. Peor todavia, una
+     * orden armada con el generador nace sin planId, asi que no avanzaba
+     * ninguno.
+     *
+     * Las actividades liberadas no cuentan: no se hicieron, y avanzar el plan
+     * por trabajo que no se ejecuto es exactamente la mentira que se quiere
+     * evitar.
+     */
+    const planesQueAvanzan = new Set<string>();
+    if (wo.planId) planesQueAvanzan.add(wo.planId);
+    const deActividades = await prisma.workOrderTask.findMany({
+      where: { workOrderId: wo.id, liberadaAt: null, origenPlanId: { not: null } },
+      select: { origenPlanId: true },
+      distinct: ["origenPlanId"],
+    });
+    for (const t of deActividades) planesQueAvanzan.add(t.origenPlanId!);
+
+    for (const planId of planesQueAvanzan) {
+      await rollForwardPlan(planId, now, wo.meterValue, wo.assetId);
+    }
 
     await prisma.predictiveAlert.updateMany({
       where: { workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },

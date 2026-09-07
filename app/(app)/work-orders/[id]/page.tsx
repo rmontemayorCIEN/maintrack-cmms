@@ -34,7 +34,13 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const wo = await prisma.workOrder.findUnique({ where: { id }, select: { number: true } });
+  // Acotado a la organizacion: sin esto el titulo de la pestania alcanzaba a
+  // mostrar el folio de otra empresa aunque la pagina diera 404.
+  const user = await requireUser();
+  const wo = await prisma.workOrder.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { number: true },
+  });
   return { title: wo ? `${wo.number}` : "Orden de trabajo" };
 }
 

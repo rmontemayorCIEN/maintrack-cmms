@@ -22,7 +22,12 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const r = await prisma.workRequest.findUnique({ where: { id }, select: { number: true } });
+  // Acotado a la organizacion, igual que la pagina.
+  const user = await requireUser();
+  const r = await prisma.workRequest.findFirst({
+    where: { id, organizationId: user.organizationId },
+    select: { number: true },
+  });
   return { title: r ? r.number : "Solicitud" };
 }
 

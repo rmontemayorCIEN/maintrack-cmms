@@ -176,6 +176,21 @@ export async function armarOrden(p: {
   const hayPreventivo = asignaciones.some((a) => a.plan.maintenanceType === "PREVENTIVE");
   const tipoEncabezado = hayPreventivo ? "PREVENTIVE" : "CORRECTIVE";
 
+  /**
+   * El plan del encabezado, cuando el trabajo vino de UNO solo.
+   *
+   * Varias pantallas siguen leyendo `WorkOrder.planId`: el panel de recursos
+   * planeados —lo que el tecnico debe preparar antes de bajar— y el calendario,
+   * que oculta la proyeccion de un plan que ya tiene orden. Dejarlo nulo hacia
+   * que el panel no apareciera y que el calendario mostrara la proyeccion
+   * duplicada.
+   *
+   * Con dos o mas planes se queda nulo a proposito: no hay uno que represente
+   * al conjunto, y elegir el primero seria mentir. Para ese caso el avance de
+   * planes ya no depende del encabezado, sino del origen de cada actividad.
+   */
+  const planUnico = asignaciones.length === 1 ? asignaciones[0].plan.id : null;
+
   const horas = asignaciones.reduce((s, a) => s + (a.plan.estimatedHours ?? 0), 0)
     + reportes.length * 1
     + delBacklog.length * 0.5;
@@ -187,6 +202,7 @@ export async function armarOrden(p: {
       number,
       title: p.title,
       maintenanceType: tipoEncabezado,
+      planId: planUnico,
       status: p.assignedToId ? "ASSIGNED" : "OPEN",
       priority: p.priority,
       assetId: asset.id,
