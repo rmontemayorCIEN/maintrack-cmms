@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Minus, RotateCcw, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Minus, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
@@ -18,6 +18,13 @@ type Area = {
   perdida: number; equipos: Equipo[];
 };
 type Mes = { clave: string; etiqueta: string; horas: number; perdida: number };
+type Analisis = {
+  explicacion: string;
+  loQueConecta: string | null;
+  contraLoQueDijo: string | null;
+  accion: { titulo: string; porque: string; quien: string };
+  confianza: "ALTA" | "MEDIA" | "BAJA";
+};
 
 /**
  * Donde para la planta, visto desde la direccion.
@@ -56,6 +63,36 @@ export function MapaDeParos({
   /** Equipos que el director quito para ver cuanto bajaria sin ellos. */
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set());
 
+  /**
+   * La explicacion de la IA, por area.
+   *
+   * Se guarda por area y no una sola: quien pregunta por la nave y luego por
+   * el patio no deberia perder la primera respuesta al volver. Y se limpia al
+   * cambiar de periodo, porque una explicacion de otro trimestre pegada a
+   * numeros nuevos es peor que no tener explicacion.
+   */
+  const [explicaciones, setExplicaciones] = useState<Record<string, Analisis>>({});
+  const [preguntando, setPreguntando] = useState(false);
+  const [errorIa, setErrorIa] = useState<string | null>(null);
+
+  async function preguntarPorQue(locationId: string | null) {
+    setPreguntando(true);
+    setErrorIa(null);
+    const res = await fetch("/api/ia/paros", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locationId, periodo }),
+    });
+    const datos = await res.json().catch(() => ({}));
+    setPreguntando(false);
+    if (!res.ok) {
+      // El motivo ya viene redactado para el usuario: se muestra tal cual.
+      setErrorIa(datos.error ?? "No fue posible analizar");
+      return;
+    }
+    setExplicaciones((e) => ({ ...e, [locationId ?? "__sin__"]: datos.analisis }));
+  }
+
   const conParo = areas.filter((a) => a.horasQueDetienen > 0);
   const totalHoras = conParo.reduce((s, a) => s + a.horasQueDetienen, 0);
 
@@ -79,6 +116,8 @@ export function MapaDeParos({
   }, [excluidos, areas, perdida]);
 
   function cambiarPeriodo(p: ClavePeriodo) {
+    setExplicaciones({});
+    setErrorIa(null);
     const q = new URLSearchParams(params.toString());
     q.set("p", p);
     // El periodo vive en la URL: asi el director puede mandar el enlace de lo
@@ -308,6 +347,83 @@ export function MapaDeParos({
                     );
                   })}
                 </ul>
+
+                {/* ── Lo que dice la IA de esta área ──────────────────── */}
+                {(() => {
+                  const clave = area.locationId ?? "__sin__";
+                  const ia = explicaciones[clave];
+                  if (ia) {
+                    return (
+                      <div className="grid gap-2 rounded-lg border border-brand-200 bg-brand-50/50 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-brand-700">
+                            <Sparkles className="h-3.5 w-3.5" /> Por qué para esta área
+                          </span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[0.625rem] font-medium ${
+                              ia.confianza === "ALTA"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : ia.confianza === "MEDIA"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-200 text-slate-600"
+                            }`}
+                            title="Qué tanto sostiene el texto de las órdenes esta conclusión"
+                          >
+                            confianza {ia.confianza.toLowerCase()}
+                          </span>
+                        </div>
+                        <p className="text-xs leading-relaxed text-slate-700">{ia.explicacion}</p>
+                        {ia.loQueConecta ? (
+                          <p className="text-xs leading-relaxed text-slate-700">
+                            <strong className="font-semibold">Lo que conecta: </strong>
+                            {ia.loQueConecta}
+                          </p>
+                        ) : null}
+                        {/*
+                          Lo que el dueno declaro contra lo que dicen los numeros.
+                          Se destaca aparte porque cuando NO coinciden, ese es el
+                          hallazgo mas valioso de toda la pantalla.
+                        */}
+                        {ia.contraLoQueDijo ? (
+                          <p className="rounded-md bg-white/70 p-2 text-xs leading-relaxed text-slate-700">
+                            <strong className="font-semibold">Contra lo que usted dijo: </strong>
+                            {ia.contraLoQueDijo}
+                          </p>
+                        ) : null}
+                        <div className="rounded-md border border-brand-200 bg-white p-2">
+                          <p className="text-xs font-semibold text-slate-900">{ia.accion.titulo}</p>
+                          <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-600">
+                            {ia.accion.porque}
+                          </p>
+                          <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-slate-600">
+                            le toca a {ia.accion.quien.toLowerCase()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => preguntarPorQue(area.locationId)}
+                        disabled={preguntando}
+                        className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+                      >
+                        {preguntando ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        {preguntando ? "Leyendo las órdenes…" : "¿Por qué para esta área?"}
+                      </button>
+                      {/* El motivo del rechazo ya viene redactado: se muestra tal cual. */}
+                      {errorIa ? (
+                        <p className="text-[0.6875rem] leading-relaxed text-amber-800">{errorIa}</p>
+                      ) : null}
+                    </div>
+                  );
+                })()}
 
                 {simulado ? (
                   <div className="grid gap-2 rounded-lg bg-emerald-50 p-2.5">

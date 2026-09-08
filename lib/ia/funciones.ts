@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -116,6 +116,13 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     nombre: "Limpieza del catálogo",
     descripcion:
       "Revisa las refacciones que parecen duplicadas y distingue las que son la misma pieza de las que solo se llaman parecido.",
+    operaciones: 2,
+    disponible: true,
+  },
+  PARO_AREA: {
+    nombre: "Por qué para esta área",
+    descripcion:
+      "Lee las órdenes de un área y le explica al dueño por qué se detuvo, en pesos: qué conecta a los equipos que fallaron y si eso coincide con lo que él dice que le duele.",
     operaciones: 2,
     disponible: true,
   },

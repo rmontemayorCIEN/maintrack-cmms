@@ -992,16 +992,29 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
       "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
     ],
+    botones: [
+      {
+        nombre: "¿Por qué para esta área?",
+        explica:
+          "La IA lee las órdenes de trabajo del área en el periodo que usted está viendo y le explica qué pasó, en pesos y sin jerga. Dice qué conecta a los equipos que fallaron, y si eso coincide con lo que usted declaró que no puede parar. Trae una etiqueta de confianza: cuando las órdenes no explican por qué falló, lo dice en vez de inventar.",
+      },
+      {
+        nombre: "El monto de cada equipo",
+        explica:
+          "Tóquelo para quitarlo de la cuenta y ver cuánto bajaría la pérdida sin él. Es lo que valdría resolverlo de raíz, calculado sobre lo que ya pasó — no una promesa.",
+      },
+    ],
     campos: [
       { nombre: "El total", explica: "Dice «al menos» cuando falta captura: entonces es un piso, no el dato. Debajo aparece exactamente qué falta y dónde se completa." },
       { nombre: "La flecha", explica: "Compara contra el periodo anterior del mismo largo. Rojo hacia arriba es peor: más pérdida. Sin periodo anterior no inventa un porcentaje." },
       { nombre: "Cómo ha venido", explica: "Los últimos doce meses, incluidos los que no tuvieron paro. Saltarse los meses buenos deformaría la tendencia." },
-      { nombre: "El monto de cada equipo", explica: "Tóquelo para quitarlo de la cuenta y ver cuánto bajaría la pérdida sin él. Es lo que valdría resolverlo de raíz, calculado sobre lo que ya pasó." },
     ],
     noPuedo: [
       { sintoma: "El mapa sale vacío o con muy pocas horas", porque: "Solo entran los equipos marcados como que detienen la producción y con paro capturado. Si nadie anota cuánto estuvo parado el equipo al cerrar la orden, el área sale en blanco y parece sana." },
       { sintoma: "Un área muestra horas pero $0", porque: "No tiene tarifa por hora. Se captura en Catálogos → Ubicaciones. Ojo: la tarifa no es cuánto produce el área, es cuánto deja de ganar la empresa cuando algo de esa área detiene la producción." },
       { sintoma: "Dice «al menos» y no el total exacto", porque: "Faltan equipos por definir si detienen la línea, o áreas sin tarifa. El mensaje dice cuántos. Mientras falte, el número es un piso." },
+      { sintoma: "La IA dice que no hay nada que explicar", porque: "Ese área no registró paros en el periodo, o los registró pero sin ninguna orden de trabajo que los explique. La IA lee texto: sin órdenes no hay qué leer." },
+      { sintoma: "La explicación sale con confianza baja", porque: "Las órdenes se cerraron sin decir qué se hizo, o con un «listo» y nada más. Es preferible que lo admita a que invente una causa y mande a desarmar un equipo sano. Se arregla capturando la resolución al cerrar." },
     ],
   },
 
