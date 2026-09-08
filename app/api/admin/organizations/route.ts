@@ -26,7 +26,7 @@ const schema = z.object({
   name: z.string().trim().min(2, "El nombre de la empresa es obligatorio"),
   industry: z.string().trim().optional().nullable(),
   tipoInstalacion: z.string().trim().max(20).optional().nullable(),
-  plan: z.enum(["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"]).default("PROFESSIONAL"),
+  plan: z.enum(["PROFESSIONAL", "ENTERPRISE"]).default("PROFESSIONAL"),
   trialDays: z.coerce.number().int().min(0).max(365).default(30),
   ownerName: z.string().trim().min(2, "El nombre del responsable es obligatorio"),
   ownerEmail: z.string().email("Correo invalido"),

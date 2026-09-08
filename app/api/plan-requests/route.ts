@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { COMPLEMENTO_IA, PLANES, nombreSolicitado, planDe, type ClavePlan } from "@/lib/planes";
+import { COMPLEMENTO_IA, PLANES, nombreSolicitado, planDe, type ClavePlan, ORDEN_PLANES } from "@/lib/planes";
 import { logAudit, notify } from "@/lib/audit";
 
 const schema = z.object({
   /// Un plan, o el complemento de IA, que sigue el mismo camino de aprobacion.
-  plan: z.enum(["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE", "IA_AVANZADA"]),
+  plan: z.enum(["PROFESSIONAL", "ENTERPRISE", "IA_AVANZADA"]),
   nota: z.string().trim().max(400).optional().nullable(),
 });
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       where: { isSuperAdmin: true, active: true },
       select: { id: true, organizationId: true },
     });
-    const orden: ClavePlan[] = ["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+    const orden = ORDEN_PLANES;
     const sube = esComplemento || orden.indexOf(input.plan as ClavePlan) > orden.indexOf(actual as ClavePlan);
 
     await Promise.all(

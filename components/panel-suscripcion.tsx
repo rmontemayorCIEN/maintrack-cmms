@@ -1,5 +1,5 @@
 import { Badge, Card, CardHeader, Progress } from "@/components/ui";
-import { PLANES, type ClavePlan, planDe, diasDePruebaRestantes } from "@/lib/planes";
+import { PLANES, type ClavePlan, planDe, diasDePruebaRestantes, ORDEN_PLANES } from "@/lib/planes";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 type Consumo = {
@@ -25,7 +25,7 @@ export function PanelSuscripcion({
   const vencida = dias !== null && dias < 0;
   const porVencer = dias !== null && dias >= 0 && dias <= 7;
 
-  const orden: ClavePlan[] = ["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+  const orden = ORDEN_PLANES;
   const siguiente = orden[orden.indexOf(org.plan as ClavePlan) + 1];
 
   return (
@@ -113,7 +113,7 @@ export function PanelSuscripcion({
           </div>
           <p className="mt-1 text-[0.6875rem] leading-relaxed text-brand-900/80">
             {PLANES[siguiente].limites.assets === Infinity
-              ? "Activos, usuarios y sitios sin limite."
+              ? "Activos, usuarios y sitios sin límite."
               : `Hasta ${formatNumber(PLANES[siguiente].limites.assets, 0)} activos y ${formatNumber(PLANES[siguiente].limites.users, 0)} usuarios.`}{" "}
             {PLANES[siguiente].incluye[1] ?? ""}
           </p>

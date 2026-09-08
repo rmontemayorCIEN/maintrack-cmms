@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Check, Loader2, Sparkles, X } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { ORDEN_PLANES } from "@/lib/planes";
 
 type Limites = { assets: number; users: number; sites: number; sensors: number; storageGb: number };
 export type FichaPlan = {
@@ -17,8 +18,16 @@ export type FichaPlan = {
 };
 type Solicitud = { id: string; planSolicitado: string; createdAt: string } | null;
 
-const ORDEN = ["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
-const inf = (n: number) => (n === null || !Number.isFinite(n) ? "Sin limite" : formatNumber(n, 0));
+/**
+ * Se compara como texto a proposito.
+ *
+ * Las fichas llegan del servidor ya serializadas, y una cuenta vieja puede
+ * traer un plan que ya no existe. `indexOf` devuelve -1 y entonces todo se
+ * muestra como subida, que es exactamente lo correcto: desde un plan retirado,
+ * cualquiera de los vigentes es hacia arriba.
+ */
+const ORDEN: string[] = ORDEN_PLANES;
+const inf = (n: number) => (n === null || !Number.isFinite(n) ? "Sin límite" : formatNumber(n, 0));
 
 /**
  * Fichas de los niveles de suscripcion.
@@ -99,7 +108,8 @@ export function FichasPlanes({
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {/* Dos planes: en cuatro columnas quedarian a media pantalla y con hueco. */}
+      <div className="grid gap-3 md:grid-cols-2">
         {planes.map((p) => {
           const actual = p.clave === planActual;
           const i = ORDEN.indexOf(p.clave);
@@ -142,10 +152,16 @@ export function FichasPlanes({
                 <Limite etiqueta="Sitios" valor={inf(p.limites.sites)} />
                 <Limite
                   etiqueta="Monitoreo predictivo"
-                  valor={p.limites.sensors === 0 ? "No incluido" : `${inf(p.limites.sensors)} sensores`}
+                  valor={
+                    p.limites.sensors === 0
+                      ? "No incluido"
+                      : Number.isFinite(p.limites.sensors)
+                        ? `${inf(p.limites.sensors)} sensores`
+                        : "Sin límite"
+                  }
                   apagado={p.limites.sensors === 0}
                 />
-                <Limite etiqueta="Archivos" valor={p.limites.storageGb === Infinity ? "Sin limite" : `${p.limites.storageGb} GB`} />
+                <Limite etiqueta="Archivos" valor={p.limites.storageGb === Infinity ? "Sin límite" : `${p.limites.storageGb} GB`} />
               </dl>
 
               <ul className="mb-4 grid flex-1 gap-1.5">

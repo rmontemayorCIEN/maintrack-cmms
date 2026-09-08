@@ -11,7 +11,16 @@ import { FUNCIONES_IA, type ClaveFuncionIA } from "./ia/funciones";
  *
  * Infinity = sin limite.
  */
-export type ClavePlan = "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE";
+export type ClavePlan = "PROFESSIONAL" | "ENTERPRISE";
+
+/**
+ * El orden comercial, de menor a mayor.
+ *
+ * Vive aqui y no repetido en cada pantalla: estaba escrito a mano en tres
+ * lugares, y quitar un plan obligaba a acordarse de los tres. El dia que se
+ * agregue uno, se agrega una vez.
+ */
+export const ORDEN_PLANES: ClavePlan[] = ["PROFESSIONAL", "ENTERPRISE"];
 
 export type DefinicionPlan = {
   nombre: string;
@@ -78,54 +87,25 @@ export const COMPLEMENTO_IA = {
 } as const;
 
 export const PLANES: Record<ClavePlan, DefinicionPlan> = {
-  FREE: {
-    nombre: "Free",
-    precioMensual: 0,
-    moneda: "MXN",
-    descripcion: "Para probar el sistema con una línea o un área.",
-    limites: { assets: 25, users: 3, sites: 1, sensors: 0, storageGb: 1 },
-    incluye: [
-      "Preventivo por calendario y por medidor",
-      "Órdenes de trabajo y solicitudes",
-      "Almacén de refacciones",
-      "Indicadores basicos",
-      "1 GB para fotos y documentos",
-    ],
-    // La ayuda va en TODOS los planes, con su propia bolsa. Cobrar por poder
-    // preguntar como se usa el sistema es hostil: el usuario que se atora y no
-    // puede preguntar no compra el plan de arriba, se va.
-    ia: { operaciones: 0, funciones: ["AYUDA"], operacionesAyuda: 30 },
-  },
-  STARTER: {
-    nombre: "Starter",
-    precioMensual: 990,
-    moneda: "MXN",
-    descripcion: "Para un taller o una planta chica con un equipo pequeño.",
-    limites: { assets: 150, users: 10, sites: 3, sensors: 0, storageGb: 10 },
-    incluye: [
-      "Todo lo de Free",
-      "Hasta 3 sitios",
-      "Reportes y exportación a CSV",
-      "Bitácora de auditoria",
-      "10 GB para fotos, videos y documentos",
-    ],
-    // La ayuda va en TODOS los planes, con su propia bolsa. Cobrar por poder
-    // preguntar como se usa el sistema es hostil: el usuario que se atora y no
-    // puede preguntar no compra el plan de arriba, se va.
-    ia: { operaciones: 0, funciones: ["AYUDA"], operacionesAyuda: 30 },
-  },
   PROFESSIONAL: {
     nombre: "Professional",
     precioMensual: 2990,
     moneda: "MXN",
     descripcion: "Para una planta completa que ya opera con indicadores.",
     limites: { assets: 1000, users: 50, sites: 10, sensors: 50, storageGb: 100 },
+    // Es el plan de entrada: la lista tiene que sostenerse sola, sin
+    // apoyarse en un plan de abajo que ya no existe.
     incluye: [
-      "Todo lo de Starter",
+      "Preventivo por calendario y por medidor",
+      "Órdenes de trabajo, solicitudes y reportes de falla",
+      "Almacén de refacciones, requisiciones y compras",
       "Mantenimiento predictivo y monitoreo de condición",
       "Alertas por tendencia y vida útil remanente",
+      "Avisos al celular, sin costo por mensaje",
+      "Reportes, indicadores y exportación",
+      "Bitácora de auditoría",
       "API para integrar sistemas externos e IoT",
-      "100 GB de archivos",
+      "100 GB para fotos, videos y documentos",
       "Diagnóstico semanal con inteligencia artificial",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
@@ -140,8 +120,8 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
     limites: { assets: Infinity, users: Infinity, sites: Infinity, sensors: Infinity, storageGb: Infinity },
     incluye: [
       "Todo lo de Professional",
-      "Activos, usuarios y sitios sin limite",
-      "Monitoreo predictivo sin limite",
+      "Activos, usuarios y sitios sin límite",
+      "Monitoreo predictivo sin límite",
       "Diagnóstico semanal y asistentes de IA",
       "Soporte prioritario",
     ],
@@ -185,14 +165,22 @@ export function iaDeLaOrganizacion(org: { plan: string; iaComplemento: boolean; 
  *
  * Las solicitudes de cambio reutilizan el mismo flujo para los planes y para
  * el complemento de IA, y `IA_AVANZADA` no es un plan: sin esto se mostraria
- * como "Free" por la degradacion de planDe.
+ * como "Professional" por la degradacion de planDe.
  */
 export function nombreSolicitado(clave: string): string {
   return clave === COMPLEMENTO_IA.clave ? COMPLEMENTO_IA.nombre : planDe(clave).nombre;
 }
 
+/**
+ * La definicion de un plan, tolerando un valor que ya no existe.
+ *
+ * Cae en Profesional y no revienta. Importa: una copia de respaldo restaurada
+ * o una cuenta vieja pueden traer "FREE" o "STARTER" en la columna, y el
+ * sistema tiene que seguir de pie. Degradar hacia ARRIBA es lo correcto aqui:
+ * dejar a alguien con menos de lo que pago seria el error caro.
+ */
 export function planDe(clave: string): DefinicionPlan {
-  return PLANES[clave as ClavePlan] ?? PLANES.FREE;
+  return PLANES[clave as ClavePlan] ?? PLANES.PROFESSIONAL;
 }
 
 /** Consumo actual de una organizacion contra los topes de su plan. */

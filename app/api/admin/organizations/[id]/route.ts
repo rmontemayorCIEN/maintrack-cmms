@@ -5,7 +5,7 @@ import { requireSuperAdmin } from "@/lib/superadmin";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
-  plan: z.enum(["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"]).optional(),
+  plan: z.enum(["PROFESSIONAL", "ENTERPRISE"]).optional(),
   status: z.enum(["ACTIVE", "TRIAL", "SUSPENDED", "CANCELLED"]).optional(),
   name: z.string().trim().min(2).optional(),
   tipoInstalacion: z.string().trim().max(20).nullable().optional(),

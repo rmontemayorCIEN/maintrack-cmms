@@ -6,6 +6,7 @@ import { ArrowRight, Building2, LogIn, Loader2, Plus, X } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { CLAVES_INSTALACION, INSTALACIONES } from "@/lib/instalaciones";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { ORDEN_PLANES } from "@/lib/planes";
 
 type Org = {
   id: string; name: string; slug: string; plan: string; status: string;
@@ -25,7 +26,8 @@ const ESTADO: Record<string, { texto: string; tono: "success" | "info" | "warnin
   CANCELLED: { texto: "Cancelada", tono: "muted" },
 };
 
-const PLANES = ["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"];
+// El orden vive en lib/planes.ts: aqui se consume, no se vuelve a escribir.
+const PLANES = ORDEN_PLANES;
 
 type SolicitudPlan = {
   id: string; empresa: string; planActual: string; planSolicitado: string;
