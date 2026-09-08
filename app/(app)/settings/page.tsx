@@ -385,7 +385,7 @@ export default async function SettingsPage({
                     {canManage ? (
                       <td className="text-right">
                         {miembro.role !== "OWNER" && miembro.id !== user.id ? (
-                          <UserRowActions userId={miembro.id} active={miembro.active} role={miembro.role} />
+                          <UserRowActions userId={miembro.id} userName={miembro.name} active={miembro.active} role={miembro.role} />
                         ) : null}
                       </td>
                     ) : null}

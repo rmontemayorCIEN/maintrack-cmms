@@ -6,16 +6,20 @@ import Link from "next/link";
 import { Activity, Loader2, ShieldCheck, TrendingUp, Wrench } from "lucide-react";
 import { Button } from "@/components/ui";
 
-const DEMO = [
-  { email: "director@aceroindustrial.mx", role: "Propietario / Dirección" },
-  { email: "supervisor@aceroindustrial.mx", role: "Supervisor de mantenimiento" },
-  { email: "tecnico@aceroindustrial.mx", role: "Tecnico" },
-];
-
-export function LoginForm() {
+/**
+ * La pantalla de acceso no anuncia cuentas ni prellena credenciales.
+ *
+ * Antes traia tres correos de demostracion y su contrasena escrita a la vista.
+ * Aunque esas cuentas no existan, una pantalla de acceso que publica una clave
+ * es lo primero que mira quien evalua el sistema, y ademas obligaba a todo
+ * usuario real a borrar dos campos antes de poder entrar.
+ *
+ * Al sistema entra solo quien fue dado de alta desde Configuracion.
+ */
+export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
   const router = useRouter();
-  const [email, setEmail] = useState("director@aceroindustrial.mx");
-  const [password, setPassword] = useState("demo1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -109,30 +113,19 @@ export function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-700">Cuentas de demostración</p>
-            <p className="mt-1 text-[0.6875rem] text-slate-500">Contraseña para todas: <code className="rounded bg-slate-100 px-1">demo1234</code></p>
-            <div className="mt-3 grid gap-1.5">
-              {DEMO.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => { setEmail(account.email); setPassword("demo1234"); }}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 px-2.5 py-1.5 text-left text-[0.6875rem] hover:bg-slate-50"
-                >
-                  <span className="font-medium text-slate-700">{account.email}</span>
-                  <span className="text-slate-400">{account.role}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-slate-500">
-            ¿Nueva empresa?{" "}
-            <Link href="/register" className="font-medium text-brand-600 hover:underline">
-              Cree su espacio de trabajo
-            </Link>
-          </p>
+          {/*
+            El alta publica esta apagada salvo que la instancia la habilite.
+            Invitar a registrarse cuando el servidor lo va a rechazar manda a la
+            persona a llenar un formulario que termina en error.
+          */}
+          {permiteAlta ? (
+            <p className="mt-6 text-center text-xs text-slate-500">
+              ¿Nueva empresa?{" "}
+              <Link href="/register" className="font-medium text-brand-600 hover:underline">
+                Cree su espacio de trabajo
+              </Link>
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

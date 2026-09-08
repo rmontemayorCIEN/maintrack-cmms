@@ -1031,12 +1031,22 @@ export const AYUDA: Record<string, FichaAyuda> = {
           "Pide el permiso al sistema y registra este aparato. En iPhone solo aparece si MainTrack ya se agregó a la pantalla de inicio.",
       },
       {
+        nombre: "Reponer contraseña (la llave, junto a cada usuario)",
+        explica:
+          "Le pone una contraseña nueva a esa persona cuando la olvidó. Usted se la dice y ella la cambia al entrar. Al propietario no se le puede reponer desde aquí —lo dejaría fuera de su propia empresa—: él la cambia en «Mi cuenta».",
+      },
+      {
         nombre: "Mandarme una prueba",
         explica:
           "Manda un aviso real a este aparato. Es la única forma de comprobar el camino completo: que diga «activado» solo significa que se guardó el registro.",
       },
     ],
     noPuedo: [
+      {
+        sintoma: "Alguien olvidó su contraseña y no puede entrar",
+        porque:
+          "No hay correo de recuperación. Un administrador se la repone desde Usuarios, con el botón de la llave junto a su nombre. Queda en la bitácora quién lo hizo, nunca cuál fue la contraseña.",
+      },
       {
         sintoma: "No me llegan los avisos al iPhone",
         porque:
