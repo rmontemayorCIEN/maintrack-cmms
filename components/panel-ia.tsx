@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Check, Loader2, Lock, Sparkles } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Loader2, Lock, Sparkles } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Progress } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 
@@ -38,6 +38,16 @@ export function PanelIa({
   funciones: Funcion[];
 }) {
   const router = useRouter();
+  /**
+   * La lista de funciones nace cerrada.
+   *
+   * Son dieciocho renglones con su descripcion, y en esta pantalla empujaban
+   * los planes tan abajo que habia que desplazarse para encontrarlos —el
+   * motivo por el que uno entra aqui—. Es material de consulta, no algo que se
+   * decida todos los dias: se deja a un clic y la pantalla vuelve a caber.
+   */
+  const [verFunciones, setVerFunciones] = useState(false);
+  const activas = funciones.filter((f) => f.incluida && f.disponible).length;
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
@@ -93,6 +103,24 @@ export function PanelIa({
         </div>
       ) : null}
 
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setVerFunciones((v) => !v)}
+          aria-expanded={verFunciones}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-2.5 py-2 text-left hover:bg-slate-50"
+        >
+          <span className="text-xs font-medium text-slate-700">
+            {activas} de {funciones.length} funciones activas
+          </span>
+          <span className="flex items-center gap-1 text-[0.6875rem] text-slate-500">
+            {verFunciones ? "Ocultar" : "Ver cuáles"}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${verFunciones ? "rotate-180" : ""}`} />
+          </span>
+        </button>
+      </div>
+
+      {verFunciones ? (
       <ul className="mb-4 grid gap-2">
         {funciones.map((f) => (
           <li key={f.clave} className="flex items-start gap-2">
@@ -111,6 +139,7 @@ export function PanelIa({
           </li>
         ))}
       </ul>
+      ) : null}
 
       {complementoActivo ? (
         <Link

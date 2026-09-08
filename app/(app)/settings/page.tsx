@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users , ClipboardList } from "lucide-react";
+import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -264,8 +264,14 @@ export default async function SettingsPage({
       ) : null}
 
       {activa === "suscripcion" && consumo ? (
+        /*
+          El orden es el de las preguntas que trae quien entra: primero "que
+          tengo y cuanto llevo usado", enseguida "cuanto cuesta cambiarme".
+          Antes los planes quedaban hasta el fondo, empujados por la lista de
+          dieciocho funciones de IA, y habia que desplazarse para encontrarlos.
+        */
         <div className="grid gap-6">
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
             <div className="lg:col-span-2">
               <PanelSuscripcion org={org} consumo={consumo} />
             </div>
@@ -292,22 +298,6 @@ export default async function SettingsPage({
               }))}
             />
 
-            {can(user.role, "settings:write") ? (
-              <Link
-                href="/import"
-                className="flex h-fit items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3 transition-colors hover:bg-brand-50"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
-                  <Upload className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-brand-900">Importar desde Excel</p>
-                  <p className="text-xs text-brand-800/80">
-                    Activos, refacciones, planes y catálogos, con plantilla y vista previa.
-                  </p>
-                </div>
-              </Link>
-            ) : null}
           </div>
 
           <FichasPlanes
