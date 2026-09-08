@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
 import { estiloDeApariencia } from "@/lib/apariencia";
+import { TextosQueCrecen } from "@/components/textos-que-crecen";
 
 export const metadata: Metadata = {
   title: {
@@ -68,7 +69,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="es" style={estilo as React.CSSProperties}>
-      <body>{children}</body>
+      <body>
+        <TextosQueCrecen />
+        {children}
+      </body>
     </html>
   );
 }

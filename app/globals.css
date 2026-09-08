@@ -98,6 +98,31 @@ body {
   padding-left: 2.25rem;
 }
 
+/*
+   Los campos multilinea crecen con lo que se escribe.
+
+   Un cuadro de dos renglones donde alguien describe una falla obliga a
+   desplazarse dentro del propio campo para releer lo que acaba de escribir, y
+   en el telefono eso es pelearse con el dedo. Aqui crece solo.
+
+   `field-sizing: content` es del navegador: no hay JavaScript de por medio y
+   funciona tambien cuando el valor lo pone el sistema —una descripcion que
+   redacto la IA, un formulario que se abre con datos ya cargados—. Para los
+   navegadores que todavia no la traen hay respaldo en
+   components/textos-que-crecen.tsx.
+
+   El atributo `rows` sigue mandando como MINIMO, asi que un campo declarado de
+   tres renglones nunca se ve mas chico que eso.
+
+   El tope de 40vh no es capricho: sin el, una descripcion larga empuja el boton
+   de guardar fuera de la pantalla y el usuario no encuentra como terminar.
+   Pasado ese alto, el campo se desplaza por dentro como antes.
+*/
+textarea {
+  field-sizing: content;
+  max-height: 40vh;
+}
+
 .label {
   display: block;
   font-size: 0.75rem;
