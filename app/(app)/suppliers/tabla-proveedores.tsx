@@ -21,19 +21,6 @@ export type FilaProveedor = ProveedorEditable & {
 
 const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 
-const FIJAS: Columna<FilaProveedor>[] = [
-  {
-    id: "name", etiqueta: "Proveedor",
-    texto: (p) => `${p.name} ${p.contactName ?? ""} ${p.notes ?? ""}`,
-    pinta: (p) => (
-      <div className="max-w-64">
-        <p className="truncate font-medium text-slate-800">{p.name}</p>
-        <p className="truncate text-xs text-slate-500">{guion(p.contactName)}</p>
-      </div>
-    ),
-  },
-];
-
 const COLUMNAS: Columna<FilaProveedor>[] = [
   { id: "telefono", etiqueta: "Telefono", texto: (p) => guion(p.phone) },
   {
@@ -89,6 +76,43 @@ export function TablaProveedores({
 }) {
   const router = useRouter();
   const [borrando, setBorrando] = useState<string | null>(null);
+
+  /**
+   * El nombre abre la ficha del proveedor.
+   *
+   * Un nombre subrayado se entiende solo —se toca y entra— y le quita un
+   * control al renglon. Se arma aqui adentro y no fuera del componente porque
+   * necesita saber si la cuenta puede editar: quien solo consulta ve el
+   * nombre como texto, sin invitar a un clic que no lleva a ningun lado.
+   */
+  const FIJAS: Columna<FilaProveedor>[] = [
+    {
+      id: "name", etiqueta: "Proveedor",
+      texto: (p) => `${p.name} ${p.contactName ?? ""} ${p.notes ?? ""}`,
+      pinta: (p) => (
+        <div className="max-w-64">
+          {editable ? (
+            <ProveedorDialog
+              proveedor={p}
+              disparador={(abrir) => (
+                <button
+                  type="button"
+                  onClick={abrir}
+                  title={`Ver y editar ${p.name}`}
+                  className="block max-w-full truncate text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+                >
+                  {p.name}
+                </button>
+              )}
+            />
+          ) : (
+            <p className="truncate font-medium text-slate-800">{p.name}</p>
+          )}
+          <p className="truncate text-xs text-slate-500">{guion(p.contactName)}</p>
+        </div>
+      ),
+    },
+  ];
   const [error, setError] = useState<string | null>(null);
 
   async function eliminar(p: FilaProveedor) {
@@ -117,7 +141,7 @@ export function TablaProveedores({
         ejemploFiltro='Filtrar: "rodamientos", "local", "urgente"…'
         acciones={editable ? (p) => (
           <div className="flex items-center justify-end gap-1">
-            <ProveedorDialog proveedor={p} />
+            {/* La ficha se abre desde el nombre; aqui solo queda borrar. */}
             <button
               type="button" onClick={() => eliminar(p)} disabled={borrando === p.id}
               title="Borrar proveedor"

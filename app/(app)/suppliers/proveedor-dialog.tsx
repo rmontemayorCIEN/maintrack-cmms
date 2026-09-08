@@ -20,7 +20,19 @@ const CAMPOS = [
   { nombre: "address", etiqueta: "Dirección", ancho: "sm:col-span-2" },
 ] as const;
 
-export function ProveedorDialog({ proveedor }: { proveedor?: ProveedorEditable }) {
+export function ProveedorDialog({
+  proveedor,
+  disparador,
+}: {
+  proveedor?: ProveedorEditable;
+  /**
+   * Quien abre el dialogo, cuando no debe ser el boton de siempre.
+   *
+   * En el listado es el nombre del proveedor: se toca y entra a la ficha. Asi
+   * el renglon carga un control menos, que es lo que se busca en una tabla.
+   */
+  disparador?: (abrir: () => void) => React.ReactNode;
+}) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -45,7 +57,9 @@ export function ProveedorDialog({ proveedor }: { proveedor?: ProveedorEditable }
 
   return (
     <>
-      {editando ? (
+      {disparador ? (
+        disparador(() => setAbierto(true))
+      ) : editando ? (
         <BotonEditar que="proveedor" onClick={() => setAbierto(true)} />
       ) : (
         <Button type="button" size="sm" onClick={() => setAbierto(true)}>

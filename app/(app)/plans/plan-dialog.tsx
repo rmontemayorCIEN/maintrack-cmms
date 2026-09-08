@@ -89,6 +89,7 @@ export function PlanDialog({
   borrador,
   aviso,
   onCerrar,
+  disparador,
 }: {
   assets: Array<{ id: string; code: string; name: string }>;
   meters: Array<{ id: string; name: string; unit: string; assetId: string; currentValue: number }>;
@@ -111,6 +112,13 @@ export function PlanDialog({
   aviso?: string | null;
   /** Se llama al cerrar, para que quien lo abrio pueda descartar el borrador. */
   onCerrar?: () => void;
+  /**
+   * Quien abre el dialogo, cuando no debe ser el boton de siempre.
+   *
+   * En el listado es el nombre del plan: se toca y entra a la ficha, y el
+   * renglon carga un control menos.
+   */
+  disparador?: (abrir: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
   const editando = Boolean(plan);
@@ -260,6 +268,7 @@ export function PlanDialog({
   }
 
   if (!open) {
+    if (disparador) return <>{disparador(abrir)}</>;
     return editando ? (
       <BotonEditar que="plan" onClick={abrir} />
     ) : (

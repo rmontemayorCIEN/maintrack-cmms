@@ -257,6 +257,15 @@ export function Avatar({ name, color }: { name: string; color?: string }) {
  * no falle, y la palabra "Editar" donde hay espacio: un lapiz solo obliga a
  * adivinar. En pantalla angosta se queda el icono, pero ya con la medida y el
  * borde que lo delatan como boton.
+ *
+ * OJO: en las tablas ya NO se usa. El patron vigente es que la columna que
+ * identifica el renglon —la clave de la refaccion, el nombre del proveedor o
+ * del plan— sea el enlace que abre la ficha: se entiende sola y le quita un
+ * control a un renglon que suele ir apretado. Los dialogos lo aceptan con la
+ * prop `disparador`.
+ *
+ * Esto queda como opcion por omision de esos dialogos, para que funcionen sin
+ * que haya que pasarles un disparador. Hoy ningun caso lo alcanza.
  */
 export function BotonEditar({
   que,

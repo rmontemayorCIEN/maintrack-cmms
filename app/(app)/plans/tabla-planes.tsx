@@ -57,7 +57,28 @@ export function TablaPlanes({
       texto: (p) => `${p.name} ${p.description ?? ""}`,
       pinta: (p) => (
         <div className={`max-w-64 ${p.active ? "" : "opacity-50"}`}>
-          <p className="truncate font-medium text-slate-800">{p.name}</p>
+          {/* El nombre abre la ficha: un control menos en el renglon. */}
+          {editable ? (
+            <PlanDialog
+              plan={p.paraEditar}
+              assets={assets} meters={meters} technicians={technicians}
+              especialidades={especialidades} refacciones={refacciones}
+              servicios={servicios} moneda={moneda}
+              puedeCrearCatalogos={puedeCrearCatalogos}
+              disparador={(abrir) => (
+                <button
+                  type="button"
+                  onClick={abrir}
+                  title={`Ver y editar ${p.name}`}
+                  className="block max-w-full truncate text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+                >
+                  {p.name}
+                </button>
+              )}
+            />
+          ) : (
+            <p className="truncate font-medium text-slate-800">{p.name}</p>
+          )}
           {p.description ? <p className="truncate text-xs text-slate-500">{p.description}</p> : null}
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <EnlacesPlan planId={p.id} nombre={p.name} editable={editable} enlaces={p.enlaces} />
@@ -162,17 +183,7 @@ export function TablaPlanes({
       ejemploFiltro='Filtrar: "bomba", "mensual", "pausado"…'
       acciones={editable ? (p) => (
         <div className="flex justify-end gap-1">
-          <PlanDialog
-            plan={p.paraEditar}
-            assets={assets}
-            meters={meters}
-            technicians={technicians}
-            especialidades={especialidades}
-            refacciones={refacciones}
-            servicios={servicios}
-            moneda={moneda}
-            puedeCrearCatalogos={puedeCrearCatalogos}
-          />
+          {/* La ficha se abre desde el nombre del plan. */}
           <PlanRowActions planId={p.id} active={p.active} />
         </div>
       ) : undefined}

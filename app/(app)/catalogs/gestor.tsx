@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MapPin, Plus, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, EmptyState, BotonEditar } from "@/components/ui";
+import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { enlaceMapa } from "@/lib/geografia";
 import { cn } from "@/lib/utils";
 
@@ -380,9 +380,26 @@ export function GestorCatalogos({
                   const uso = textoUso(fila);
                   return (
                     <tr key={String(fila.id)}>
-                      {columnas.map((c) => (
+                      {columnas.map((c, i) => (
                         <td key={c.nombre} className="text-slate-700">
-                          {c.nombre === "code" ? (
+                          {/*
+                            La primera columna abre la ficha del registro.
+                            Es la que lo identifica —clave o nombre, segun el
+                            catalogo— y subrayada se entiende sola. Asi el
+                            renglon carga un control menos.
+                          */}
+                          {i === 0 && editable ? (
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicion(fila)}
+                              title={`Ver y editar ${String(fila[c.nombre] ?? "")}`}
+                              className="text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+                            >
+                              {c.nombre === "code"
+                                ? String(fila[c.nombre] ?? "—")
+                                : etiquetaDeCelda(fila, c)}
+                            </button>
+                          ) : c.nombre === "code" ? (
                             <span className="font-medium">{String(fila[c.nombre] ?? "—")}</span>
                           ) : (
                             etiquetaDeCelda(fila, c)
@@ -417,7 +434,7 @@ export function GestorCatalogos({
                       {editable ? (
                         <td className="text-right">
                           <div className="flex justify-end gap-1">
-                            <BotonEditar que="registro" onClick={() => abrirEdicion(fila)} />
+                            {/* La ficha se abre desde la primera columna. */}
                             <button
                               type="button"
                               onClick={() => borrar(fila)}
