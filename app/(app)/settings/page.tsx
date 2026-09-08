@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users , ClipboardList } from "lucide-react";
+import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, Upload, UserCog, Users , ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -25,11 +25,12 @@ import { Pestanas, type Pestana } from "./pestanas";
 import { ConfiguracionCompras } from "./compras";
 import { ConfiguracionJornada } from "./jornada";
 import { ConfiguracionOrdenes } from "./ordenes";
+import { PanelAvisos } from "./avisos";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "avisos", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
@@ -38,6 +39,7 @@ const DESCRIPCIONES: Record<Seccion, string> = {
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
+  avisos: "Avisos al teléfono: si la empresa los manda y cómo activar cada aparato.",
   suscripcion: "Plan contratado, consumo y carga inicial de información.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
   usuarios: "Quien entra al sistema, con que rol y a que tarifa.",
@@ -65,6 +67,7 @@ export default async function SettingsPage({
     { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
+    { clave: "avisos", titulo: "Avisos", icono: <BellRing className="h-4 w-4" /> },
     { clave: "suscripcion", titulo: "Suscripción", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
@@ -168,6 +171,13 @@ export default async function SettingsPage({
           multiOrigen={org.otMultiOrigen}
           horizonteDias={org.otHorizonteDias}
           editable={can(user.role, "settings:write")}
+        />
+      ) : null}
+
+      {activa === "avisos" ? (
+        <PanelAvisos
+          encendidoInicial={org.avisosPush}
+          puedeEditar={can(user.role, "settings:write")}
         />
       ) : null}
 

@@ -113,6 +113,7 @@ export async function POST(request: Request) {
         title: `OT asignada ${number}`,
         body: input.title,
         link: `/work-orders/${workOrder.id}`,
+        tag: number,
       });
     }
 

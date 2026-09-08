@@ -16,18 +16,11 @@ import { notify } from "./audit";
  * que llego y a que almacen entro.
  */
 
-export const ESTADOS_COMPRA = {
-  SOLICITADA: "Solicitada",
-  AUTORIZADA: "Autorizada",
-  RECHAZADA: "Rechazada",
-  EN_COMPRA: "En compra",
-  RECIBIDA_PARCIAL: "Recibida en parte",
-  RECIBIDA: "Recibida",
-  CERRADA: "Cerrada",
-  CANCELADA: "Cancelada",
-} as const;
-
-export type EstadoCompra = keyof typeof ESTADOS_COMPRA;
+// Los nombres visibles de los estados viven en lib/estados-compra.ts y NO se
+// reexportan desde aqui a proposito: reexportarlos deja abierta la puerta a que
+// una pantalla los vuelva a tomar de este modulo y se lleve consigo prisma y el
+// envio de avisos al paquete del navegador. Ya paso una vez.
+import { ESTADOS_COMPRA, type EstadoCompra } from "./estados-compra";
 
 export class ErrorDeCompra extends Error {}
 
@@ -172,6 +165,7 @@ export async function autorizar(params: {
       body: params.aprueba ? undefined : params.motivo?.trim(),
       link: `/compras/${req.id}`,
       kind: params.aprueba ? "SUCCESS" : "WARNING",
+      tag: req.folio,
     });
   }
 

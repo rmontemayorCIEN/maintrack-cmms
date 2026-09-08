@@ -77,6 +77,31 @@ extrae lo comun. Ejemplos vivos: `TablaConfigurable`, `CONTROLES_TABLA`,
 pasan por `withAuth(permiso, handler)` de `lib/api.ts`, que entrega `orgId` ya
 resuelto —incluida la suplantacion de super-admin. No leas la sesion a mano.
 
+### 8. Los avisos salen por `notify()`, no por donde sea
+
+`notify()` en `lib/audit.ts` es el UNICO lugar por donde el sistema le dice
+algo a una persona. Guarda la notificacion de la campana y, ademas, la manda
+al celular si la organizacion tiene `avisosPush` encendido.
+
+Un canal nuevo —WhatsApp, correo— se enchufa **ahi**, y lo ganan de golpe los
+siete lugares que ya notifican. No se agrega un envio suelto en una pantalla:
+esa es justo la forma de terminar con siete canales que se comportan distinto.
+
+Dos cosas que no se tocan:
+
+- **El registro va primero, el canal despues.** Si el envio falla, la
+  notificacion ya quedo guardada y la persona la ve al entrar. Al reves se
+  pierde el aviso cuando se cae el canal.
+- **El canal nunca tumba la operacion.** Un fallo de envio no puede impedir
+  que se cierre una orden de trabajo.
+
+Los avisos al celular no cuestan por mensaje. Las llaves VAPID se generan una
+sola vez con `scripts/generar-llaves-avisos.ts`, que **no imprime la privada**;
+en produccion vive en Secret Manager. Regenerarlas obliga a cada persona a
+volver a activar su telefono a mano.
+
+---
+
 ---
 
 ## Como esta armado
@@ -152,8 +177,9 @@ creo un servicio `cmms` de mas, que hubo que borrar.
 ### El guardian de secretos
 
 `scripts/git-hooks/pre-commit` revisa el contenido de cada commit y lo detiene
-si encuentra una llave de Anthropic o de Google, una llave privada, o una
-cadena de conexion con contrasena literal. Se activa con:
+si encuentra una llave de Anthropic o de Google, una llave privada, la llave
+VAPID de los avisos, o una cadena de conexion con contrasena literal. Se activa
+con:
 
 ```bash
 git config core.hooksPath scripts/git-hooks

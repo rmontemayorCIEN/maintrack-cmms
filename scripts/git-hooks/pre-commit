@@ -14,7 +14,12 @@ archivos=$(git diff --cached --name-only --diff-filter=ACM)
 
 # La parte de la contrasena excluye $ \ ( ) * | y comillas: eso descarta las
 # variables de shell ($CLAVE) y los patrones de sed, que no son secretos.
-patron='sk-ant-[a-zA-Z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}|BEGIN [A-Z ]*PRIVATE KEY|postgres(ql)?://[^:@ "]+:[^$@ "\\()*|]{6,}@'
+# La llave privada de los avisos es base64 de 43 caracteres. Se exige el
+# nombre de la variable delante para no confundirla con cualquier cadena
+# larga: un hash de git o un identificador tambien la empatarian.
+# El .{0,2} cubre la comilla opcional: escribir una comilla simple aqui
+# cierra la cadena del shell y deja el archivo sin poder ejecutarse.
+patron='sk-ant-[a-zA-Z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}|BEGIN [A-Z ]*PRIVATE KEY|postgres(ql)?://[^:@ "]+:[^$@ "\\()*|]{6,}@|VAPID_PRIVATE_KEY[ ]*[:=][ ]*.{0,2}[A-Za-z0-9_-]{40,}'
 
 
 encontrados=$(echo "$archivos" | tr '\n' '\0' | xargs -0 grep -lIE "$patron" 2>/dev/null \

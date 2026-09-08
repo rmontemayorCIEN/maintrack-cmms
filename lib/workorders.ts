@@ -328,6 +328,7 @@ export async function transitionWorkOrder(params: {
         body: wo.title,
         link: `/work-orders/${wo.id}`,
         kind: "SUCCESS",
+        tag: wo.number,
       });
     }
   }

@@ -53,6 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           body: input.reviewNotes ?? undefined,
           link: "/requests",
           kind: "WARNING",
+          tag: workRequest.number,
         });
       }
       return ok({ request: updated });
@@ -157,6 +158,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         body: `Se genero la orden ${number}`,
         link: `/work-orders/${workOrder.id}`,
         kind: "SUCCESS",
+        tag: workRequest.number,
       });
     }
 

@@ -76,6 +76,17 @@ model Organization {
   /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
   otHorizonteDias Int     @default(15)
 
+  /// Si esta organizacion manda avisos al celular de su gente.
+  ///
+  /// Apagado por omision, y a proposito. Un aviso que llega al telefono
+  /// interrumpe a una persona: eso se pide, no se impone. Ademas, encenderlo
+  /// sin explicarle a nadie como instalar la aplicacion solo produce la queja
+  /// de que "no llegan los avisos" cuando en realidad nadie se suscribio.
+  ///
+  /// Apagarlo no borra las suscripciones: se dejan de usar y vuelven a servir
+  /// si se enciende otra vez. Quien se dio de baja no tiene por que volver a
+  /// hacer el tramite en el telefono por una decision de la empresa.
+  avisosPush    Boolean  @default(false)
   /// Complemento "IA Avanzada" contratado sobre el plan.
   iaComplemento Boolean  @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
@@ -83,52 +94,53 @@ model Organization {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  users            User[]
-  sites            Site[]
-  locations        Location[]
-  assetCategories  AssetCategory[]
-  assets           Asset[]
-  meters           Meter[]
-  meterReadings    MeterReading[]
-  plans            MaintenancePlan[]
-  workOrders       WorkOrder[]
-  workRequests     WorkRequest[]
-  parts            Part[]
-  partCategories   PartCategory[]
-  partUnits        PartUnit[]
-  aiUsage          AiUsage[]
-  aiReports        AiReport[]
-  assetIntakes     AssetIntake[]
-  specialties      Specialty[]
-  externalServices ExternalService[]
-  stockMovements   StockMovement[]
-  suppliers        Supplier[]
-  teams            Team[]
-  sensors          Sensor[]
-  sensorReadings   SensorReading[]
-  alerts           PredictiveAlert[]
-  failureCodes     FailureCode[]
-  rootCauses       RootCause[]
-  notifications    Notification[]
-  auditLogs        AuditLog[]
-  attachments      Attachment[]
-  links            ReferenceLink[]
-  invites          Invitation[]
-  planRequests     PlanRequest[]
-  invoices         Invoice[]
-  warehouses       Warehouse[]
-  partStocks       PartStock[]
-  stockTransfers   StockTransfer[]
-  materialRequests MaterialRequest[]
-  purchaseRequests PurchaseRequest[]
-  goodsReceipts    GoodsReceipt[]
-  quotes           Quote[]
-  purchaseOrders   PurchaseOrder[]
-  inventoryCounts  InventoryCount[]
-  reportPoints     ReportPoint[]
-  festivos         DiaFestivo[]
-  equivalencias    EquivalenciaRefaccion[]
-  asignacionesPlan PlanAsset[]
+  users             User[]
+  sites             Site[]
+  locations         Location[]
+  assetCategories   AssetCategory[]
+  assets            Asset[]
+  meters            Meter[]
+  meterReadings     MeterReading[]
+  plans             MaintenancePlan[]
+  workOrders        WorkOrder[]
+  workRequests      WorkRequest[]
+  parts             Part[]
+  partCategories    PartCategory[]
+  partUnits         PartUnit[]
+  aiUsage           AiUsage[]
+  aiReports         AiReport[]
+  assetIntakes      AssetIntake[]
+  specialties       Specialty[]
+  externalServices  ExternalService[]
+  stockMovements    StockMovement[]
+  suppliers         Supplier[]
+  teams             Team[]
+  sensors           Sensor[]
+  sensorReadings    SensorReading[]
+  alerts            PredictiveAlert[]
+  failureCodes      FailureCode[]
+  rootCauses        RootCause[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  auditLogs         AuditLog[]
+  attachments       Attachment[]
+  links             ReferenceLink[]
+  invites           Invitation[]
+  planRequests      PlanRequest[]
+  invoices          Invoice[]
+  warehouses        Warehouse[]
+  partStocks        PartStock[]
+  stockTransfers    StockTransfer[]
+  materialRequests  MaterialRequest[]
+  purchaseRequests  PurchaseRequest[]
+  goodsReceipts     GoodsReceipt[]
+  quotes            Quote[]
+  purchaseOrders    PurchaseOrder[]
+  inventoryCounts   InventoryCount[]
+  reportPoints      ReportPoint[]
+  festivos          DiaFestivo[]
+  equivalencias     EquivalenciaRefaccion[]
+  asignacionesPlan  PlanAsset[]
 }
 
 model User {
@@ -173,6 +185,7 @@ model User {
   meterReadings        MeterReading[]
   stockMovements       StockMovement[]
   notifications        Notification[]
+  pushSubscriptions    PushSubscription[]
   auditLogs            AuditLog[]
   acknowledgedAlerts   PredictiveAlert[]
   completedTasks       WorkOrderTask[]
@@ -1904,6 +1917,49 @@ model Notification {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Un telefono o computadora que acepto recibir avisos de MainTrack.
+///
+/// Es POR DISPOSITIVO, no por persona: quien usa telefono y tableta tiene dos
+/// renglones, y aceptar en uno no hace que llegue al otro. Esa es la naturaleza
+/// del mecanismo del navegador y hay que explicarsela al usuario, porque de
+/// otro modo lo vive como una falla.
+model PushSubscription {
+  id             String @id @default(cuid())
+  organizationId String
+  userId         String
+  /// La direccion a la que el navegador entrega el aviso. La da el navegador,
+  /// es unica en el mundo y es la identidad real de la suscripcion: si el
+  /// usuario reinstala, cambia y hay que dar de alta una nueva.
+  endpoint       String @unique
+  /// Llaves de cifrado del navegador. El servidor cifra con ellas y ni Google
+  /// ni Apple pueden leer el contenido del aviso al pasarlo.
+  p256dh         String
+  auth           String
+
+  /// Como llamarle a este aparato en la lista: "iPhone", "Android · Chrome".
+  /// Se calcula al darlo de alta; el usuario no tiene que nombrarlo.
+  dispositivo String  @default("Dispositivo")
+  /// El identificador crudo del navegador, para soporte. Cuando alguien dice
+  /// "no me llegan", esto dice si instalo la aplicacion o quedo en el
+  /// navegador, que es la causa mas comun en iPhone.
+  userAgent   String?
+
+  /// Ultimo aviso entregado. Sirve para distinguir una suscripcion viva de una
+  /// que nunca ha recibido nada.
+  ultimoEnvioAt DateTime?
+  /// Fallos seguidos. El envio borra la suscripcion en cuanto el navegador
+  /// dice que ya no existe; esto es para los errores pasajeros, que no deben
+  /// dar de baja a nadie por un rato de mala red.
+  fallos        Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
 }
 
 model AuditLog {

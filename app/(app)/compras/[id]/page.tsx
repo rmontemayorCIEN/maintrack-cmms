@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ESTADOS_COMPRA } from "@/lib/compras";
+import { ESTADOS_COMPRA } from "@/lib/estados-compra";
 import { URGENCIAS } from "@/lib/requisiciones";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesCompra, type RenglonCompra } from "./acciones";

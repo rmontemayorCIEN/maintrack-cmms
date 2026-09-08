@@ -190,6 +190,7 @@ export async function generateScheduledWorkOrders(
         title: `Nueva OT preventiva ${number}`,
         body: plan.name,
         link: `/work-orders/${workOrder.id}`,
+        tag: number,
       });
     }
 

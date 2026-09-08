@@ -1000,11 +1000,59 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Configurar logotipo, color, proceso de compras y umbral de autorización",
       "Definir la jornada, los días laborables y los días que la empresa no trabaja",
       "Dar de alta usuarios y revisar la bitácora",
+      "Encender los avisos al teléfono y activar cada aparato",
     ],
     flujo: [
       "Los permisos van por rol. Cambiar el rol de alguien cambia lo que puede hacer en todas las pantallas.",
       "En «Jornada y calendario» se define de cuántas horas es un día de trabajo. De ahí sale si un día del calendario cabe y en qué fechas puede programar el programador.",
       "La capacidad se define por excepción: la organización fija el número general y solo quien trabaje distinto lleva el suyo.",
+      "Los avisos al teléfono llevan DOS llaves: el administrador enciende la de la empresa, y además cada persona activa su propio aparato. Encender la de la empresa no activa a nadie.",
+    ],
+    campos: [
+      {
+        nombre: "Avisos · Esta empresa manda avisos",
+        explica:
+          "Apagado, nadie recibe nada aunque tenga su teléfono activado. Apagarlo no borra los aparatos: vuelven a servir si se enciende otra vez.",
+      },
+      {
+        nombre: "Avisos · Sus aparatos",
+        explica:
+          "Cada teléfono, tableta o computadora va por separado. Activarlo en el teléfono no lo activa en la tableta: así funciona el navegador, no es una falla.",
+      },
+    ],
+    botones: [
+      {
+        nombre: "Activar en este aparato",
+        explica:
+          "Pide el permiso al sistema y registra este aparato. En iPhone solo aparece si MainTrack ya se agregó a la pantalla de inicio.",
+      },
+      {
+        nombre: "Mandarme una prueba",
+        explica:
+          "Manda un aviso real a este aparato. Es la única forma de comprobar el camino completo: que diga «activado» solo significa que se guardó el registro.",
+      },
+    ],
+    noPuedo: [
+      {
+        sintoma: "No me llegan los avisos al iPhone",
+        porque:
+          "Casi siempre es que MainTrack no está agregado a la pantalla de inicio, o que se abrió desde Safari y no desde el icono. Apple solo entrega avisos a la aplicación instalada. Los pasos están en la pestaña Avisos.",
+      },
+      {
+        sintoma: "Dice «Bloqueado» y el botón de activar no hace nada",
+        porque:
+          "El sistema operativo tiene negadas las notificaciones para MainTrack. Desde la página ya no se puede volver a preguntar: hay que permitirlas en los ajustes del aparato. La pantalla trae los pasos del aparato que esté usando.",
+      },
+      {
+        sintoma: "Antes llegaban y de repente dejaron de llegar",
+        porque:
+          "Se borró el icono, se reinstaló la aplicación o se cambió de teléfono: la activación se pierde y hay que volver a activar. Si en la lista de aparatos aparece «intentos sin llegar», es eso.",
+      },
+      {
+        sintoma: "Activé mi teléfono pero no recibo nada",
+        porque:
+          "Puede que su empresa tenga los avisos apagados. Mande una prueba: si están apagados, el mensaje se lo dice.",
+      },
     ],
   },
 

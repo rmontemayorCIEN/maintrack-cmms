@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { BandaCliente } from "@/components/shell/banda-cliente";
+import { RegistrarSW } from "@/components/registrar-sw";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -10,6 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
+      <RegistrarSW />
       <Sidebar
         tieneLogo={Boolean(user.organization.logoUrl)}
         orgName={user.organization.name}

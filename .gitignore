@@ -8,6 +8,9 @@ out
 next-env.d.ts
 .vercel
 
+# Llaves VAPID de los avisos al celular. La privada firma cada aviso.
+.llaves-avisos.txt
+
 # Credenciales de cuentas de servicio: nunca deben viajar al repositorio
 clave-github.json
 *-service-account*.json
