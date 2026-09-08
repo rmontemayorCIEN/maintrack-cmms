@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui";
 import {
   costoComparado, comoDecirlo, eventosDeParo, ventanas, esPeriodo, type ClavePeriodo,
@@ -70,6 +71,7 @@ export default async function ParosPage({
         desdeLinea={v.actual.desde.getTime()}
         hastaLinea={v.actual.hasta.getTime()}
         ventana={ventanaPropia ? { desde: d, hasta: hst } : null}
+        puedeAcomodar={can(user.role, "settings:write")}
         moneda={user.organization.currency}
       />
     </>

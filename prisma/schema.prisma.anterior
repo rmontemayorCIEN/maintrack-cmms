@@ -322,13 +322,32 @@ model Site {
 }
 
 model Location {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   siteId         String
   parentId       String?
   name           String
   code           String
   description    String?
+  /// ─── El croquis: donde queda esta area en la planta ───────────────────
+  ///
+  /// El mapa de calor dibujado como tira proporcional dice DONDE DUELE, pero
+  /// no se parece a la planta de nadie. Un director piensa en lugares —"el
+  /// area de tornos, alla al fondo"— y cuando el dibujo coincide con esa
+  /// geografia mental deja de ser una grafica y pasa a ser SU planta.
+  ///
+  /// Va en celdas de una rejilla y no en pixeles: la rejilla perdona el pulso
+  /// —nadie acomoda cajas al pixel con el dedo en una tableta— y el resultado
+  /// se ve ordenado aunque se haya armado de prisa.
+  ///
+  /// Nulo en X/Y significa SIN COLOCAR. Mientras alguna area lo este, la
+  /// pantalla cae a la tira proporcional: media planta dibujada y media no
+  /// seria peor que ninguna.
+  planoX         Int?
+  planoY         Int?
+  planoAncho     Int     @default(3)
+  planoAlto      Int     @default(2)
+
   /// Lo que esta area o linea DEJA DE GANAR por cada hora parada.
   ///
   /// Margen, no venta. Un numero de precio de venta sale enorme y se ve
@@ -340,8 +359,8 @@ model Location {
   /// Cero significa SIN CAPTURAR, no "parar aqui es gratis". La diferencia
   /// importa al presentarlo: un area sin tarifa no debe salir en $0, debe
   /// salir como pendiente de definir.
-  margenPorHora  Float    @default(0)
-  createdAt      DateTime @default(now())
+  margenPorHora Float    @default(0)
+  createdAt     DateTime @default(now())
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   site         Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)

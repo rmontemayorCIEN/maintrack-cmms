@@ -987,7 +987,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Simular cuánto bajaría la pérdida sin un equipo",
     ],
     flujo: [
-      "El tamaño de cada bloque ES el daño: si un área concentra tres cuartas partes de las horas perdidas, ocupa tres cuartas partes del mapa.",
+      "En el croquis el COLOR es el daño y el tamaño es geografía: las cajas están donde usted las puso, no ordenadas por lo que costaron. Por eso cada una trae sus horas y sus pesos escritos adentro.",
+      "El croquis arranca con las áreas repartidas en la rejilla. Ese acomodo no adivina su planta —acertar a medias sería peor—: es un punto de partida para que usted las arrastre a donde de verdad están.",
+      "Soltar un área encima de otra las intercambia de lugar. Es la forma rápida de acomodar cuando la rejilla ya está llena y no hay hueco a dónde mover.",
       "Solo cuentan los equipos marcados como que detienen la producción, a la tarifa de su ubicación. Sin esa marca se le cargaría a la extracción de humos el costo completo de la nave.",
       "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
       "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
@@ -1008,10 +1010,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
     campos: [
       { nombre: "El total", explica: "Dice «al menos» cuando falta captura: entonces es un piso, no el dato. Debajo aparece exactamente qué falta y dónde se completa." },
       { nombre: "La flecha", explica: "Compara contra el periodo anterior del mismo largo. Rojo hacia arriba es peor: más pérdida. Sin periodo anterior no inventa un porcentaje." },
+      { nombre: "Acomodar mi planta", explica: "Pone el croquis en modo de acomodo: arrastre cada área a donde de verdad está y jale la esquina de abajo para cambiar su tamaño. Se guarda para toda la organización, no solo para usted, porque el croquis es de la planta y no de quien lo abre. Solo quien administra la configuración puede moverlo." },
+      { nombre: "El croquis", explica: "Su planta como usted la ve, no como la ordena una gráfica. Cuando el dibujo coincide con la geografía que ya tiene en la cabeza —«el área de tornos, allá al fondo»— deja de ser una gráfica y pasa a ser SU planta. Toque un área para ver qué equipos la detuvieron." },
       { nombre: "El latido de la planta", explica: "Cada marca es un paro: dónde está dice cuándo, qué tan alta dice cuánto duró, y el color si detuvo producción, fue mantenimiento planeado, o paró sin costar. Una barra mensual escondería lo que más importa: un equipo que para cada tres semanas tiene un patrón; uno que paró dos veces tuvo dos accidentes, y se atienden distinto." },
       { nombre: "Arrastrar sobre la línea", explica: "Escoge cualquier tramo, no solo los de los botones. Todo se recalcula sobre ese tramo —incluida la comparación, que se hace contra el periodo anterior del mismo largo— y la pregunta a la IA se limita a él. El tramo queda en la dirección de la página, así que se puede mandar por correo." },
     ],
     noPuedo: [
+      { sintoma: "No veo el botón de acomodar el croquis", porque: "Acomodar la planta cambia lo que ve toda la organización, así que pide permiso de configuración. Quien no lo tiene ve el croquis y puede tocarlo, pero no moverlo." },
+      { sintoma: "Arrastré un área y regresó a otro lado", porque: "Dos áreas no pueden quedar encimadas: una taparía a la otra por completo sin que nadie lo note. Si la soltó sobre una sola área, las dos se intercambian; si cayó sobre varias, se va al primer hueco libre." },
       { sintoma: "El mapa sale vacío o con muy pocas horas", porque: "Solo entran los equipos marcados como que detienen la producción y con paro capturado. Si nadie anota cuánto estuvo parado el equipo al cerrar la orden, el área sale en blanco y parece sana." },
       { sintoma: "Un área muestra horas pero $0", porque: "No tiene tarifa por hora. Se captura en Catálogos → Ubicaciones. Ojo: la tarifa no es cuánto produce el área, es cuánto deja de ganar la empresa cuando algo de esa área detiene la producción." },
       { sintoma: "Dice «al menos» y no el total exacto", porque: "Faltan equipos por definir si detienen la línea, o áreas sin tarifa. El mensaje dice cuántos. Mientras falte, el número es un piso." },

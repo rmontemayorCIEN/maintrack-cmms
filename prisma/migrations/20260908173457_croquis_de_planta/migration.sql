@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Location" ADD COLUMN     "planoAlto" INTEGER NOT NULL DEFAULT 2,
+ADD COLUMN     "planoAncho" INTEGER NOT NULL DEFAULT 3,
+ADD COLUMN     "planoX" INTEGER,
+ADD COLUMN     "planoY" INTEGER;
+

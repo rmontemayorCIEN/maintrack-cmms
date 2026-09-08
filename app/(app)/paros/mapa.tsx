@@ -8,6 +8,7 @@ import { Card } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
 import { Latido, type Evento } from "./latido";
+import { Croquis } from "./croquis";
 
 type Equipo = {
   assetId: string; code: string; name: string;
@@ -15,6 +16,7 @@ type Equipo = {
 };
 type Area = {
   locationId: string | null; area: string; margenPorHora: number;
+  planoX: number | null; planoY: number | null; planoAncho: number; planoAlto: number;
   horasQueDetienen: number; horasQueNoDetienen: number; horasPlaneadas: number;
   perdida: number; equipos: Equipo[];
 };
@@ -44,7 +46,7 @@ type Analisis = {
 export function MapaDeParos({
   periodo, areas, perdida, cambio, anterior,
   horasQueDetienen, horasPlaneadas, cobertura, comoDecirlo,
-  eventos, desdeLinea, hastaLinea, ventana, moneda,
+  eventos, desdeLinea, hastaLinea, ventana, puedeAcomodar, moneda,
 }: {
   periodo: ClavePeriodo;
   areas: Area[];
@@ -59,6 +61,8 @@ export function MapaDeParos({
   desdeLinea: number;
   hastaLinea: number;
   ventana: { desde: number; hasta: number } | null;
+  /** Solo un administrador acomoda el croquis; los demas lo miran. */
+  puedeAcomodar: boolean;
   moneda: string;
 }) {
   const router = useRouter();
@@ -233,59 +237,26 @@ export function MapaDeParos({
       {/* ── El mapa ──────────────────────────────────────────────────── */}
       <Card padded={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-          <div className="grid gap-3 p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-900">El mapa de la planta</h2>
-              <p className="text-[0.6875rem] text-slate-500">
-                El tamaño es el daño. Toque un área.
-              </p>
-            </div>
-
-            {/*
-              El ancho de cada bloque va en porcentaje pero con un minimo en
-              pixeles: con un area muy chica el bloque quedaba tan angosto que
-              el nombre se partia a media palabra —"Almacé y patio"—. Si ya no
-              caben, la fila se desliza; deformar las proporciones para que
-              quepan seria mentir sobre el tamano del dano, que es justo lo que
-              este mapa dice.
-            */}
+          <div className="p-4">
             {conParo.length ? (
-              <div className="flex gap-1 overflow-x-auto" style={{ height: 260 }}>
-                {conParo.map((a) => (
-                  <button
-                    key={a.locationId ?? a.area}
-                    type="button"
-                    onClick={() => setAreaViendo(a.locationId)}
-                    aria-pressed={a.locationId === area?.locationId}
-                    style={{
-                      flex: `1 1 ${(a.horasQueDetienen / totalHoras) * 100}%`,
-                      minWidth: 108,
-                      background: tono(a.horasQueDetienen, totalHoras),
-                    }}
-                    className={`flex flex-col justify-between overflow-hidden rounded-lg p-2.5 text-left outline-offset-[-2px] transition hover:brightness-105 ${
-                      a.locationId === area?.locationId ? "outline outline-2 outline-slate-900" : ""
-                    }`}
-                  >
-                    <span
-                      className="text-[0.8125rem] font-semibold leading-tight text-white drop-shadow-sm"
-                      style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-                    >
-                      {a.area}
-                    </span>
-                    <span>
-                      <span className="block text-2xl font-semibold leading-none tabular-nums text-white drop-shadow-sm">
-                        {a.horasQueDetienen}
-                        <span className="text-sm font-medium opacity-85"> h</span>
-                      </span>
-                      <span className="mt-0.5 block text-[0.6875rem] text-white/90">
-                        {a.perdida > 0 ? formatCurrency(a.perdida, moneda) : "sin tarifa"}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <Croquis
+                areas={conParo.map((a) => ({
+                  locationId: a.locationId,
+                  area: a.area,
+                  planoX: a.planoX,
+                  planoY: a.planoY,
+                  planoAncho: a.planoAncho,
+                  planoAlto: a.planoAlto,
+                  horasQueDetienen: a.horasQueDetienen,
+                  perdida: a.perdida,
+                }))}
+                moneda={moneda}
+                editable={puedeAcomodar}
+                areaViendo={areaViendo}
+                onVerArea={setAreaViendo}
+              />
             ) : (
-              <p className="rounded-lg bg-slate-50 p-4 text-xs text-slate-500">
+              <p className="rounded-lg bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">
                 En este periodo ningún equipo marcado como que detiene la producción registró
                 paro. Si eso no le cuadra, revise que el paro se esté capturando al cerrar las
                 órdenes.
@@ -474,14 +445,6 @@ export function MapaDeParos({
   );
 }
 
-/** La rampa de calor. Un area que concentra el dano se ve caliente. */
-function tono(horas: number, total: number): string {
-  const p = total > 0 ? horas / total : 0;
-  if (p >= 0.5) return "#9e2f12";
-  if (p >= 0.25) return "#c4522a";
-  if (p >= 0.1) return "#d9622c";
-  return "#e08b4f";
-}
 
 /**
  * La flecha del cambio.

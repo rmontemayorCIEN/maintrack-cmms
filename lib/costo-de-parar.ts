@@ -30,6 +30,11 @@ import { prisma } from "./db";
 export type CostoPorArea = {
   locationId: string | null;
   area: string;
+  /** Donde queda en el croquis. Nulo en X/Y = sin colocar. */
+  planoX: number | null;
+  planoY: number | null;
+  planoAncho: number;
+  planoAlto: number;
   /** Lo que deja de ganarse por hora en esta area. Cero = sin capturar. */
   margenPorHora: number;
   /** Horas de paro de equipos que SI detienen la linea. */
@@ -89,7 +94,12 @@ export async function costoDeParar(
       asset: {
         select: {
           id: true, code: true, name: true, detieneLinea: true,
-          location: { select: { id: true, name: true, margenPorHora: true } },
+          location: {
+            select: {
+              id: true, name: true, margenPorHora: true,
+              planoX: true, planoY: true, planoAncho: true, planoAlto: true,
+            },
+          },
         },
       },
     },
@@ -104,6 +114,10 @@ export async function costoDeParar(
     const area = porArea.get(clave) ?? {
       locationId: loc?.id ?? null,
       area: loc?.name ?? "Sin ubicación",
+      planoX: loc?.planoX ?? null,
+      planoY: loc?.planoY ?? null,
+      planoAncho: loc?.planoAncho ?? 3,
+      planoAlto: loc?.planoAlto ?? 2,
       margenPorHora: loc?.margenPorHora ?? 0,
       horasQueDetienen: 0,
       horasQueNoDetienen: 0,
