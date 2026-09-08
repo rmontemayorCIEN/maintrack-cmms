@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Cpu,
   Factory,
+  Flame,
   Gauge,
   Rocket,
   Inbox,
@@ -108,6 +109,7 @@ const NAV: Array<{
     section: "Como me fue",
     clave: "analisis",
     items: [
+      { href: "/paros", label: "Dónde para la planta", icon: <Flame className="h-4 w-4" /> },
       { href: "/reports", label: "Reportes", icon: <BarChart3 className="h-4 w-4" /> },
       { href: "/consulta", label: "Pregunte a sus datos", icon: <MessageCircleQuestion className="h-4 w-4" /> },
       { href: "/diagnostico", label: "Diagnóstico IA", icon: <Sparkles className="h-4 w-4" /> },

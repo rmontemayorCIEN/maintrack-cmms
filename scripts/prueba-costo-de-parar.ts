@@ -13,7 +13,7 @@
  *   npx tsx scripts/prueba-costo-de-parar.ts
  */
 import { prisma } from "../lib/db";
-import { costoDeParar, comoDecirlo } from "../lib/costo-de-parar";
+import { costoDeParar, comoDecirlo, ventanas, costoComparado, serieMensual, PERIODOS } from "../lib/costo-de-parar";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -122,6 +122,35 @@ async function main() {
     const extR = nave2.equipos.find((e) => e.code === "EXT-801")!;
     revisar("el extractor aparece con horas pero sin pérdida",
       extR.horas === 6 && extR.perdida === 0, `${extR.horas} h · $${extR.perdida}`);
+
+    console.log("\nLas ventanas son móviles, no trimestres de calendario");
+    // "Este trimestre" a cinco dias de empezado compararia cinco dias contra
+    // noventa, y el tablero mostraria un desplome que no ocurrio.
+    const ahora = new Date("2026-09-08T12:00:00Z");
+    const v = ventanas("TRIMESTRE", ahora);
+    const largoActual = v.actual.hasta.getTime() - v.actual.desde.getTime();
+    const largoAnterior = v.anterior.hasta.getTime() - v.anterior.desde.getTime();
+    revisar("ambas ventanas miden lo mismo", largoActual === largoAnterior,
+      `${Math.round(largoActual / 86400000)} días cada una`);
+    revisar("la anterior termina donde empieza la actual",
+      v.anterior.hasta.getTime() === v.actual.desde.getTime());
+    revisar("y son los días del periodo", v.dias === PERIODOS.TRIMESTRE.dias);
+
+    console.log("\nLa comparación contra el periodo anterior");
+    const comp = await costoComparado(org.id, "ANO");
+    revisar("trae el resultado actual", comp.perdida === 66000, `$${comp.perdida}`);
+    // De cero a algo no es "infinito por ciento": es que empezo a medirse.
+    revisar("sin periodo anterior no inventa un porcentaje", comp.cambio === null,
+      String(comp.cambio));
+
+    console.log("\nLa serie mensual no se salta los meses buenos");
+    // Saltarselos deformaria la franja: tres meses sin paro se verian como si
+    // fueran consecutivos y la tendencia mentiria.
+    const serie = await serieMensual(org.id, 12);
+    revisar("devuelve los doce meses", serie.length === 12, `${serie.length}`);
+    revisar("incluye meses en cero", serie.some((m) => m.horas === 0));
+    revisar("van en orden", serie[0].clave < serie[11].clave, `${serie[0].clave} → ${serie[11].clave}`);
+    revisar("el mes con paro trae sus horas", serie.some((m) => m.horas > 0));
 
     console.log("\nCada organización ve solo lo suyo");
     const otra = await prisma.organization.create({

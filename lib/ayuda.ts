@@ -977,6 +977,34 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/paros": {
+    titulo: "Dónde para la planta",
+    que: "Qué áreas detuvieron la producción, cuánto costó y si va mejorando.",
+    hacer: [
+      "Ver de un vistazo qué área concentra el daño",
+      "Saber cuánto costó en dinero, no solo en horas",
+      "Comparar contra el periodo anterior del mismo largo",
+      "Simular cuánto bajaría la pérdida sin un equipo",
+    ],
+    flujo: [
+      "El tamaño de cada bloque ES el daño: si un área concentra tres cuartas partes de las horas perdidas, ocupa tres cuartas partes del mapa.",
+      "Solo cuentan los equipos marcados como que detienen la producción, a la tarifa de su ubicación. Sin esa marca se le cargaría a la extracción de humos el costo completo de la nave.",
+      "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
+      "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
+    ],
+    campos: [
+      { nombre: "El total", explica: "Dice «al menos» cuando falta captura: entonces es un piso, no el dato. Debajo aparece exactamente qué falta y dónde se completa." },
+      { nombre: "La flecha", explica: "Compara contra el periodo anterior del mismo largo. Rojo hacia arriba es peor: más pérdida. Sin periodo anterior no inventa un porcentaje." },
+      { nombre: "Cómo ha venido", explica: "Los últimos doce meses, incluidos los que no tuvieron paro. Saltarse los meses buenos deformaría la tendencia." },
+      { nombre: "El monto de cada equipo", explica: "Tóquelo para quitarlo de la cuenta y ver cuánto bajaría la pérdida sin él. Es lo que valdría resolverlo de raíz, calculado sobre lo que ya pasó." },
+    ],
+    noPuedo: [
+      { sintoma: "El mapa sale vacío o con muy pocas horas", porque: "Solo entran los equipos marcados como que detienen la producción y con paro capturado. Si nadie anota cuánto estuvo parado el equipo al cerrar la orden, el área sale en blanco y parece sana." },
+      { sintoma: "Un área muestra horas pero $0", porque: "No tiene tarifa por hora. Se captura en Catálogos → Ubicaciones. Ojo: la tarifa no es cuánto produce el área, es cuánto deja de ganar la empresa cuando algo de esa área detiene la producción." },
+      { sintoma: "Dice «al menos» y no el total exacto", porque: "Faltan equipos por definir si detienen la línea, o áreas sin tarifa. El mensaje dice cuántos. Mientras falte, el número es un piso." },
+    ],
+  },
+
   "/reports": {
     titulo: "Reportes",
     que: "Los cortes de información para llevar a una junta o a un cierre de mes.",

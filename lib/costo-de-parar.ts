@@ -202,3 +202,131 @@ export function comoDecirlo(r: ResumenCosto): { prefijo: string; falta: string |
   }
   return { prefijo: "al menos ", falta: pendientes.join(" y ") };
 }
+
+// ─────────────────────────────────────────────────────────── Periodos ───
+
+/**
+ * Ventanas moviles, no trimestres de calendario.
+ *
+ * "Este trimestre" a cinco dias de empezado compara cinco dias contra noventa,
+ * y el tablero mostraria un desplome que no ocurrio. Una ventana movil siempre
+ * compara periodos del mismo largo, que es lo unico que hace honesta la flecha.
+ */
+export const PERIODOS = {
+  MES: { etiqueta: "Últimos 30 días", dias: 30 },
+  TRIMESTRE: { etiqueta: "Últimos 90 días", dias: 90 },
+  SEMESTRE: { etiqueta: "Últimos 6 meses", dias: 180 },
+  ANO: { etiqueta: "Último año", dias: 365 },
+} as const;
+
+export type ClavePeriodo = keyof typeof PERIODOS;
+
+export function esPeriodo(v: string | undefined): v is ClavePeriodo {
+  return Boolean(v && v in PERIODOS);
+}
+
+/** La ventana actual y la inmediata anterior, del mismo largo. */
+export function ventanas(periodo: ClavePeriodo, ahora = new Date()) {
+  const dias = PERIODOS[periodo].dias;
+  const ms = dias * 86_400_000;
+  const hasta = ahora;
+  const desde = new Date(ahora.getTime() - ms);
+  return {
+    dias,
+    actual: { desde, hasta },
+    anterior: { desde: new Date(desde.getTime() - ms), hasta: desde },
+  };
+}
+
+export type Comparado = ResumenCosto & {
+  /** El mismo calculo en la ventana anterior, para poder decir si va peor. */
+  anterior: { perdida: number; horasQueDetienen: number; horasPlaneadas: number };
+  /**
+   * Cambio porcentual de la perdida. Nulo cuando antes no habia nada: de cero
+   * a algo no es "infinito por ciento", es que empezo a medirse.
+   */
+  cambio: number | null;
+};
+
+export async function costoComparado(
+  organizationId: string,
+  periodo: ClavePeriodo,
+  ahora = new Date(),
+): Promise<Comparado> {
+  const v = ventanas(periodo, ahora);
+  const [actual, previo] = await Promise.all([
+    costoDeParar(organizationId, v.actual),
+    costoDeParar(organizationId, v.anterior),
+  ]);
+  return {
+    ...actual,
+    anterior: {
+      perdida: previo.perdida,
+      horasQueDetienen: previo.horasQueDetienen,
+      horasPlaneadas: previo.horasPlaneadas,
+    },
+    cambio: previo.perdida > 0
+      ? Math.round(((actual.perdida - previo.perdida) / previo.perdida) * 100)
+      : null,
+  };
+}
+
+// ────────────────────────────────────────────────────── Serie mensual ───
+
+export type Mes = {
+  /** "2026-09", para ordenar sin ambiguedad. */
+  clave: string;
+  etiqueta: string;
+  horas: number;
+  perdida: number;
+};
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * Los ultimos N meses, para la franja que se arrastra.
+ *
+ * Se devuelven TODOS los meses del rango, incluidos los que no tuvieron ningun
+ * paro. Saltarselos deformaria la franja: un hueco de tres meses buenos se
+ * veria como si fueran consecutivos y la tendencia mentiria.
+ */
+export async function serieMensual(
+  organizationId: string,
+  meses = 12,
+  ahora = new Date(),
+): Promise<Mes[]> {
+  const desde = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1), 1);
+  const eventos = await prisma.downtimeEvent.findMany({
+    where: { asset: { organizationId }, planned: false, startedAt: { gte: desde, lte: ahora } },
+    select: {
+      minutes: true, startedAt: true,
+      asset: { select: { detieneLinea: true, location: { select: { margenPorHora: true } } } },
+    },
+  });
+
+  const porMes = new Map<string, { minutos: number; perdida: number }>();
+  for (let i = 0; i < meses; i += 1) {
+    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1) + i, 1);
+    porMes.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, { minutos: 0, perdida: 0 });
+  }
+
+  for (const e of eventos) {
+    if (e.asset.detieneLinea !== true) continue;
+    const d = e.startedAt;
+    const clave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const acc = porMes.get(clave);
+    if (!acc) continue;
+    acc.minutos += e.minutes;
+    acc.perdida += (e.minutes / HORA) * (e.asset.location?.margenPorHora ?? 0);
+  }
+
+  return [...porMes.entries()].map(([clave, v]) => {
+    const [ano, mes] = clave.split("-");
+    return {
+      clave,
+      etiqueta: `${MESES[Number(mes) - 1]} ${ano.slice(2)}`,
+      horas: h(v.minutos),
+      perdida: Math.round(v.perdida),
+    };
+  });
+}
