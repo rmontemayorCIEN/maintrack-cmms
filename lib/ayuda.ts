@@ -269,16 +269,20 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "La actividad se queda marcada en su orden, para que esa orden cuente lo que de verdad pasó, y aparece aquí.",
       "Al armar una orden nueva para ese equipo, el trabajo pendiente se puede retomar.",
       "Si se liberó por falta de una refacción y se indicó cuál, esta pantalla marca «Ya se puede hacer» en cuanto hay existencia.",
+      "Y no hay que estar asomándose: el sistema avisa solo. Cuando la refacción llega al almacén, le manda un aviso a quien liberó la actividad y a los supervisores, con el equipo y cuánto llevaba esperando.",
     ],
     campos: [
       { nombre: "Ya se puede hacer", explica: "Se liberó por falta de una refacción y hoy sí hay con qué: la original, o una equivalente registrada. Es la señal de que ese trabajo ya no tiene por qué seguir esperando." },
       { nombre: "Se puede resolver con…", explica: "La refacción original no llegó, pero hay una equivalente en existencia. Si es un sustituto, la salvedad viene ahí mismo: léala antes de mandar a montar la pieza." },
       { nombre: "De un plan / De una solicitud", explica: "De dónde venía la actividad. Una que viene de un plan es trabajo preventivo que se dejó de hacer, y eso importa más que un pendiente suelto." },
       { nombre: "Liberada hace N días", explica: "Cuánto lleva esperando. Un número que crece sin parar es una refacción que nadie pidió o un servicio que nadie contrató." },
+      { nombre: "El aviso automático", explica: "Sale una sola vez, en el momento en que la actividad pasa de no poderse a poderse. No se repite mientras siga disponible; si la refacción se vuelve a acabar y luego regresa, avisa de nuevo." },
     ],
     noPuedo: [
       { sintoma: "Una actividad no aparece aquí aunque no se hizo", porque: "Solo entran las que se liberaron con motivo. Si la orden sigue abierta, la actividad sigue en ella; el backlog es para lo que ya se decidió posponer." },
       { sintoma: "Desapareció una que estaba aquí", porque: "Otra orden ya la retomó. Se puede seguir la cadena desde la orden nueva hasta la que la liberó." },
+      { sintoma: "Dice «Ya se puede hacer» pero no me llegó ningún aviso", porque: "El aviso sale una sola vez, cuando cambia de estado. Si la refacción ya estaba antes de que se activara esta función, esa actividad no vuelve a avisar. También revise que tenga activados los avisos en Configuración → Avisos." },
+      { sintoma: "Me llegó el aviso pero la refacción no es la que pedí", porque: "Se está resolviendo con una equivalente registrada. El aviso dice cuál. Si es un sustituto y no un equivalente exacto, revise la salvedad en la columna «Se puede resolver con…» antes de mandar a montarla." },
     ],
     preguntas: [
       {

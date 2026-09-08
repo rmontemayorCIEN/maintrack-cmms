@@ -674,6 +674,17 @@ model WorkOrderTask {
   /// encabezado no se puede repartir entre varias fallas.
   downtimeMinutes Int     @default(0)
 
+  /// Cuando se aviso que esta actividad YA SE PUEDE hacer.
+  ///
+  /// El dato de que la refaccion llego siempre existio; lo que faltaba era que
+  /// alguien se enterara. Este campo es la memoria de ese aviso: sin el, cada
+  /// barrido volveria a avisar lo mismo y la gente dejaria de leerlos.
+  ///
+  /// Se limpia si la refaccion se vuelve a acabar, de modo que el aviso salga
+  /// otra vez cuando vuelva a haber. Asi solo avisa en el cambio de "no se
+  /// puede" a "si se puede", nunca mientras el estado se mantiene.
+  avisoDisponibleAt DateTime?
+
   /// La actividad liberada que esta continua, cuando se retomo del backlog.
   ///
   /// Encadena el historial: liberada en una OT, retomada en otra, hecha. Saber

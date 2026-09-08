@@ -110,6 +110,17 @@ npx tsx scripts/prueba-ciclo-completo.ts >/dev/null 2>&1 \
   && echo "     Ciclo completo plan-orden-refaccion-cierre correcto." \
   || { echo "     ERROR: el ciclo completo fallo."; npx tsx scripts/prueba-ciclo-completo.ts; exit 1; }
 
+# Los dos avisos. Su falla no la ve nadie: el sistema sigue funcionando y
+# simplemente deja de avisar, que es indistinguible de "no habia nada que
+# avisar". Por eso entran a la puerta del despliegue y no solo a la suite.
+npx tsx scripts/prueba-avisos-push.ts >/dev/null 2>&1 \
+  && echo "     Avisos al celular correctos." \
+  || { echo "     ERROR: la prueba de avisos push fallo."; npx tsx scripts/prueba-avisos-push.ts; exit 1; }
+
+npx tsx scripts/prueba-aviso-ya-se-puede.ts >/dev/null 2>&1 \
+  && echo "     Aviso de trabajo que ya se puede hacer correcto." \
+  || { echo "     ERROR: la prueba de 'ya se puede' fallo."; npx tsx scripts/prueba-aviso-ya-se-puede.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

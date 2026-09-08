@@ -71,6 +71,10 @@ export async function backlog(organizationId: string, opciones?: { assetId?: str
       origen: true, origenPlanId: true, origenRequestId: true, maintenanceType: true,
       liberadaAt: true, motivoLiberacion: true, motivoDetalle: true,
       bloqueadaPorPartId: true,
+      // El id va ademas del nombre: sin el no se le puede avisar a esa persona
+      // cuando la refaccion que la trabo por fin llega.
+      avisoDisponibleAt: true,
+      liberadaPorId: true,
       liberadaPor: { select: { name: true } },
       bloqueadaPor: { select: { id: true, code: true, name: true, quantityOnHand: true, unit: true } },
       workOrder: {
