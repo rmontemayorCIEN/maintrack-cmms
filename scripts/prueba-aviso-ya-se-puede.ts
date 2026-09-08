@@ -17,6 +17,7 @@ import { prisma } from "../lib/db";
 import { aplicarMovimiento } from "../lib/almacen";
 import { avisarTrabajoDisponible, redactarAviso } from "../lib/aviso-ya-se-puede";
 import { backlog } from "../lib/backlog";
+import { notify } from "../lib/audit";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -175,6 +176,41 @@ async function main() {
     const items = await backlog(org.id);
     revisar("ya no aparece la retomada", !items.some((t) => t.id === tarea.id), `${items.length} en backlog`);
     await prisma.workOrderTask.delete({ where: { id: retoma.id } });
+
+    console.log("\nUn aviso nunca sale de su organización");
+    /**
+     * El operador de la plataforma, trabajando dentro de una empresa cliente,
+     * conserva SU usuario. Si libera una actividad ahi, queda como
+     * `liberadaPorId` de trabajo que es del cliente. El aviso no puede llegarle:
+     * traeria el equipo, la refaccion y el folio de una empresa que no es la
+     * suya. Paso en produccion.
+     */
+    const forastero = await prisma.user.create({
+      data: { organizationId: ajeno.id, email: `${sello}-fuera@t.mx`, name: "Operador", role: "OWNER", passwordHash: "x" },
+    });
+    const antesForastero = (await avisosDe(forastero.id)).length;
+    await notify({
+      organizationId: org.id, userId: forastero.id,
+      title: "Aviso de otra empresa", body: "No debe llegar", link: "/backlog",
+    });
+    revisar("descarta al usuario de otra organización",
+      (await avisosDe(forastero.id)).length === antesForastero,
+      `${(await avisosDe(forastero.id)).length} avisos`);
+
+    const tarea3 = await prisma.workOrderTask.create({
+      data: {
+        workOrderId: ot.id, position: 3, origen: "PLAN", title: "Actividad liberada por un forastero",
+        liberadaAt: hace12dias, liberadaPorId: forastero.id,
+        motivoLiberacion: "SIN_REFACCION", bloqueadaPorPartId: balero.id,
+      },
+    });
+    await avisarTrabajoDisponible(org.id);
+    revisar("y tampoco por la vía de quien liberó",
+      (await avisosDe(forastero.id)).length === antesForastero);
+    // Los responsables de la organización sí se enteran: nadie se queda sin saber.
+    revisar("los de la organización sí reciben el aviso",
+      (await avisosDe(jefe.id)).length > 0);
+    await prisma.workOrderTask.delete({ where: { id: tarea3.id } });
 
     console.log("\nCada organización ve solo lo suyo");
     const ajenoAntes = (await avisosDe(jefeAjeno.id)).length;

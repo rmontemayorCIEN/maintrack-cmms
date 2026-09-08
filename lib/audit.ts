@@ -51,6 +51,30 @@ export async function notify(params: {
   tag?: string;
 }) {
   const kind = params.kind ?? "INFO";
+
+  /**
+   * Nadie recibe un aviso de una organizacion que no es la suya.
+   *
+   * Se comprueba AQUI, en el unico punto por donde pasan todos los avisos, y
+   * no en cada uno de los ocho lugares que notifican. Es la regla 7 —cada
+   * organizacion ve solo lo suyo— aplicada tambien a lo que se le dice a la
+   * gente, no solo a lo que se le muestra.
+   *
+   * El caso que lo destapo: el operador de la plataforma, trabajando dentro de
+   * una empresa cliente, conserva su propio usuario. Si libera una actividad
+   * ahi, queda como `liberadaPorId` de un trabajo que pertenece al cliente, y
+   * meses despues le llegaba a SU campana —y a su telefono— un aviso con el
+   * equipo, la refaccion y el folio de ese cliente.
+   *
+   * Se descarta en silencio: no es un error del que avisar, es una
+   * combinacion que simplemente no debe producir aviso. Los responsables de
+   * esa organizacion ya lo reciben por su propia via.
+   */
+  const esDeLaOrganizacion = await prisma.user.count({
+    where: { id: params.userId, organizationId: params.organizationId },
+  }).catch(() => 0);
+  if (!esDeLaOrganizacion) return;
+
   try {
     await prisma.notification.create({
       data: {
