@@ -175,11 +175,41 @@ CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL/login")
 REDES=$(gcloud sql instances describe "$INSTANCIA_SQL" \
   --format="value(settings.ipConfiguration.authorizedNetworks[].value)")
 
+# Que el servicio conserve TODO lo que la aplicacion necesita.
+#
+# Un secreto conectado a mano fuera de deploy.sh desaparece en el siguiente
+# despliegue, porque --set-secrets reemplaza la lista completa. Nada falla: el
+# despliegue sale verde y la funcion simplemente deja de existir. Ya paso con
+# las llaves de los avisos y el sintoma aparecio dos despliegues despues, en
+# otra pantalla. Aqui se compara contra lo que el secreto exista en el
+# proyecto, no contra una lista escrita a mano que se quedaria vieja.
+FALTANTES=""
+VARIABLES=$(gcloud run services describe maintrack-cmms --region us-central1 \
+  --format="value(spec.template.spec.containers[0].env[].name)" 2>/dev/null)
+for par in "DATABASE_URL:cmms-database-url" "AUTH_SECRET:cmms-auth-secret" \
+           "CRON_SECRET:cmms-cron-secret" "ANTHROPIC_API_KEY:cmms-anthropic-key" \
+           "VAPID_PRIVATE_KEY:vapid-private-key" "VAPID_PUBLIC_KEY:vapid-public-key"; do
+  VAR="${par%%:*}"; SECRETO="${par##*:}"
+  if gcloud secrets describe "$SECRETO" >/dev/null 2>&1; then
+    echo "$VARIABLES" | tr ';' '\n' | grep -qx "$VAR" || FALTANTES="$FALTANTES $VAR"
+  fi
+done
+
 echo "     Acceso: HTTP $CODIGO"
 if [ -z "$REDES" ]; then
   echo "     Cloud SQL: sin redes autorizadas (cerrada)"
 else
   echo "     ATENCION: Cloud SQL sigue abierta a: $REDES"
+fi
+if [ -n "$FALTANTES" ]; then
+  echo ""
+  echo "     ATENCION: el servicio quedo SIN estas variables:$FALTANTES"
+  echo "     El secreto existe en el proyecto pero no llego al servicio."
+  echo "     Revise que esten declaradas en scripts/deploy.sh: conectarlas a"
+  echo "     mano con 'gcloud run services update' no sirve, el siguiente"
+  echo "     despliegue las borra."
+else
+  echo "     Secretos: todos los configurados llegaron al servicio."
 fi
 
 echo ""

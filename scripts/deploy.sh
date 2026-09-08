@@ -60,10 +60,26 @@ else
   IA="no configurada (falta el secreto cmms-anthropic-key)"
 fi
 
+# Avisos al celular. Opcionales igual que la IA: sin llaves la funcion queda
+# apagada y la pantalla lo dice, pero la aplicacion se publica igual.
+#
+# TIENEN QUE ESTAR AQUI. `--set-secrets` de abajo reemplaza la lista COMPLETA,
+# asi que un secreto conectado a mano con `gcloud run services update` se borra
+# en el siguiente despliegue. Paso: los avisos dejaron de funcionar sin que
+# nada fallara, y el sintoma aparecio en otra pantalla dos despliegues despues.
+# Todo lo que la aplicacion necesite se declara en este archivo, sin excepcion.
+if gcloud secrets describe vapid-private-key >/dev/null 2>&1; then
+  SECRETOS="$SECRETOS,VAPID_PRIVATE_KEY=vapid-private-key:latest,VAPID_PUBLIC_KEY=vapid-public-key:latest"
+  AVISOS="habilitados"
+else
+  AVISOS="no configurados (faltan las llaves VAPID)"
+fi
+
 echo "Proyecto  : $(gcloud config get-value project 2>/dev/null)"
 echo "Cloud SQL : $INSTANCIA"
 echo "Archivos  : gs://$BUCKET_ARCHIVOS"
 echo "IA        : $IA"
+echo "Avisos    : $AVISOS"
 echo "Publicando $SERVICIO en $REGION..."
 echo ""
 
