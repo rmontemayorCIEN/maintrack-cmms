@@ -145,8 +145,8 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "description", etiqueta: "Descripción", tipo: "texto" },
       {
-        nombre: "margenPorHora", etiqueta: "Deja de ganar por hora parada", tipo: "numero",
-        ayuda: "Lo que esta área deja de GANAR cada hora que se detiene: lo que dejaría de facturar menos el material que no se consumiría. Margen, no venta — un número de precio de venta se ve enorme y lo tumba el primero que pregunte si de verdad se perdió la venta. Déjelo en cero si no lo sabe.",
+        nombre: "margenPorHora", etiqueta: "Deja de ganar por hora detenida", tipo: "numero",
+        ayuda: "Cuánto deja de GANAR la empresa por cada hora que algo de esta área detiene la producción. Ojo: no es cuánto produce el área. Un cuarto de compresores no produce nada, pero si su compresor para la nave, aquí va lo que deja de ganar la nave. Es margen, no venta: lo que dejaría de facturar menos el material que no se consumiría — un número de precio de venta se ve enorme y lo tumba el primero que pregunte si de verdad se perdió la venta.",
       },
     ],
     crear: z.object({

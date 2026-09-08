@@ -157,8 +157,16 @@ export async function costoDeParar(
   const cobertura: Cobertura = {
     equiposConParo: equipos.length,
     equiposDefinidos: equipos.filter((e) => e.detieneLinea !== null).length,
-    areasConParo: areas.length,
-    areasConTarifa: areas.filter((a) => a.margenPorHora > 0).length,
+    /**
+     * Solo cuentan las areas que DETIENEN produccion.
+     *
+     * Un area cuyos paros no detienen nada no necesita tarifa, y pedirsela al
+     * usuario lo manda a capturar un dato que no cambia ningun resultado. Que
+     * el almacen no tenga tarifa no es un hueco: es que ahi no se pierde
+     * produccion.
+     */
+    areasConParo: areas.filter((a) => a.horasQueDetienen > 0).length,
+    areasConTarifa: areas.filter((a) => a.horasQueDetienen > 0 && a.margenPorHora > 0).length,
     completa: false,
   };
   cobertura.completa =
