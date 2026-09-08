@@ -32,9 +32,29 @@ export function MovementForm({ partId, unit, warehouseId }: { partId: string; un
     router.refresh();
   }
 
+  /*
+   * Se captura de pie junto al anaquel, con el telefono en una mano.
+   *
+   * `shrink-0` NO es adorno. `.field` trae `width: 100%`, y en un contenedor
+   * que se ajusta al contenido —una celda de tabla— flex encoge los controles
+   * hasta el ancho minimo: quedaban en 24 px, un campo donde no cabe ni un
+   * numero de dos digitos. Con shrink-0 conservan el ancho declarado.
+   *
+   * No se pone `text-xs`: `.field` ya fija 0.875rem y le gana por orden. La
+   * clase quedaria ahi aparentando hacer algo.
+   *
+   * Estaba en 80 px de ancho y letra de 11 px: en un pulgar no se atina ni se
+   * lee lo que uno acaba de escribir. Los tres controles crecen y el boton
+   * pasa a 36 px, que es el minimo con el que una persona no falla el toque.
+   * La tabla ya se desliza de lado, asi que el ancho extra no rompe nada.
+   */
   return (
-    <form onSubmit={submit} className="flex items-center gap-1">
-      <select value={type} onChange={(e) => setType(e.target.value)} className="field max-w-24 px-1.5 py-1 text-[0.6875rem]">
+    <form onSubmit={submit} className="flex items-center gap-1.5">
+      <select
+        value={type}
+        onChange={(e) => setType(e.target.value)}
+        className="field w-28 shrink-0 max-w-28 px-2 py-1.5"
+      >
         <option value="IN">Entrada</option>
         <option value="OUT">Salida</option>
         <option value="ADJUST">Ajuste</option>
@@ -42,18 +62,24 @@ export function MovementForm({ partId, unit, warehouseId }: { partId: string; un
       <input
         type="number"
         step="0.5"
-        className="field max-w-20 px-1.5 py-1 text-[0.6875rem]"
+        min="0"
+        /* Abre el teclado numerico del telefono, con punto decimal. Sin esto
+           el usuario recibe el teclado completo y tiene que cambiarlo a mano. */
+        inputMode="decimal"
+        className="field w-24 shrink-0 max-w-24 px-2 py-1.5"
         placeholder={unit}
+        aria-label={`Cantidad en ${unit}`}
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
       />
       <button
         type="submit"
         disabled={loading || !quantity}
-        className="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+        aria-label="Aplicar movimiento"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
         title={error ?? "Aplicar"}
       >
-        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : "→"}
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "→"}
       </button>
     </form>
   );

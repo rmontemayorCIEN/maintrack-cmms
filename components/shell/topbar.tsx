@@ -72,7 +72,7 @@ export function Topbar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar OT, activos, refacciones…"
-          className="field pl-9"
+          className="field con-icono"
         />
       </form>
 

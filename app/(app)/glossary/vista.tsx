@@ -45,7 +45,7 @@ export function VistaGlosario({ terminos }: { terminos: TerminoGlosario[] }) {
         <div className="relative min-w-56 flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
-            className="field pl-9"
+            className="field con-icono"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar termino o definición…"

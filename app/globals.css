@@ -89,6 +89,15 @@ body {
   line-height: 1.5rem;
 }
 
+/* Variante con icono a la izquierda.
+   Doble clase a proposito, igual que .compacto. El `padding` en atajo de
+   .field le gana por orden a un `pl-9` de Tailwind —misma especificidad y
+   este archivo carga despues—, asi que el texto arrancaba encima del icono.
+   Ya paso con `width` y `w-auto`; es la misma trampa. */
+.field.con-icono {
+  padding-left: 2.25rem;
+}
+
 .label {
   display: block;
   font-size: 0.75rem;
