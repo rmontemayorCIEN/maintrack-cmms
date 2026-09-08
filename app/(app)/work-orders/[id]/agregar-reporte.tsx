@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { TIPOS_SOLICITUD, type ClaveTipoSolicitud } from "@/lib/tipos-solicitud";
+import { CampoTitulo } from "@/components/campo-titulo";
 
 /**
  * Sumar un reporte a esta orden, o levantar uno nuevo desde aqui.
@@ -102,11 +103,11 @@ export function AgregarReporte({
       ) : (
         <>
           <div>
-            <label className="label">Que encontro</label>
-            <input
-              className="field"
+            <label className="label">Qué encontró</label>
+            <CampoTitulo
               value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
+              onChange={setTitulo}
+              onEnter={() => { if (titulo.trim().length >= 4) guardar(); }}
               placeholder="Fuga de aceite en el reductor"
             />
           </div>

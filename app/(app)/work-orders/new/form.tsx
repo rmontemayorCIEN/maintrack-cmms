@@ -7,6 +7,7 @@ import { Button, Card, CardHeader } from "@/components/ui";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/constants";
+import { CampoTitulo } from "@/components/campo-titulo";
 
 type Option = { id: string; name: string; code?: string };
 
@@ -83,7 +84,7 @@ export function NewWorkOrderForm({
           <div className="grid gap-4">
             <div>
               <label className="label">Título del trabajo</label>
-              <input className="field" value={form.title} onChange={(e) => set("title", e.target.value)} required minLength={3} placeholder="Ej. Cambio de rodamiento en bomba P-101" />
+              <CampoTitulo value={form.title} onChange={(v) => set("title", v)} required minLength={3} placeholder="Ej. Cambio de rodamiento en bomba P-101" />
             </div>
             <div>
               <label className="label">Descripción / síntoma reportado</label>

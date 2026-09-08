@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Check, Loader2, X } from "lucide-react";
+import { CampoTitulo } from "@/components/campo-titulo";
 
 const LIMITE_MB = 5;
 
@@ -108,8 +109,8 @@ export function FormularioReporte({
     <form onSubmit={enviar} className="grid gap-4">
       <div>
         <label className="text-sm font-medium text-slate-800">¿Qué está pasando? *</label>
-        <input
-          value={titulo} onChange={(e) => setTitulo(e.target.value)} required minLength={5} maxLength={140}
+        <CampoTitulo
+          value={titulo} onChange={setTitulo} required minLength={5} maxLength={140}
           placeholder="El aire no enfría, gotea una llave, no prende la luz…"
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base"
         />

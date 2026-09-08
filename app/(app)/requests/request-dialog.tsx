@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { Adjuntos } from "@/components/adjuntos";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { SelectorBuscable } from "@/components/selector-buscable";
+import { CampoTitulo } from "@/components/campo-titulo";
 
 export function RequestDialog({ assets }: { assets: Array<{ id: string; code: string; name: string }> }) {
   const router = useRouter();
@@ -99,11 +100,10 @@ export function RequestDialog({ assets }: { assets: Array<{ id: string; code: st
 
         <div className="grid gap-4">
           <div>
-            <label className="label">¿Que ocurre?</label>
-            <input
-              className="field"
+            <label className="label">¿Qué ocurre?</label>
+            <CampoTitulo
               value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(v) => setForm((f) => ({ ...f, title: v }))}
               placeholder="Ej. Fuga de aceite en reductor"
               required
               minLength={3}
