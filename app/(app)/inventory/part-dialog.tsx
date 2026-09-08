@@ -25,6 +25,7 @@ export function PartDialog({
   unidades,
   refaccion,
   puedeGestionarCatalogos = false,
+  disparador,
 }: {
   suppliers: Array<{ id: string; name: string }>;
   familias: Array<{ code: string; name: string }>;
@@ -32,6 +33,13 @@ export function PartDialog({
   /** Si viene, el dialogo edita esa refaccion en vez de crear una nueva. */
   refaccion?: RefaccionEditable;
   puedeGestionarCatalogos?: boolean;
+  /**
+   * Quien abre el dialogo, cuando no debe ser el boton de siempre.
+   *
+   * Recibe la funcion de abrir y devuelve lo que se pinta. En el almacen es la
+   * clave de la refaccion.
+   */
+  disparador?: (abrir: () => void) => React.ReactNode;
 }) {
   const router = useRouter();
   const editando = Boolean(refaccion);
@@ -92,6 +100,15 @@ export function PartDialog({
   }
 
   if (!open) {
+    /**
+     * Quien abre el detalle puede ser otra cosa que un boton de editar.
+     *
+     * En el almacen es la clave de la refaccion: se entiende sola —una clave
+     * subrayada se toca— y le quita un control a un renglon que ya venia
+     * apretado. El boton de editar ocupaba ancho y terminaba encimado sobre
+     * la cantidad.
+     */
+    if (disparador) return <>{disparador(() => setOpen(true))}</>;
     return editando ? (
       <BotonEditar que="refacción" onClick={() => setOpen(true)} />
     ) : (

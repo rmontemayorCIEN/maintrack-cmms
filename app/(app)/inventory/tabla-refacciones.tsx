@@ -57,7 +57,43 @@ export function TablaRefacciones({
   const catalogo = refacciones.map((r) => ({ id: r.id, code: r.code, name: r.name }));
 
   const FIJAS: Columna<FilaRefaccion>[] = [
-    { id: "code", etiqueta: "Código", texto: (p) => p.code, pinta: (p) => <span className="font-medium text-slate-700">{p.code}</span> },
+    {
+      id: "code", etiqueta: "Código", texto: (p) => p.code,
+      /*
+        La clave abre la ficha de la refaccion.
+        Una clave subrayada se entiende sola —se toca y entra al detalle— y le
+        quita un control al renglon. El boton de "Editar" al final ocupaba
+        ancho y terminaba encimado sobre el campo de cantidad.
+      */
+      pinta: (p) =>
+        editable ? (
+          <PartDialog
+            suppliers={suppliers}
+            familias={familias}
+            unidades={unidades}
+            puedeGestionarCatalogos={puedeGestionarCatalogos}
+            refaccion={{
+              id: p.id, code: p.code, name: p.name,
+              description: p.description, category: p.category,
+              unit: p.unit, unitCost: p.unitCost,
+              minQuantity: p.minQuantity, maxQuantity: p.maxQuantity,
+              bin: p.bin, supplierId: p.supplierId,
+            }}
+            disparador={(abrir) => (
+              <button
+                type="button"
+                onClick={abrir}
+                title={`Ver y editar ${p.code}`}
+                className="whitespace-nowrap text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+              >
+                {p.code}
+              </button>
+            )}
+          />
+        ) : (
+          <span className="whitespace-nowrap font-medium text-slate-700">{p.code}</span>
+        ),
+    },
     {
       id: "name", etiqueta: "Refacción",
       texto: (p) => `${p.name} ${p.description ?? ""} ${p.category ?? ""}`,
@@ -140,23 +176,9 @@ export function TablaRefacciones({
       clave="refacciones"
       sustantivo="refacciones"
       ejemploFiltro='Filtrar: "balero", "agotada", "filtro"…'
+      // Solo el movimiento rapido: la ficha se abre desde la clave.
       acciones={editable ? (p) => (
-        <div className="flex items-center justify-end gap-1.5">
-          <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} />
-          <PartDialog
-            suppliers={suppliers}
-            familias={familias}
-            unidades={unidades}
-            puedeGestionarCatalogos={puedeGestionarCatalogos}
-            refaccion={{
-              id: p.id, code: p.code, name: p.name,
-              description: p.description, category: p.category,
-              unit: p.unit, unitCost: p.unitCost,
-              minQuantity: p.minQuantity, maxQuantity: p.maxQuantity,
-              bin: p.bin, supplierId: p.supplierId,
-            }}
-          />
-        </div>
+        <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} />
       ) : undefined}
     />
   );
