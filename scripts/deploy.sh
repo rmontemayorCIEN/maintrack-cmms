@@ -35,13 +35,36 @@ fi
 
 # Se le pide el nombre a Google en vez de construirlo: en zsh, "$VAR:us-central1"
 # activa el modificador :u y deforma el valor.
-INSTANCIA=$(gcloud sql instances describe "$INSTANCIA_SQL" \
-  --format="value(connectionName)" 2>/dev/null || true)
+#
+# El error se guarda: distinguir "la instancia no existe" de "no llegue a
+# Google" es la diferencia entre revisar la configuracion media hora y ver que
+# se cayo el internet. Ya paso: el mensaje mandaba a revisar el proyecto cuando
+# el proyecto estaba bien y lo que fallaba era el DNS.
+SALIDA_SQL=$(gcloud sql instances describe "$INSTANCIA_SQL" \
+  --format="value(connectionName)" 2>&1) || SALIDA_SQL="$SALIDA_SQL"
+INSTANCIA=$(printf '%s' "$SALIDA_SQL" | grep -E '^[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]+$' | head -1)
 
 if [ -z "$INSTANCIA" ]; then
-  echo "ERROR: no se encontro la instancia $INSTANCIA_SQL."
-  echo "       Revise que gcloud apunte al proyecto correcto:"
-  echo "         gcloud config get-value project"
+  echo ""
+  if printf '%s' "$SALIDA_SQL" | grep -qiE "failed to resolve|nodename nor servname|connectionerror|max retries|network is unreachable|temporary failure in name resolution"; then
+    echo "ERROR: no se pudo llegar a Google. Parece que no hay conexion."
+    echo ""
+    echo "       No es problema del codigo ni del proyecto. Compruebelo con:"
+    echo "         ping -c1 google.com"
+    echo ""
+    echo "       Su commit esta a salvo. Cuando vuelva la red, repita el mismo"
+    echo "       comando: no hace falta deshacer nada."
+  elif printf '%s' "$SALIDA_SQL" | grep -qiE "credential|reauth|login|unauthorized|permission"; then
+    echo "ERROR: gcloud no tiene sesion valida."
+    echo "       Vuelva a entrar con:  gcloud auth login"
+  else
+    echo "ERROR: no se encontro la instancia $INSTANCIA_SQL."
+    echo "       Revise que gcloud apunte al proyecto correcto:"
+    echo "         gcloud config get-value project"
+    echo ""
+    echo "       Lo que contesto Google:"
+    printf '%s\n' "$SALIDA_SQL" | head -5 | sed 's/^/         /'
+  fi
   exit 1
 fi
 
