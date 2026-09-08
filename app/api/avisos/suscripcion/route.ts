@@ -59,7 +59,18 @@ export async function GET() {
 
 /** Da de alta este aparato. Repetirlo no duplica: la direccion es unica. */
 export async function POST(request: Request) {
-  return withAuth(null, async ({ user, orgId }) => {
+  return withAuth(null, async ({ user }) => {
+    /**
+     * El aparato se registra en la organizacion PROPIA de la persona, no en la
+     * que esta viendo.
+     *
+     * Un superadministrador trabajando dentro de una empresa cliente conserva
+     * su usuario pero `orgId` apunta al cliente. Si el telefono se guardara con
+     * ese `orgId`, el interruptor de avisos del CLIENTE decidiria si le llegan
+     * los avisos de SU PROPIA empresa: el cliente apaga los suyos y el operador
+     * de la plataforma deja de recibir los de su cuenta sin entender por que.
+     */
+    const orgId = user.organizacionPropia.id;
     if (!pushConfigurado()) {
       return fail("Los avisos al celular no están configurados en el servidor.", 503);
     }
