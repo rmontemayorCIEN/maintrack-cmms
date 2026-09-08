@@ -13,7 +13,7 @@
  *   npx tsx scripts/prueba-costo-de-parar.ts
  */
 import { prisma } from "../lib/db";
-import { costoDeParar, comoDecirlo, ventanas, costoComparado, serieMensual, PERIODOS } from "../lib/costo-de-parar";
+import { costoDeParar, comoDecirlo, ventanas, costoComparado, eventosDeParo, PERIODOS } from "../lib/costo-de-parar";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -143,14 +143,19 @@ async function main() {
     revisar("sin periodo anterior no inventa un porcentaje", comp.cambio === null,
       String(comp.cambio));
 
-    console.log("\nLa serie mensual no se salta los meses buenos");
-    // Saltarselos deformaria la franja: tres meses sin paro se verian como si
-    // fueran consecutivos y la tendencia mentiria.
-    const serie = await serieMensual(org.id, 12);
-    revisar("devuelve los doce meses", serie.length === 12, `${serie.length}`);
-    revisar("incluye meses en cero", serie.some((m) => m.horas === 0));
-    revisar("van en orden", serie[0].clave < serie[11].clave, `${serie[0].clave} → ${serie[11].clave}`);
-    revisar("el mes con paro trae sus horas", serie.some((m) => m.horas > 0));
+    console.log("\nEl latido: cada paro, uno por uno");
+    // Una barra mensual esconde si fueron doce paros cortos o uno largo, y esa
+    // diferencia ES el diagnostico. Por eso viajan los eventos crudos.
+    const latido = await eventosDeParo(org.id, { desde: new Date(Date.now() - 86_400_000), hasta: new Date(Date.now() + 86_400_000) });
+    revisar("devuelve un evento por paro, no un agregado", latido.length === 5, `${latido.length} eventos`);
+    revisar("cada uno trae su lugar en el tiempo", latido.every((e) => e.inicio > 0));
+    const tornoEv = latido.filter((e) => e.code === "TOR-101" && !e.planeado);
+    revisar("el paro del torno cuesta a la tarifa de su area",
+      tornoEv.some((e) => e.perdida === 50000), tornoEv.map((e) => `$${e.perdida}`).join(", "));
+    // Misma regla que costoDeParar: el planeado y el que no detiene no cuestan.
+    revisar("el paro planeado no cuesta", latido.filter((e) => e.planeado).every((e) => e.perdida === 0));
+    revisar("el extractor aparece pero sin costo",
+      latido.filter((e) => e.code === "EXT-801").every((e) => e.perdida === 0));
 
     console.log("\nCada organización ve solo lo suyo");
     const otra = await prisma.organization.create({

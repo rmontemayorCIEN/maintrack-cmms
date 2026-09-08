@@ -76,6 +76,8 @@ export async function explicarParos(
   params: {
     locationId: string | null;
     periodo: ClavePeriodo;
+    /** Ventana exacta, cuando el director la delimito arrastrando el dedo. */
+    rango?: { desde: Date; hasta: Date } | null;
     userId?: string | null;
     operador?: boolean;
   },
@@ -86,8 +88,16 @@ export async function explicarParos(
   const veredicto = await puedeUsarIa(org, "PARO_AREA", { operador: params.operador });
   if (!veredicto.permitido) return { ok: false, motivo: veredicto.motivo };
 
+  /**
+   * La ventana que el usuario delimito manda sobre el periodo del boton.
+   *
+   * Es la diferencia entre preguntar por "los ultimos 90 dias" y preguntar por
+   * "esas tres semanas de julio en las que algo paso". Lo segundo es lo que
+   * ningun tablero deja hacer, y es donde esta el valor.
+   */
   const v = ventanas(params.periodo);
-  const resumen = await costoDeParar(org.id, v.actual);
+  const rango = params.rango ?? v.actual;
+  const resumen = await costoDeParar(org.id, rango);
   const area = resumen.areas.find((a) => a.locationId === params.locationId);
 
   /**
@@ -110,8 +120,8 @@ export async function explicarParos(
       organizationId: org.id,
       assetId: { in: equiposDelArea },
       OR: [
-        { startedAt: { gte: v.actual.desde, lte: v.actual.hasta } },
-        { completedAt: { gte: v.actual.desde, lte: v.actual.hasta } },
+        { startedAt: { gte: rango.desde, lte: rango.hasta } },
+        { completedAt: { gte: rango.desde, lte: rango.hasta } },
       ],
     },
     orderBy: { completedAt: "desc" },
@@ -133,6 +143,11 @@ export async function explicarParos(
     };
   }
 
+  const dia = (d: Date) => d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+  const rotulo = params.rango
+    ? `el tramo del ${dia(rango.desde)} al ${dia(rango.hasta)}`
+    : PERIODOS[params.periodo].etiqueta.toLowerCase();
+
   const empresa = await prisma.organization.findUniqueOrThrow({
     where: { id: org.id },
     select: {
@@ -148,13 +163,13 @@ export async function explicarParos(
     sistema: SISTEMA,
     esquema: Esquema,
     instruccion:
-      `Explique por que se detuvo el area "${area.area}" en ${PERIODOS[params.periodo].etiqueta.toLowerCase()}, ` +
+      `Explique por que se detuvo el area "${area.area}" en ${rotulo}, ` +
       "leyendo el texto de las ordenes. Empiece por lo que mas costo.",
     contexto: {
       empresa: contextoDeLaEmpresa(empresa),
       area: {
         nombre: area.area,
-        periodo: PERIODOS[params.periodo].etiqueta,
+        periodo: rotulo,
         margenPorHoraDetenida: area.margenPorHora || null,
         horasQueDetuvieronProduccion: area.horasQueDetienen,
         horasDeEquiposQueNoDetienen: area.horasQueNoDetienen,

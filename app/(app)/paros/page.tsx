@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import {
-  costoComparado, comoDecirlo, serieMensual, esPeriodo, type ClavePeriodo,
+  costoComparado, comoDecirlo, eventosDeParo, ventanas, esPeriodo, type ClavePeriodo,
 } from "@/lib/costo-de-parar";
 import { MapaDeParos } from "./mapa";
 
@@ -22,15 +22,32 @@ export const dynamic = "force-dynamic";
 export default async function ParosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ p?: string }>;
+  searchParams: Promise<{ p?: string; d?: string; h?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
   const periodo: ClavePeriodo = esPeriodo(params.p) ? params.p : "TRIMESTRE";
 
-  const [datos, serie] = await Promise.all([
-    costoComparado(user.organizationId, periodo),
-    serieMensual(user.organizationId, 12),
+  /**
+   * La ventana que el director delimito arrastrando manda sobre el boton.
+   *
+   * Vive en la URL igual que el periodo: asi puede mandar por correo "mira
+   * estas tres semanas de julio" y quien lo abra ve exactamente eso.
+   */
+  const d = Number(params.d);
+  const hst = Number(params.h);
+  const ventanaPropia =
+    Number.isFinite(d) && Number.isFinite(hst) && hst > d
+      ? { desde: new Date(d), hasta: new Date(hst) }
+      : null;
+
+  const v = ventanas(periodo);
+  const [datos, eventos] = await Promise.all([
+    costoComparado(user.organizationId, periodo, undefined, ventanaPropia),
+    // El latido siempre muestra el periodo completo: la ventana es una
+    // seleccion DENTRO de el, y encogerlo dejaria sin contexto lo que se
+    // acaba de escoger.
+    eventosDeParo(user.organizationId, v.actual),
   ]);
 
   return (
@@ -49,7 +66,10 @@ export default async function ParosPage({
         horasPlaneadas={datos.horasPlaneadas}
         cobertura={datos.cobertura}
         comoDecirlo={comoDecirlo(datos)}
-        serie={serie}
+        eventos={eventos}
+        desdeLinea={v.actual.desde.getTime()}
+        hastaLinea={v.actual.hasta.getTime()}
+        ventana={ventanaPropia ? { desde: d, hasta: hst } : null}
         moneda={user.organization.currency}
       />
     </>

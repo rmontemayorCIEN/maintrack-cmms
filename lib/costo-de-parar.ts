@@ -252,11 +252,22 @@ export async function costoComparado(
   organizationId: string,
   periodo: ClavePeriodo,
   ahora = new Date(),
+  /**
+   * Ventana delimitada a mano. Si viene, manda sobre el periodo y se compara
+   * contra el tramo inmediatamente anterior DEL MISMO LARGO — que es lo unico
+   * que hace honesta la flecha, sea la ventana de 90 dias o de tres semanas.
+   */
+  propia?: { desde: Date; hasta: Date } | null,
 ): Promise<Comparado> {
   const v = ventanas(periodo, ahora);
+  const actualRango = propia ?? v.actual;
+  const largo = actualRango.hasta.getTime() - actualRango.desde.getTime();
+  const anteriorRango = propia
+    ? { desde: new Date(actualRango.desde.getTime() - largo), hasta: actualRango.desde }
+    : v.anterior;
   const [actual, previo] = await Promise.all([
-    costoDeParar(organizationId, v.actual),
-    costoDeParar(organizationId, v.anterior),
+    costoDeParar(organizationId, actualRango),
+    costoDeParar(organizationId, anteriorRango),
   ]);
   return {
     ...actual,
@@ -271,62 +282,76 @@ export async function costoComparado(
   };
 }
 
-// ────────────────────────────────────────────────────── Serie mensual ───
 
-export type Mes = {
-  /** "2026-09", para ordenar sin ambiguedad. */
-  clave: string;
-  etiqueta: string;
-  horas: number;
+// ───────────────────────────────────────────── El latido de la planta ───
+
+export type EventoDeParo = {
+  id: string;
+  /** Milisegundos desde epoch: el cliente los posiciona sin volver a parsear. */
+  inicio: number;
+  minutos: number;
+  planeado: boolean;
+  assetId: string;
+  code: string;
+  name: string;
+  area: string;
+  locationId: string | null;
+  detieneLinea: boolean | null;
+  /** Lo que costo ESTE paro. Cero si el equipo no detiene o el area no tiene tarifa. */
   perdida: number;
+  folio: string | null;
+  queSeHizo: string | null;
 };
 
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
 /**
- * Los ultimos N meses, para la franja que se arrastra.
+ * Cada paro, uno por uno, con su lugar en el tiempo.
  *
- * Se devuelven TODOS los meses del rango, incluidos los que no tuvieron ningun
- * paro. Saltarselos deformaria la franja: un hueco de tres meses buenos se
- * veria como si fueran consecutivos y la tendencia mentiria.
+ * Una barra mensual destruye justo lo que hace falta ver. "45 horas en julio"
+ * no dice si fue un paro largo o doce cortos, y esa diferencia ES el
+ * diagnostico: un equipo que para cada tres semanas como reloj tiene un
+ * patron; uno que paro dos veces tuvo dos accidentes. Se atienden distinto.
+ *
+ * Por eso viajan los eventos crudos y no un agregado: el ritmo solo se ve
+ * cuando cada paro ocupa su lugar en la linea del tiempo.
  */
-export async function serieMensual(
+export async function eventosDeParo(
   organizationId: string,
-  meses = 12,
-  ahora = new Date(),
-): Promise<Mes[]> {
-  const desde = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1), 1);
+  rango: { desde: Date; hasta: Date },
+): Promise<EventoDeParo[]> {
   const eventos = await prisma.downtimeEvent.findMany({
-    where: { asset: { organizationId }, planned: false, startedAt: { gte: desde, lte: ahora } },
+    where: { asset: { organizationId }, startedAt: { gte: rango.desde, lte: rango.hasta } },
+    orderBy: { startedAt: "asc" },
     select: {
-      minutes: true, startedAt: true,
-      asset: { select: { detieneLinea: true, location: { select: { margenPorHora: true } } } },
+      id: true, startedAt: true, minutes: true, planned: true,
+      workOrder: { select: { number: true, resolution: true } },
+      asset: {
+        select: {
+          id: true, code: true, name: true, detieneLinea: true,
+          location: { select: { id: true, name: true, margenPorHora: true } },
+        },
+      },
     },
   });
 
-  const porMes = new Map<string, { minutos: number; perdida: number }>();
-  for (let i = 0; i < meses; i += 1) {
-    const d = new Date(ahora.getFullYear(), ahora.getMonth() - (meses - 1) + i, 1);
-    porMes.set(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, { minutos: 0, perdida: 0 });
-  }
-
-  for (const e of eventos) {
-    if (e.asset.detieneLinea !== true) continue;
-    const d = e.startedAt;
-    const clave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const acc = porMes.get(clave);
-    if (!acc) continue;
-    acc.minutos += e.minutes;
-    acc.perdida += (e.minutes / HORA) * (e.asset.location?.margenPorHora ?? 0);
-  }
-
-  return [...porMes.entries()].map(([clave, v]) => {
-    const [ano, mes] = clave.split("-");
-    return {
-      clave,
-      etiqueta: `${MESES[Number(mes) - 1]} ${ano.slice(2)}`,
-      horas: h(v.minutos),
-      perdida: Math.round(v.perdida),
-    };
-  });
+  return eventos.map((e) => ({
+    id: e.id,
+    inicio: e.startedAt.getTime(),
+    minutos: e.minutes,
+    planeado: e.planned,
+    assetId: e.asset.id,
+    code: e.asset.code,
+    name: e.asset.name,
+    area: e.asset.location?.name ?? "Sin ubicación",
+    locationId: e.asset.location?.id ?? null,
+    detieneLinea: e.asset.detieneLinea,
+    // Mismo criterio que costoDeParar: solo cuesta el paro no planeado de un
+    // equipo que detiene la linea. Repetir la regla aqui seria arriesgar que
+    // se separen; se calcula igual y con los mismos datos.
+    perdida:
+      !e.planned && e.asset.detieneLinea === true
+        ? Math.round((e.minutes / HORA) * (e.asset.location?.margenPorHora ?? 0))
+        : 0,
+    folio: e.workOrder?.number ?? null,
+    queSeHizo: e.workOrder?.resolution ?? null,
+  }));
 }

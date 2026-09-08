@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Loader2, Minus, RotateCcw, Sparkles, TriangleAlert 
 import { Card } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
+import { Latido, type Evento } from "./latido";
 
 type Equipo = {
   assetId: string; code: string; name: string;
@@ -17,7 +18,6 @@ type Area = {
   horasQueDetienen: number; horasQueNoDetienen: number; horasPlaneadas: number;
   perdida: number; equipos: Equipo[];
 };
-type Mes = { clave: string; etiqueta: string; horas: number; perdida: number };
 type Analisis = {
   explicacion: string;
   loQueConecta: string | null;
@@ -43,7 +43,8 @@ type Analisis = {
  */
 export function MapaDeParos({
   periodo, areas, perdida, cambio, anterior,
-  horasQueDetienen, horasPlaneadas, cobertura, comoDecirlo, serie, moneda,
+  horasQueDetienen, horasPlaneadas, cobertura, comoDecirlo,
+  eventos, desdeLinea, hastaLinea, ventana, moneda,
 }: {
   periodo: ClavePeriodo;
   areas: Area[];
@@ -54,7 +55,10 @@ export function MapaDeParos({
   horasPlaneadas: number;
   cobertura: { equiposConParo: number; equiposDefinidos: number; areasConParo: number; areasConTarifa: number; completa: boolean };
   comoDecirlo: { prefijo: string; falta: string | null };
-  serie: Mes[];
+  eventos: Evento[];
+  desdeLinea: number;
+  hastaLinea: number;
+  ventana: { desde: number; hasta: number } | null;
   moneda: string;
 }) {
   const router = useRouter();
@@ -81,7 +85,7 @@ export function MapaDeParos({
     const res = await fetch("/api/ia/paros", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locationId, periodo }),
+      body: JSON.stringify({ locationId, periodo, ...(ventana ?? {}) }),
     });
     const datos = await res.json().catch(() => ({}));
     setPreguntando(false);
@@ -115,18 +119,40 @@ export function MapaDeParos({
     };
   }, [excluidos, areas, perdida]);
 
-  function cambiarPeriodo(p: ClavePeriodo) {
+  function irA(q: URLSearchParams) {
+    // Al cambiar lo que se esta viendo se borran las explicaciones: una
+    // respuesta de otro tramo pegada a numeros nuevos confunde mas que ayudar.
     setExplicaciones({});
     setErrorIa(null);
-    const q = new URLSearchParams(params.toString());
-    q.set("p", p);
-    // El periodo vive en la URL: asi el director puede mandar el enlace de lo
-    // que esta viendo, y volver a el es recargar y no reconstruir.
     router.push(`/paros?${q.toString()}`);
   }
 
+  function elegirVentana(v: { desde: number; hasta: number }) {
+    const q = new URLSearchParams(params.toString());
+    q.set("d", String(Math.round(v.desde)));
+    q.set("h", String(Math.round(v.hasta)));
+    irA(q);
+  }
+
+  function limpiarVentana() {
+    const q = new URLSearchParams(params.toString());
+    q.delete("d");
+    q.delete("h");
+    irA(q);
+  }
+
+  function cambiarPeriodo(p: ClavePeriodo) {
+    const q = new URLSearchParams(params.toString());
+    q.set("p", p);
+    // Un periodo nuevo invalida la ventana: sus fechas pueden quedar fuera.
+    q.delete("d");
+    q.delete("h");
+    // Todo lo que se ve vive en la URL: asi el director puede mandar el enlace
+    // de lo que esta mirando, y volver a el es recargar y no reconstruir.
+    irA(q);
+  }
+
   const area = conParo.find((a) => a.locationId === areaViendo) ?? conParo[0];
-  const maxMes = Math.max(...serie.map((m) => m.horas), 1);
 
   return (
     <div className="grid gap-4">
@@ -191,31 +217,17 @@ export function MapaDeParos({
         </div>
       </Card>
 
-      {/* ── La franja de meses ───────────────────────────────────────── */}
+      {/* ── El latido ────────────────────────────────────────────────── */}
       <Card>
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Cómo ha venido</h2>
-            <p className="text-[0.6875rem] text-slate-500">
-              Horas que detuvieron producción, mes a mes
-            </p>
-          </div>
-          <div className="flex items-end gap-1 overflow-x-auto pb-1" style={{ height: 96 }}>
-            {serie.map((m) => (
-              <div key={m.clave} className="flex min-w-8 flex-1 flex-col items-center gap-1">
-                <span className="text-[0.625rem] tabular-nums text-slate-500">
-                  {m.horas > 0 ? m.horas : ""}
-                </span>
-                <div
-                  className={`w-full rounded-t ${m.horas > 0 ? "bg-orange-400" : "bg-slate-100"}`}
-                  style={{ height: `${Math.max((m.horas / maxMes) * 56, m.horas > 0 ? 4 : 2)}px` }}
-                  title={`${m.etiqueta}: ${m.horas} h · ${formatCurrency(m.perdida, moneda)}`}
-                />
-                <span className="text-[0.625rem] text-slate-400">{m.etiqueta}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Latido
+          eventos={eventos}
+          desde={desdeLinea}
+          hasta={hastaLinea}
+          moneda={moneda}
+          ventana={ventana}
+          onVentana={elegirVentana}
+          onLimpiar={limpiarVentana}
+        />
       </Card>
 
       {/* ── El mapa ──────────────────────────────────────────────────── */}

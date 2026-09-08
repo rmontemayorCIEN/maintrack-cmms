@@ -10,6 +10,9 @@ const schema = z.object({
   /** Nulo es valido: son los equipos sin ubicacion asignada. */
   locationId: z.string().min(1).nullable(),
   periodo: z.enum(Object.keys(PERIODOS) as [string, ...string[]]),
+  /** Milisegundos. Van juntos o no van: media ventana no delimita nada. */
+  desde: z.number().int().positive().optional(),
+  hasta: z.number().int().positive().optional(),
 });
 
 /**
@@ -42,6 +45,10 @@ export async function POST(request: Request) {
         {
           locationId: input.locationId,
           periodo: input.periodo as Parameters<typeof explicarParos>[1]["periodo"],
+          rango:
+            input.desde && input.hasta && input.hasta > input.desde
+              ? { desde: new Date(input.desde), hasta: new Date(input.hasta) }
+              : null,
           userId: user.id,
           operador: user.isSuperAdmin,
         },

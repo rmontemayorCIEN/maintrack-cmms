@@ -991,6 +991,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Solo cuentan los equipos marcados como que detienen la producción, a la tarifa de su ubicación. Sin esa marca se le cargaría a la extracción de humos el costo completo de la nave.",
       "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
       "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
+      "Un arrastre de menos de un día se ignora: casi siempre es un toque que se resbaló, y aplicarlo dejaría la pantalla vacía sin que se entienda por qué.",
     ],
     botones: [
       {
@@ -1007,7 +1008,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     campos: [
       { nombre: "El total", explica: "Dice «al menos» cuando falta captura: entonces es un piso, no el dato. Debajo aparece exactamente qué falta y dónde se completa." },
       { nombre: "La flecha", explica: "Compara contra el periodo anterior del mismo largo. Rojo hacia arriba es peor: más pérdida. Sin periodo anterior no inventa un porcentaje." },
-      { nombre: "Cómo ha venido", explica: "Los últimos doce meses, incluidos los que no tuvieron paro. Saltarse los meses buenos deformaría la tendencia." },
+      { nombre: "El latido de la planta", explica: "Cada marca es un paro: dónde está dice cuándo, qué tan alta dice cuánto duró, y el color si detuvo producción, fue mantenimiento planeado, o paró sin costar. Una barra mensual escondería lo que más importa: un equipo que para cada tres semanas tiene un patrón; uno que paró dos veces tuvo dos accidentes, y se atienden distinto." },
+      { nombre: "Arrastrar sobre la línea", explica: "Escoge cualquier tramo, no solo los de los botones. Todo se recalcula sobre ese tramo —incluida la comparación, que se hace contra el periodo anterior del mismo largo— y la pregunta a la IA se limita a él. El tramo queda en la dirección de la página, así que se puede mandar por correo." },
     ],
     noPuedo: [
       { sintoma: "El mapa sale vacío o con muy pocas horas", porque: "Solo entran los equipos marcados como que detienen la producción y con paro capturado. Si nadie anota cuánto estuvo parado el equipo al cerrar la orden, el área sale en blanco y parece sana." },
