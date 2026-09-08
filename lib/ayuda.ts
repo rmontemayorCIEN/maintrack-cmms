@@ -1001,6 +1001,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Su cuenta, la organización, los usuarios, el plan y la bitácora.",
     hacer: [
       "Cambiar tamaño de letra y densidad —eso es suyo, no de la empresa—",
+      "Contarle al sistema qué hace su empresa, para que la IA piense mejor",
       "Configurar logotipo, color, proceso de compras y umbral de autorización",
       "Definir la jornada, los días laborables y los días que la empresa no trabaja",
       "Dar de alta usuarios y revisar la bitácora",
@@ -1011,6 +1012,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Jornada y calendario» se define de cuántas horas es un día de trabajo. De ahí sale si un día del calendario cabe y en qué fechas puede programar el programador.",
       "La capacidad se define por excepción: la organización fija el número general y solo quien trabaje distinto lleva el suyo.",
       "Los avisos al teléfono llevan DOS llaves: el administrador enciende la de la empresa, y además cada persona activa su propio aparato. Encender la de la empresa no activa a nadie.",
+      "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [
       {
@@ -1031,6 +1033,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
           "Pide el permiso al sistema y registra este aparato. En iPhone solo aparece si MainTrack ya se agregó a la pantalla de inicio.",
       },
       {
+        nombre: "Su negocio, en sus palabras",
+        explica:
+          "Cinco preguntas que la IA lee antes de analizar. No sustituyen a los datos: si escribe algo que sus órdenes de trabajo contradicen, mandan los datos y la IA se lo señala. Se marca solo cuando lleva más de un año sin actualizarse.",
+      },
+      {
         nombre: "Reponer contraseña (la llave, junto a cada usuario)",
         explica:
           "Le pone una contraseña nueva a esa persona cuando la olvidó. Usted se la dice y ella la cambia al entrar. Al propietario no se le puede reponer desde aquí —lo dejaría fuera de su propia empresa—: él la cambia en «Mi cuenta».",
@@ -1042,6 +1049,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
       },
     ],
     noPuedo: [
+      {
+        sintoma: "La IA me da respuestas genéricas, que no parecen de mi empresa",
+        porque:
+          "Probablemente falta el contexto del negocio, en la pestaña «Organización». Con solo el giro, la IA sabe la categoría pero no su operación: ni sus turnos, ni de qué equipo depende todo lo demás.",
+      },
       {
         sintoma: "Alguien olvidó su contraseña y no puede entrar",
         porque:

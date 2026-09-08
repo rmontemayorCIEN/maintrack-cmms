@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         {
           base64: input.base64, tipo: input.tipo, zona: input.zona,
           userId: user.id, operador: user.isSuperAdmin,
-          org: { tipoInstalacion: user.organization.tipoInstalacion, industry: user.organization.industry },
+          org: user.organization,
         },
       );
       if (!r.ok) return fail(r.motivo, 402);

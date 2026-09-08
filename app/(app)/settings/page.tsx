@@ -25,6 +25,8 @@ import { Pestanas, type Pestana } from "./pestanas";
 import { ConfiguracionCompras } from "./compras";
 import { ConfiguracionJornada } from "./jornada";
 import { ConfiguracionOrdenes } from "./ordenes";
+import { ContextoDelNegocio } from "./contexto";
+import { contextoEnvejecido, PREGUNTAS, type ClavePregunta } from "@/lib/contexto-negocio";
 import { PanelAvisos } from "./avisos";
 
 export const metadata = { title: "Configuración" };
@@ -191,6 +193,17 @@ export default async function SettingsPage({
       ) : null}
 
       {activa === "organizacion" && sitios && ubicaciones ? (
+        <div className="grid gap-4">
+          <ContextoDelNegocio
+            valores={Object.fromEntries(
+              PREGUNTAS.map((p) => [p.clave, org[p.clave]]),
+            ) as Record<ClavePregunta, string | null>}
+            tipoInstalacion={org.tipoInstalacion}
+            actualizadoEl={org.contextoAt ? formatDate(org.contextoAt) : null}
+            envejecido={contextoEnvejecido(org)}
+            editable={can(user.role, "settings:write")}
+          />
+
         <div className="grid gap-4 lg:grid-cols-3">
           <ConfiguracionCompras
             comprasInternas={org.comprasInternas}
@@ -260,6 +273,7 @@ export default async function SettingsPage({
               </ul>
             )}
           </Card>
+        </div>
         </div>
       ) : null}
 

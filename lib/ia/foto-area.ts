@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa, type OrgConContexto } from "../contexto-negocio";
 
 /**
  * Reconocimiento de equipos a partir de la foto de un area.
@@ -62,7 +62,7 @@ export async function reconocerArea(
     zona?: string | null;
     userId?: string | null;
     operador?: boolean;
-    org?: { tipoInstalacion?: string | null; industry?: string | null };
+    org?: OrgConContexto;
   },
 ): Promise<{ ok: true; lectura: LecturaFotoArea; costoUsd: number } | { ok: false; motivo: string }> {
   const veredicto = await puedeUsarIa(org, "FOTO_AREA", { operador: params.operador });
@@ -77,7 +77,7 @@ export async function reconocerArea(
       "Diga si la foto sirve e identifique los equipos mantenibles que se ven. Si no sirve, explique como repetirla.",
     contexto: {
       zonaSegunElUsuario: params.zona || "no indicada",
-      tipoDeInstalacion: contextoDeInstalacion(params.org ?? {}),
+      tipoDeInstalacion: contextoDeLaEmpresa(params.org ?? {}),
     },
     esquema: EsquemaFotoArea,
     imagen: { base64: params.base64, tipo: params.tipo },

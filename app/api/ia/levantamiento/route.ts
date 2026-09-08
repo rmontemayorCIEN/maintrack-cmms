@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         const r = await prepararEntrevista(org, { descripcion: input.descripcion,
           userId: user.id,
           operador: user.isSuperAdmin,
-          org: { tipoInstalacion: user.organization.tipoInstalacion, industry: user.organization.industry },
+          org: user.organization,
         });
         if (!r.ok) return fail(r.motivo, 402);
         return ok({ entrevista: r.entrevista });
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         tipo: input.tipo,
         respuestas: input.respuestas,
         equiposVistos: input.equiposVistos,
-        org: { tipoInstalacion: user.organization.tipoInstalacion, industry: user.organization.industry },
+        org: user.organization,
         userId: user.id,
         operador: user.isSuperAdmin,
       });

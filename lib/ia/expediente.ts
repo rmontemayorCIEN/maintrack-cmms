@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { assetCostRanking, computeKpis } from "../kpi";
 import { saludDeDatos } from "../salud-datos";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
 import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 
@@ -29,7 +29,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
   const [org, sitios, salud, actual, previo, topCosto] = await Promise.all([
     prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
-      select: { name: true, plan: true, currency: true, industry: true, tipoInstalacion: true },
+      select: { name: true, plan: true, currency: true, industry: true, tipoInstalacion: true, queProduce: true, comoOpera: true, noPuedeParar: true, dueleHoy: true, objetivoDelAno: true, contextoAt: true },
     }),
     prisma.site.findMany({
       where: { organizationId },
@@ -114,7 +114,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
     empresa: {
       nombre: org.name,
       giro: org.industry,
-      instalacion: contextoDeInstalacion(org),
+      instalacion: contextoDeLaEmpresa(org),
       ubicacion: contextoGeografico(sitios),
       plan: org.plan,
       moneda: org.currency,

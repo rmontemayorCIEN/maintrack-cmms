@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
 
 /**
@@ -103,7 +103,7 @@ export async function sugerirRefacciones(
 
   const empresa = await prisma.organization.findUniqueOrThrow({
     where: { id: org.id },
-    select: { tipoInstalacion: true, industry: true },
+    select: { tipoInstalacion: true, industry: true, queProduce: true, comoOpera: true, noPuedeParar: true, dueleHoy: true, objetivoDelAno: true, contextoAt: true },
   });
 
   const [catalogo, familias, unidades] = await Promise.all([
@@ -124,7 +124,7 @@ export async function sugerirRefacciones(
     instruccion:
       "Proponga que refacciones conviene tener en almacén para este equipo, considerando lo que ya tienen y lo que su historial revela.",
     contexto: {
-      instalacion: contextoDeInstalacion(empresa),
+      instalacion: contextoDeLaEmpresa(empresa),
       activo: {
         codigo: activo.code,
         nombre: activo.name,

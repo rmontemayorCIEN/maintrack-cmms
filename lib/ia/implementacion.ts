@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa, type OrgConContexto } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
 
 /**
@@ -59,7 +59,7 @@ export async function prepararEntrevista(
     userId?: string | null;
     operador?: boolean;
     /// Tipo de instalacion e industria registrados en la cuenta.
-    org?: { tipoInstalacion?: string | null; industry?: string | null };
+    org?: OrgConContexto;
   },
 ): Promise<{ ok: true; entrevista: Entrevista; costoUsd: number } | { ok: false; motivo: string }> {
   const veredicto = await puedeUsarIa(org, "LEVANTAMIENTO", { operador: params.operador });
@@ -73,7 +73,7 @@ export async function prepararEntrevista(
     instruccion: "Prepare la entrevista para levantar el inventario de activos de esta instalación.",
     contexto: {
       descripcionDeLaInstalacion: params.descripcion,
-      tipoDeInstalacionRegistrado: contextoDeInstalacion(params.org ?? {}),
+      tipoDeInstalacionRegistrado: contextoDeLaEmpresa(params.org ?? {}),
     },
     esquema: EsquemaEntrevista,
     esfuerzo: "medium",
@@ -130,7 +130,7 @@ export async function generarInventario(
     descripcion: string;
     tipo: string | null;
     respuestas: Array<{ pregunta: string; respuesta: string }>;
-    org?: { tipoInstalacion?: string | null; industry?: string | null };
+    org?: OrgConContexto;
     /** Equipos reconocidos en las fotos del recorrido, si las hubo. */
     equiposVistos?: Array<{ zona: string; equipos: string[] }>;
     userId?: string | null;
@@ -158,7 +158,7 @@ export async function generarInventario(
     contexto: {
       instalacion: params.descripcion,
       tipo: params.tipo,
-      tipoDeInstalacionRegistrado: contextoDeInstalacion(params.org ?? {}),
+      tipoDeInstalacionRegistrado: contextoDeLaEmpresa(params.org ?? {}),
       entrevista: params.respuestas,
       equiposVistosEnFotografias: params.equiposVistos?.length ? params.equiposVistos : null,
       categoriasDisponibles: categorias.map((c) => ({ codigo: c.code, nombre: c.name })),

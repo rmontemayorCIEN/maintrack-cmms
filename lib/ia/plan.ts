@@ -3,7 +3,7 @@ import { prisma } from "../db";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { prisma as db } from "../db";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
 
 /**
@@ -167,10 +167,10 @@ export async function generarPlan(
     instruccion:
       "Redacte el plan de mantenimiento preventivo de este equipo, usando unicamente los catálogos de la empresa.",
     contexto: {
-      instalacion: contextoDeInstalacion(
+      instalacion: contextoDeLaEmpresa(
         await db.organization.findUniqueOrThrow({
           where: { id: org.id },
-          select: { tipoInstalacion: true, industry: true },
+          select: { tipoInstalacion: true, industry: true, queProduce: true, comoOpera: true, noPuedeParar: true, dueleHoy: true, objetivoDelAno: true, contextoAt: true },
         }),
       ),
       activo: {

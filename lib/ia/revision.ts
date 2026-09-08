@@ -4,7 +4,7 @@ import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { puestaEnMarcha } from "../puesta-en-marcha";
 import { saludDeDatos } from "../salud-datos";
-import { contextoDeInstalacion } from "../instalaciones";
+import { contextoDeLaEmpresa } from "../contexto-negocio";
 
 /**
  * Revision de la configuracion de la cuenta.
@@ -67,7 +67,7 @@ export async function revisarConfiguracion(
     await Promise.all([
       prisma.organization.findUniqueOrThrow({
         where: { id: org.id },
-        select: { name: true, plan: true, tipoInstalacion: true, industry: true },
+        select: { name: true, plan: true, tipoInstalacion: true, industry: true, queProduce: true, comoOpera: true, noPuedeParar: true, dueleHoy: true, objetivoDelAno: true, contextoAt: true },
       }),
       puestaEnMarcha(org.id),
       saludDeDatos(org.id),
@@ -86,7 +86,7 @@ export async function revisarConfiguracion(
     sistema: SISTEMA,
     instruccion: "Revise como quedo configurada esta cuenta y senale lo que la lista de pasos no alcanza a ver.",
     contexto: {
-      empresa: { nombre: empresa.name, plan: empresa.plan, instalacion: contextoDeInstalacion(empresa) },
+      empresa: { nombre: empresa.name, plan: empresa.plan, instalacion: contextoDeLaEmpresa(empresa) },
       puestaEnMarcha: {
         porcentaje: marcha.porcentaje,
         pasos: marcha.pasos.map((p) => ({

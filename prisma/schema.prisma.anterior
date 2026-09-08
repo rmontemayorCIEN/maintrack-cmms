@@ -76,6 +76,38 @@ model Organization {
   /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
   otHorizonteDias Int     @default(15)
 
+  /// ─── Lo que la empresa hace, en sus propias palabras ───────────────────
+  ///
+  /// El giro y el tipo de instalacion dicen la CATEGORIA: "planta
+  /// metalmecanica". Eso no dice que trabaja tres turnos, que su cuello de
+  /// botella es la grua, ni que este ano quiere certificarse. La diferencia
+  /// entre un hallazgo y un consejo esta justo ahi.
+  ///
+  /// Son cinco campos y no un recuadro vacio a proposito: un "describa su
+  /// empresa" en blanco recibe una linea o nada. Cada pregunta se eligio por
+  /// lo que cambia en la respuesta de la IA, no por completar una ficha.
+  ///
+  /// Entran a los prompts como DATO delimitado, nunca como instruccion.
+
+  /// Que produce y para quien. Cambia que significa "critico" en esta planta.
+  queProduce     String?
+  /// Turnos, dias, temporada alta. De aqui sale cuanto cuesta de verdad un
+  /// paro planeado: en domingo sin produccion no cuesta lo mismo.
+  comoOpera      String?
+  /// La restriccion: que NO puede parar. Es el campo mas valioso de los cinco.
+  /// "Sin la grua no se mueve material" explica de golpe por que ocho paros
+  /// cortos duelen mas que cuatro largos, y eso ningun numero lo dice.
+  noPuedeParar   String?
+  /// El problema que el dueno reconoce hoy. Le da un blanco al analisis.
+  dueleHoy       String?
+  /// Que quiere lograr este ano. Convierte el hallazgo en recomendacion.
+  objetivoDelAno String?
+  /// Cuando se actualizo por ultima vez.
+  ///
+  /// Un contexto de hace dos anos describe una empresa que ya no existe, y la
+  /// IA lo tomaria como cierto. Se muestra la fecha para que se note viejo.
+  contextoAt     DateTime?
+
   /// Si esta organizacion manda avisos al celular de su gente.
   ///
   /// Apagado por omision, y a proposito. Un aviso que llega al telefono
