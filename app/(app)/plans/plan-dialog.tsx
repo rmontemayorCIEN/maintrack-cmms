@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Button } from "@/components/ui";
+import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Button, BotonEditar } from "@/components/ui";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { RecursosTarea, type LineaMO, type LineaRef, type LineaSrv, type Opcion } from "./recursos-tarea";
@@ -261,14 +261,7 @@ export function PlanDialog({
 
   if (!open) {
     return editando ? (
-      <button
-        type="button"
-        onClick={abrir}
-        title="Editar plan"
-        className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
+      <BotonEditar que="plan" onClick={abrir} />
     ) : (
       <Button size="sm" onClick={abrir}>
         <Plus className="h-3.5 w-3.5" /> Nuevo plan

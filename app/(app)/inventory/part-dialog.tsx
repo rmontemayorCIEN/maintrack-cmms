@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Loader2, Plus, X } from "lucide-react";
+import { Button, BotonEditar } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 
 /** Al migrar valores de texto libre el nombre queda igual al codigo; repetirlo
@@ -93,12 +93,7 @@ export function PartDialog({
 
   if (!open) {
     return editando ? (
-      <button
-        type="button" onClick={() => setOpen(true)} title="Editar refaccion"
-        className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
+      <BotonEditar que="refacción" onClick={() => setOpen(true)} />
     ) : (
       <Button size="sm" onClick={() => setOpen(true)}>
         <Plus className="h-3.5 w-3.5" /> Nueva refacción

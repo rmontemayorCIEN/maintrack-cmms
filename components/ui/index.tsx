@@ -1,3 +1,4 @@
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -240,5 +241,41 @@ export function Avatar({ name, color }: { name: string; color?: string }) {
     >
       {letters}
     </span>
+  );
+}
+
+/**
+ * El boton de editar de un renglon de tabla.
+ *
+ * Existe porque el anterior no se veia. Era un lapiz de 14 px en gris claro,
+ * sin borde ni fondo, que solo se distinguia al pasar el raton —y en un
+ * telefono no hay raton—. Rafael no lo encontro en el almacen, y lo estaba
+ * buscando a proposito; el mismo boton invisible estaba en proveedores, planes
+ * y catalogos.
+ *
+ * Lleva borde para que se lea como control, 36 px de alto para que el pulgar
+ * no falle, y la palabra "Editar" donde hay espacio: un lapiz solo obliga a
+ * adivinar. En pantalla angosta se queda el icono, pero ya con la medida y el
+ * borde que lo delatan como boton.
+ */
+export function BotonEditar({
+  que,
+  onClick,
+}: {
+  /** Que se edita, para el rotulo de accesibilidad: "refacción", "plan". */
+  que: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Editar ${que}`}
+      aria-label={`Editar ${que}`}
+      className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 text-xs text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+    >
+      <Pencil className="h-3.5 w-3.5" />
+      <span className="hidden sm:inline">Editar</span>
+    </button>
   );
 }

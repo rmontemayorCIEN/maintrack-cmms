@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import { Loader2, MapPin, Plus, Trash2, X } from "lucide-react";
+import { Badge, Button, Card, EmptyState, BotonEditar } from "@/components/ui";
 import { enlaceMapa } from "@/lib/geografia";
 import { cn } from "@/lib/utils";
 
@@ -417,14 +417,7 @@ export function GestorCatalogos({
                       {editable ? (
                         <td className="text-right">
                           <div className="flex justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => abrirEdicion(fila)}
-                              title="Editar"
-                              className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
+                            <BotonEditar que="registro" onClick={() => abrirEdicion(fila)} />
                             <button
                               type="button"
                               onClick={() => borrar(fila)}

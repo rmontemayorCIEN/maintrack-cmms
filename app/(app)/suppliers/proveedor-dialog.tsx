@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, Plus } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Loader2, Plus } from "lucide-react";
+import { Button, BotonEditar } from "@/components/ui";
 
 export type ProveedorEditable = {
   id: string; name: string;
@@ -46,12 +46,7 @@ export function ProveedorDialog({ proveedor }: { proveedor?: ProveedorEditable }
   return (
     <>
       {editando ? (
-        <button
-          type="button" onClick={() => setAbierto(true)} title="Editar proveedor"
-          className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+        <BotonEditar que="proveedor" onClick={() => setAbierto(true)} />
       ) : (
         <Button type="button" size="sm" onClick={() => setAbierto(true)}>
           <Plus className="h-3.5 w-3.5" /> Nuevo proveedor
