@@ -12,6 +12,7 @@ const schema = z.object({
   model: z.string().nullable().optional(),
   serialNumber: z.string().nullable().optional(),
   criticality: z.enum(["A", "B", "C"]).optional(),
+  detieneLinea: z.boolean().nullable().optional(),
   status: z.enum(["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY", "RETIRED"]).optional(),
   purchaseDate: z.string().nullable().optional(),
   purchaseCost: z.coerce.number().min(0).optional(),

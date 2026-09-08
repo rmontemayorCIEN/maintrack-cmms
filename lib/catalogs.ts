@@ -144,23 +144,30 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "description", etiqueta: "Descripción", tipo: "texto" },
+      {
+        nombre: "margenPorHora", etiqueta: "Deja de ganar por hora parada", tipo: "numero",
+        ayuda: "Lo que esta área deja de GANAR cada hora que se detiene: lo que dejaría de facturar menos el material que no se consumiría. Margen, no venta — un número de precio de venta se ve enorme y lo tumba el primero que pregunte si de verdad se perdió la venta. Déjelo en cero si no lo sabe.",
+      },
     ],
     crear: z.object({
       siteId: z.string().min(1),
       code: texto(1, 20),
       name: texto(2),
       description: texto(0, 200).optional().nullable(),
+      margenPorHora: z.coerce.number().min(0).optional(),
     }),
     editar: z.object({
       code: texto(1, 20).optional(),
       name: texto(2).optional(),
       description: texto(0, 200).nullable().optional(),
+      margenPorHora: z.coerce.number().min(0).optional(),
     }),
     listar: (orgId) =>
       prisma.location.findMany({
         where: { organizationId: orgId },
         select: {
           id: true, code: true, name: true, description: true, siteId: true,
+          margenPorHora: true,
           site: { select: { name: true } },
           _count: { select: { assets: true } },
         },

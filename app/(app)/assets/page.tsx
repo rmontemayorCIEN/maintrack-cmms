@@ -92,6 +92,7 @@ export default async function AssetsPage({
     serialNumber: a.serialNumber,
     purchaseCost: a.purchaseCost,
     replacementCost: a.replacementCost,
+    detieneLinea: a.detieneLinea,
     expectedLifeYears: a.expectedLifeYears,
     commissionedAt: a.commissionedAt?.toISOString() ?? null,
     warrantyExpiry: a.warrantyExpiry?.toISOString() ?? null,

@@ -186,6 +186,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   warrantyExpiry: asset.warrantyExpiry?.toISOString() ?? null,
                   purchaseCost: asset.purchaseCost,
                   replacementCost: asset.replacementCost,
+                  detieneLinea: asset.detieneLinea,
                 }}
               />
             ) : null}

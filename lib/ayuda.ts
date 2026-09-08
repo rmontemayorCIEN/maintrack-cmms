@@ -532,6 +532,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Activo", explica: "El nombre y, debajo, fabricante y modelo si ya se capturaron de la placa." },
       { nombre: "Criticidad", explica: "A si su falla detiene la operacion o compromete la seguridad; C si se puede vivir sin el unos dias. Decide el orden de atencion cuando hay varias cosas detenidas." },
       { nombre: "Estado", explica: "Operando, degradado, detenido o retirado. Los retirados salen de las listas de trabajo pero conservan su historial." },
+      { nombre: "Si para, ¿detiene la producción?", explica: "De aquí sale cuánto CUESTA que este equipo falle. No es lo mismo que la criticidad: el extractor de humos puede ser crítico por seguridad y aun así no detener la línea. Sin definir, sus paros no se cuentan como pérdida — y el sistema le dice cuántos equipos le faltan." },
       { nombre: "Ubicacion", explica: "Donde esta fisicamente. Es lo que permite armar una ruta de recorrido en vez de ir y venir." },
       { nombre: "OT abiertas", explica: "Trabajo pendiente sobre ese equipo. Varias abiertas a la vez suele ser síntoma de que se atiende el síntoma y no la causa." },
       { nombre: "Planes", explica: "Cuantas rutinas preventivas tiene. En cero, ese equipo solo se atiende cuando ya fallo." },
@@ -987,6 +988,13 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Catálogos",
     que: "Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, causas de falla, cuadrillas.",
     hacer: ["Dar de alta y editar cada catálogo", "Borrar los que no estén en uso"],
+    campos: [
+      {
+        nombre: "Ubicaciones · Deja de ganar por hora parada",
+        explica:
+          "Lo que esa área deja de GANAR cada hora detenida: lo que dejaría de facturar menos el material que no se consumiría. Margen, no venta — un número de precio de venta se ve enorme y lo tumba el primero que pregunte si de verdad se perdió la venta. En cero significa «sin capturar», no «parar aquí es gratis».",
+      },
+    ],
     flujo: [
       "Un catálogo limpio es lo que después permite agrupar y comparar. Texto libre no se puede agrupar.",
       "Los proveedores tienen pantalla propia porque a ellos les cuelga información real.",

@@ -329,6 +329,18 @@ model Location {
   name           String
   code           String
   description    String?
+  /// Lo que esta area o linea DEJA DE GANAR por cada hora parada.
+  ///
+  /// Margen, no venta. Un numero de precio de venta sale enorme y se ve
+  /// espectacular, pero lo tumba la primera persona que pregunte si de verdad
+  /// se perdio la venta o se recupero el sabado con tiempo extra, y si se
+  /// resto el material que no se consumio. Un numero que tumban una vez
+  /// desacredita todo el tablero, incluidas las partes correctas.
+  ///
+  /// Cero significa SIN CAPTURAR, no "parar aqui es gratis". La diferencia
+  /// importa al presentarlo: un area sin tarifa no debe salir en $0, debe
+  /// salir como pendiente de definir.
+  margenPorHora  Float    @default(0)
   createdAt      DateTime @default(now())
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -376,6 +388,23 @@ model Asset {
   model             String?
   serialNumber      String?
   criticality       String    @default("B") // A | B | C
+  /// Si parar este equipo DETIENE la produccion de su ubicacion.
+  ///
+  /// Sin esta marca, el costo del paro seria mentira: al extractor de humos o
+  /// a la bomba de respaldo se les cargaria la tarifa completa de la nave, y
+  /// el dueno lo cacharia a la primera —con razon—, que es como se pierde la
+  /// confianza en un tablero entero.
+  ///
+  /// Nulo a proposito: significa QUE NADIE LO HA DICHO, no "no detiene". Un
+  /// falso por omision daria un total bajo que parece exacto; un verdadero por
+  /// omision daria uno inflado. Nulo obliga a que la pantalla muestre cuantos
+  /// equipos faltan por definir, y convierte el hueco en tarea visible en vez
+  /// de en un numero equivocado.
+  ///
+  /// No se deduce de `criticality`: la criticidad habla de consecuencia en
+  /// general —seguridad, costo, normativa— y esto habla solo de si se detiene
+  /// la produccion. Un equipo critico por seguridad puede no parar la linea.
+  detieneLinea      Boolean?
   status            String    @default("OPERATIONAL") // OPERATIONAL|DEGRADED|DOWN|STANDBY|RETIRED
   purchaseDate      DateTime?
   purchaseCost      Float     @default(0)

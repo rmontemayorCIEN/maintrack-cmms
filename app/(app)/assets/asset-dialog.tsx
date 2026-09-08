@@ -12,6 +12,7 @@ export type ActivoEditable = {
   siteId: string; locationId: string | null; categoryId: string | null;
   manufacturer: string | null; model: string | null; serialNumber: string | null;
   criticality: string; status: string;
+  detieneLinea: boolean | null;
   purchaseDate: string | null; warrantyExpiry: string | null;
   purchaseCost: number; replacementCost: number;
 };
@@ -57,6 +58,9 @@ export function AssetDialog({
     model: activo?.model ?? "",
     serialNumber: activo?.serialNumber ?? "",
     criticality: activo?.criticality ?? "B",
+    // Vacio = nadie lo ha dicho. No se adivina: un "no" por omision daria
+    // un costo de paro bajo que parece exacto.
+    detieneLinea: activo?.detieneLinea === true ? "SI" : activo?.detieneLinea === false ? "NO" : "",
     status: activo?.status ?? "OPERATIONAL",
     purchaseDate: activo?.purchaseDate?.slice(0, 10) ?? "",
     purchaseCost: String(activo?.purchaseCost ?? 0),
@@ -88,6 +92,9 @@ export function AssetDialog({
         warrantyExpiry: form.warrantyExpiry || null,
         locationId: form.locationId || null,
         categoryId: form.categoryId || null,
+        // El select maneja tres estados y el campo es booleano nulable: vacio
+        // viaja como null, que es "nadie lo ha dicho".
+        detieneLinea: form.detieneLinea === "SI" ? true : form.detieneLinea === "NO" ? false : null,
       }),
     });
     const data = await res.json();
@@ -208,6 +215,29 @@ export function AssetDialog({
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="label">Si para, ¿detiene la producción?</label>
+            <select
+              className="field"
+              value={form.detieneLinea}
+              onChange={(e) => set("detieneLinea", e.target.value)}
+            >
+              <option value="">Sin definir</option>
+              <option value="SI">Sí, se detiene el área</option>
+              <option value="NO">No, se sigue produciendo</option>
+            </select>
+            {/*
+              Es distinto de la criticidad: la criticidad habla de consecuencia
+              en general —seguridad, costo, normativa— y esto solo de si se
+              detiene la produccion. Un extractor de humos puede ser critico por
+              seguridad y no parar la linea.
+            */}
+            <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+              De aquí sale cuánto cuesta que este equipo falle. No es lo mismo que la
+              criticidad: el extractor de humos puede ser crítico por seguridad y aun así
+              no detener la producción. Sin definir, sus paros no se cuentan como pérdida.
+            </p>
           </div>
           <div>
             <label className="label">Fabricante</label>
