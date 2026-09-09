@@ -138,7 +138,34 @@ npm run actualizar             # desplegar a produccion (con migracion)
 npm run actualizar -- --sin-migrar
 ./scripts/nueva-migracion.sh   # crear migracion
 ./scripts/con-produccion.sh scripts/<x>.ts   # correr un script contra produccion
+./scripts/fuera-de-icloud.sh   # cuando el dev server se porte raro (ver abajo)
 ```
+
+### Esta Mac: `~/Documents` ES iCloud Drive
+
+No es un enlace visible sino un enlace firme de APFS, asi que el proyecto se
+sincroniza entero sin que se note. Con `node_modules` y `.next` adentro eran
+1.9 GB subiendo y bajando, y iCloud resuelve conflictos creando copias con
+`" 2"` en el nombre.
+
+**No es cosmetico.** 147 de esas copias dentro de `.next` dejaron el servidor
+de desarrollo sirviendo los chunks del cliente con error 500: la pantalla
+cargaba, React nunca hidrataba, y todo lo interactivo quedaba muerto sin un
+solo mensaje que lo explicara. Se diagnostico dos veces como si fuera un error
+del codigo.
+
+`node_modules` y `.next` ya viven en `~/Library/Caches/maintrack` con un enlace
+desde aqui. **`npm ci` deshace eso en silencio** —borra `node_modules` con todo
+y enlace, y vuelve a crear la carpeta dentro de iCloud—, asi que despues de un
+`npm ci`, o cuando el `npm run dev` se comporte raro:
+
+```bash
+./scripts/fuera-de-icloud.sh
+```
+
+Queda pendiente lo de fondo: `.env` y `prisma/dev.db` siguen sincronizandose
+porque estan en el arbol del proyecto. La solucion completa es sacar el
+proyecto de `~/Documents`.
 
 `con-produccion.sh` abre la puerta de Cloud SQL, corre y **siempre la cierra**,
 incluso si truena. La llave de IA la trae de Secret Manager sin pasar por la
