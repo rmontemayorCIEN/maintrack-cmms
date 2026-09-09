@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Boxes, CircleAlert, CircleCheck, CircleMinus, Loader2, Pencil, Plus, Trash2, Unlink } from "lucide-react";
+import { Boxes, CircleAlert, CircleCheck, CircleMinus, LayoutGrid, Loader2, Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { Badge, Button, EmptyState } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import { SelectorBuscable } from "@/components/selector-buscable";
@@ -117,7 +117,7 @@ export function Panel({
         <EmptyState
           icon={<Boxes className="h-6 w-6" />}
           title={`Todavía no hay ${termino.plural.toLowerCase()}`}
-          description={`${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} agrupa los equipos que sirven o no sirven juntos —la línea de producción, la alberca, los elevadores— aunque estén en áreas distintas. Sirve para ver de un vistazo cómo está lo que a alguien le toca cuidar.`}
+          description={`${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} agrupa los equipos que sirven o no sirven juntos —la línea de producción, la alberca, los elevadores— aunque estén en áreas distintas. Al entrar, los acomoda en un lienzo como de verdad están y el color le dice cuáles operan, cuánto costaron y qué traen pendiente.`}
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -166,8 +166,26 @@ export function Panel({
                   )}
                 </p>
 
-                {editable ? (
-                  <div className="mt-1 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
+                {/*
+                  El lienzo es LO QUE VALE de esta pantalla, y estaba escondido
+                  detras del nombre en color. Rafael abrio Lineas y pregunto
+                  "como visualizo": si el dueno del sistema no lo encuentra,
+                  nadie lo va a encontrar. Es la misma leccion de Almacen, donde
+                  el boton de editar no se hallaba.
+
+                  Va fuera del `editable` a proposito: quien solo mira es
+                  precisamente quien mas necesita el dibujo, y antes no tenia
+                  ninguna accion visible.
+                */}
+                <div className="mt-1 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
+                  <Link
+                    href={`/conjuntos/${f.id}`}
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-[0.6875rem] font-medium text-brand-700 hover:bg-brand-100"
+                  >
+                    <LayoutGrid className="h-3 w-3" /> Ver el lienzo
+                  </Link>
+                  {editable ? (
+                    <>
                     <button
                       type="button"
                       onClick={() => { setEditando(f); setError(null); }}
@@ -184,8 +202,9 @@ export function Panel({
                       {borrando === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                       Eliminar
                     </button>
-                  </div>
-                ) : null}
+                    </>
+                  ) : null}
+                </div>
               </div>
             );
           })}

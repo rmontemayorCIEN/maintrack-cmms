@@ -69,7 +69,7 @@ export default async function ConjuntosPage() {
     <div>
       <PageHeader
         title={termino.plural}
-        description={`${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} es un grupo de equipos que sirve o no sirve como un todo, y del que alguien responde. Puede cruzar áreas.`}
+        description={`${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} es un grupo de equipos que sirve o no sirve como un todo, y del que alguien responde. Puede cruzar áreas. Toque «Ver el lienzo» para dibujarlo.`}
       />
       <Panel
         termino={termino}
