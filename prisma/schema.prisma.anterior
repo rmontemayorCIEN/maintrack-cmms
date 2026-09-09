@@ -15,55 +15,65 @@ datasource db {
 // ---------------------------------------------------------------- Tenancy ---
 
 model Organization {
-  id                String    @id @default(cuid())
-  name              String
-  slug              String    @unique
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
   /// Giro en texto libre: "Manufactura metalmecanica", "Alimentos".
-  industry          String?
+  industry              String?
   /// Tipo de instalacion, de lib/instalaciones.ts. Alimenta los ejemplos de
   /// captura y el contexto de todos los prompts de IA.
-  tipoInstalacion   String?
-  plan              String    @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
-  status            String    @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELLED
-  trialEndsAt       DateTime?
-  seats             Int       @default(10)
-  timezone          String    @default("America/Mexico_City")
-  currency          String    @default("MXN")
-  locale            String    @default("es-MX")
-  logoUrl           String?
+  tipoInstalacion       String?
+  plan                  String    @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
+  status                String    @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELLED
+  trialEndsAt           DateTime?
+  seats                 Int       @default(10)
+  timezone              String    @default("America/Mexico_City")
+  currency              String    @default("MXN")
+  locale                String    @default("es-MX")
+  logoUrl               String?
   /// Paleta de acento de la empresa, de lib/apariencia.ts.
-  colorAcento       String?
-  settings          String    @default("{}")
-  woSequence        Int       @default(0)
-  wrSequence        Int       @default(0)
-  poSequence        Int       @default(0)
-  invSequence       Int       @default(0)
-  tsSequence        Int       @default(0)
-  rmSequence        Int       @default(0)
-  rcSequence        Int       @default(0)
-  reSequence        Int       @default(0)
-  icSequence        Int       @default(0)
+  colorAcento           String?
+  settings              String    @default("{}")
+  woSequence            Int       @default(0)
+  wrSequence            Int       @default(0)
+  poSequence            Int       @default(0)
+  invSequence           Int       @default(0)
+  tsSequence            Int       @default(0)
+  rmSequence            Int       @default(0)
+  rcSequence            Int       @default(0)
+  reSequence            Int       @default(0)
+  icSequence            Int       @default(0)
   /// Si el proceso de compras corre DENTRO de MainTrack.
   ///
   /// Apagado por omision a proposito: la mayoria de las empresas ya compra en
   /// su ERP y no lo va a mover. Con el apagado, la requisicion de compra
   /// guarda el folio de la orden externa y salta directo a recepcion, sin
   /// perder trazabilidad de quien pidio ni de donde termino el material.
-  comprasInternas   Boolean   @default(false)
+  /// Como le llama ESTA cuenta a un conjunto de equipos.
+  ///
+  /// Vacio significa "el que corresponde a mi tipo de instalacion": Linea en
+  /// planta, Sistema en edificio, Servicio en club, Ruta en flotilla. Se llena
+  /// solo cuando el cliente usa una palabra propia —hay plantas que dicen
+  /// "celda" y hospitales que dicen "area critica"— y entonces gana sobre la
+  /// del tipo. Nadie escribe la palabra en una pantalla: se lee de aqui.
+  terminoConjunto       String?
+  terminoConjuntoPlural String?
+
+  comprasInternas   Boolean @default(false)
   /// Arriba de este monto la requisicion de compra necesita autorizacion.
   /// Cero significa que todas la necesitan; un monto muy alto, ninguna.
-  montoAutorizacion Float     @default(0)
+  montoAutorizacion Float   @default(0)
   /// Horas de trabajo al dia de un tecnico. Es el piso: quien quiera precision
   /// lo ajusta por persona en User.horasDisponibles.
   ///
   /// De aqui sale si un dia esta sobrecargado. Sin este numero el calendario
   /// puede mostrar 38 horas de trabajo asignadas al mismo martes y verse
   /// perfectamente normal.
-  horasJornada      Float     @default(8)
+  horasJornada      Float   @default(8)
   /// Dias de la semana que se trabajan, separados por coma: 1 es lunes y 7 es
   /// domingo. Texto y no arreglo, porque el esquema corre en SQLite y en
   /// PostgreSQL con el mismo archivo.
-  diasHabiles       String    @default("1,2,3,4,5")
+  diasHabiles       String  @default("1,2,3,4,5")
 
   /// Si una OT puede juntar actividades de varios origenes (preventivo del
   /// plan + un correctivo + una mejora) en un solo esfuerzo.
@@ -134,6 +144,8 @@ model Organization {
   meters            Meter[]
   meterReadings     MeterReading[]
   plans             MaintenancePlan[]
+  conjuntos         Conjunto[]
+  conjuntoAssets    ConjuntoAsset[]
   workOrders        WorkOrder[]
   workRequests      WorkRequest[]
   parts             Part[]
@@ -243,6 +255,7 @@ model User {
   festivos             DiaFestivo[]            @relation("FestivoCreadoPor")
   equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
   asignacionesCreadas  PlanAsset[]             @relation("AsignacionCreadaPor")
+  conjuntosACargo      Conjunto[]              @relation("ConjuntoResponsable")
 
   @@index([organizationId])
 }
@@ -433,14 +446,27 @@ model Asset {
   expectedLifeYears Int?
   /// Ultimo analisis de recurrencia de fallas, en JSON, y cuando se hizo. Se
   /// guarda para no volver a pagarlo cada vez que alguien abre la ficha.
-  iaRecurrencia     String?
-  iaRecurrenciaEl   DateTime?
-  imageUrl          String?
-  qrToken           String    @unique @default(cuid())
-  specsJson         String    @default("{}")
-  active            Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  /// Este equipo va solo, y es una decision, no un pendiente.
+  ///
+  /// Un equipo que no esta en ningun conjunto puede ser dos cosas muy
+  /// distintas: nadie lo ha acomodado todavia —eso es tarea— o alguien ya
+  /// decidio que no pertenece a ninguno, como el calentador del bano de
+  /// oficinas. Sin distinguirlas, la lista de pendientes se llena de cosas
+  /// que nunca se van a mover, se vuelve ruido, y el dia que de verdad falte
+  /// acomodar algo importante ya nadie la esta viendo.
+  ///
+  /// Misma regla que detieneLinea: lo que nadie ha decidido se ve como hueco;
+  /// lo decidido se guarda y el sistema deja de preguntar.
+  independiente     Boolean   @default(false)
+
+  iaRecurrencia   String?
+  iaRecurrenciaEl DateTime?
+  imageUrl        String?
+  qrToken         String    @unique @default(cuid())
+  specsJson       String    @default("{}")
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   site            Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -460,6 +486,7 @@ model Asset {
   links           ReferenceLink[]
   reportPoints    ReportPoint[]
   planesAsignados PlanAsset[]
+  conjuntos       ConjuntoAsset[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -2172,4 +2199,74 @@ model PlanAsset {
   @@index([organizationId])
   @@index([assetId])
   @@index([nextDueDate])
+}
+
+/// Un conjunto de equipos que sirve o no sirve como un todo.
+///
+/// En una planta es "la Linea 4, desde almacen de refacciones hasta producto
+/// terminado". En un club es "la alberca": bombas, filtros, calentador y
+/// clorador, repartidos en el cuarto de maquinas, el area de alberca y la
+/// subestacion. Si falla el calentador, la alberca no abre. El objeto es el
+/// mismo y la palabra cambia —de ahi terminoConjunto en Organization—.
+///
+/// Es distinto de Location a proposito: las ubicaciones son geografia y son
+/// exclusivas —un equipo esta en un solo lugar—; los conjuntos son funcion y
+/// se traslapan. La subestacion alimenta la linea, los elevadores y la
+/// alberca al mismo tiempo.
+model Conjunto {
+  id             String  @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  descripcion    String?
+
+  /// Quien responde por que esto funcione. La mitad del valor del objeto es
+  /// que haya un nombre; sin dueno vuelve a ser una etiqueta.
+  responsableId String?
+
+  /// MANUAL | IA. Un conjunto propuesto por la IA y aceptado sin revisar no
+  /// vale lo mismo que uno armado a mano, y hay que poder distinguirlos
+  /// despues sin adivinar.
+  origen String @default("MANUAL")
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsable  User?           @relation("ConjuntoResponsable", fields: [responsableId], references: [id])
+  equipos      ConjuntoAsset[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+/// Que equipo pertenece a que conjunto, y donde queda dibujado.
+///
+/// Las coordenadas viven AQUI y no en Asset. Un equipo puede estar en varios
+/// conjuntos —la subestacion esta en tres—, asi que tiene una posicion
+/// distinta en cada lienzo. Guardarlas en Asset haria que acomodar un lienzo
+/// desacomodara los otros dos, en silencio y sin que nadie lo relacione.
+///
+/// Nulo en planoX/planoY significa SIN COLOCAR, igual que en Location.
+model ConjuntoAsset {
+  id             String @id @default(cuid())
+  organizationId String
+  conjuntoId     String
+  assetId        String
+
+  planoX     Int?
+  planoY     Int?
+  planoAncho Int  @default(3)
+  planoAlto  Int  @default(2)
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conjunto     Conjunto     @relation(fields: [conjuntoId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([conjuntoId, assetId])
+  @@index([organizationId])
+  @@index([assetId])
 }

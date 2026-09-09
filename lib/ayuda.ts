@@ -977,6 +977,47 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/conjuntos": {
+    titulo: "Líneas, sistemas y servicios",
+    que: "Los grupos de equipos que sirven o no sirven como un todo, y de los que alguien responde.",
+    hacer: [
+      "Agrupar los equipos que dependen unos de otros, aunque estén en áreas distintas",
+      "Ver de un vistazo si lo que alguien cuida está completo o tiene algo abajo",
+      "Saber qué equipos no están en ningún grupo todavía",
+      "Poner nombre y responsable a cada uno",
+    ],
+    flujo: [
+      "El nombre del grupo lo pone su tipo de instalación: en una planta son Líneas, en un edificio Sistemas, en un club o un hotel Servicios, en una flotilla Rutas. Se puede cambiar por la palabra que usted use.",
+      "Un grupo NO es un área. Las áreas son geografía y son exclusivas —un equipo está en un solo lugar—; los grupos son función y se traslapan. La subestación puede alimentar la línea, los elevadores y la alberca al mismo tiempo, y estar en los tres.",
+      "El estado sale del estado vivo de cada equipo. Un equipo se marca abajo solo cuando entra a ejecución una orden que requiere paro, y vuelve a operar al completarse: nadie tiene que acordarse de actualizarlo.",
+      "Los equipos que no están en ningún grupo se calculan solos y aparecen abajo. Un equipo nuevo entra ahí sin que nadie lo ponga: por eso no existe un grupo de «Equipos varios» que alguien tenga que mantener.",
+    ],
+    botones: [
+      {
+        nombre: "Va solo",
+        explica:
+          "Marca ese equipo como independiente a propósito: el calentador del baño de oficinas no va a pertenecer a ninguna línea nunca. Deja de contar como pendiente pero sigue a la vista, en el otro grupo. Es la diferencia entre «nadie lo ha acomodado» y «ya se decidió que va solo».",
+      },
+      {
+        nombre: "Eliminar",
+        explica:
+          "Solo funciona si el grupo está vacío, y si no, le dice cuántos equipos lo impiden. Si el grupo ya no se usa pero quiere conservarlo, desactívelo en vez de borrarlo.",
+      },
+    ],
+    campos: [
+      { nombre: "El estado", explica: "Completo es que ninguno de sus equipos está abajo ni degradado. Detenido es que al menos uno lo está — y si ese equipo detiene la producción, lo dice aparte, porque no es lo mismo que pare un extractor a que pare el torno." },
+      { nombre: "Responsable", explica: "Quién responde por que esto funcione. Sin un nombre, el grupo vuelve a ser una etiqueta: la mitad del valor es que haya alguien a quien preguntarle." },
+      { nombre: "Clave", explica: "Se genera del nombre si la deja vacía, y no se puede cambiar después. Si su planta ya tiene sus propias claves —L4, SIS-ELEV— use las suyas." },
+      { nombre: "«23 de 73 equipos»", explica: "Cuántos de sus equipos están en algún grupo. Es la medida de qué tan armada está su instalación, y baja sola cuando da de alta equipos nuevos." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo el botón de crear", porque: "Crear grupos cambia lo que ve toda la organización, así que pide el mismo permiso que dar de alta un activo. Quien no lo tiene los ve pero no los modifica." },
+      { sintoma: "Un equipo aparece en «sin acomodar» aunque ya lo puse en un grupo", porque: "El grupo está desactivado. Un grupo apagado no cuenta como hogar: sus equipos vuelven a estar sueltos, que es lo correcto — si se apagó la Línea 4, esos equipos ya no están cuidados por nadie." },
+      { sintoma: "Dice que un equipo está operando y yo sé que está descompuesto", porque: "Nadie ha levantado la orden, o la orden no requiere paro del equipo. El sistema sabe lo que le contaron: mientras no haya orden en ejecución, el equipo se reporta operando." },
+      { sintoma: "No puedo eliminar un grupo", porque: "Todavía tiene equipos adentro. Quítelos primero, o desactívelo para conservarlo con su historia sin que aparezca en la lista." },
+    ],
+  },
+
   "/paros": {
     titulo: "Dónde para la planta",
     que: "Qué áreas detuvieron la producción, cuánto costó y si va mejorando.",

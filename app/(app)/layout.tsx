@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { BandaCliente } from "@/components/shell/banda-cliente";
 import { RegistrarSW } from "@/components/registrar-sw";
+import { terminoConjunto } from "@/lib/instalaciones";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         orgName={user.organization.name}
         plan={user.organization.plan}
         esSuperAdmin={user.isSuperAdmin}
+        terminoConjuntoPlural={terminoConjunto(user.organization).plural}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {user.actuandoComoCliente ? (

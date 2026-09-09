@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Loader2, Plus, Trash2, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui";
-import { SelectorBuscable } from "@/components/selector-buscable";
+import { SelectorMultiple } from "@/components/selector-multiple";
 import { cn } from "@/lib/utils";
 
 type Asignacion = {
@@ -44,7 +44,6 @@ export function EquiposDelPlan({
   const [lista, setLista] = useState<Asignacion[] | null>(null);
   const [cargando, setCargando] = useState(false);
   const [elegidos, setElegidos] = useState<string[]>([]);
-  const [uno, setUno] = useState("");
   const [escalonar, setEscalonar] = useState(true);
   const [desde, setDesde] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +75,7 @@ export function EquiposDelPlan({
         "hasta que se le dé de alta su medidor.",
       );
     }
-    setElegidos([]); setUno(""); setDesde("");
+    setElegidos([]); setDesde("");
     cargar(); router.refresh();
   }
 
@@ -89,7 +88,7 @@ export function EquiposDelPlan({
   }
 
   const yaAsignados = new Set((lista ?? []).map((a) => a.asset.id));
-  const disponibles = activos.filter((a) => !yaAsignados.has(a.id) && !elegidos.includes(a.id));
+  const disponibles = activos.filter((a) => !yaAsignados.has(a.id));
   const fmt = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" })
       .format(new Date(iso)) : "sin fecha";
@@ -156,26 +155,10 @@ export function EquiposDelPlan({
                   <div className="mt-5 border-t border-slate-100 pt-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aplicar a más equipos</p>
 
-                    {elegidos.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {elegidos.map((id) => {
-                          const a = activos.find((x) => x.id === id);
-                          return (
-                            <span key={id} className="inline-flex items-center gap-1 rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-700">
-                              {a?.code}
-                              <button type="button" onClick={() => setElegidos((p) => p.filter((x) => x !== id))} aria-label={`Quitar ${a?.code}`}>
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
                     <div className="mt-2">
-                      <SelectorBuscable
-                        valor={uno}
-                        onCambio={(id) => { if (id) { setElegidos((p) => [...p, id]); setUno(""); } }}
+                      <SelectorMultiple
+                        valores={elegidos}
+                        onCambio={setElegidos}
                         vacio="Elija un equipo"
                         marcador="Busque por clave o nombre del equipo"
                         opciones={disponibles.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}

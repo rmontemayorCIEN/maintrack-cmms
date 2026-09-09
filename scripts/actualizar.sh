@@ -128,6 +128,13 @@ npx tsx scripts/prueba-croquis.ts >/dev/null 2>&1 \
   && echo "     Croquis de la planta correcto." \
   || { echo "     ERROR: la prueba del croquis fallo."; npx tsx scripts/prueba-croquis.ts; exit 1; }
 
+# Los conjuntos. Lo que se prueba es lo que el modelo esta disenado para
+# impedir: que acomodar un lienzo desacomode al mismo equipo en otro, y que un
+# equipo nuevo no aparezca en el residual —las dos fallan calladas—.
+npx tsx scripts/prueba-conjuntos.ts >/dev/null 2>&1 \
+  && echo "     Conjuntos de equipos correctos." \
+  || { echo "     ERROR: la prueba de conjuntos fallo."; npx tsx scripts/prueba-conjuntos.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

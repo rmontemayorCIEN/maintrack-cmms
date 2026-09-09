@@ -13,6 +13,9 @@ const schema = z.object({
   serialNumber: z.string().nullable().optional(),
   criticality: z.enum(["A", "B", "C"]).optional(),
   detieneLinea: z.boolean().nullable().optional(),
+  // "Este equipo va solo" es una DECISION, no un pendiente. Sin ella, un
+  // equipo que nunca va a pertenecer a nada aparece por siempre como hueco.
+  independiente: z.boolean().optional(),
   status: z.enum(["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY", "RETIRED"]).optional(),
   purchaseDate: z.string().nullable().optional(),
   purchaseCost: z.coerce.number().min(0).optional(),

@@ -20,6 +20,7 @@ import {
   Rocket,
   Inbox,
   UsersRound,
+  Waypoints,
   PackageX,
   KanbanSquare,
   Library,
@@ -50,7 +51,19 @@ const NAV: Array<{
   section: string;
   /** Para recordar si el grupo quedo abierto o cerrado. */
   clave: string;
-  items: Array<{ href: string; label: string; icon: React.ReactNode }>;
+  items: Array<{
+    href: string;
+    label: string;
+    icon: React.ReactNode;
+    /**
+     * La etiqueta la pone la instalacion, no este archivo.
+     *
+     * Un club no tiene "Lineas" y una planta no tiene "Servicios". Con esta
+     * marca, el nombre sale de terminoConjunto() y aqui solo queda un texto de
+     * respaldo por si el termino no llega.
+     */
+    porInstalacion?: boolean;
+  }>;
 }> = [
   {
     section: "Como voy",
@@ -92,6 +105,7 @@ const NAV: Array<{
       { href: "/assets", label: "Activos / Equipos", icon: <Factory className="h-4 w-4" /> },
       { href: "/meters", label: "Medidores", icon: <Cpu className="h-4 w-4" /> },
       { href: "/plans", label: "Planes preventivos", icon: <ListChecks className="h-4 w-4" /> },
+      { href: "/conjuntos", label: "Conjuntos", icon: <Waypoints className="h-4 w-4" />, porInstalacion: true },
       { href: "/predictive", label: "Predictivo", icon: <Activity className="h-4 w-4" /> },
     ],
   },
@@ -130,17 +144,31 @@ const NAV: Array<{
 
 const LLAVE_ABIERTOS = "mt_menu_abiertos";
 
+/** Solo para el super-admin. Tipado como NAV o la union pierde sus campos. */
+const NAV_PLATAFORMA: typeof NAV = [
+  {
+    section: "Plataforma",
+    clave: "plataforma",
+    items: [
+      { href: "/clients", label: "Empresas cliente", icon: <Building2 className="h-4 w-4" /> },
+    ],
+  },
+];
+
 export function Sidebar({
   orgName,
   plan,
   esSuperAdmin = false,
   tieneLogo = false,
+  terminoConjuntoPlural,
 }: {
   orgName: string;
   plan: string;
   esSuperAdmin?: boolean;
   /** Si la empresa subio su logotipo, sustituye al icono generico. */
   tieneLogo?: boolean;
+  /** Como le llama esta cuenta a un conjunto de equipos: Lineas, Sistemas, Servicios, Rutas. */
+  terminoConjuntoPlural?: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -197,19 +225,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {(esSuperAdmin
-          ? [
-              ...NAV,
-              {
-                section: "Plataforma",
-                clave: "plataforma",
-                items: [
-                  { href: "/clients", label: "Empresas cliente", icon: <Building2 className="h-4 w-4" /> },
-                ],
-              },
-            ]
-          : NAV
-        ).map((group) => (
+        {(esSuperAdmin ? [...NAV, ...NAV_PLATAFORMA] : NAV).map((group) => (
           <div key={group.section} className="mb-3">
             {/* El grupo que contiene la pagina actual se muestra abierto
                 aunque este cerrado: esconder donde esta parado el usuario
@@ -251,7 +267,7 @@ export function Sidebar({
                       )}
                     >
                       <span className={active ? "text-brand-600" : "text-slate-400"}>{item.icon}</span>
-                      {item.label}
+                      {item.porInstalacion ? terminoConjuntoPlural ?? item.label : item.label}
                     </Link>
                   </li>
                 );
