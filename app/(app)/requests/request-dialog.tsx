@@ -57,7 +57,7 @@ export function RequestDialog({ assets }: { assets: Array<{ id: string; code: st
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-900/40 p-4">
       {creada ? (
         <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
           <div className="mb-4 flex items-start justify-between">

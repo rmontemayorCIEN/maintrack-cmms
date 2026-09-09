@@ -98,7 +98,7 @@ export function EquivalenciasRefaccion({
       {abierto && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4"
+              className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-900/40 p-4"
               role="dialog"
               aria-modal="true"
               onClick={(e) => e.target === e.currentTarget && setAbierto(false)}

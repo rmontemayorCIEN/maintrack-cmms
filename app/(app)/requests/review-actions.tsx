@@ -79,7 +79,7 @@ export function ReviewActions({
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
+        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-900/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 text-left shadow-xl">
             <h3 className="text-base font-semibold text-slate-900">
               {open === "APPROVE" ? "Aprobar y generar orden" : "Rechazar solicitud"}

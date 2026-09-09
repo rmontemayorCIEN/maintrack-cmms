@@ -67,6 +67,13 @@ npx tsx scripts/revisar-ayuda.ts
 - **`fixed` dentro del shell no funciona.** El `backdrop-blur` de la barra
   superior crea bloque contenedor. Los paneles flotantes usan `createPortal` a
   `document.body`, como `components/shell/ayuda.tsx`.
+- **Las ventanas usan `components/ui/dialogo.tsx`, no un armazon copiado.** El
+  patron copiado a mano (`fixed inset-0 grid place-items-center` sin
+  `overflow-y-auto`) se ve perfecto mientras el contenido cabe y deja el pie
+  FUERA DE ALCANCE cuando crece: en el cierre tecnico de una orden con varias
+  actividades el boton de completar quedaba inalcanzable, sin nada en pantalla
+  que lo explicara. Estaba asi en 12 de 21 ventanas. Con `pie`, el encabezado y
+  los botones quedan fijos y solo se desliza el contenido.
 - **Un `<select>` cuyo valor no esta entre sus opciones miente**: muestra la
   primera y conserva el valor viejo. Deriva el valor efectivo en cada render.
 - **Movil primero en lo que el usuario lee de golpe.** Casi todos los reportes

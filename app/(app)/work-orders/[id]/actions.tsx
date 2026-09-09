@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, Pause, Play, Sparkles, X } from "lucide-react";
+import { CheckCircle2, Loader2, Pause, Play, Sparkles } from "lucide-react";
+import { Dialogo } from "@/components/ui/dialogo";
 import { Button } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 import { STATUS_TRANSITIONS, WO_STATUS_LABELS } from "@/lib/constants";
@@ -235,20 +236,40 @@ export function WorkOrderActions({
       ) : null}
 
       {closing ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">Cierre técnico</h3>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Registre el resultado del trabajo para alimentar los indicadores de confiabilidad.
-                </p>
-              </div>
-              <button type="button" onClick={() => setClosing(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100">
-                <X className="h-4 w-4" />
-              </button>
+        <Dialogo
+          titulo="Cierre técnico"
+          descripcion="Registre el resultado del trabajo para alimentar los indicadores de confiabilidad."
+          onCerrar={() => setClosing(false)}
+          pie={
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setClosing(false)}>Cancelar</Button>
+              <Button
+                variant="success"
+                disabled={loading !== null}
+                onClick={() =>
+                  move("COMPLETED", {
+                    resolution: closeForm.resolution || undefined,
+                    /**
+                     * Una entrada por falla. Las que quedaron sin codificar se
+                     * mandan igual con el paro: el tecnico pudo no saber la
+                     * causa y aun asi el equipo estuvo parado, y ese dato no se
+                     * puede perder.
+                     */
+                    fallas: Object.entries(fallas).map(([clave, v]) => ({
+                      taskId: clave === ENCABEZADO ? null : clave,
+                      failureCodeId: v.failureCodeId || null,
+                      rootCauseId: v.rootCauseId || null,
+                      downtimeMinutes: Number(v.downtimeMinutes) || 0,
+                    })),
+                  })
+                }
+              >
+                {loading === "COMPLETED" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Completar orden
+              </Button>
             </div>
-
+          }
+        >
             {pendingRequired > 0 ? (
               <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Quedan {pendingRequired} actividad(es) sin resolver. Marque cada una como hecha, o
@@ -415,35 +436,7 @@ export function WorkOrderActions({
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setClosing(false)}>Cancelar</Button>
-              <Button
-                variant="success"
-                disabled={loading !== null}
-                onClick={() =>
-                  move("COMPLETED", {
-                    resolution: closeForm.resolution || undefined,
-                    /**
-                     * Una entrada por falla. Las que quedaron sin codificar se
-                     * mandan igual con el paro: el tecnico pudo no saber la
-                     * causa y aun asi el equipo estuvo parado, y ese dato no se
-                     * puede perder.
-                     */
-                    fallas: Object.entries(fallas).map(([clave, v]) => ({
-                      taskId: clave === ENCABEZADO ? null : clave,
-                      failureCodeId: v.failureCodeId || null,
-                      rootCauseId: v.rootCauseId || null,
-                      downtimeMinutes: Number(v.downtimeMinutes) || 0,
-                    })),
-                  })
-                }
-              >
-                {loading === "COMPLETED" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Completar orden
-              </Button>
-            </div>
-          </div>
-        </div>
+        </Dialogo>
       ) : null}
     </div>
   );
