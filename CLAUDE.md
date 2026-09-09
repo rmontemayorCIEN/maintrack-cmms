@@ -138,38 +138,27 @@ npm run actualizar             # desplegar a produccion (con migracion)
 npm run actualizar -- --sin-migrar
 ./scripts/nueva-migracion.sh   # crear migracion
 ./scripts/con-produccion.sh scripts/<x>.ts   # correr un script contra produccion
-./scripts/fuera-de-icloud.sh   # cuando el dev server se porte raro (ver abajo)
 ```
 
-### Esta Mac: `~/Documents` ES iCloud Drive
+### El proyecto NO vive en ~/Documents, y es a proposito
 
-No es un enlace visible sino un enlace firme de APFS, asi que el proyecto se
-sincroniza entero sin que se note. Con `node_modules` y `.next` adentro eran
-1.9 GB subiendo y bajando, y iCloud resuelve conflictos creando copias con
-`" 2"` en el nombre.
+`~/Documents` en esta Mac **es** iCloud Drive: no es un enlace visible sino un
+enlace firme de APFS, asi que `readlink` no dice nada y todo lo que este ahi se
+sincroniza sin que se note.
 
-**No es cosmetico.** 147 de esas copias dentro de `.next` dejaron el servidor
-de desarrollo sirviendo los chunks del cliente con error 500: la pantalla
-cargaba, React nunca hidrataba, y todo lo interactivo quedaba muerto sin un
-solo mensaje que lo explicara. Se diagnostico dos veces como si fuera un error
-del codigo.
+Con el proyecto adentro eran 1.9 GB subiendo y bajando, y iCloud resuelve
+conflictos creando copias con `" 2"` en el nombre. **No es cosmetico:** 147 de
+esas copias dentro de `.next` dejaron el servidor de desarrollo sirviendo los
+chunks del cliente con error 500 —la pagina cargaba, React nunca hidrataba, y
+todo lo interactivo quedaba muerto sin un solo mensaje—. Se diagnostico dos
+veces como si fuera un error del codigo.
 
-`node_modules` y `.next` ya viven en `~/Library/Caches/maintrack` con un enlace
-desde aqui. **`npm ci` deshace eso en silencio** —borra `node_modules` con todo
-y enlace, y vuelve a crear la carpeta dentro de iCloud—, asi que despues de un
-`npm ci`, o cuando el `npm run dev` se comporte raro:
+El proyecto vive en `~/Proyectos/CMMS-V1`. **No lo regrese a `~/Documents`**,
+ni al Escritorio, que tambien se sincroniza.
 
-```bash
-./scripts/fuera-de-icloud.sh
-```
-
-Queda pendiente lo de fondo: `.env` y `prisma/dev.db` siguen sincronizandose
-porque estan en el arbol del proyecto. La solucion completa es sacar el
-proyecto de `~/Documents`.
-
-`con-produccion.sh` abre la puerta de Cloud SQL, corre y **siempre la cierra**,
-incluso si truena. La llave de IA la trae de Secret Manager sin pasar por la
-terminal.
+Y una leccion de un intento anterior: `~/Library/Caches` **no** es un lugar
+donde guardar nada que haga falta. macOS la purga cuando necesita espacio, y
+se llevo un `node_modules` completo sin avisar.
 
 ### Publicar: `npm run actualizar` cuando hay migraciones
 
