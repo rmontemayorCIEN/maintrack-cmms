@@ -125,7 +125,12 @@ export function Panel({
               <div key={f.id} className="card grid gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{f.name}</p>
+                    <Link
+                      href={`/conjuntos/${f.id}`}
+                      className="block truncate text-sm font-semibold text-brand-700 hover:underline"
+                    >
+                      {f.name}
+                    </Link>
                     <p className="truncate font-mono text-[0.6875rem] text-slate-400">{f.code}</p>
                   </div>
                   <Badge tone={sello.tono}>

@@ -13,7 +13,9 @@ export const REJILLA = {
 } as const;
 
 export type CajaCroquis = {
-  locationId: string;
+  /** Identificador de lo que ocupa la caja: un area en el croquis de planta,
+   *  un equipo en el lienzo de un conjunto. La rejilla no sabe cual es. */
+  id: string;
   x: number;
   y: number;
   ancho: number;
@@ -66,7 +68,7 @@ export function acomodoInicial(areas: AreaParaCroquis[]): CajaCroquis[] {
   const alto = Math.max(Math.floor(REJILLA.filas / filas), 1);
 
   return conId.map((a, i) => ({
-    locationId: a.locationId,
+    id: a.locationId,
     x: (i % columnas) * ancho,
     y: Math.floor(i / columnas) * alto,
     ancho,
@@ -77,7 +79,7 @@ export function acomodoInicial(areas: AreaParaCroquis[]): CajaCroquis[] {
 /** Si dos cajas se enciman. Se usa al soltar, para no dejar una encima de otra. */
 export function seEncima(a: CajaCroquis, b: CajaCroquis): boolean {
   return (
-    a.locationId !== b.locationId &&
+    a.id !== b.id &&
     a.x < b.x + b.ancho &&
     b.x < a.x + a.ancho &&
     a.y < b.y + b.alto &&
@@ -116,24 +118,36 @@ export function primerHueco(
  *
  * Soltar un area sobre otra quiere decir "van cambiadas": cada una toma el
  * lugar de la otra. El hueco libre queda de respaldo para cuando no cabe.
+ *
+ * Y casi siempre se encima con DOS, no con una. Con la rejilla llena de cajas
+ * del mismo tamano, cualquier caida corrida toca a dos vecinas: al soltar el
+ * torno un poco a la izquierda, pisa la grua y la torre al mismo tiempo. La
+ * primera version exigia que fuera exactamente una y con dos se rendia al
+ * hueco libre —que resulta ser el lugar de donde salio—, asi que la caja
+ * regresaba sola y de nuevo parecia que arrastrar no servia. Se cambia con la
+ * que MAS se pise, que es a la que se le estaba apuntando.
  */
 export function resolverSoltada(
   cajas: CajaCroquis[],
   id: string,
   salioDe: { x: number; y: number } | null,
 ): CajaCroquis[] {
-  const yo = cajas.find((c) => c.locationId === id);
+  const yo = cajas.find((c) => c.id === id);
   if (!yo) return cajas;
-  const otras = cajas.filter((c) => c.locationId !== id);
+  const otras = cajas.filter((c) => c.id !== id);
   const encimadas = otras.filter((o) => seEncima(yo, o));
   if (!encimadas.length) return cajas;
 
-  if (salioDe && encimadas.length === 1) {
-    const otra = encimadas[0];
+  if (salioDe && encimadas.length) {
+    // A la que mas se pisa es a la que se le apuntaba. Con empate gana la
+    // primera, que da un resultado estable en vez de uno que cambia solo.
+    const otra = encimadas.reduce((mejor, c) =>
+      areaComun(yo, c) > areaComun(yo, mejor) ? c : mejor,
+    );
     const mia = { ...yo, x: otra.x, y: otra.y };
     const suya = { ...otra, x: salioDe.x, y: salioDe.y };
     const terceras = cajas.filter(
-      (c) => c.locationId !== id && c.locationId !== otra.locationId,
+      (c) => c.id !== id && c.id !== otra.id,
     );
     const cabe =
       dentro(mia) &&
@@ -142,13 +156,13 @@ export function resolverSoltada(
       !terceras.some((t) => seEncima(mia, t) || seEncima(suya, t));
     if (cabe) {
       return cajas.map((c) =>
-        c.locationId === id ? mia : c.locationId === otra.locationId ? suya : c,
+        c.id === id ? mia : c.id === otra.id ? suya : c,
       );
     }
   }
 
   const { x, y } = primerHueco(otras, yo);
-  return cajas.map((c) => (c.locationId === id ? { ...c, x, y } : c));
+  return cajas.map((c) => (c.id === id ? { ...c, x, y } : c));
 }
 
 /** Si una caja cabe completa dentro de la rejilla. */
@@ -171,7 +185,7 @@ export function tamanoQueCabe(
   cajas: CajaCroquis[],
   caja: CajaCroquis,
 ): { ancho: number; alto: number } {
-  const otras = cajas.filter((c) => c.locationId !== caja.locationId);
+  const otras = cajas.filter((c) => c.id !== caja.id);
   const pedido = {
     ancho: Math.min(Math.max(caja.ancho, 1), REJILLA.columnas - caja.x),
     alto: Math.min(Math.max(caja.alto, 1), REJILLA.filas - caja.y),
@@ -190,4 +204,11 @@ export function tamanoQueCabe(
     if (seCruzanEnX && o.y >= caja.y) alto = Math.min(alto, o.y - caja.y);
   }
   return { ancho, alto: Math.max(alto, 1) };
+}
+
+/** Cuantas celdas comparten dos cajas. Cero si no se tocan. */
+function areaComun(a: CajaCroquis, b: CajaCroquis): number {
+  const ancho = Math.min(a.x + a.ancho, b.x + b.ancho) - Math.max(a.x, b.x);
+  const alto = Math.min(a.y + a.alto, b.y + b.alto) - Math.max(a.y, b.y);
+  return ancho > 0 && alto > 0 ? ancho * alto : 0;
 }

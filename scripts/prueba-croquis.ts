@@ -30,7 +30,7 @@ const area = (id: string): AreaParaCroquis => ({
   locationId: id, area: id, planoX: null, planoY: null, planoAncho: 3, planoAlto: 2,
 });
 const caja = (id: string, x: number, y: number, ancho = 6, alto = 4): CajaCroquis =>
-  ({ locationId: id, x, y, ancho, alto });
+  ({ id, x, y, ancho, alto });
 
 async function main() {
   console.log("\nAcomodo de arranque");
@@ -54,10 +54,10 @@ async function main() {
   const rejillaLlena = [caja("A", 0, 0), caja("B", 6, 0), caja("C", 0, 4), caja("D", 6, 4)];
 
   // D se arrastro de (6,4) y cayo corrida un renglon, encima de B.
-  const cayoCorrida = rejillaLlena.map((c) => (c.locationId === "D" ? { ...c, y: 1 } : c));
+  const cayoCorrida = rejillaLlena.map((c) => (c.id === "D" ? { ...c, y: 1 } : c));
   const tras = resolverSoltada(cayoCorrida, "D", { x: 6, y: 4 });
-  const d = tras.find((c) => c.locationId === "D")!;
-  const b = tras.find((c) => c.locationId === "B")!;
+  const d = tras.find((c) => c.id === "D")!;
+  const b = tras.find((c) => c.id === "B")!;
   revisar("se intercambian aunque el aterrizaje quede corrido",
     d.x === 6 && d.y === 0 && b.x === 6 && b.y === 4, `D@${d.x},${d.y} B@${b.x},${b.y}`);
   revisar("tras el intercambio ninguna queda encimada",
@@ -67,11 +67,29 @@ async function main() {
   revisar("con la rejilla llena, soltar encima sí cambia el croquis",
     JSON.stringify(tras) !== JSON.stringify(cayoCorrida));
 
-  // Soltar sobre dos a la vez no es un intercambio: se va al primer hueco.
-  const sueltas = [caja("A", 0, 0, 3, 2), caja("B", 3, 0, 3, 2), caja("C", 1, 0, 3, 2)];
-  const tras2 = resolverSoltada(sueltas, "C", { x: 0, y: 6 });
-  revisar("encima de dos áreas, se va a un hueco y no encima",
+  // Lo que rompio el lienzo de los conjuntos: con la rejilla llena de cajas
+  // iguales, cualquier caida corrida pisa a DOS vecinas. Antes eso se rendia
+  // al hueco libre —que era el lugar de donde salio— y la caja regresaba sola.
+  const llenaDe4 = [
+    caja("A", 0, 0, 4, 4), caja("B", 4, 0, 4, 4), caja("C", 8, 0, 4, 4),
+    caja("D", 0, 4, 4, 4), caja("E", 4, 4, 4, 4),
+  ];
+  // A se arrastro de (0,0) y cayo en (1,4): pisa a D con 12 celdas y a E con 4.
+  const pisaDos = llenaDe4.map((c) => (c.id === "A" ? { ...c, x: 1, y: 4 } : c));
+  const tras2 = resolverSoltada(pisaDos, "A", { x: 0, y: 0 });
+  const a2 = tras2.find((c) => c.id === "A")!;
+  const d2 = tras2.find((c) => c.id === "D")!;
+  revisar("encima de dos, se intercambia con la que MAS se pisa",
+    a2.x === 0 && a2.y === 4 && d2.x === 0 && d2.y === 0,
+    `A@${a2.x},${a2.y} D@${d2.x},${d2.y}`);
+  revisar("y no queda ninguna encimada",
     !tras2.some((a) => tras2.some((z) => seEncima(a, z))));
+  revisar("la caja SI se movio de donde salio", a2.x !== 0 || a2.y !== 0);
+
+  // Sin salioDe —al terminar de estirar— no hay intercambio: al hueco libre.
+  const trasEstirar = resolverSoltada(pisaDos, "A", null);
+  revisar("al estirar encima, se va a un hueco y no encima",
+    !trasEstirar.some((a) => trasEstirar.some((z) => seEncima(a, z))));
 
   // Sin encimarse, no se toca nada: mover un área a un lugar libre la deja ahí.
   const libre = [caja("A", 0, 0, 3, 2), caja("B", 6, 4, 3, 2)];
