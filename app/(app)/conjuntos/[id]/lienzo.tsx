@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CircleAlert, CircleCheck, CircleMinus, X } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { LienzoRejilla } from "@/components/lienzo-rejilla";
 import { WO_STATUS_LABELS } from "@/lib/constants";
+import { formatCurrency } from "@/lib/utils";
+import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
 import type { EstadoConjunto } from "@/lib/conjuntos";
 import type { TerminoConjunto } from "@/lib/instalaciones";
 
 type Equipo = {
   id: string; code: string; name: string;
   status: string; criticality: string; detieneLinea: boolean | null;
-  area: string | null; categoria: string | null;
+  area: string | null; categoriaId: string | null; categoria: string | null;
+  horas: number; perdida: number;
+  planesVencidos: number; ordenesAbiertas: number;
   planoX: number | null; planoY: number | null;
   planoAncho: number; planoAlto: number;
 };
@@ -25,24 +29,32 @@ type Orden = {
 };
 
 /**
- * El conjunto dibujado como lo acomoda quien responde por el.
+ * Los tres lentes.
  *
- * El croquis de planta le dio al director su geografia; esto se la da un nivel
- * mas abajo, donde vive el trabajo: los equipos de la linea, en el orden en
- * que estan. Si su linea es una cadena, la va a acomodar de izquierda a
- * derecha y el dibujo lo dice sin que el sistema guarde ninguna secuencia —no
- * adivinamos su planta, el la dibuja—.
+ * Es el mismo acomodo visto de tres maneras, y eso es lo que convierte el
+ * lienzo de reporte en tablero. El de en medio es el que vale: "cómo está
+ * ahora" no existe en un reporte, y su dato se mantiene solo.
  *
- * El color es el estado de AHORA, y ese dato se mantiene solo: cuando entra a
- * ejecucion una orden que requiere paro, el equipo se marca abajo, y al
- * completarse vuelve. Nadie tiene que acordarse de actualizarlo.
+ * Cruzado con el filtro por tipo de equipo, cada combinacion es la pregunta de
+ * alguien: "solo compresores + cómo están ahora" es la mañana de un jefe de
+ * mantenimiento; "solo bombas + lo que costó" es su junta de presupuesto.
  */
+const LENTES = {
+  AHORA: { etiqueta: "Cómo está ahora", ayuda: "El color es el estado de cada equipo en este momento. Toque uno para ver sus órdenes." },
+  COSTO: { etiqueta: "Lo que costó", ayuda: "El color son las horas que estuvo parado en el periodo. Solo se cobra el paro de equipos que detienen la producción." },
+  PENDIENTE: { etiqueta: "Lo que trae pendiente", ayuda: "El color son los planes vencidos y las órdenes abiertas de cada equipo." },
+} as const;
+type Lente = keyof typeof LENTES;
+
 export function Lienzo({
-  conjuntoId, nombre, termino, estado, abajoQueDetienen, aMedias, equipos, ordenes, editable,
+  conjuntoId, nombre, termino, moneda, periodo, estado, abajoQueDetienen, aMedias,
+  equipos, ordenes, editable,
 }: {
   conjuntoId: string;
   nombre: string;
   termino: TerminoConjunto;
+  moneda: string;
+  periodo: ClavePeriodo;
   estado: EstadoConjunto;
   abajoQueDetienen: number;
   aMedias: number;
@@ -51,12 +63,38 @@ export function Lienzo({
   editable: boolean;
 }) {
   const router = useRouter();
+  const params = useSearchParams();
+  const [lente, setLente] = useState<Lente>("AHORA");
+  const [categoria, setCategoria] = useState<string | null>(null);
   const [viendo, setViendo] = useState<string | null>(null);
+
+  const categorias = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of equipos) if (e.categoriaId && e.categoria) m.set(e.categoriaId, e.categoria);
+    return [...m.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [equipos]);
+
+  const maxHoras = Math.max(...equipos.map((e) => e.horas), 1);
 
   const elegido = equipos.find((e) => e.id === viendo) ?? null;
   const suyas = elegido ? ordenes.filter((o) => o.assetId === elegido.id) : [];
   const abiertas = suyas.filter((o) => !["COMPLETED", "CLOSED"].includes(o.status));
   const cerradas = suyas.filter((o) => ["COMPLETED", "CLOSED"].includes(o.status));
+
+  /**
+   * El filtro APAGA, no esconde.
+   *
+   * Quitar del lienzo lo que no coincide destruiria la geografia, que es lo
+   * unico que este dibujo tiene y una lista no. Se ve donde estan los
+   * compresores DENTRO de la planta, no una lista de compresores flotando.
+   */
+  const coincide = (e: Equipo) => !categoria || e.categoriaId === categoria;
+
+  function verPeriodo(p: ClavePeriodo) {
+    const q = new URLSearchParams(params.toString());
+    q.set("p", p);
+    router.push(`/conjuntos/${conjuntoId}?${q.toString()}`);
+  }
 
   if (!equipos.length) {
     return (
@@ -68,20 +106,89 @@ export function Lienzo({
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <Dictamen
         estado={estado}
         genero={termino.genero}
         equipos={equipos}
         abajoQueDetienen={abajoQueDetienen}
         aMedias={aMedias}
+        perdida={equipos.reduce((s, e) => s + e.perdida, 0)}
+        moneda={moneda}
+        periodo={periodo}
       />
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(Object.keys(LENTES) as Lente[]).map((l) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => setLente(l)}
+            aria-pressed={lente === l}
+            className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              lente === l
+                ? "bg-slate-900 text-white"
+                : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {LENTES[l].etiqueta}
+          </button>
+        ))}
+        {lente === "COSTO" ? (
+          <span className="ml-auto flex flex-wrap gap-1">
+            {(Object.keys(PERIODOS) as ClavePeriodo[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => verPeriodo(p)}
+                aria-pressed={periodo === p}
+                className={`rounded-lg px-2 py-1 text-[0.6875rem] transition ${
+                  periodo === p
+                    ? "bg-brand-50 font-medium text-brand-700"
+                    : "border border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                {PERIODOS[p].etiqueta}
+              </button>
+            ))}
+          </span>
+        ) : null}
+      </div>
+
+      {categorias.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[0.6875rem] uppercase tracking-wide text-slate-400">Ver solo</span>
+          <button
+            type="button"
+            onClick={() => setCategoria(null)}
+            aria-pressed={categoria === null}
+            className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] transition ${
+              categoria === null ? "bg-slate-800 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Todos
+          </button>
+          {categorias.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setCategoria((v) => (v === c.id ? null : c.id))}
+              aria-pressed={categoria === c.id}
+              className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] transition ${
+                categoria === c.id ? "bg-slate-800 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {c.nombre}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="card p-4">
         <LienzoRejilla
           items={equipos}
-          titulo="Cómo está ahora"
-          ayuda="El color es el estado de cada equipo en este momento. Toque uno para ver sus órdenes."
+          titulo={LENTES[lente].etiqueta}
+          ayuda={LENTES[lente].ayuda}
           ayudaEditando="Arrastre cada equipo a donde de verdad está. Jale la esquina para cambiar su tamaño."
           etiquetaEditar="Acomodar"
           etiquetaGuardar="Guardar acomodo"
@@ -89,35 +196,80 @@ export function Lienzo({
           activo={viendo}
           onTocar={(id) => setViendo((v) => (v === id ? null : id))}
           nombreDe={(e) => `${e.code} ${e.name}`}
-          color={(e) => tono(e.status)}
-          contenido={(e) => (
-            <>
-              <span className="min-w-0">
-                <span className="block truncate font-mono text-[0.6875rem] font-semibold text-white drop-shadow-sm">
-                  {e.code}
-                </span>
-                <span
-                  className="block text-[0.6875rem] leading-tight text-white/90"
-                  style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-                >
-                  {e.name}
-                </span>
-              </span>
-              <span className="flex flex-wrap items-center gap-1 text-white/95">
-                <span className="text-[0.625rem] font-medium uppercase tracking-wide drop-shadow-sm">
-                  {ESTADO_EQUIPO[e.status] ?? e.status}
-                </span>
-                {e.detieneLinea === true ? (
-                  <span
-                    title="Cuando este equipo para, la producción para"
-                    className="rounded-sm bg-white/25 px-1 text-[0.5625rem] font-semibold uppercase"
-                  >
-                    detiene
+          color={(e) =>
+            !coincide(e)
+              ? "#dfe4ea"
+              : lente === "AHORA"
+                ? tonoEstado(e.status)
+                : lente === "COSTO"
+                  ? rampa(e.horas / maxHoras)
+                  : tonoPendiente(e.planesVencidos, e.ordenesAbiertas)
+          }
+          contenido={(e) => {
+            const apagado = !coincide(e);
+            return (
+              <>
+                <span className={`min-w-0 ${apagado ? "opacity-45" : ""}`}>
+                  <span className="block truncate font-mono text-[0.6875rem] font-semibold text-white drop-shadow-sm">
+                    {e.code}
                   </span>
-                ) : null}
-              </span>
-            </>
-          )}
+                  <span
+                    className="block text-[0.6875rem] leading-tight text-white/90"
+                    style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                  >
+                    {e.name}
+                  </span>
+                </span>
+                <span className={`flex flex-wrap items-center gap-1 text-white/95 ${apagado ? "opacity-45" : ""}`}>
+                  {lente === "AHORA" ? (
+                    <>
+                      <span className="text-[0.625rem] font-medium uppercase tracking-wide drop-shadow-sm">
+                        {ESTADO_EQUIPO[e.status] ?? e.status}
+                      </span>
+                      {e.detieneLinea === true ? (
+                        <span
+                          title="Cuando este equipo para, la producción para"
+                          className="rounded-sm bg-white/25 px-1 text-[0.5625rem] font-semibold uppercase"
+                        >
+                          detiene
+                        </span>
+                      ) : null}
+                    </>
+                  ) : lente === "COSTO" ? (
+                    <span className="block">
+                      <span className="block text-sm font-semibold leading-none tabular-nums drop-shadow-sm">
+                        {e.horas}
+                        <span className="text-[0.625rem] font-medium opacity-85"> h</span>
+                      </span>
+                      {e.perdida > 0 ? (
+                        <span className="block text-[0.625rem] leading-tight">
+                          {formatCurrency(e.perdida, moneda)}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="block text-[0.625rem] leading-tight">
+                      {e.planesVencidos > 0 ? (
+                        <span className="block font-semibold">
+                          {e.planesVencidos} plan{e.planesVencidos === 1 ? "" : "es"} vencido
+                          {e.planesVencidos === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      {e.ordenesAbiertas > 0 ? (
+                        <span className="block">
+                          {e.ordenesAbiertas} orden{e.ordenesAbiertas === 1 ? "" : "es"} abierta
+                          {e.ordenesAbiertas === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      {e.planesVencidos + e.ordenesAbiertas === 0 ? (
+                        <span className="block opacity-80">Al día</span>
+                      ) : null}
+                    </span>
+                  )}
+                </span>
+              </>
+            );
+          }}
           onGuardar={async (cajas) => {
             const res = await fetch(`/api/conjuntos/${conjuntoId}/croquis`, {
               method: "PATCH",
@@ -132,16 +284,34 @@ export function Lienzo({
             return null;
           }}
           leyenda={
-            <>
-              {(["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY"] as const).map((s) => (
-                <span key={s} className="inline-flex items-center gap-1">
-                  <i className="block h-2.5 w-4 rounded-sm" style={{ background: tono(s) }} />
-                  {ESTADO_EQUIPO[s]}
+            lente === "AHORA" ? (
+              <>
+                {(["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY"] as const).map((s) => (
+                  <span key={s} className="inline-flex items-center gap-1">
+                    <i className="block h-2.5 w-4 rounded-sm" style={{ background: tonoEstado(s) }} />
+                    {ESTADO_EQUIPO[s]}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <>
+                <span>{lente === "COSTO" ? "Menos paro" : "Al día"}</span>
+                <span className="flex gap-0.5" aria-hidden="true">
+                  {[0, 0.15, 0.35, 0.6, 1].map((p) => (
+                    <i key={p} className="block h-2.5 w-5 rounded-sm" style={{ background: rampa(p) }} />
+                  ))}
                 </span>
-              ))}
-            </>
+                <span>{lente === "COSTO" ? "Más paro" : "Más pendiente"}</span>
+              </>
+            )
           }
         />
+        {categoria ? (
+          <p className="mt-2 text-[0.6875rem] text-slate-500">
+            Los demás equipos siguen dibujados en gris: sin ellos se perdería dónde están los que
+            está viendo.
+          </p>
+        ) : null}
       </div>
 
       {elegido ? (
@@ -158,6 +328,9 @@ export function Lienzo({
                 {[elegido.area, elegido.categoria, `criticidad ${elegido.criticality}`]
                   .filter(Boolean)
                   .join(" · ")}
+                {elegido.horas > 0
+                  ? ` · ${elegido.horas} h de paro en ${PERIODOS[periodo].etiqueta.toLowerCase()}`
+                  : ""}
               </p>
             </div>
             <button
@@ -223,16 +396,20 @@ function Ordenes({ titulo, lista, vacio }: { titulo: string; lista: Orden[]; vac
  * cumple", y eso depende del edificio, no del sistema.
  */
 function Dictamen({
-  estado, genero, equipos, abajoQueDetienen, aMedias,
+  estado, genero, equipos, abajoQueDetienen, aMedias, perdida, moneda, periodo,
 }: {
   estado: EstadoConjunto;
   genero: "f" | "m";
   equipos: Equipo[];
   abajoQueDetienen: number;
   aMedias: number;
+  perdida: number;
+  moneda: string;
+  periodo: ClavePeriodo;
 }) {
   const f = genero === "f";
   const abajo = equipos.filter((e) => e.status === "DOWN");
+  const vencidos = equipos.reduce((s, e) => s + e.planesVencidos, 0);
   const sello = {
     COMPLETO:  { texto: f ? "Completa" : "Completo",   clase: "bg-emerald-50 text-emerald-800 border-emerald-200", Icono: CircleCheck },
     DEGRADADO: { texto: f ? "Degradada" : "Degradado", clase: "bg-amber-50 text-amber-900 border-amber-200",       Icono: CircleAlert },
@@ -258,6 +435,10 @@ function Dictamen({
           </>
         ) : null}
         {aMedias > 0 ? ` · ${aMedias} degradado${aMedias === 1 ? "" : "s"}` : ""}
+        {vencidos > 0 ? ` · ${vencidos} plan${vencidos === 1 ? "" : "es"} vencido${vencidos === 1 ? "" : "s"}` : ""}
+        {perdida > 0
+          ? ` · ${formatCurrency(perdida, moneda)} de paro en ${PERIODOS[periodo].etiqueta.toLowerCase()}`
+          : ""}
       </span>
       {/*
         El limite, escrito donde se ve. Un tablero que se presenta como la
@@ -278,8 +459,8 @@ const ESTADO_EQUIPO: Record<string, string> = {
   RETIRED: "Retirado",
 };
 
-/** El color es el estado de ahora, no el histórico. */
-function tono(status: string): string {
+/** El color del estado de ahora. */
+function tonoEstado(status: string): string {
   switch (status) {
     case "DOWN": return "#a32a12";
     case "DEGRADED": return "#c07818";
@@ -287,4 +468,34 @@ function tono(status: string): string {
     case "RETIRED": return "#b9c2d0";
     default: return "#2f7d5d";
   }
+}
+
+/** La rampa de calor, la misma del croquis de planta. */
+function rampa(p: number): string {
+  if (p >= 0.75) return "#9e2f12";
+  if (p >= 0.45) return "#c4522a";
+  if (p >= 0.2) return "#d9622c";
+  if (p > 0) return "#e08b4f";
+  return "#b9c2d0";
+}
+
+/**
+ * El color de lo pendiente, en escala ABSOLUTA y no contra el maximo.
+ *
+ * Normalizado contra el maximo, cuatro equipos con una orden abierta cada uno
+ * salian los cuatro en rojo maximo: la pantalla gritaba catastrofe donde habia
+ * normalidad. En el lente de costo la comparacion relativa si dice algo —quien
+ * concentra el dano—, pero "tiene pendientes" no es una carrera: uno es uno.
+ *
+ * Un plan vencido pesa el doble que una orden abierta. Una orden abierta es
+ * trabajo en curso; un plan vencido es trabajo que ya debio hacerse y no se
+ * hizo, y es lo que termina en falla.
+ */
+function tonoPendiente(vencidos: number, abiertas: number): string {
+  const peso = vencidos * 2 + abiertas;
+  if (peso === 0) return "#b9c2d0";
+  if (peso === 1) return "#e08b4f";
+  if (peso <= 3) return "#d9622c";
+  if (peso <= 5) return "#c4522a";
+  return "#9e2f12";
 }

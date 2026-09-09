@@ -50,7 +50,7 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
   const correctivasCerradas = { ...cerradas, maintenanceType: "CORRECTIVE" };
 
   const [
-    activos, activosConPlan, activosUbicados, activosConValor,
+    activos, activosConPlan, activosUbicados, activosConValor, activosClasificados,
     otCerradas, otConCausa, otConHoras,
     correctivas, correctivasConFalla,
     refacciones, refaccionesConMinimo, refaccionesConCosto,
@@ -61,6 +61,7 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
     prisma.asset.count({ where: { organizationId, active: true, plans: { some: {} } } }),
     prisma.asset.count({ where: { organizationId, active: true, locationId: { not: null } } }),
     prisma.asset.count({ where: { organizationId, active: true, replacementCost: { gt: 0 } } }),
+    prisma.asset.count({ where: { organizationId, active: true, categoryId: { not: null } } }),
 
     prisma.workOrder.count({ where: cerradas }),
     prisma.workOrder.count({ where: { ...cerradas, rootCauseId: { not: null } } }),
@@ -116,6 +117,10 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
     revision("activos-ubicados", "Activos con ubicación precisa",
       "Es como se filtra el trabajo por área y como se encuentra el equipo en piso.",
       "/assets", 1, activos, activosUbicados),
+
+    revision("activos-clasificados", "Activos con familia asignada",
+      "Es como se filtra «solo compresores» en una linea, y lo que la IA necesita para poder proponer agrupaciones.",
+      "/assets", 1, activos, activosClasificados),
 
     revision("activos-con-valor", "Activos con costo de reemplazo",
       "Permite comparar lo gastado contra reponer el equipo: la decision de reemplazo.",

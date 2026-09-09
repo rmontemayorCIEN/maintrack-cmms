@@ -44,13 +44,15 @@ const SELLOS: Record<
 };
 
 export function Panel({
-  termino, conjuntos, residual, equipos, personas, editable,
+  termino, conjuntos, residual, equipos, personas, clasificados, editable,
 }: {
   termino: TerminoConjunto;
   conjuntos: Fila[];
   residual: Residual;
   equipos: Equipo[];
   personas: { id: string; name: string }[];
+  /** Cuantos equipos tienen familia asignada. */
+  clasificados: number;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -191,6 +193,28 @@ export function Panel({
       )}
 
       <Residuo termino={termino} residual={residual} editable={editable} />
+
+      {/*
+        La carencia como tarea, no como silencio.
+
+        Un boton que simplemente no esta no ensena nada: el usuario nunca sabe
+        que existe ni que le falta para tenerlo. Aqui se dice que se gana y
+        cuanto falta, con una razon de HOY —el filtro dentro del lienzo— y no
+        con la promesa de una funcion que todavia no existe.
+      */}
+      {residual.total > 0 && clasificados < residual.total ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+          Con la familia del equipo capturada puede ver <strong>«solo compresores»</strong> dentro
+          de {termino.el} {termino.singular.toLowerCase()}, sin perder de vista dónde están. Van{" "}
+          <span className="font-semibold tabular-nums">{clasificados}</span> de{" "}
+          <span className="tabular-nums">{residual.total}</span> equipos con familia.{" "}
+          <Link href="/assets" className="text-brand-600 underline underline-offset-2">
+            Completarla en Activos
+          </Link>
+          . Es también lo que hará falta el día que el sistema proponga las agrupaciones por su
+          cuenta.
+        </p>
+      ) : null}
 
       {editando ? (
         <FichaConjunto

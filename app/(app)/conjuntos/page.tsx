@@ -28,7 +28,7 @@ export default async function ConjuntosPage() {
   const editable = can(user.role, "asset:write");
   const termino = terminoConjunto(user.organization);
 
-  const [conjuntos, residual, equipos, personas] = await Promise.all([
+  const [conjuntos, residual, equipos, personas, clasificados] = await Promise.all([
     conjuntosDe(orgId),
     residualDe(orgId),
     prisma.asset.findMany({
@@ -44,6 +44,12 @@ export default async function ConjuntosPage() {
       where: { organizationId: orgId, active: true },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
+    }),
+    // Cuantos equipos tienen familia. Es lo que habilita el filtro «solo
+    // compresores» dentro de un lienzo, y lo mismo que hara falta el dia que
+    // el sistema proponga agrupaciones solo.
+    prisma.asset.count({
+      where: { organizationId: orgId, active: true, categoryId: { not: null } },
     }),
   ]);
 
@@ -75,6 +81,7 @@ export default async function ConjuntosPage() {
           categoria: a.category?.name ?? null,
         }))}
         personas={personas}
+        clasificados={clasificados}
         editable={editable}
       />
     </div>
