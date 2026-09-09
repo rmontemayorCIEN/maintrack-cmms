@@ -23,6 +23,31 @@ export type GenerationResult = {
  *  - METER: se proyecta con el promedio diario del medidor para estimar la
  *    fecha de vencimiento y respetar la anticipacion.
  */
+/**
+ * Que equipo cuenta como en servicio para efectos de programar preventivos.
+ *
+ * Un equipo dado de baja NO debe generar planes, y hasta hoy los generaba: el
+ * programador filtraba por PlanAsset.active y plan.active, pero nunca miraba
+ * el equipo. Se retiraba un activo —desaparecia de la lista, todo se veia
+ * bien— y el sistema seguia emitiendo preventivos para el, para siempre. Un
+ * tecnico recibiendo una orden de un equipo que ya no existe.
+ *
+ * Se filtra por las DOS formas de estar fuera: `active: false` es la baja
+ * logica que hace la pantalla, y `status: RETIRED` se puede poner solo desde
+ * la ficha sin tocar `active`. Cubrir una y no la otra habria dejado el mismo
+ * defecto por la puerta de al lado.
+ *
+ * Va aqui y no en la baja del activo a proposito: asi protege venga de donde
+ * venga —pantalla, importacion, script— y si el equipo se reactiva, sus planes
+ * vuelven solos sin que nadie tenga que acordarse.
+ *
+ * OJO: esto NO cubre el equipo en STANDBY, que hoy sigue generando planes.
+ * Eso es una decision de diseno pendiente y no un defecto: hay preventivos que
+ * existen JUSTO porque el equipo esta parado —rotar flechas, revisar sellos—,
+ * asi que suspenderlos todos seria tan incorrecto como no suspender ninguno.
+ */
+const EQUIPO_EN_SERVICIO = { active: true, status: { not: "RETIRED" } } as const;
+
 export async function generateScheduledWorkOrders(
   organizationId: string,
   options: { horizonDays?: number; userId?: string | null; dryRun?: boolean } = {},
@@ -50,6 +75,7 @@ export async function generateScheduledWorkOrders(
       organizationId,
       active: true,
       plan: { active: true, triggerType: { in: ["CALENDAR", "METER"] } },
+      asset: EQUIPO_EN_SERVICIO,
     },
     include: {
       plan: { include: { tasks: { orderBy: { position: "asc" } } } },
@@ -277,7 +303,9 @@ export async function forecastSchedule(organizationId: string, days = 60) {
   // sola linea por plan aunque sirva a diez equipos, y con la fecha del plan,
   // que quedo obsoleta cuando el calendario se mudo al equipo.
   const asignaciones = await prisma.planAsset.findMany({
-    where: { organizationId, active: true, plan: { active: true } },
+    // La proyeccion tenia el mismo hueco: pronosticaba trabajo para equipos
+    // dados de baja, y esa cifra se usa para planear carga de personal.
+    where: { organizationId, active: true, plan: { active: true }, asset: EQUIPO_EN_SERVICIO },
     include: {
       plan: { select: { id: true, name: true, priority: true, maintenanceType: true, triggerType: true, intervalDays: true, intervalMeter: true, createdAt: true } },
       asset: { select: { id: true, name: true, code: true, categoryId: true } },

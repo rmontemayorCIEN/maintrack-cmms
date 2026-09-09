@@ -144,6 +144,13 @@ npx tsx scripts/prueba-conjuntos.ts >/dev/null 2>&1 \
   && echo "     Conjuntos de equipos correctos." \
   || { echo "     ERROR: la prueba de conjuntos fallo."; npx tsx scripts/prueba-conjuntos.ts; exit 1; }
 
+# Un equipo dado de baja no debe generar preventivos. Fallaba callado: nada
+# truena, el activo desaparece de la lista, y el sistema sigue emitiendo
+# ordenes para el. El tecnico las recibe.
+npx tsx scripts/prueba-equipo-de-baja.ts >/dev/null 2>&1 \
+  && echo "     Los equipos de baja no generan preventivos." \
+  || { echo "     ERROR: la prueba de equipos de baja fallo."; npx tsx scripts/prueba-equipo-de-baja.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""
