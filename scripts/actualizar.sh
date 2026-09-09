@@ -52,12 +52,21 @@ trap limpiar EXIT INT TERM
 # ── 1. Revisiones antes de tocar nada ────────────────────────────────────────
 echo "1/4  Revisando el codigo..."
 
-# La sincronizacion de iCloud deja copias con " 2" y " 3" en el nombre dentro
+# La sincronizacion en la nube deja copias con " 2" y " 3" en el nombre dentro
 # de .next, y esas copias rompen la verificacion de tipos con identificadores
 # duplicados. Se limpian aqui para que no detengan un despliegue por algo que
 # no tiene que ver con el codigo.
-BASURA=$(find .next -name "* [0-9].*" -delete -print 2>/dev/null | wc -l | tr -d " ")
-[ "$BASURA" != "0" ] && echo "     Se limpiaron $BASURA archivos duplicados por sincronizacion."
+#
+# El guardia `-d` no sobra: si `.next` no existe —recien clonado, o borrado a
+# mano— find sale con 1, `set -o pipefail` se lo pasa a la asignacion, y
+# `set -e` mata el despliegue en su primer paso. Paso de verdad, y el mensaje
+# no decia nada util: "La actualizacion no termino (codigo 1)".
+if [ -d .next ]; then
+  BASURA=$(find .next -name "* [0-9].*" -delete -print 2>/dev/null | wc -l | tr -d " ")
+  if [ "$BASURA" != "0" ]; then
+    echo "     Se limpiaron $BASURA archivos duplicados por sincronizacion."
+  fi
+fi
 
 MALAS=$(grep -rlE '\bDATETIME\b|PRAGMA ' prisma/migrations --include=migration.sql 2>/dev/null || true)
 if [ -n "$MALAS" ]; then
