@@ -86,6 +86,30 @@ model Organization {
   /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
   otHorizonteDias Int     @default(15)
 
+  /// Contar los intervalos EN DIAS como dias habiles en vez de corridos.
+  ///
+  /// No es lo mismo contar habiles que recorrer al siguiente habil, que es lo
+  /// unico que hacia el sistema: recorrer ajusta el resultado, contar cambia
+  /// el resultado. Del viernes 4 de septiembre, "cada 15 dias" cae el sabado
+  /// 19 contando corridos y el martes 22 contando habiles en una planta de
+  /// lunes a sabado. Tres dias sobre el mismo dato, y las dos formas son
+  /// legitimas: hay quien programa por almanaque y quien programa por
+  /// desgaste, que ocurre operando.
+  ///
+  /// NO trae su propia lista de dias: usa `diasHabiles` y los festivos de la
+  /// pestana "Jornada y calendario", los mismos que ya usan la carga del
+  /// personal y el recorrido de vencimientos. Un solo lugar decide que dia es
+  /// habil.
+  ///
+  /// Apagado por omision porque es lo que el sistema hace hoy. Prenderlo NO
+  /// recalcula lo ya programado: mover de golpe el programa anual de una
+  /// planta sin que nadie lo pidiera es peor que la inconsistencia de que
+  /// convivan dos formas de contar durante un ciclo.
+  ///
+  /// Aplica SOLO a los intervalos en dias. Un trimestre son tres meses aunque
+  /// la planta cierre dos semanas.
+  otDiasHabiles Boolean @default(false)
+
   /// Desde donde se cuenta el siguiente preventivo: CIERRE | PROGRAMADO.
   ///
   /// CIERRE —lo de siempre— cuenta desde que se hizo de verdad. Si el
@@ -202,6 +226,7 @@ model Organization {
   festivos          DiaFestivo[]
   equivalencias     EquivalenciaRefaccion[]
   asignacionesPlan  PlanAsset[]
+  calendariosTarea  PlanTaskAsset[]
 }
 
 model User {
@@ -485,25 +510,26 @@ model Asset {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site            Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  location        Location?         @relation(fields: [locationId], references: [id])
-  category        AssetCategory?    @relation(fields: [categoryId], references: [id])
-  parent          Asset?            @relation("AssetTree", fields: [parentId], references: [id])
-  children        Asset[]           @relation("AssetTree")
-  meters          Meter[]
-  sensors         Sensor[]
-  plans           MaintenancePlan[]
-  workOrders      WorkOrder[]
-  requests        WorkRequest[]
-  alerts          PredictiveAlert[]
-  downtimes       DowntimeEvent[]
-  requisiciones   MaterialRequest[]
-  attachments     Attachment[]
-  links           ReferenceLink[]
-  reportPoints    ReportPoint[]
-  planesAsignados PlanAsset[]
-  conjuntos       ConjuntoAsset[]
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  location         Location?         @relation(fields: [locationId], references: [id])
+  category         AssetCategory?    @relation(fields: [categoryId], references: [id])
+  parent           Asset?            @relation("AssetTree", fields: [parentId], references: [id])
+  children         Asset[]           @relation("AssetTree")
+  meters           Meter[]
+  sensors          Sensor[]
+  plans            MaintenancePlan[]
+  workOrders       WorkOrder[]
+  requests         WorkRequest[]
+  alerts           PredictiveAlert[]
+  downtimes        DowntimeEvent[]
+  requisiciones    MaterialRequest[]
+  attachments      Attachment[]
+  links            ReferenceLink[]
+  reportPoints     ReportPoint[]
+  planesAsignados  PlanAsset[]
+  calendariosTarea PlanTaskAsset[]
+  conjuntos        ConjuntoAsset[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -653,16 +679,45 @@ model PlanTask {
   /// arreglo con varios planes puede dar sin logica de mezcla.
   ///
   /// En 1 el comportamiento es identico al de siempre: sale en cada ejecucion.
-  cadaCuantas Int     @default(1)
-  unit        String?
-  minValue    Float?
-  maxValue    Float?
-  required    Boolean @default(true)
+  ///
+  /// OBSOLETO desde el calendario por actividad. Lo lee nadie: la frecuencia
+  /// real vive en `cadaCuanto` + `unidadFrecuencia`, que no obliga a que todas
+  /// las actividades sean multiplos de una misma cadencia. Se midio por que:
+  /// con actividades semanales y mensuales —la combinacion mas comun que
+  /// existe— el maximo comun divisor es 1, la cadencia base se colapsa a un
+  /// dia, y el programador daba 365 vueltas al ano de las cuales 302 no
+  /// producian nada.
+  ///
+  /// No se borra en esta migracion a proposito: si el calendario nuevo sale
+  /// mal en produccion quiero poder volver sin haber perdido el dato. Se
+  /// retira cuando lleve tiempo corriendo.
+  cadaCuantas Int @default(1)
 
-  plan     MaintenancePlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
-  labor    PlanTaskLabor[]
-  parts    PlanTaskPart[]
-  services PlanTaskService[]
+  /// Cada cuanto toca ESTA actividad, en la unidad de al lado.
+  ///
+  /// Nulo mientras no se ha migrado; entonces manda la cadencia del plan. Toda
+  /// actividad nueva lo trae.
+  cadaCuanto       Int?
+  /// DIAS | SEMANAS | MESES.
+  ///
+  /// Tres unidades y no una porque no son la misma operacion. "Mensual" como
+  /// 30 dias se corre cinco dias al ano; como mes de calendario cae siempre el
+  /// mismo dia. Y "cada 15 dias" puede querer decir 15 dias de trabajo, que es
+  /// lo que significa para una maquina que se desgasta operando.
+  ///
+  /// "Cada lunes" no necesita un tipo propio: es una semana anclada en lunes,
+  /// y el ancla la pone `PlanTaskAsset`.
+  unidadFrecuencia String  @default("DIAS")
+  unit             String?
+  minValue         Float?
+  maxValue         Float?
+  required         Boolean @default(true)
+
+  plan        MaintenancePlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  labor       PlanTaskLabor[]
+  parts       PlanTaskPart[]
+  services    PlanTaskService[]
+  calendarios PlanTaskAsset[]
 
   @@index([planId])
 }
@@ -2244,6 +2299,70 @@ model PlanAsset {
   @@index([organizationId])
   @@index([assetId])
   @@index([nextDueDate])
+}
+
+/// El calendario de UNA actividad en UN equipo.
+///
+/// Es la pieza que faltaba. Hasta hoy el calendario vivia en la asignacion:
+/// una sola fecha para todo el plan. Con eso no habia forma de expresar lo que
+/// pasa todos los dias en una planta —que el aceite se cambio fuera de ciclo
+/// porque la maquina ya estaba abierta, y solo ESE reloj debe moverse—, ni de
+/// que un plan tuviera una actividad semanal y otra mensual sin que la
+/// cadencia base se colapsara a un dia.
+///
+/// Un renglon por actividad y equipo: el mismo plan de compresores sirve a
+/// seis compresores y cada uno trae su propia historia.
+model PlanTaskAsset {
+  id             String @id @default(cuid())
+  organizationId String
+  planTaskId     String
+  assetId        String
+
+  /// Lo que se declaro al asignar el plan, porque la primera vez no hay de
+  /// donde derivarlo.
+  ///
+  /// Un plan recien creado no tiene historial: nadie puede saber cuando se
+  /// hizo por ultima vez el cambio de aceite si el sistema no estaba. Alguien
+  /// lo dice una sola vez y de ahi en adelante manda el historial.
+  arranqueEl DateTime?
+
+  /// Que significa `arranqueEl`.
+  ///
+  /// Verdadero: "la ultima vez se hizo ese dia", y el calendario cuenta hacia
+  /// adelante desde ahi. Es el equipo que ya se venia manteniendo.
+  ///
+  /// Falso: "arranca ese dia", y esa fecha ES la primera vez que toca. Es el
+  /// equipo nuevo, o la actividad que nunca se habia hecho.
+  ///
+  /// Sin esta distincion las dos capturas se verian iguales y una de las dos
+  /// quedaria corrida un intervalo completo, en silencio.
+  arranqueEsUltima Boolean @default(true)
+
+  /// La ultima vez que se hizo de verdad, del historial.
+  ///
+  /// Se puede derivar de `WorkOrderTask` —que guarda `planTaskId` y
+  /// `completedAt`—, pero se guarda aqui tambien porque el programador y la
+  /// proyeccion la consultan en cada barrido y recorrer el historial de cada
+  /// actividad de cada equipo cada vez no escala.
+  ultimaEl DateTime?
+
+  /// La fecha calculada. Se recalcula al cerrar, como hoy la de la asignacion.
+  proximaEl DateTime?
+
+  /// Se puede suspender una actividad en un equipo sin tocar el plan.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planTask     PlanTask     @relation(fields: [planTaskId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([planTaskId, assetId])
+  @@index([organizationId])
+  @@index([assetId])
+  @@index([proximaEl])
 }
 
 /// Un conjunto de equipos que sirve o no sirve como un todo.

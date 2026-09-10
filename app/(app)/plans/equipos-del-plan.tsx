@@ -46,6 +46,8 @@ export function EquiposDelPlan({
   const [elegidos, setElegidos] = useState<string[]>([]);
   const [escalonar, setEscalonar] = useState(true);
   const [desde, setDesde] = useState("");
+  /** Si `desde` es "la ultima vez que se hizo" o "cuando arranca". */
+  const [desdeEsUltima, setDesdeEsUltima] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -63,7 +65,10 @@ export function EquiposDelPlan({
     setGuardando(true); setError(null);
     const res = await fetch("/api/plans/asignaciones", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, assetIds: elegidos, escalonar, desde: desde || null }),
+      body: JSON.stringify({
+        planId, assetIds: elegidos, escalonar,
+        desde: desde || null, desdeEsUltima: desde ? desdeEsUltima : false,
+      }),
     });
     setGuardando(false);
     const c = await res.json().catch(() => null);
@@ -202,6 +207,54 @@ export function EquiposDelPlan({
                       </label>
                     </div>
                     )}
+
+                    {/*
+                      Que SIGNIFICA la fecha.
+
+                      Un plan recien creado no tiene historial, asi que nadie
+                      puede deducir cuando se hizo cada actividad por ultima
+                      vez: alguien tiene que decirlo una sola vez, y de ahi en
+                      adelante manda el historial.
+
+                      Las dos lecturas se ven identicas en pantalla y estan a un
+                      intervalo completo de distancia. Sin preguntarlo, la mitad
+                      de las altas quedaria corrida un ciclo, en silencio.
+                    */}
+                    {desde && !porMedidor ? (
+                      <div className="mt-2 rounded-lg border border-slate-200 p-2.5">
+                        <p className="mb-1.5 text-xs font-medium text-slate-800">
+                          Esa fecha es…
+                        </p>
+                        <div className="grid gap-1.5 sm:grid-cols-2">
+                          <label className="flex cursor-pointer items-start gap-2 text-xs">
+                            <input
+                              type="radio" className="mt-0.5"
+                              checked={!desdeEsUltima}
+                              onChange={() => setDesdeEsUltima(false)}
+                            />
+                            <span>
+                              <b className="block text-slate-700">Cuando arranca</b>
+                              <span className="text-slate-500">
+                                Ese día toca por primera vez.
+                              </span>
+                            </span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-2 text-xs">
+                            <input
+                              type="radio" className="mt-0.5"
+                              checked={desdeEsUltima}
+                              onChange={() => setDesdeEsUltima(true)}
+                            />
+                            <span>
+                              <b className="block text-slate-700">La última vez que se hizo</b>
+                              <span className="text-slate-500">
+                                La primera vez cae un intervalo después.
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
 

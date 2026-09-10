@@ -173,6 +173,8 @@ export default async function SettingsPage({
           multiOrigen={org.otMultiOrigen}
           horizonteDias={org.otHorizonteDias}
           recalculo={org.recalculoPlan}
+          diasHabiles={org.otDiasHabiles}
+          jornadaDias={org.diasHabiles}
           editable={can(user.role, "settings:write")}
         />
       ) : null}

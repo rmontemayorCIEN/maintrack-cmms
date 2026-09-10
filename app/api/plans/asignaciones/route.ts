@@ -28,6 +28,8 @@ const crear = z.object({
   /// `escalonar` el sistema reparte las fechas para no parar todo el mismo dia.
   escalonar: z.boolean().default(true),
   desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  /** Si `desde` es la ultima ejecucion (y no el arranque). */
+  desdeEsUltima: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -38,7 +40,9 @@ export async function POST(request: Request) {
       const r = await asignarPlan({
         organizationId: orgId,
         planId: input.planId,
-        equipos: input.assetIds.map((assetId) => ({ assetId, desde })),
+        equipos: input.assetIds.map((assetId) => ({
+          assetId, desde, desdeEsUltima: input.desdeEsUltima ?? false,
+        })),
         escalonarAuto: input.escalonar && !desde,
         userId: user.id,
       });

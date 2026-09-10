@@ -325,7 +325,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "El equipo no tiene nada que ofrecer", porque: "No tiene planes asignados, ni fallas reportadas, ni pendientes. Para asignarle un plan vaya a Planes → Equipos y sus planes." },
     ],
     preguntas: [
-      { pregunta: "¿Por qué no aparece un plan que sí tiene el equipo?", respuesta: "Porque vence más allá del plazo que configuró. En Configuración → Órdenes de trabajo se define cuánto se puede adelantar un preventivo. En cero solo se ofrece lo ya vencido. Adelantar de más gasta el mantenimiento antes de tiempo, así que conviene un plazo corto salvo que la planta pare pocas veces al año." },
+      { pregunta: "¿Por qué no aparece un plan que sí tiene el equipo?", respuesta: "Porque ninguna de sus actividades vence dentro del plazo que configuró. En Configuración → Órdenes de trabajo se define cuánto se puede adelantar un preventivo. En cero solo se ofrece lo ya vencido. Adelantar de más gasta el mantenimiento antes de tiempo, así que conviene un plazo corto salvo que la planta pare pocas veces al año." },
+      { pregunta: "El plan aparece pero con menos actividades de las que tiene. ¿Se perdieron?", respuesta: "No. Cada actividad lleva su propia frecuencia, y solo se ofrecen las que tocan. La revisión semestral no aparece en la orden de esta semana porque no toca todavía: aparecerá cuando venza. Cada renglón muestra su vencimiento —vencida, vence hoy, en 6 días— para que usted decida si adelanta." },
       { pregunta: "Marco algo de un grupo y se borra lo de otro. ¿Por qué?", respuesta: "Porque su organización tiene apagada la opción de juntar varios orígenes en una orden: cada origen lleva su propia orden. Se cambia en Configuración → Órdenes de trabajo." },
 
       { pregunta: "¿En qué se diferencia de «Nueva orden»?", respuesta: "«Nueva orden» captura un trabajo suelto a mano. «Armar» parte de lo que el sistema ya sabe que se le debe a ese equipo y lo junta. Si solo va a levantar un correctivo que nadie reportó, use Nueva orden." },
@@ -452,9 +453,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Un plan no hace nada por sí solo: el programador es el que convierte planes en órdenes.",
       "Cada plan dispara con anticipación: si vence el día 5 y anticipa 3 días, la orden nace el día 2.",
       "Al cerrar la orden generada, el plan recalcula su próximo vencimiento.",
-          "Cada actividad puede llevar su propia frecuencia, en días. En blanco toma la del plan, que es el caso de siempre. Así un solo plan cubre el aceite mensual y el líquido de frenos semestral, sin partirlo en dos.",
-      "El plan se visita a la CADENCIA BASE: el ritmo que hace encajar todas sus frecuencias. Si pone una actividad cada 45 días en un plan mensual, la base baja a 15 —y la pantalla se lo dice antes de guardar, con el calendario que va a quedar—.",
-      "Cuando varias actividades coinciden en la misma visita, salen en UNA sola orden: el técnico va una vez y hace todo lo que toca. Y si un ciclo no lleva ninguna, no se genera orden vacía.",
+          "Cada actividad lleva su propia frecuencia y su propia unidad: cada 15 días, semanal, mensual, trimestral. En blanco toma la del plan, que es el caso de siempre. Así un solo plan cubre el aceite quincenal y el líquido de frenos semestral, sin partirlo en dos.",
+      "Cada actividad tiene su propia fecha, contada desde la última vez que se hizo ESA actividad en ESE equipo. Al asignar el plan usted dice cuándo se hizo por última vez o desde cuándo arranca; después manda el historial. Si el aceite se cambió fuera de ciclo porque la máquina ya estaba abierta, solo ese calendario se recorre.",
+      "«Mensual» no es lo mismo que «cada 30 días»: doce veces treinta días se corren cinco al año. Y si en Configuración → Órdenes de trabajo eligió contar en días hábiles, «cada 15 días» son 15 días de trabajo, saltando los que su empresa no labora. Eso aplica solo a los intervalos en días; un trimestre son tres meses siempre.",
+      "Las actividades que caen cerca salen en UNA sola orden: el técnico va una vez y hace todo lo que toca. Qué tan cerca lo decide «cuánto se puede adelantar un preventivo», en Configuración. La ventana siempre adelanta, nunca retrasa: nada se difiere por acompañar a otra cosa.",
 ],
     tablaConfigurable: true,
     campos: [
@@ -1123,6 +1125,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Contarle al sistema qué hace su empresa, para que la IA piense mejor",
       "Configurar logotipo, color, proceso de compras y umbral de autorización",
       "Definir la jornada, los días laborables y los días que la empresa no trabaja",
+      "Decidir cómo se arman las órdenes: si los días se cuentan corridos o hábiles, cuánto se puede adelantar un preventivo y desde dónde se recalcula",
       "Dar de alta usuarios y revisar la bitácora",
       "Encender los avisos al teléfono y activar cada aparato",
     ],
@@ -1134,6 +1137,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [
+      { nombre: "Los intervalos en días se cuentan…", explica: "«Corridos» cuenta días de calendario; «hábiles» cuenta días de trabajo, saltando los que su empresa no labora. Un cambio de aceite cada 15 días hecho el viernes 4 de septiembre cae el sábado 19 contando corridos, y el martes 22 contando hábiles en una planta de lunes a sábado. Cuente en hábiles si el mantenimiento va por desgaste —la máquina se gasta operando, no en el almanaque—. Los días laborables y los festivos son los de «Jornada y calendario», no una lista aparte. Aplica solo a los intervalos en días: una actividad semanal, mensual o trimestral se cuenta siempre por calendario. Cambiarlo no recalcula lo ya programado." },
       { nombre: "Cuando un preventivo se cierra tarde", explica: "Decide desde dónde se cuenta el siguiente. «Desde que se hizo» sirve cuando importa cuánto lleva operando el equipo —engrasado, cambios de aceite—; «desde la fecha en que tocaba» mantiene el calendario fijo, que es lo que necesita quien reporta cumplimiento contra un programa anual. En los dos casos no se salta ninguna actividad: cerrar tarde mueve la fecha, nunca se brinca el ciclo." },
 
       {

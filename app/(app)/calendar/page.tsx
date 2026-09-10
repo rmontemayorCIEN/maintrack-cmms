@@ -152,7 +152,7 @@ export default async function CalendarPage({
         }))}
         proyecciones={proyecciones.map((p) => ({
           id: p.id, title: p.title, asset: p.asset, date: new Date(p.date).toISOString(),
-          assetId: p.assetId, categoryId: p.categoryId,
+          assetId: p.assetId, categoryId: p.categoryId, titulos: p.titulos,
         }))}
         tecnicos={tecnicos}
         activos={activos}

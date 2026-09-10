@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
-import { tocanEn } from "@/lib/frecuencias";
+import { actividadesPendientes, sembrarLoQueFalte } from "@/lib/calendario-actividad";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { tipoDeTrabajo } from "@/lib/tipos-solicitud";
@@ -27,6 +27,14 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
     select: { otHorizonteDias: true, otMultiOrigen: true },
   });
   const horizonte = org?.otHorizonteDias ?? 0;
+
+  // Que este equipo no aparezca sin trabajo solo porque le faltan relojes: una
+  // asignacion anterior a este cambio, o creada por importacion, no los tiene.
+  // Es barato cuando no hay nada que sembrar.
+  await sembrarLoQueFalte(organizationId, assetId);
+
+  const hasta = new Date(Date.now() + horizonte * 86_400_000);
+  const porTocar = await actividadesPendientes(organizationId, { assetId, hasta });
 
   const [asignaciones, reportes, pendientes] = await Promise.all([
     /**
@@ -78,7 +86,9 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
     backlog(organizationId, { assetId }),
   ]);
 
-  const hoy = new Date();
+  /** Lo que toca de un plan, ya ordenado por fecha. */
+  const deEstePlan = (planId: string) =>
+    porTocar.filter((x) => x.planId === planId).sort((a, b) => +a.proximaEl - +b.proximaEl);
 
   return {
     /** Como esta configurada la organizacion, para que la pantalla obedezca. */
@@ -92,26 +102,43 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
         nombre: a.plan.name,
         maintenanceType: a.plan.maintenanceType,
         horasEstimadas: a.plan.estimatedHours,
-        venceEl: a.nextDueDate,
+        /**
+         * La fecha del plan es la MAS PROXIMA de sus actividades.
+         *
+         * Deja de ser un dato propio y pasa a ser un resumen: con cada
+         * actividad llevando su calendario, "cuando vence el plan" solo puede
+         * significar "cuando vence lo primero que trae".
+         */
+        venceEl: deEstePlan(a.plan.id)[0]?.proximaEl ?? a.nextDueDate,
         /** Ya vencio o vence pronto: es lo que de verdad "toca". */
-        yaToca: !!a.nextDueDate && a.nextDueDate <= hoy,
-        diasParaVencer: a.nextDueDate
-          ? Math.round((a.nextDueDate.getTime() - hoy.getTime()) / 86_400_000)
-          : null,
+        yaToca: deEstePlan(a.plan.id).some((x) => x.faltan <= 0),
+        diasParaVencer: deEstePlan(a.plan.id)[0]?.faltan ?? null,
         /**
          * Solo las actividades que TOCAN en la proxima ejecucion.
          *
          * Ofrecer las cinco de un plan cuando en esta visita van tres es
          * invitar a que alguien las meta todas: se cambia el aceite de mas y
-         * el calendario del resto se desalinea sin que nadie lo note. La misma
-         * regla que usa el programador, en el mismo lugar —lib/frecuencias—.
+         * el calendario del resto se desalinea sin que nadie lo note.
          *
-         * Un plan sin frecuencias declaradas trae todas sus actividades en
-         * `cadaCuantas: 1`, asi que esto no cambia nada para el caso de
-         * siempre.
+         * Cada una viaja con su propio vencimiento para que la pantalla pueda
+         * decir "vencida" o "vence en 6 dias" por renglon, que es justo la
+         * informacion con la que se decide adelantar o no.
          */
-        actividades: tocanEn(a.plan.tasks, a.ejecuciones + 1),
-      })),
+        actividades: deEstePlan(a.plan.id).map((x) => ({
+          id: x.planTaskId,
+          position: x.position,
+          title: x.titulo,
+          description: x.descripcion,
+          taskType: x.taskType,
+          unit: x.unit,
+          minValue: x.minValue,
+          maxValue: x.maxValue,
+          required: x.required,
+          venceEl: x.proximaEl,
+          faltan: x.faltan,
+        })),
+      }))
+      .filter((p) => p.actividades.length > 0),
     reportes,
     backlog: pendientes.map((t) => ({
       id: t.id,
@@ -175,7 +202,7 @@ export async function armarOrden(p: {
    */
   const config = await prisma.organization.findUnique({
     where: { id: p.organizationId },
-    select: { otMultiOrigen: true },
+    select: { otMultiOrigen: true, otHorizonteDias: true },
   });
   const grupos = [p.asignaciones.length, p.reportes.length, p.backlog.length].filter((n) => n > 0);
   if (config && !config.otMultiOrigen && grupos.length > 1) {
@@ -283,8 +310,30 @@ export async function armarOrden(p: {
   let posicion = 0;
   const actividades: Prisma.WorkOrderTaskCreateManyInput[] = [];
 
+  /**
+   * De un plan entran SOLO las actividades que le tocan a esta visita.
+   *
+   * Antes entraban todas, porque todas compartian la fecha del plan. Con el
+   * calendario por actividad eso meteria la revision semestral en cada orden
+   * manual, y al cerrar avanzaria su reloj seis meses cada vez: el semestral se
+   * volveria anual sin que nadie lo pidiera y sin un solo aviso.
+   *
+   * Se usa la MISMA ventana con la que se ofrecieron en pantalla, para que lo
+   * que se guarda sea exactamente lo que la persona vio.
+   */
+  // Igual que al ofrecer: una asignacion sin relojes —creada por importacion,
+  // por script, o anterior a este cambio— quedaria fuera de la orden sin decir
+  // por que, y su plan no avanzaria nunca.
+  await sembrarLoQueFalte(p.organizationId, asset.id);
+  const porTocar = await actividadesPendientes(p.organizationId, {
+    assetId: asset.id,
+    hasta: new Date(Date.now() + (config?.otHorizonteDias ?? 0) * 86_400_000),
+  });
+  const tocan = new Set(porTocar.map((x) => x.planTaskId));
+
   for (const a of asignaciones) {
     for (const t of a.plan.tasks) {
+      if (!tocan.has(t.id)) continue;
       actividades.push({
         workOrderId: orden.id, position: posicion++,
         title: t.title, description: t.description, taskType: t.taskType,
@@ -332,10 +381,10 @@ export async function armarOrden(p: {
   /**
    * Armar una orden a mano TAMBIEN es una ejecucion del plan.
    *
-   * Sin avanzar el contador, la siguiente vez se ofrecerian las mismas
-   * actividades para siempre —el mensual saldria cada vez y el semestral
-   * nunca— y ademas el programador automatico quedaria desalineado con lo que
-   * de verdad se hizo. Es la misma cuenta y tiene que llevarla el mismo lugar.
+   * El contador `ejecuciones` solo lo sigue usando el camino de medidores; en
+   * el de calendario mandan los relojes por actividad, que avanzan al CERRAR
+   * la orden y no al armarla —armar no es haber hecho el trabajo—. Se mantiene
+   * al dia para que los dos caminos cuenten lo mismo.
    */
   await prisma.planAsset.updateMany({
     where: { id: { in: asignaciones.map((a) => a.id) } },

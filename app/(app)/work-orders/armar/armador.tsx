@@ -149,7 +149,9 @@ export function Armador({
                       ? { texto: `En ${p.diasParaVencer} d`, tono: "suave" }
                       : { texto: "Sin fecha", tono: "suave" }
                 }
-              />
+              >
+                <Actividades lista={p.actividades} />
+              </Fila>
             ))}
           </Grupo>
 
@@ -281,13 +283,15 @@ function Grupo({
 }
 
 function Fila({
-  marcado, onMarcar, titulo, detalle, señal,
+  marcado, onMarcar, titulo, detalle, señal, children,
 }: {
   marcado: boolean;
   onMarcar: () => void;
   titulo: string;
   detalle: string;
   señal: { texto: string; tono: "urgente" | "suave" | "listo" };
+  /** Desglose opcional bajo la fila, para ver que trae adentro. */
+  children?: React.ReactNode;
 }) {
   const tonos = {
     urgente: "bg-rose-100 text-rose-700",
@@ -295,19 +299,62 @@ function Fila({
     suave: "bg-slate-100 text-slate-600",
   };
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 ${
-        marcado ? "border-brand-300 bg-brand-50/60" : "border-slate-200 hover:bg-slate-50"
+    <div
+      className={`rounded-lg border ${
+        marcado ? "border-brand-300 bg-brand-50/60" : "border-slate-200"
       }`}
     >
-      <input type="checkbox" checked={marcado} onChange={onMarcar} className="h-3.5 w-3.5" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium text-slate-800">{titulo}</span>
-        <span className="block truncate text-[0.6875rem] text-slate-500">{detalle}</span>
-      </span>
-      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[0.625rem] ${tonos[señal.tono]}`}>
-        {señal.texto}
-      </span>
-    </label>
+      <label
+        className={`flex cursor-pointer items-center gap-2.5 px-2.5 py-2 ${
+          marcado ? "" : "hover:bg-slate-50"
+        }`}
+      >
+        <input type="checkbox" checked={marcado} onChange={onMarcar} className="h-3.5 w-3.5" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs font-medium text-slate-800">{titulo}</span>
+          <span className="block truncate text-[0.6875rem] text-slate-500">{detalle}</span>
+        </span>
+        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[0.625rem] ${tonos[señal.tono]}`}>
+          {señal.texto}
+        </span>
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Lo que trae adentro un plan: sus actividades, cada una con su vencimiento.
+ *
+ * Antes bastaba con decir "3 actividad(es)" porque todas compartian la fecha
+ * del plan. Con el calendario por actividad ya no: la orden puede llevar el
+ * engrase que vencio ayer y el aceite que vence en seis dias, y quien arma la
+ * orden necesita ver esa diferencia para decidir si adelanta o espera.
+ */
+function Actividades({
+  lista,
+}: {
+  lista: Array<{ id: string; title: string; faltan: number }>;
+}) {
+  if (!lista.length) return null;
+  return (
+    <ul className="border-t border-slate-200/70 px-2.5 py-1.5">
+      {lista.map((a) => (
+        <li key={a.id} className="flex items-baseline gap-2 py-0.5 text-[0.6875rem]">
+          <span className="min-w-0 flex-1 truncate text-slate-600">{a.title}</span>
+          <span
+            className={`shrink-0 tabular-nums ${
+              a.faltan < 0 ? "font-medium text-rose-600" : "text-slate-400"
+            }`}
+          >
+            {a.faltan < 0
+              ? `vencida ${Math.abs(a.faltan)} d`
+              : a.faltan === 0
+                ? "vence hoy"
+                : `en ${a.faltan} d`}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

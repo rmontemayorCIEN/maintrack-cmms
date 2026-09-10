@@ -12,6 +12,7 @@ const schema = z.object({
    * que paran una vez al ano y ahi si tiene sentido juntarlo todo.
    */
   otHorizonteDias: z.coerce.number().int().min(0).max(365).optional(),
+  otDiasHabiles: z.boolean().optional(),
 });
 
 /** Como se arman las ordenes de trabajo en esta organizacion. */
@@ -23,13 +24,14 @@ export async function PATCH(request: Request) {
     if (datos.otMultiOrigen !== undefined) actualizacion.otMultiOrigen = datos.otMultiOrigen;
     if (datos.recalculoPlan !== undefined) actualizacion.recalculoPlan = datos.recalculoPlan;
     if (datos.otHorizonteDias !== undefined) actualizacion.otHorizonteDias = datos.otHorizonteDias;
+    if (datos.otDiasHabiles !== undefined) actualizacion.otDiasHabiles = datos.otDiasHabiles;
 
     if (!Object.keys(actualizacion).length) return ok({ sinCambios: true });
 
     const org = await prisma.organization.update({
       where: { id: orgId },
       data: actualizacion,
-      select: { otMultiOrigen: true, otHorizonteDias: true },
+      select: { otMultiOrigen: true, otHorizonteDias: true, otDiasHabiles: true },
     });
 
     await logAudit({
@@ -42,7 +44,9 @@ export async function PATCH(request: Request) {
         datos.otMultiOrigen !== undefined
           ? `varios origenes ${datos.otMultiOrigen ? "encendido" : "apagado"}`
           : "sin cambio"
-      }, horizonte ${datos.otHorizonteDias ?? "sin cambio"} dias`,
+      }, horizonte ${datos.otHorizonteDias ?? "sin cambio"} dias, dias ${
+        datos.otDiasHabiles === undefined ? "sin cambio" : datos.otDiasHabiles ? "habiles" : "corridos"
+      }`,
     });
 
     return ok({ organizacion: org });

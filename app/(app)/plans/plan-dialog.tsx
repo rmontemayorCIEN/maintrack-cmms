@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { derivarCadencia } from "@/lib/frecuencias";
+import { describirIntervalo, diasAproximados } from "@/lib/calendario";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Button, BotonEditar } from "@/components/ui";
@@ -28,6 +28,10 @@ export type Task = {
    * guardar, no aqui.
    */
   cadaDias?: string;
+  /** Cada cuanto toca esta actividad, en la unidad de abajo. */
+  cadaCuanto?: string;
+  /** DIAS | SEMANAS | MESES. */
+  unidadFrecuencia?: string;
 };
 
 /** Un plan ya guardado, tal como lo manda la pagina para editarlo. */
@@ -189,29 +193,34 @@ export function PlanDialog({
   }, [tasks, catEsp, catSrv, refacciones]);
 
   /**
-   * Que cadencia queda si se guardan estas frecuencias.
+   * El calendario que queda, ANTES de guardar.
    *
-   * Se calcula en vivo para poder ENSEÑARLO antes de guardar: si alguien pone
-   * una actividad cada 45 dias en un plan mensual, la cadencia baja a 15 y el
-   * equipo se visita mas seguido. Eso no puede ser una sorpresa.
+   * Ya no hay una "cadencia base" que deducir: cada actividad lleva su propia
+   * fecha. Lo que si hay que enseñar es el resultado —cada cuanto va cada
+   * cosa, en las palabras en que se dijo— para que nadie descubra en la
+   * bandeja de ordenes que puso "cada 6" pensando en meses y quedaron dias.
    */
   const cadencia = useMemo(() => {
     if (form.triggerType !== "CALENDAR") return null;
-    const base = Number(form.intervalDays) || 0;
-    if (base < 1) return null;
     const conTitulo = tasks.filter((t) => t.title.trim());
     if (!conTitulo.length) return null;
-    const dias = conTitulo.map((t) => Number(t.cadaDias) || base);
-    const d = derivarCadencia([{ cadaDias: base }, ...dias.map((x) => ({ cadaDias: x }))]);
-    return {
-      base: d.base,
-      cambia: d.base !== base,
-      // Lo que lleva cada visita, hasta la que junta todo.
-      actividades: conTitulo.map((t, i) => ({
+    const base = Number(form.intervalDays) || 0;
+    const lista = conTitulo.map((t) => {
+      const n = Number(t.cadaCuanto) || 0;
+      const unidad = (t.unidadFrecuencia ?? "DIAS") as "DIAS" | "SEMANAS" | "MESES";
+      return {
         titulo: t.title,
-        dias: dias[i],
-        cadaCuantas: Math.max(Math.round(dias[i] / d.base), 1),
-      })),
+        propia: n > 0,
+        etiqueta: n > 0 ? describirIntervalo(n, unidad) : base ? `Cada ${base} días (del plan)` : "Sin frecuencia",
+        dias: n > 0 ? diasAproximados(n, unidad) : base,
+      };
+    });
+    return {
+      actividades: lista,
+      // Solo vale la pena enseñarlo cuando hay mas de un ritmo: si todas van
+      // igual, el recuadro no dice nada que no este ya en la pantalla.
+      distintas: new Set(lista.map((a) => a.etiqueta)).size > 1,
+      sinFrecuencia: lista.filter((a) => !a.propia && !base).length,
     };
   }, [tasks, form.triggerType, form.intervalDays]);
 
@@ -265,6 +274,8 @@ export function PlanDialog({
           maxValue: t.maxValue ? Number(t.maxValue) : null,
           required: t.required,
           cadaDias: Number(t.cadaDias) || null,
+          cadaCuanto: Number(t.cadaCuanto) || null,
+          unidadFrecuencia: t.unidadFrecuencia || "DIAS",
           labor: t.labor.filter((l) => l.specialtyId).map((l) => ({
             specialtyId: l.specialtyId,
             personas: Number(l.personas || 1),
@@ -503,32 +514,31 @@ export function PlanDialog({
                 cadencia a 15 y el equipo se visita mas seguido. Eso no puede
                 ser una sorpresa que alguien descubra en la bandeja de ordenes.
               */}
-              {cadencia && cadencia.actividades.some((a) => a.cadaCuantas > 1) ? (
+              {cadencia && (cadencia.distintas || cadencia.sinFrecuencia > 0) ? (
                 <div className="mb-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-[0.6875rem] leading-relaxed text-slate-700">
-                  {cadencia.cambia ? (
-                    <p className="mb-1 font-medium text-amber-800">
-                      Con estas frecuencias, el equipo se visita cada {cadencia.base} días —no cada{" "}
-                      {form.intervalDays}—, porque es el ritmo que las hace encajar todas.
-                    </p>
-                  ) : (
-                    <p className="mb-1 font-medium">
-                      El equipo se visita cada {cadencia.base} días. En cada visita entra:
-                    </p>
-                  )}
+                  <p className="mb-1 font-medium">Cada actividad lleva su propio calendario:</p>
                   <ul className="grid gap-0.5">
-                    {cadencia.actividades.map((a, i) => (
-                      <li key={i} className="flex flex-wrap gap-x-1.5">
-                        <span className="font-mono text-slate-500">
-                          {a.cadaCuantas === 1 ? "cada visita" : `1 de cada ${a.cadaCuantas}`}
-                        </span>
-                        <span>· {a.titulo || "(sin nombre)"}</span>
-                        <span className="text-slate-500">— cada {a.dias} días</span>
-                      </li>
-                    ))}
+                    {cadencia.actividades
+                      .slice()
+                      .sort((a, b) => a.dias - b.dias)
+                      .map((a, i) => (
+                        <li key={i} className="flex flex-wrap gap-x-1.5">
+                          <span className="font-medium text-slate-600">{a.etiqueta}</span>
+                          <span>· {a.titulo || "(sin nombre)"}</span>
+                        </li>
+                      ))}
                   </ul>
+                  {cadencia.sinFrecuencia > 0 ? (
+                    <p className="mt-1 font-medium text-amber-800">
+                      {cadencia.sinFrecuencia === 1
+                        ? "Una actividad quedó sin frecuencia"
+                        : `${cadencia.sinFrecuencia} actividades quedaron sin frecuencia`}{" "}
+                      y el plan tampoco tiene intervalo: no se van a programar nunca.
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-slate-500">
-                    Las visitas donde coinciden varias salen en <strong>una sola orden</strong>: el
-                    técnico va una vez y hace todo lo que toca.
+                    Las que caigan cerca salen en <strong>una sola orden</strong>: el técnico va una
+                    vez y hace todo lo que toca. Cada una avanza su propia fecha al cerrarse.
                   </p>
                 </div>
               ) : null}
@@ -556,19 +566,43 @@ export function PlanDialog({
                         <option value="REPLACE">Reemplazo</option>
                       </select>
                       {/*
-                        Cada cuantos DIAS, no cada cuantas ejecuciones: nadie
-                        piensa en multiplos. La traduccion se hace al guardar.
-                        Vacio hereda la frecuencia del plan, que es el caso de
-                        siempre y por eso es lo que no hay que capturar.
+                        Cada cuanto y EN QUE, no cada cuantas ejecuciones: nadie
+                        piensa en multiplos, y "mensual" no es lo mismo que
+                        "cada 30 dias" —doce veces treinta dias se corren cinco
+                        dias al ano—. Vacio hereda la frecuencia del plan, que
+                        es el caso de siempre y por eso es lo que no hay que
+                        capturar.
                       */}
-                      <input
-                        className="field"
-                        placeholder={form.triggerType === "CALENDAR" ? `cada ${form.intervalDays || "?"} d` : "cada"}
-                        title="Cada cuántos días se hace esta actividad. Vacío: la frecuencia del plan."
-                        inputMode="numeric"
-                        value={task.cadaDias ?? ""}
-                        onChange={(e) => cambiarTarea(index, { cadaDias: e.target.value.replace(/[^0-9]/g, "") })}
-                      />
+                      {/*
+                        El ancho del selector va en un envoltorio, no en el
+                        propio <select>: `.field` fija width:100% y globals.css
+                        carga DESPUES de Tailwind, asi que una utilidad de la
+                        misma especificidad —w-[5.5rem]— pierde en silencio y el
+                        control se estira. Es la misma trampa que ya tienen
+                        documentada `.field.compacto` y `.field.con-icono`.
+                      */}
+                      <div className="flex gap-1">
+                        <input
+                          className="field min-w-0 flex-1"
+                          placeholder={form.triggerType === "CALENDAR" ? `${form.intervalDays || "?"}` : "cada"}
+                          title="Cada cuánto se hace esta actividad. Vacío: la frecuencia del plan."
+                          inputMode="numeric"
+                          value={task.cadaCuanto ?? ""}
+                          onChange={(e) => cambiarTarea(index, { cadaCuanto: e.target.value.replace(/[^0-9]/g, "") })}
+                        />
+                        <span className="w-[5.25rem] shrink-0">
+                          <select
+                            className="field px-1"
+                            title="En días, semanas o meses. Los días hábiles, si su empresa los usa, solo aplican a los días."
+                            value={task.unidadFrecuencia ?? "DIAS"}
+                            onChange={(e) => cambiarTarea(index, { unidadFrecuencia: e.target.value })}
+                          >
+                            <option value="DIAS">días</option>
+                            <option value="SEMANAS">sem.</option>
+                            <option value="MESES">meses</option>
+                          </select>
+                        </span>
+                      </div>
                       <input
                         className="field" placeholder="Unidad"
                         value={task.unit ?? ""}

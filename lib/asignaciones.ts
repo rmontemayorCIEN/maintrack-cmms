@@ -8,6 +8,7 @@
  */
 import { prisma } from "./db";
 import { esHabil, jornada } from "./agenda";
+import { sembrarCalendario } from "./calendario-actividad";
 
 export class ErrorDeAsignacion extends Error {
   constructor(mensaje: string, readonly codigo = 422) {
@@ -62,7 +63,24 @@ export function escalonar(
 export async function asignarPlan(params: {
   organizationId: string;
   planId: string;
-  equipos: { assetId: string; desde?: Date | null; meterId?: string | null }[];
+  equipos: {
+    assetId: string;
+    desde?: Date | null;
+    meterId?: string | null;
+    /**
+     * Que significa `desde` para el calendario por actividad.
+     *
+     * Falso —lo de siempre— es "a partir de esta fecha arranca", y esa fecha ES
+     * la primera vez que toca. Verdadero es "la ultima vez se hizo ese dia", y
+     * entonces se cuenta un intervalo hacia adelante.
+     *
+     * La distincion importa porque las dos capturas se ven identicas en
+     * pantalla y confundirlas corre la actividad un ciclo completo en silencio.
+     */
+    desdeEsUltima?: boolean;
+    /** Fechas propias por actividad, cuando alguna difiere del resto. */
+    porActividad?: { planTaskId: string; fecha: Date; esUltima: boolean }[];
+  }[];
   escalonarAuto?: boolean;
   userId?: string | null;
 }) {
@@ -130,6 +148,8 @@ export async function asignarPlan(params: {
 
   const creadas: string[] = [];
   const yaEstaban: string[] = [];
+  /** Actividades que quedaron sin fecha porque no tienen frecuencia. */
+  const sinProgramar: string[] = [];
   /** Equipos que quedaron sin medidor en un plan que lo necesita. */
   const sinMedidor: string[] = [];
   for (const e of params.equipos) {
@@ -155,6 +175,32 @@ export async function asignarPlan(params: {
         createdById: params.userId ?? null,
       },
     });
+    /**
+     * Y el reloj de cada actividad de este plan en este equipo.
+     *
+     * Es lo que permite que el aceite y el liquido de frenos vayan por su
+     * cuenta. Se siembra aqui —al asignar— porque es el unico momento en que
+     * alguien puede declarar cuando se hizo por ultima vez: un plan recien
+     * creado no tiene historial de donde derivarlo.
+     */
+    const arranques = new Map<string, { fecha: Date; esUltima: boolean }>();
+    for (const a of e.porActividad ?? []) {
+      arranques.set(a.planTaskId, { fecha: a.fecha, esUltima: a.esUltima });
+    }
+    const { sinFrecuencia } = await sembrarCalendario({
+      organizationId: params.organizationId,
+      planId: plan.id,
+      assetId: e.assetId,
+      arranquePorOmision: {
+        fecha: e.desde ?? calendario.get(e.assetId) ?? hoy,
+        esUltima: e.desdeEsUltima ?? false,
+      },
+      arranques,
+    });
+    // Una actividad sin frecuencia nunca genera y se ve igual que una que
+    // todavia no toca. Se reporta hacia arriba en vez de quedarse callada.
+    for (const t of sinFrecuencia) sinProgramar.push(`${codigo} · ${t}`);
+
     creadas.push(codigo);
   }
 
@@ -168,7 +214,7 @@ export async function asignarPlan(params: {
   // que el sistema si puede afirmar sin equivocarse es lo contrario: que un
   // equipo no esta en NINGUN plan. Eso vive en lib/cobertura-planes.ts.
 
-  return { creadas, yaEstaban, sinMedidor };
+  return { creadas, yaEstaban, sinMedidor, sinProgramar };
 }
 
 export async function quitarAsignacion(organizationId: string, id: string) {

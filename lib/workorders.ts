@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "./almacen";
 import { STATUS_TRANSITIONS } from "./constants";
 import { rollForwardPlan } from "./scheduler";
+import { avanzarActividadesDeOrden } from "./calendario-actividad";
 import { logAudit, notify } from "./audit";
 
 /**
@@ -314,6 +315,24 @@ export async function transitionWorkOrder(params: {
     for (const planId of planesQueAvanzan) {
       await rollForwardPlan(planId, now, wo.meterValue, wo.assetId);
     }
+
+    /**
+     * Y avanzar el reloj de CADA actividad que se hizo.
+     *
+     * El plan avanza como conjunto —eso sigue, para las pantallas que todavia
+     * leen la fecha de la asignacion— pero la verdad ahora esta por actividad:
+     * una orden puede traer tres de las diez actividades del plan y las otras
+     * siete siguen debiendose para cuando les toque. Avanzar el plan entero se
+     * llevaria las siete por delante sin que nadie lo viera.
+     *
+     * Las liberadas no cuentan aqui tampoco: no se hicieron.
+     */
+    await avanzarActividadesDeOrden({
+      organizationId: params.organizationId,
+      workOrderId: wo.id,
+      assetId: wo.assetId,
+      completadaEl: now,
+    });
 
     await prisma.predictiveAlert.updateMany({
       where: { workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },

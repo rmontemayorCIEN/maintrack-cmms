@@ -29,6 +29,25 @@ const iso = (d: Date | null | undefined) =>
     ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
     : null;
 
+/**
+ * Vence un plan en un equipo, moviendo la palanca que de verdad manda.
+ *
+ * Desde el calendario por actividad, `PlanAsset.nextDueDate` es un DERIVADO
+ * para las pantallas: quien decide si toca es el reloj de cada actividad. Una
+ * prueba que solo mueve la fecha de la asignacion ya no vence nada, y pasaria
+ * a probar un campo que nadie lee.
+ */
+async function vencer(assetIds: string[], planId: string, cuando: Date) {
+  await prisma.planAsset.updateMany({
+    where: { planId, assetId: { in: assetIds } },
+    data: { nextDueDate: cuando },
+  });
+  await prisma.planTaskAsset.updateMany({
+    where: { assetId: { in: assetIds }, planTask: { planId } },
+    data: { proximaEl: cuando },
+  });
+}
+
 async function main() {
   const suf = Date.now();
   const org = await prisma.organization.create({
@@ -105,7 +124,7 @@ async function main() {
   paso("3 · EL PROGRAMADOR GENERA SOLO LO VENCIDO");
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
-  await prisma.planAsset.update({ where: { id: asigs[0].id }, data: { nextDueDate: ayer } });
+  await vencer([asigs[0].assetId], plan.id, ayer);
 
   const gen = await generateScheduledWorkOrders(org.id, {});
   revisar("genera una sola orden", gen.generated, 1);
@@ -174,10 +193,7 @@ async function main() {
   const ot2 = await prisma.workOrder.count({ where: { organizationId: org.id } });
   revisar("sigue habiendo una sola orden", ot2, 1);
 
-  await prisma.planAsset.updateMany({
-    where: { planId: plan.id, assetId: { in: [asigs[1].assetId, asigs[2].assetId] } },
-    data: { nextDueDate: ayer },
-  });
+  await vencer([asigs[1].assetId, asigs[2].assetId], plan.id, ayer);
   const gen3 = await generateScheduledWorkOrders(org.id, {});
   revisar("ahora si genera los otros dos", gen3.generated, 2);
   revisar("tres ordenes en total", await prisma.workOrder.count({ where: { organizationId: org.id } }), 3);

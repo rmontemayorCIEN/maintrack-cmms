@@ -28,6 +28,25 @@ async function seRechaza(e: string, fn: () => Promise<unknown>, frag: string) {
 }
 const iso = (d: Date | null) => d ? d.toISOString().slice(0, 10) : null;
 
+/**
+ * Vence un plan en un equipo, moviendo la palanca que de verdad manda.
+ *
+ * Desde el calendario por actividad, `PlanAsset.nextDueDate` es un DERIVADO
+ * para las pantallas: quien decide si toca es el reloj de cada actividad. Una
+ * prueba que solo mueve la fecha de la asignacion ya no vence nada, y pasaria
+ * a probar un campo que nadie lee.
+ */
+async function vencer(assetIds: string[], planId: string, cuando: Date) {
+  await prisma.planAsset.updateMany({
+    where: { planId, assetId: { in: assetIds } },
+    data: { nextDueDate: cuando },
+  });
+  await prisma.planTaskAsset.updateMany({
+    where: { assetId: { in: assetIds }, planTask: { planId } },
+    data: { proximaEl: cuando },
+  });
+}
+
 async function main() {
   const suf = Date.now();
   const org = await prisma.organization.create({
@@ -86,9 +105,7 @@ async function main() {
   // Vencer solo dos de los cinco
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
-  await prisma.planAsset.updateMany({
-    where: { id: { in: [asigs[0].id, asigs[1].id] } }, data: { nextDueDate: ayer },
-  });
+  await vencer([asigs[0].assetId, asigs[1].assetId], plan.id, ayer);
   const gen = await generateScheduledWorkOrders(org.id, {});
   revisar("genera solo las dos vencidas", gen.generated, 2);
   const ots = await prisma.workOrder.findMany({ where: { organizationId: org.id }, select: { assetId: true, planId: true } });

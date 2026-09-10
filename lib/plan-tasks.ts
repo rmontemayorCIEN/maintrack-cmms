@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { resolverCadenciaDelPlan } from "./frecuencias";
+import { desdeDias, esUnidad, UNIDADES, type Unidad } from "./calendario";
 
 /**
  * Las actividades de un plan y los recursos que cada una requiere.
@@ -22,8 +24,18 @@ export const esquemaTarea = z.object({
   minValue: z.coerce.number().optional().nullable(),
   maxValue: z.coerce.number().optional().nullable(),
   required: z.boolean().default(true),
-  /** Cada cuantos dias va esta actividad. Nulo: la cadencia del plan. */
+  /**
+   * Cada cuantos dias va esta actividad. Nulo: la cadencia del plan.
+   *
+   * Se conserva porque lo escriben el generador de IA, la importacion y las
+   * pantallas viejas. Si no viene `cadaCuanto`, de aqui se deriva: 90 dias son
+   * "cada 3 meses" y no "cada 90 dias", que es como lo diria una persona.
+   */
   cadaDias: z.coerce.number().int().min(1).optional().nullable(),
+  /** Cada cuanto toca, en la unidad de al lado. */
+  cadaCuanto: z.coerce.number().int().min(1).optional().nullable(),
+  /** DIAS | SEMANAS | MESES. */
+  unidadFrecuencia: z.enum([UNIDADES.DIAS, UNIDADES.SEMANAS, UNIDADES.MESES]).optional().nullable(),
   labor: z.array(z.object({
     specialtyId: z.string().min(1),
     personas: z.coerce.number().int().min(1).max(99).default(1),
@@ -80,9 +92,34 @@ export async function validarRecursos(orgId: string, tareas: TareaDePlan[]): Pro
   return null;
 }
 
+/**
+ * La frecuencia de una actividad, venga como venga.
+ *
+ * Hay tres formas de llegar aqui y las tres tienen que dar el mismo calendario:
+ * la pantalla manda numero y unidad, el generador de IA y la importacion mandan
+ * dias, y una actividad vieja no manda nada. Resolverlo en un solo lugar evita
+ * que cada camino invente su propia interpretacion.
+ */
+export function frecuenciaDe(t: {
+  cadaCuanto?: number | null;
+  unidadFrecuencia?: string | null;
+  cadaDias?: number | null;
+}): { cadaCuanto: number | null; unidadFrecuencia: Unidad } {
+  if (t.cadaCuanto && esUnidad(t.unidadFrecuencia)) {
+    return { cadaCuanto: t.cadaCuanto, unidadFrecuencia: t.unidadFrecuencia };
+  }
+  if (t.cadaCuanto) return { cadaCuanto: t.cadaCuanto, unidadFrecuencia: "DIAS" };
+  if (t.cadaDias) {
+    const d = desdeDias(t.cadaDias);
+    return { cadaCuanto: d.cadaCuanto, unidadFrecuencia: d.unidad };
+  }
+  return { cadaCuanto: null, unidadFrecuencia: "DIAS" };
+}
+
 /** Traduce las tareas del formulario a un `create` anidado de Prisma. */
 export function crearTareas(tareas: TareaDePlan[], multiplos?: number[]) {
   return tareas.map((t, index) => ({
+    ...frecuenciaDe(t),
     // El multiplo lo calcula resolverCadenciaDelPlan a partir de los dias; si
     // no viene, es 1 y la actividad sale en cada ejecucion —lo de siempre—.
     cadaCuantas: multiplos?.[index] ?? 1,
@@ -101,12 +138,28 @@ export function crearTareas(tareas: TareaDePlan[], multiplos?: number[]) {
 }
 
 /**
- * Reemplaza por completo la lista de actividades de un plan.
+ * Deja la lista de actividades de un plan igual a la que se capturo,
+ * CONSERVANDO la identidad de las que siguen ahi.
  *
- * Se borra y se vuelve a crear en lugar de reconciliar fila por fila: las
- * tareas de un plan son una plantilla, no historia. Lo que ya se ejecuto vive
- * copiado en las ordenes generadas y no se toca.
+ * Antes se borraba todo y se volvia a crear. Se veia bien y rompia dos cosas
+ * en silencio, las dos invisibles desde la pantalla:
+ *
+ *  - **El historial.** `WorkOrderTask.planTaskId` guarda de que actividad del
+ *    plan salio cada renglon de cada orden, y no es una llave foranea: es una
+ *    cadena suelta. Al recrear las actividades con ids nuevos, todas las
+ *    ordenes viejas quedaban apuntando a ids que ya no existen. La pregunta
+ *    "cuando se cambio el aceite por ultima vez" dejaba de tener respuesta
+ *    cada vez que alguien corregia una falta de ortografia en el plan.
+ *  - **El calendario.** Los relojes por actividad y equipo cuelgan de la
+ *    actividad con borrado en cascada. Recrear la lista borraba el calendario
+ *    de todos los equipos del plan y los devolvia al arranque.
+ *
+ * Ahora se emparejan por titulo: la actividad que sigue llamandose igual
+ * conserva su id, su historial y su reloj. Solo se crean las nuevas y solo se
+ * borran las que de verdad se quitaron.
  */
+const claveDeTitulo = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
+
 export async function reemplazarTareas(
   planId: string,
   tareas: TareaDePlan[],
@@ -116,16 +169,59 @@ export async function reemplazarTareas(
   // puede mover la del plan entero, y guardar los multiplos contra una base
   // vieja daria un calendario que nadie puede cumplir.
   const cadencia = resolverCadenciaDelPlan(intervalBase, tareas);
-  await prisma.$transaction([
-    prisma.planTask.deleteMany({ where: { planId } }),
-    ...crearTareas(tareas, cadencia.multiplos).map((data) =>
-      prisma.planTask.create({ data: { ...data, planId } }),
-    ),
-    ...(cadencia.base != null
-      ? [prisma.maintenancePlan.update({ where: { id: planId }, data: { intervalDays: cadencia.base } })]
-      : []),
-  ]);
-  return cadencia;
+  const nuevas = crearTareas(tareas, cadencia.multiplos);
+
+  const existentes = await prisma.planTask.findMany({
+    where: { planId },
+    select: { id: true, title: true },
+  });
+  const porTitulo = new Map<string, string>();
+  for (const t of existentes) {
+    const k = claveDeTitulo(t.title);
+    // Con titulos repetidos gana el primero; el segundo se crea de nuevo. Es
+    // preferible perder el vinculo de un duplicado que asignarselo al que no.
+    if (!porTitulo.has(k)) porTitulo.set(k, t.id);
+  }
+
+  const conservados = new Set<string>();
+  const operaciones: Prisma.PrismaPromise<unknown>[] = [];
+
+  for (const data of nuevas) {
+    const { labor, parts, services, ...campos } = data;
+    const previa = porTitulo.get(claveDeTitulo(campos.title));
+
+    if (previa && !conservados.has(previa)) {
+      conservados.add(previa);
+      operaciones.push(
+        prisma.planTask.update({
+          where: { id: previa },
+          data: {
+            ...campos,
+            // Los recursos si se reemplazan enteros: son una plantilla y no
+            // llevan historia propia.
+            labor: { deleteMany: {}, ...labor },
+            parts: { deleteMany: {}, ...parts },
+            services: { deleteMany: {}, ...services },
+          },
+        }),
+      );
+    } else {
+      operaciones.push(prisma.planTask.create({ data: { ...data, planId } }));
+    }
+  }
+
+  const sobran = existentes.filter((t) => !conservados.has(t.id)).map((t) => t.id);
+  if (sobran.length) {
+    operaciones.push(prisma.planTask.deleteMany({ where: { id: { in: sobran } } }));
+  }
+  if (cadencia.base != null) {
+    operaciones.push(
+      prisma.maintenancePlan.update({ where: { id: planId }, data: { intervalDays: cadencia.base } }),
+    );
+  }
+
+  await prisma.$transaction(operaciones);
+  return { ...cadencia, conservadas: conservados.size, creadas: nuevas.length - conservados.size, borradas: sobran.length };
 }
 
 type TareaConRecursos = {

@@ -14,20 +14,42 @@ import { Button, Card } from "@/components/ui";
  * cuenta el siguiente cuando uno se cierra tarde.
  */
 export function ConfiguracionOrdenes({
-  multiOrigen, horizonteDias, recalculo, editable,
+  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, editable,
 }: {
   multiOrigen: boolean;
   horizonteDias: number;
   /** CIERRE | PROGRAMADO. Desde donde se cuenta el siguiente preventivo. */
   recalculo: string;
+  /** Contar los intervalos en dias habiles en vez de corridos. */
+  diasHabiles: boolean;
+  /** Los dias laborables ya configurados, para poder nombrarlos aqui. */
+  jornadaDias: string;
   editable: boolean;
 }) {
   const router = useRouter();
   const [mezcla, setMezcla] = useState(multiOrigen);
   const [dias, setDias] = useState(String(horizonteDias));
   const [desde, setDesde] = useState(recalculo === "PROGRAMADO" ? "PROGRAMADO" : "CIERRE");
+  const [habiles, setHabiles] = useState(diasHabiles);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+
+  /**
+   * Los dias laborables en palabras, para no mandar al usuario a otra pestana
+   * a averiguar contra que se va a contar.
+   */
+  const NOMBRES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+  const numeros = jornadaDias
+    .split(",")
+    .map((d) => Number(d.trim()))
+    .filter((d) => d >= 1 && d <= 7)
+    .sort((a, b) => a - b);
+  const corrido = numeros.length > 1 && numeros.every((d, i) => i === 0 || d === numeros[i - 1] + 1);
+  const nombreDias = !numeros.length
+    ? ""
+    : corrido
+      ? `${NOMBRES[numeros[0] - 1]} a ${NOMBRES[numeros[numeros.length - 1] - 1]}`
+      : numeros.map((d) => NOMBRES[d - 1]).join(", ");
 
   async function guardar() {
     setGuardando(true);
@@ -39,6 +61,7 @@ export function ConfiguracionOrdenes({
         otMultiOrigen: mezcla,
         otHorizonteDias: Number(dias) || 0,
         recalculoPlan: desde,
+        otDiasHabiles: habiles,
       }),
     });
     setGuardando(false);
@@ -99,6 +122,37 @@ export function ConfiguracionOrdenes({
             En cero solo se ofrece lo que ya vencio. Adelantar de mas gasta el mantenimiento
             antes de tiempo, asi que conviene un plazo corto salvo que la planta pare pocas
             veces al ano.
+          </p>
+        </div>
+
+        <div>
+          <label className="label">Los intervalos en días se cuentan…</label>
+          <select
+            className="field"
+            value={habiles ? "HABILES" : "CORRIDOS"}
+            disabled={!editable}
+            onChange={(e) => setHabiles(e.target.value === "HABILES")}
+          >
+            <option value="CORRIDOS">En días corridos</option>
+            <option value="HABILES">En días hábiles</option>
+          </select>
+          <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+            Un cambio de aceite «cada 15 días» que se hizo el viernes 4 de septiembre.{" "}
+            <b>Corridos</b>, el siguiente cae el sábado 19. <b>Hábiles</b>, cae el martes 22:
+            se cuentan 15 días de trabajo, saltando los que su empresa no labora.
+            <br />
+            Cuente en hábiles si el mantenimiento va por desgaste —la máquina se gasta
+            operando, no en el almanaque—. Deje corridos si su programa está anclado al
+            calendario.
+            <br />
+            Los días laborables y los festivos salen de{" "}
+            <b>Jornada y calendario</b>, donde ya los tiene configurados
+            {nombreDias ? <> —hoy: <b>{nombreDias}</b>—</> : null}. Esto <b>solo</b> aplica a
+            intervalos en días: una actividad semanal, mensual o trimestral se cuenta siempre
+            por calendario.
+            <br />
+            Cambiarlo <b>no recalcula lo ya programado</b>: aplica a las fechas que se
+            calculen de aquí en adelante.
           </p>
         </div>
 

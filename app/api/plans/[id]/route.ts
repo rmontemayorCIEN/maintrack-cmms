@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { esquemaTarea, reemplazarTareas, validarRecursos } from "@/lib/plan-tasks";
+import { sembrarCalendarioDelPlan } from "@/lib/calendario-actividad";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -72,7 +73,13 @@ export async function PATCH(request: Request, { params }: Params) {
     // Se pasa la cadencia que quedo guardada —no la del formulario— porque
     // reemplazarTareas la puede bajar si alguna actividad no encaja, y de ahi
     // salen los multiplos que se persisten.
-    if (tasks) await reemplazarTareas(id, tasks, plan.intervalDays);
+    if (tasks) {
+      await reemplazarTareas(id, tasks, plan.intervalDays);
+      // Una actividad recien agregada no tiene reloj en ninguno de los equipos
+      // del plan. Sin esto no generaria nunca, y se veria igual que una que
+      // todavia no toca.
+      await sembrarCalendarioDelPlan(orgId, id);
+    }
 
     await logAudit({
       organizationId: orgId,

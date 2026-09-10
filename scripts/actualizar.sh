@@ -163,6 +163,15 @@ npx tsx scripts/prueba-frecuencia-actividad.ts >/dev/null 2>&1 \
   && echo "     Cada actividad sale en su propia frecuencia." \
   || { echo "     ERROR: la prueba de frecuencia por actividad fallo."; npx tsx scripts/prueba-frecuencia-actividad.ts; exit 1; }
 
+echo "  -> Calendario por actividad"
+npx tsx scripts/prueba-calendario.ts >/dev/null 2>&1 \
+  && echo "     ok" \
+  || { echo "     ERROR: la aritmetica de fechas fallo."; npx tsx scripts/prueba-calendario.ts; exit 1; }
+
+npx tsx scripts/prueba-calendario-actividad.ts >/dev/null 2>&1 \
+  && echo "     ok" \
+  || { echo "     ERROR: el calendario por actividad fallo."; npx tsx scripts/prueba-calendario-actividad.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

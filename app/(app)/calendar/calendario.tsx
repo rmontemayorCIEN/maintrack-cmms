@@ -24,6 +24,8 @@ type Dia = { fecha: string; habil: boolean; festivo: string | null; horas: numbe
 type Proyeccion = {
   id: string; title: string; asset: string; date: string;
   assetId: string | null; categoryId: string | null;
+  /** Que actividades lleva esa visita. Vacio en los planes por medidor. */
+  titulos: string[];
 };
 
 const mismoDia = (a: string, b: string) => a.slice(0, 10) === b.slice(0, 10);
@@ -520,11 +522,24 @@ function DetalleDia({
           </li>
         ))}
         {proyecciones.map((p) => (
-          <li key={p.id} className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-2.5 py-1.5 text-xs text-slate-500">
-            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">{p.title}</span>
-            <span className="shrink-0 text-slate-400">{p.asset}</span>
-            <span className="shrink-0 text-slate-400">proyectada</span>
+          <li key={p.id} className="rounded-lg border border-dashed border-slate-300 px-2.5 py-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{p.title}</span>
+              <span className="shrink-0 text-slate-400">{p.asset}</span>
+              <span className="shrink-0 text-slate-400">proyectada</span>
+            </div>
+            {/*
+              Que lleva esa visita. Con cada actividad en su propia fecha, dos
+              visitas del mismo plan pueden traer cosas distintas: una el
+              engrase y la otra el engrase mas el aceite. Enseñar solo el nombre
+              del plan las haria ver iguales.
+            */}
+            {p.titulos.length ? (
+              <p className="mt-0.5 pl-5 text-[0.6875rem] leading-relaxed text-slate-400">
+                {p.titulos.join(" · ")}
+              </p>
+            ) : null}
           </li>
         ))}
       </ul>
