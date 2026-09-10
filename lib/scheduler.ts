@@ -660,16 +660,56 @@ async function generarPorActividad(
     ocupadas.set(`${t.planTaskId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
   }
 
+  /**
+   * Las ordenes viejas, que no dicen de que actividad salio cada renglon.
+   *
+   * `WorkOrderTask.planTaskId` es reciente: al publicar esto habia 67
+   * actividades de origen PLAN en ordenes ABIERTAS sin ese vinculo. El candado
+   * por actividad no las ve, asi que el programador habria emitido una orden
+   * duplicada por cada una de esas ordenes —seis de golpe en una sola cuenta—
+   * y las dos se verian legitimas.
+   *
+   * Cuando una orden abierta trae trabajo de un plan que NO se puede
+   * identificar actividad por actividad, se da por cubierto el plan entero en
+   * ese equipo. Es de mas —puede retener una actividad que si tocaba— pero el
+   * error va del lado seguro: repetir un mantenimiento cuesta plata y confianza,
+   * posponerlo unos dias hasta que se cierre la orden abierta, no.
+   *
+   * Se drena solo: conforme esas ordenes se cierran, todo pasa al candado
+   * preciso. No hay que acordarse de quitarlo.
+   */
+  const sinVinculo = await prisma.workOrderTask.findMany({
+    where: {
+      workOrder: { organizationId, status: { in: [...ORDEN_ABIERTA] } },
+      liberadaAt: null,
+      origen: "PLAN",
+      planTaskId: null,
+    },
+    select: {
+      origenPlanId: true,
+      workOrder: { select: { assetId: true, number: true, planId: true } },
+    },
+  });
+  const planesCubiertos = new Map<string, string>();
+  for (const t of sinVinculo) {
+    const planId = t.origenPlanId ?? t.workOrder.planId;
+    if (!planId) continue;
+    planesCubiertos.set(`${planId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
+  }
+
   // Agrupadas por equipo y plan. No se mezclan planes en una sola orden: el
   // encabezado lleva UN planId y 23 de 24 asignaciones reales son un equipo
   // con un solo plan, asi que mezclar complicaria el caso raro para nadie.
   const grupos = new Map<string, typeof pendientes>();
   for (const a of pendientes) {
-    if (ocupadas.has(`${a.planTaskId}:${a.assetId}`)) {
+    const enOrden =
+      ocupadas.get(`${a.planTaskId}:${a.assetId}`) ??
+      planesCubiertos.get(`${a.planId}:${a.assetId}`);
+    if (enOrden) {
       result.skipped += 1;
       result.details.push({
         plan: a.planNombre,
-        reason: `${a.assetCode} · ${a.titulo}: ya está en ${ocupadas.get(`${a.planTaskId}:${a.assetId}`)}`,
+        reason: `${a.assetCode} · ${a.titulo}: ya está en ${enOrden}`,
       });
       continue;
     }

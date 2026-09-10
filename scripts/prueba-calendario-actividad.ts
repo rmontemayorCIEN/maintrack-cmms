@@ -233,6 +233,50 @@ async function main() {
     );
   }
 
+  console.log("\nUna orden VIEJA, sin el vínculo a la actividad, también cuenta");
+  // El caso real: `WorkOrderTask.planTaskId` es reciente. Al publicar el
+  // calendario por actividad habia 67 actividades de origen PLAN en ordenes
+  // ABIERTAS sin ese vinculo. Si el candado solo mirara planTaskId, cada una de
+  // esas ordenes habria recibido una duplicada en el siguiente barrido —seis de
+  // golpe en una sola cuenta de cliente— y las dos se verian legitimas.
+  const tercero = await prisma.asset.create({
+    data: { organizationId: org.id, siteId: sitio.id, code: "MON-902", name: "Montacargas 902", status: "OPERATIONAL" },
+  });
+  await asignarPlan({
+    organizationId: org.id, planId, userId: gestor.id,
+    equipos: [{ assetId: tercero.id, desde: HOY, desdeEsUltima: false }],
+  });
+  // Una orden abierta como las de antes: origen PLAN, pero sin planTaskId.
+  const vieja = await prisma.workOrder.create({
+    data: {
+      organizationId: org.id, number: `OT-VIEJA-${Date.now()}`, title: "Orden anterior al vínculo",
+      maintenanceType: "PREVENTIVE", status: "OPEN", priority: "MEDIUM",
+      assetId: tercero.id, planId,
+      tasks: {
+        create: [{ position: 0, title: "Engrase de cadenas", origen: "PLAN", origenPlanId: planId }],
+      },
+    },
+  });
+  const antesDeBarrer = await prisma.workOrder.count({ where: { organizationId: org.id, assetId: tercero.id } });
+  await generateScheduledWorkOrders(org.id, { userId: gestor.id });
+  const despuesDeBarrer = await prisma.workOrder.count({ where: { organizationId: org.id, assetId: tercero.id } });
+  revisar(
+    "no se duplica: la orden vieja cubre su plan aunque no diga qué actividad trae",
+    despuesDeBarrer === antesDeBarrer,
+    `${antesDeBarrer} → ${despuesDeBarrer} órdenes`,
+  );
+  // Y al cerrarse esa orden, el candado preciso vuelve a mandar.
+  await prisma.workOrder.update({ where: { id: vieja.id }, data: { status: "CANCELLED" } });
+  await generateScheduledWorkOrders(org.id, { userId: gestor.id });
+  const yaCerrada = await prisma.workOrder.count({
+    where: { organizationId: org.id, assetId: tercero.id, status: { not: "CANCELLED" } },
+  });
+  revisar(
+    "y cuando esa orden se cierra, el trabajo vuelve a ofrecerse",
+    yaCerrada >= 1,
+    `${yaCerrada} órdenes vivas`,
+  );
+
   console.log("\nUn equipo dado de baja no genera nada");
   await prisma.asset.update({ where: { id: otro.id }, data: { status: "RETIRED" } });
   const pendientesBaja = await actividadesPendientes(org.id, { assetId: otro.id, hasta: addDays(HOY, 400) });
