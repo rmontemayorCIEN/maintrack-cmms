@@ -15,7 +15,8 @@
  *   npx tsx scripts/prueba-frecuencia-actividad.ts
  */
 import { prisma } from "../lib/db";
-import { generateScheduledWorkOrders } from "../lib/scheduler";
+import { generateScheduledWorkOrders, forecastSchedule } from "../lib/scheduler";
+import { trabajoDisponible } from "../lib/armar-ot";
 import { derivarCadencia, tocanEn, diasDe, resolverCadenciaDelPlan } from "../lib/frecuencias";
 
 let fallos = 0;
@@ -146,6 +147,31 @@ async function main() {
   revisar("ciclo 3: 3 h (aceite + filtro)", ciclos[2].horas === 3, `${ciclos[2].horas} h`);
   revisar("ciclo 6: 7 h (aceite + filtro + frenos con 2 personas)",
     ciclos[5].horas === 7, `${ciclos[5].horas} h`);
+
+  console.log("\nArmar una orden a mano ofrece solo lo que toca");
+  // La asignacion va en la ejecucion 6; la siguiente es la 7, donde solo toca
+  // el aceite (cada 1). Ofrecer las tres invitaria a cambiar el aceite de mas
+  // y a desalinear el calendario del resto.
+  const antes = await prisma.planAsset.findFirst({
+    where: { organizationId: org.id, planId: plan.id }, select: { ejecuciones: true },
+  });
+  const ofrece = await trabajoDisponible(org.id, torno.id);
+  const delPlan = ofrece.planes.find((x) => x.planId === plan.id);
+  revisar("ofrece solo la actividad que toca en la próxima ejecución",
+    delPlan?.actividades.map((a) => a.title).join(",") === "Cambio de aceite",
+    delPlan?.actividades.map((a) => a.title).join(",") ?? "(no ofreció el plan)");
+  revisar("y el contador va en 6, así que la próxima es la 7",
+    antes?.ejecuciones === 6, `ejecuciones: ${antes?.ejecuciones}`);
+
+  console.log("\nLa proyección no promete visitas vacías");
+  const proy = await forecastSchedule(org.id, 120);
+  revisar("cada visita proyectada lleva al menos una actividad",
+    proy.length > 0 && proy.every((e) => e.actividades > 0),
+    `${proy.length} visitas proyectadas`);
+  const delTorno = proy.filter((e) => e.planId === plan.id);
+  revisar("y el número de actividades varía entre visitas",
+    new Set(delTorno.map((e) => e.actividades)).size > 1,
+    delTorno.map((e) => e.actividades).join(","));
 
   console.log("\nEl caso viejo sigue igual");
   const plano = await prisma.maintenancePlan.create({

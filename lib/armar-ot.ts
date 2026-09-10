@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
+import { tocanEn } from "@/lib/frecuencias";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { tipoDeTrabajo } from "@/lib/tipos-solicitud";
@@ -46,6 +47,7 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
       },
       select: {
         id: true, nextDueDate: true, nextDueMeter: true, lastCompletedAt: true,
+        ejecuciones: true,
         plan: {
           select: {
             id: true, name: true, maintenanceType: true, estimatedHours: true,
@@ -54,6 +56,7 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
               select: {
                 id: true, position: true, title: true, description: true,
                 taskType: true, unit: true, minValue: true, maxValue: true, required: true,
+                cadaCuantas: true,
               },
             },
           },
@@ -95,7 +98,19 @@ export async function trabajoDisponible(organizationId: string, assetId: string)
         diasParaVencer: a.nextDueDate
           ? Math.round((a.nextDueDate.getTime() - hoy.getTime()) / 86_400_000)
           : null,
-        actividades: a.plan.tasks,
+        /**
+         * Solo las actividades que TOCAN en la proxima ejecucion.
+         *
+         * Ofrecer las cinco de un plan cuando en esta visita van tres es
+         * invitar a que alguien las meta todas: se cambia el aceite de mas y
+         * el calendario del resto se desalinea sin que nadie lo note. La misma
+         * regla que usa el programador, en el mismo lugar —lib/frecuencias—.
+         *
+         * Un plan sin frecuencias declaradas trae todas sus actividades en
+         * `cadaCuantas: 1`, asi que esto no cambia nada para el caso de
+         * siempre.
+         */
+        actividades: tocanEn(a.plan.tasks, a.ejecuciones + 1),
       })),
     reportes,
     backlog: pendientes.map((t) => ({
@@ -314,9 +329,17 @@ export async function armarOrden(p: {
     });
   }
 
+  /**
+   * Armar una orden a mano TAMBIEN es una ejecucion del plan.
+   *
+   * Sin avanzar el contador, la siguiente vez se ofrecerian las mismas
+   * actividades para siempre —el mensual saldria cada vez y el semestral
+   * nunca— y ademas el programador automatico quedaria desalineado con lo que
+   * de verdad se hizo. Es la misma cuenta y tiene que llevarla el mismo lugar.
+   */
   await prisma.planAsset.updateMany({
     where: { id: { in: asignaciones.map((a) => a.id) } },
-    data: { lastGeneratedAt: new Date() },
+    data: { lastGeneratedAt: new Date(), ejecuciones: { increment: 1 } },
   });
 
   await logAudit({

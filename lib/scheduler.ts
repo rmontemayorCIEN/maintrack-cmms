@@ -347,7 +347,14 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     // dados de baja, y esa cifra se usa para planear carga de personal.
     where: { organizationId, active: true, plan: { active: true }, asset: EQUIPO_EN_SERVICIO },
     include: {
-      plan: { select: { id: true, name: true, priority: true, maintenanceType: true, triggerType: true, intervalDays: true, intervalMeter: true, createdAt: true } },
+      plan: {
+        select: {
+          id: true, name: true, priority: true, maintenanceType: true, triggerType: true,
+          intervalDays: true, intervalMeter: true, createdAt: true,
+          // Para saber que visitas van a llevar algo y cuales no.
+          tasks: { select: { cadaCuantas: true } },
+        },
+      },
       asset: { select: { id: true, name: true, code: true, categoryId: true } },
       meter: true,
     },
@@ -364,6 +371,7 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     nextDueDate: a.nextDueDate,
     nextDueMeter: a.nextDueMeter,
     lastCompletedAt: a.lastCompletedAt,
+    ejecuciones: a.ejecuciones,
   }));
 
   const horizon = addDays(new Date(), days);
@@ -378,6 +386,8 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     date: string;
     priority: string;
     type: string;
+    /** Cuantas actividades lleva ESA visita. Con frecuencias distintas, varia. */
+    actividades: number;
     projected: true;
   }> = [];
 
@@ -385,8 +395,28 @@ export async function forecastSchedule(organizationId: string, days = 60) {
     let due = resolveDueDate(plan);
     if (!due) continue;
     let guard = 0;
+    /**
+     * El contador avanza junto con la proyeccion.
+     *
+     * Sin esto el calendario mostraria una visita cada ciclo aunque no toque
+     * ninguna actividad —pasa cuando las frecuencias no son multiplos entre
+     * si— y estaria enseñando trabajo que nunca va a ocurrir. El programador
+     * salta esos ciclos; la proyeccion tiene que saltarlos igual o las dos
+     * dicen cosas distintas sobre lo mismo.
+     */
+    let n = plan.ejecuciones;
     while (due <= horizon && guard < 40) {
+      n += 1;
+      const tocan = tocanEn(plan.tasks, n);
+      if (!tocan.length) {
+        guard += 1;
+        const siguiente = avanzar(plan, due);
+        if (!siguiente) break;
+        due = siguiente;
+        continue;
+      }
       events.push({
+        actividades: tocan.length,
         id: `${plan.id}-${due.toISOString()}`,
         planId: plan.planId,
         title: plan.name,
@@ -398,12 +428,9 @@ export async function forecastSchedule(organizationId: string, days = 60) {
         type: plan.maintenanceType,
         projected: true,
       });
-      if (plan.triggerType === "CALENDAR" && plan.intervalDays) {
-        due = addDays(due, plan.intervalDays);
-      } else if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter) {
-        const rate = plan.meter.dailyAverage > 0 ? plan.meter.dailyAverage : 1;
-        due = addDays(due, Math.ceil(plan.intervalMeter / rate));
-      } else break;
+      const siguiente = avanzar(plan, due);
+      if (!siguiente) break;
+      due = siguiente;
       guard += 1;
     }
   }
@@ -449,4 +476,28 @@ function horasDe(
     0,
   );
   return suma > 0 ? suma : estimadoDelPlan;
+}
+
+/**
+ * La fecha del siguiente ciclo. Un solo lugar porque la usan el ciclo normal
+ * y el vacio: si se escribieran aparte, un dia dejarian de coincidir y la
+ * proyeccion se desplazaria justo en los planes con frecuencias mezcladas.
+ */
+function avanzar(
+  plan: {
+    triggerType: string;
+    intervalDays: number | null;
+    intervalMeter: number | null;
+    meter?: { dailyAverage: number } | null;
+  },
+  desde: Date,
+): Date | null {
+  if (plan.triggerType === "CALENDAR" && plan.intervalDays) {
+    return addDays(desde, plan.intervalDays);
+  }
+  if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter) {
+    const rate = plan.meter.dailyAverage > 0 ? plan.meter.dailyAverage : 1;
+    return addDays(desde, Math.ceil(plan.intervalMeter / rate));
+  }
+  return null;
 }
