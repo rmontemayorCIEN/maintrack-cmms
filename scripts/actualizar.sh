@@ -157,6 +157,12 @@ npx tsx scripts/prueba-solicitud-sin-equipo.ts >/dev/null 2>&1 \
   && echo "     Las solicitudes sin equipo se pueden asignar al revisar." \
   || { echo "     ERROR: la prueba de solicitudes sin equipo fallo."; npx tsx scripts/prueba-solicitud-sin-equipo.ts; exit 1; }
 
+# Cada actividad con su frecuencia. Si esto se rompe, el aceite se cambia de
+# mas o el filtro de menos, y no avisa: la orden se ve normal.
+npx tsx scripts/prueba-frecuencia-actividad.ts >/dev/null 2>&1 \
+  && echo "     Cada actividad sale en su propia frecuencia." \
+  || { echo "     ERROR: la prueba de frecuencia por actividad fallo."; npx tsx scripts/prueba-frecuencia-actividad.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

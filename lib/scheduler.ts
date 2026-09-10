@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
+import { tocanEn } from "./frecuencias";
 import { addDays, startOfDay } from "./utils";
 import { logAudit, notify } from "./audit";
 import { esHabil, jornada } from "./agenda";
@@ -78,7 +79,12 @@ export async function generateScheduledWorkOrders(
       asset: EQUIPO_EN_SERVICIO,
     },
     include: {
-      plan: { include: { tasks: { orderBy: { position: "asc" } } } },
+      // La mano de obra viene por actividad: con frecuencias distintas, el
+      // estimado de la orden es la suma de LO QUE ENTRA, no el del servicio
+      // completo. Sin esto, un ciclo ligero se proyecta con las horas de uno
+      // pesado y la carga del personal sale inflada —y esa cifra decide si
+      // contratar—.
+      plan: { include: { tasks: { orderBy: { position: "asc" }, include: { labor: true } } } },
       asset: true,
       meter: true,
     },
@@ -141,6 +147,40 @@ export async function generateScheduledWorkOrders(
       continue;
     }
 
+    /**
+     * Que actividades entran en ESTA ejecucion.
+     *
+     * No todas van cada vez: el aceite cada mes y el liquido de frenos cada
+     * seis. La actividad toca cuando el numero de ejecucion es multiplo de su
+     * `cadaCuantas`, y por eso el anidamiento sale gratis —en la sexta entran
+     * las de cada 1, cada 2, cada 3 y cada 6, en una sola orden y una sola
+     * visita—.
+     *
+     * Con `cadaCuantas` en 1 —el valor por omision— entran todas siempre, que
+     * es el comportamiento de toda la vida.
+     */
+    const nEjecucion = asignacion.ejecuciones + 1;
+    const actividades = tocanEn(plan.tasks, nEjecucion);
+
+    /**
+     * Un ciclo donde no toca nada NO genera orden.
+     *
+     * Pasa cuando las frecuencias no son multiplos entre si: con actividades
+     * cada 45 y cada 30 dias la base es 15, y hay ciclos vacios. Emitir una
+     * orden sin actividades es exactamente la clase de basura que hace que la
+     * gente deje de mirar la bandeja. Se avanza el calendario y el contador, y
+     * ya.
+     */
+    if (!actividades.length) {
+      await prisma.planAsset.update({
+        where: { id: asignacion.id },
+        data: { ejecuciones: nEjecucion, nextDueDate: due },
+      });
+      result.skipped += 1;
+      result.details.push({ plan: plan.name, reason: "ninguna actividad toca en este ciclo" });
+      continue;
+    }
+
     if (options.dryRun) {
       result.generated += 1;
       result.details.push({ plan: plan.name, workOrder: "(simulacion)" });
@@ -166,13 +206,13 @@ export async function generateScheduledWorkOrders(
         createdById: options.userId ?? null,
         dueDate: due,
         scheduledStart: triggerDate,
-        estimatedHours: plan.estimatedHours,
+        estimatedHours: horasDe(actividades, plan.estimatedHours),
         requiresShutdown: plan.requiresShutdown,
         procedure: plan.procedure,
         safetyNotes: plan.safetyNotes,
         meterValue: plan.meter?.currentValue ?? null,
         tasks: {
-          create: plan.tasks.map((task) => ({
+          create: actividades.map((task) => ({
             position: task.position,
             title: task.title,
             description: task.description,
@@ -197,7 +237,7 @@ export async function generateScheduledWorkOrders(
     // cada uno lleva su propio avance.
     await prisma.planAsset.update({
       where: { id: asignacion.id },
-      data: { lastGeneratedAt: new Date(), nextDueDate: due },
+      data: { lastGeneratedAt: new Date(), nextDueDate: due, ejecuciones: nEjecucion },
     });
 
     await logAudit({
@@ -390,4 +430,23 @@ export function siguienteHabil(fecha: Date | null, j: Parameters<typeof esHabil>
     d.setDate(d.getDate() + 1);
   }
   return fecha;
+}
+
+/**
+ * Las horas estimadas de lo que de verdad entra en la orden.
+ *
+ * Si las actividades declaran su mano de obra, se suman —personas por horas—.
+ * Si ninguna la declara, se cae al estimado del plan: es lo que habia antes y
+ * sigue siendo mejor que cero. La mezcla se evita a proposito; sumar lo
+ * declarado y ademas el estimado del plan contaria dos veces.
+ */
+function horasDe(
+  actividades: Array<{ labor?: Array<{ personas: number; hours: number }> }>,
+  estimadoDelPlan: number,
+): number {
+  const suma = actividades.reduce(
+    (t, a) => t + (a.labor ?? []).reduce((h, l) => h + l.personas * l.hours, 0),
+    0,
+  );
+  return suma > 0 ? suma : estimadoDelPlan;
 }

@@ -617,6 +617,26 @@ model PlanTask {
   title       String
   description String?
   taskType    String  @default("CHECK") // CHECK | MEASURE | TEXT | REPLACE
+
+  /// Cada cuantas ejecuciones del plan toca esta actividad.
+  ///
+  /// La frecuencia vive AQUI y no solo en el plan porque no es la misma para
+  /// todo: el aceite se cambia cada mes y el liquido de frenos cada seis. Con
+  /// la frecuencia unica del plan, o se cambia el aceite de mas o el filtro de
+  /// menos, y no avisa.
+  ///
+  /// Se midio antes de decidirlo: de 24 asignaciones en produccion, 23 son un
+  /// equipo con UN solo plan. El diseño pedia partir en varios planes cuando
+  /// las frecuencias difieren, y nadie lo hacia. Un diseño que exige algo que
+  /// nadie hace no es un diseño.
+  ///
+  /// Es un MULTIPLO de la cadencia base del plan, no dias. Asi el anidamiento
+  /// sale gratis: en la ejecucion 6 entran las de cada 1, cada 2, cada 3 y
+  /// cada 6 —una sola visita, una sola orden— que es justo lo que ningun
+  /// arreglo con varios planes puede dar sin logica de mezcla.
+  ///
+  /// En 1 el comportamiento es identico al de siempre: sale en cada ejecucion.
+  cadaCuantas Int     @default(1)
   unit        String?
   minValue    Float?
   maxValue    Float?
@@ -2181,6 +2201,14 @@ model PlanAsset {
   nextDueMeter    Float?
   lastGeneratedAt DateTime?
   lastCompletedAt DateTime?
+
+  /// Cuantas veces se ha generado este plan para ESTE equipo.
+  ///
+  /// Es el contador que decide que actividades entran: toca la actividad
+  /// cuando (ejecuciones + 1) es multiplo de su `cadaCuantas`. Vive en la
+  /// asignacion y no en el plan porque diez compresores iguales van cada uno
+  /// por su cuenta: uno se instalo en marzo y otro en agosto.
+  ejecuciones Int @default(0)
 
   /// Se puede pausar un equipo sin desactivar el plan de los demas.
   active Boolean @default(true)
