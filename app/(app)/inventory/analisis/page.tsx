@@ -92,7 +92,10 @@ export default async function AnalisisAlmacenPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4">
+      {/* `grid-cols-[minmax(0,1fr)]`: una columna implicita se mide por el
+          contenido, asi que las tablas de aqui abajo inflaban la pista y sacaban
+          de lado la pantalla en el telefono. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
         {a.faltantesDePlan.length ? (
           <Card padded={false}>
             <div className="border-b border-slate-200 px-5 py-4">

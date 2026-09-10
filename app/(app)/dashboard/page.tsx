@@ -251,7 +251,11 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      {/* `grid-cols-[minmax(0,1fr)]`: en el telefono esta rejilla es de una sola
+          columna, y una columna implicita se mide por el contenido. Con la tabla
+          de abajo adentro, la pista crecia a 620 px y sacaba de lado a toda la
+          pantalla. Ver components/tabla-configurable.tsx. */}
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2" padded={false}>
           <div className="flex items-center justify-between px-5 py-4">
             <div>
