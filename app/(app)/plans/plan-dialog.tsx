@@ -2,6 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { describirIntervalo, diasAproximados } from "@/lib/calendario";
+
+/**
+ * Las columnas del renglon de actividad.
+ *
+ * Vive en una constante porque la usan el ENCABEZADO y cada renglon: si se
+ * escribieran por separado, cambiar un ancho en uno y no en el otro dejaria
+ * los titulos apuntando a la columna equivocada, y eso se ve bien hasta que
+ * alguien captura un dato en el campo que no era.
+ */
+const REJILLA_ACTIVIDAD = "grid gap-2 md:grid-cols-[1fr_130px_164px_96px_80px_80px_32px]";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Button, BotonEditar } from "@/components/ui";
@@ -328,7 +338,7 @@ export function PlanDialog({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-4 text-left">
-      <form onSubmit={submit} className="mx-auto my-6 w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl">
+      <form onSubmit={submit} className="mx-auto my-6 w-full max-w-6xl rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h3 className="text-base font-semibold text-slate-900">
@@ -543,28 +553,73 @@ export function PlanDialog({
                 </div>
               ) : null}
 
+              {/*
+                Los encabezados de las columnas.
+                
+                Sin ellos, quien captura ve siete cajas seguidas sin saber que
+                va en cada una: los marcadores de posicion desaparecen en cuanto
+                se escribe algo, y dos de los controles —el tipo y la unidad de
+                la frecuencia— son <select> y nunca tuvieron marcador.
+                
+                Solo de `md` para arriba, que es donde la rejilla es de columnas.
+                Abajo de ese corte los campos se apilan y cada uno lleva su
+                propia etiqueta, porque un encabezado a siete columnas no tiene
+                nada con que alinearse.
+              */}
+              {tasks.length ? (
+                <div className={`hidden ${REJILLA_ACTIVIDAD} px-2 md:grid`}>
+                  {[
+                    ["Actividad", "Qué hay que hacer"],
+                    ["Tipo", "Verificación, medición, texto libre o reemplazo"],
+                    ["Frecuencia", "Cada cuánto toca. En blanco, la del plan"],
+                    ["Unidad", "En qué se mide, cuando es una medición"],
+                    ["Mínimo", "Valor aceptable más bajo"],
+                    ["Máximo", "Valor aceptable más alto"],
+                  ].map(([texto, ayuda]) => (
+                    <span
+                      key={texto}
+                      title={ayuda}
+                      className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-500"
+                    >
+                      {texto}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
               {tasks.map((task, index) => {
                 const recursos = task.labor.length + task.parts.length + task.services.length;
                 const desplegada = abierta === index;
                 return (
                   <div key={index} className="rounded-lg border border-slate-200 p-2">
-                    <div className="grid gap-2 md:grid-cols-[1fr_130px_92px_80px_80px_80px_32px]">
+                    <div className={REJILLA_ACTIVIDAD}>
                       <input
                         className="field"
-                        placeholder="Descripción de la actividad"
+                        placeholder="Descripción de la actividad" aria-label="Descripción de la actividad"
                         value={task.title}
                         onChange={(e) => cambiarTarea(index, { title: e.target.value })}
                       />
-                      <select
-                        className="field"
-                        value={task.taskType}
-                        onChange={(e) => cambiarTarea(index, { taskType: e.target.value })}
-                      >
-                        <option value="CHECK">Verificación</option>
-                        <option value="MEASURE">Medición</option>
-                        <option value="TEXT">Texto</option>
-                        <option value="REPLACE">Reemplazo</option>
-                      </select>
+                      {/*
+                        Abajo de `md` los campos se apilan y el encabezado no
+                        aplica, asi que los dos <select> —que nunca tuvieron
+                        marcador de posicion— llevan su etiqueta aqui. Los demas
+                        controles se sostienen con su marcador.
+                      */}
+                      <label className="grid gap-0.5">
+                        <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-500 md:hidden">
+                          Tipo
+                        </span>
+                        <select
+                          className="field"
+                          value={task.taskType}
+                          onChange={(e) => cambiarTarea(index, { taskType: e.target.value })}
+                        >
+                          <option value="CHECK">Verificación</option>
+                          <option value="MEASURE">Medición</option>
+                          <option value="TEXT">Texto</option>
+                          <option value="REPLACE">Reemplazo</option>
+                        </select>
+                      </label>
                       {/*
                         Cada cuanto y EN QUE, no cada cuantas ejecuciones: nadie
                         piensa en multiplos, y "mensual" no es lo mismo que
@@ -581,9 +636,14 @@ export function PlanDialog({
                         control se estira. Es la misma trampa que ya tienen
                         documentada `.field.compacto` y `.field.con-icono`.
                       */}
-                      <div className="flex gap-1">
+                      <div className="grid gap-0.5">
+                        <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-500 md:hidden">
+                          Frecuencia
+                        </span>
+                        <div className="flex gap-1">
                         <input
                           className="field min-w-0 flex-1"
+                          aria-label="Cada cuánto se hace esta actividad"
                           placeholder={form.triggerType === "CALENDAR" ? `${form.intervalDays || "?"}` : "cada"}
                           title="Cada cuánto se hace esta actividad. Vacío: la frecuencia del plan."
                           inputMode="numeric"
@@ -602,19 +662,20 @@ export function PlanDialog({
                             <option value="MESES">meses</option>
                           </select>
                         </span>
+                        </div>
                       </div>
                       <input
-                        className="field" placeholder="Unidad"
+                        className="field" placeholder="Unidad" aria-label="Unidad de medida"
                         value={task.unit ?? ""}
                         onChange={(e) => cambiarTarea(index, { unit: e.target.value })}
                       />
                       <input
-                        className="field" placeholder="Min"
+                        className="field" placeholder="Mín" aria-label="Valor mínimo aceptable"
                         value={task.minValue ?? ""}
                         onChange={(e) => cambiarTarea(index, { minValue: e.target.value })}
                       />
                       <input
-                        className="field" placeholder="Max"
+                        className="field" placeholder="Máx" aria-label="Valor máximo aceptable"
                         value={task.maxValue ?? ""}
                         onChange={(e) => cambiarTarea(index, { maxValue: e.target.value })}
                       />
