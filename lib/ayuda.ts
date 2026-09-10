@@ -1134,6 +1134,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [
+      { nombre: "Cuando un preventivo se cierra tarde", explica: "Decide desde dónde se cuenta el siguiente. «Desde que se hizo» sirve cuando importa cuánto lleva operando el equipo —engrasado, cambios de aceite—; «desde la fecha en que tocaba» mantiene el calendario fijo, que es lo que necesita quien reporta cumplimiento contra un programa anual. En los dos casos no se salta ninguna actividad: cerrar tarde mueve la fecha, nunca se brinca el ciclo." },
+
       {
         nombre: "Avisos · Esta empresa manda avisos",
         explica:

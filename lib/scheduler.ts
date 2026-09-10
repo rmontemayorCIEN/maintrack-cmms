@@ -321,10 +321,41 @@ export async function rollForwardPlan(
     : null;
   if (!asignacion) return;
 
+  /**
+   * Desde donde se cuenta el siguiente: lo decide la organizacion.
+   *
+   * CIERRE —lo de siempre— cuenta desde que se hizo de verdad. Correcto para
+   * trabajo por desgaste: si el engrasado tocaba el 1 y se hizo el 15, el
+   * siguiente es 30 dias despues del 15.
+   *
+   * PROGRAMADO cuenta desde la fecha en que TOCABA, asi que el calendario no
+   * se desplaza. Correcto para trabajo anclado al calendario y para quien
+   * reporta cumplimiento contra un programa anual.
+   *
+   * Ninguno de los dos salta actividades: el contador de ejecuciones avanza de
+   * uno en uno, asi que un cierre tardio mueve la fecha pero nunca se brinca
+   * el ciclo que tocaba.
+   */
+  const org = await prisma.organization.findUnique({
+    where: { id: asignacion.organizationId },
+    select: { recalculoPlan: true },
+  });
+  const desdeProgramado = org?.recalculoPlan === "PROGRAMADO";
+
   const data: Record<string, unknown> = { lastCompletedAt: completedAt };
 
   if (plan.triggerType === "CALENDAR" && plan.intervalDays) {
-    data.nextDueDate = addDays(completedAt, plan.intervalDays);
+    const ancla = desdeProgramado ? (asignacion.nextDueDate ?? completedAt) : completedAt;
+    let siguiente = addDays(ancla, plan.intervalDays);
+    // Con PROGRAMADO y un cierre muy tardio la siguiente fecha puede quedar en
+    // el pasado. Se adelanta hasta la primera que no ha ocurrido, en vez de
+    // dejar un vencimiento que nace vencido y dispara una orden de inmediato.
+    let guarda = 0;
+    while (desdeProgramado && siguiente <= completedAt && guarda < 400) {
+      siguiente = addDays(siguiente, plan.intervalDays);
+      guarda += 1;
+    }
+    data.nextDueDate = siguiente;
   }
   if (plan.triggerType === "METER" && plan.intervalMeter) {
     const base = meterValue ?? asignacion.meter?.currentValue ?? 0;

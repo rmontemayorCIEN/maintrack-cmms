@@ -15,7 +15,7 @@
  *   npx tsx scripts/prueba-frecuencia-actividad.ts
  */
 import { prisma } from "../lib/db";
-import { generateScheduledWorkOrders, forecastSchedule } from "../lib/scheduler";
+import { generateScheduledWorkOrders, forecastSchedule, rollForwardPlan } from "../lib/scheduler";
 import { trabajoDisponible } from "../lib/armar-ot";
 import { derivarCadencia, tocanEn, diasDe, resolverCadenciaDelPlan } from "../lib/frecuencias";
 
@@ -218,6 +218,59 @@ async function main() {
   revisar("el ciclo vacío NO generó orden", delRaro === 0, `${delRaro} órdenes`);
   revisar("pero el contador sí avanzó, o se atoraría para siempre",
     asigRara?.ejecuciones === 1, `ejecuciones: ${asigRara?.ejecuciones}`);
+
+  console.log("\nCerrar tarde: desde el cierre o desde lo programado");
+  // Tocaba hace 20 dias y se cierra hoy. Plan de 30 dias.
+  const tocaba = new Date(Date.now() - 20 * 86_400_000);
+  const planTarde = await prisma.maintenancePlan.create({
+    data: {
+      organizationId: org.id, name: "Inspección mensual", triggerType: "CALENDAR",
+      intervalDays: 30, active: true, estimatedHours: 1,
+      tasks: { create: [{ position: 1, title: "Revisar" }] },
+    },
+  });
+  const conAsignacion = async () => {
+    await prisma.planAsset.deleteMany({ where: { planId: planTarde.id } });
+    return prisma.planAsset.create({
+      data: { organizationId: org.id, planId: planTarde.id, assetId: torno.id, nextDueDate: tocaba, active: true },
+    });
+  };
+  const diasDesdeHoy = (d: Date | null) =>
+    d ? Math.round((d.getTime() - Date.now()) / 86_400_000) : null;
+
+  await prisma.organization.update({ where: { id: org.id }, data: { recalculoPlan: "CIERRE" } });
+  await conAsignacion();
+  await rollForwardPlan(planTarde.id, new Date(), null, torno.id);
+  const aCierre = await prisma.planAsset.findFirst({
+    where: { planId: planTarde.id }, select: { nextDueDate: true },
+  });
+  revisar("desde el CIERRE: el siguiente cae en 30 días, contados desde hoy",
+    diasDesdeHoy(aCierre?.nextDueDate ?? null) === 30, `en ${diasDesdeHoy(aCierre?.nextDueDate ?? null)} días`);
+
+  await prisma.organization.update({ where: { id: org.id }, data: { recalculoPlan: "PROGRAMADO" } });
+  await conAsignacion();
+  await rollForwardPlan(planTarde.id, new Date(), null, torno.id);
+  const aProgramado = await prisma.planAsset.findFirst({
+    where: { planId: planTarde.id }, select: { nextDueDate: true },
+  });
+  revisar("desde lo PROGRAMADO: cae en 10 días —el calendario no se recorre—",
+    diasDesdeHoy(aProgramado?.nextDueDate ?? null) === 10,
+    `en ${diasDesdeHoy(aProgramado?.nextDueDate ?? null)} días`);
+
+  // Un cierre MUY tardio no puede dejar una fecha ya vencida.
+  await prisma.planAsset.deleteMany({ where: { planId: planTarde.id } });
+  await prisma.planAsset.create({
+    data: { organizationId: org.id, planId: planTarde.id, assetId: torno.id,
+      nextDueDate: new Date(Date.now() - 200 * 86_400_000), active: true },
+  });
+  await rollForwardPlan(planTarde.id, new Date(), null, torno.id);
+  const muyTarde = await prisma.planAsset.findFirst({
+    where: { planId: planTarde.id }, select: { nextDueDate: true },
+  });
+  revisar("y un cierre muy tardío NO deja un vencimiento que nace vencido",
+    (diasDesdeHoy(muyTarde?.nextDueDate ?? null) ?? -1) > 0,
+    `en ${diasDesdeHoy(muyTarde?.nextDueDate ?? null)} días`);
+  await prisma.organization.update({ where: { id: org.id }, data: { recalculoPlan: "CIERRE" } });
 
   await prisma.workOrderTask.deleteMany({ where: { workOrder: { organizationId: org.id } } });
   await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

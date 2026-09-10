@@ -86,6 +86,23 @@ model Organization {
   /// sumar a una OT. Determina que tan lejos puede adelantarse trabajo.
   otHorizonteDias Int     @default(15)
 
+  /// Desde donde se cuenta el siguiente preventivo: CIERRE | PROGRAMADO.
+  ///
+  /// CIERRE —lo de siempre— cuenta desde que se hizo de verdad. Si el
+  /// engrasado tocaba el 1 y se hizo el 15, el siguiente es 30 dias despues
+  /// del 15. Es lo correcto para trabajo por desgaste: lo que importa es
+  /// cuanto lleva operando desde la ultima vez.
+  ///
+  /// PROGRAMADO cuenta desde la fecha en que TOCABA. El calendario no se
+  /// desplaza: la inspeccion mensual sigue cayendo el dia 1 aunque un mes se
+  /// haya hecho tarde. Es lo correcto para trabajo anclado al calendario, y
+  /// para quien reporta cumplimiento contra un programa anual.
+  ///
+  /// Ninguno de los dos salta actividades: el contador de ejecuciones avanza
+  /// de uno en uno, asi que un cierre tardio mueve la fecha pero nunca se
+  /// brinca el ciclo que tocaba.
+  recalculoPlan String @default("CIERRE")
+
   /// ─── Lo que la empresa hace, en sus propias palabras ───────────────────
   ///
   /// El giro y el tipo de instalacion dicen la CATEGORIA: "planta

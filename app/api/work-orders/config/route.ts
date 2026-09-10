@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   otMultiOrigen: z.boolean().optional(),
+  recalculoPlan: z.enum(["CIERRE", "PROGRAMADO"]).optional(),
   /**
    * Tope alto a proposito: adelantar un preventivo que vence en tres meses casi
    * nunca conviene —se gasta el mantenimiento antes de tiempo— pero hay plantas
@@ -20,6 +21,7 @@ export async function PATCH(request: Request) {
 
     const actualizacion: Record<string, unknown> = {};
     if (datos.otMultiOrigen !== undefined) actualizacion.otMultiOrigen = datos.otMultiOrigen;
+    if (datos.recalculoPlan !== undefined) actualizacion.recalculoPlan = datos.recalculoPlan;
     if (datos.otHorizonteDias !== undefined) actualizacion.otHorizonteDias = datos.otHorizonteDias;
 
     if (!Object.keys(actualizacion).length) return ok({ sinCambios: true });

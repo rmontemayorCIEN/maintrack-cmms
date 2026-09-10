@@ -8,20 +8,24 @@ import { Button, Card } from "@/components/ui";
 /**
  * Como se arman las ordenes de trabajo en esta organizacion.
  *
- * Dos decisiones que cambian segun la planta y que antes estaban fijas en el
- * codigo: si una orden puede juntar trabajo de varios origenes, y que tan
- * lejos se puede adelantar un preventivo para aprovechar la vuelta.
+ * Tres decisiones que cambian segun la planta y que antes estaban fijas en el
+ * codigo: si una orden puede juntar trabajo de varios origenes, que tan lejos
+ * se puede adelantar un preventivo para aprovechar la vuelta, y desde donde se
+ * cuenta el siguiente cuando uno se cierra tarde.
  */
 export function ConfiguracionOrdenes({
-  multiOrigen, horizonteDias, editable,
+  multiOrigen, horizonteDias, recalculo, editable,
 }: {
   multiOrigen: boolean;
   horizonteDias: number;
+  /** CIERRE | PROGRAMADO. Desde donde se cuenta el siguiente preventivo. */
+  recalculo: string;
   editable: boolean;
 }) {
   const router = useRouter();
   const [mezcla, setMezcla] = useState(multiOrigen);
   const [dias, setDias] = useState(String(horizonteDias));
+  const [desde, setDesde] = useState(recalculo === "PROGRAMADO" ? "PROGRAMADO" : "CIERRE");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -31,7 +35,11 @@ export function ConfiguracionOrdenes({
     const res = await fetch("/api/work-orders/config", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ otMultiOrigen: mezcla, otHorizonteDias: Number(dias) || 0 }),
+      body: JSON.stringify({
+        otMultiOrigen: mezcla,
+        otHorizonteDias: Number(dias) || 0,
+        recalculoPlan: desde,
+      }),
     });
     setGuardando(false);
     setMensaje(res.ok ? "Guardado." : "No fue posible guardar.");
@@ -91,6 +99,31 @@ export function ConfiguracionOrdenes({
             En cero solo se ofrece lo que ya vencio. Adelantar de mas gasta el mantenimiento
             antes de tiempo, asi que conviene un plazo corto salvo que la planta pare pocas
             veces al ano.
+          </p>
+        </div>
+
+        <div>
+          <label className="label">Cuando un preventivo se cierra tarde, el siguiente se cuenta…</label>
+          <select
+            className="field"
+            value={desde}
+            disabled={!editable}
+            onChange={(e) => setDesde(e.target.value)}
+          >
+            <option value="CIERRE">Desde que se hizo de verdad</option>
+            <option value="PROGRAMADO">Desde la fecha en que tocaba</option>
+          </select>
+          <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+            El engrasado tocaba el día 1 y se hizo el 15. <b>Desde que se hizo</b>, el siguiente
+            cae 30 días después del 15: correcto cuando lo que importa es cuánto lleva operando
+            el equipo desde la última vez.
+            <br />
+            <b>Desde la fecha en que tocaba</b>, el siguiente sigue cayendo el día 1: el
+            calendario no se recorre. Correcto para trabajo anclado al calendario y para quien
+            reporta cumplimiento contra un programa anual.
+            <br />
+            En los dos casos <b>no se salta ninguna actividad</b>: cerrar tarde mueve la fecha,
+            nunca se brinca el ciclo que tocaba.
           </p>
         </div>
 
