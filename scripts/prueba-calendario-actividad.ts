@@ -18,7 +18,11 @@ import { altaDePlan } from "../lib/alta-de-plan";
 import { asignarPlan } from "../lib/asignaciones";
 import { generateScheduledWorkOrders } from "../lib/scheduler";
 import { transitionWorkOrder } from "../lib/workorders";
-import { actividadesPendientes, actividadesSinProgramar } from "../lib/calendario-actividad";
+import {
+  actividadesPendientes,
+  actividadesSinProgramar,
+  sembrarLoQueFalte,
+} from "../lib/calendario-actividad";
 import { startOfDay, addDays } from "../lib/utils";
 
 let fallos = 0;
@@ -232,6 +236,57 @@ async function main() {
       `${iso(antes?.proximaEl)} → ${iso(despues?.proximaEl)}`,
     );
   }
+
+  console.log("\nAl sembrar, cada actividad conserva DONDE IBA en el ciclo viejo");
+  // El caso real, y un error que ya cometi: al migrar puse todas las
+  // actividades en la fecha del plan. Un "cambio de rodamientos" con multiplo
+  // 12 en un plan mensual tocaba dentro de once meses, y quedo vencido HOY.
+  // Adelantarlo manda a desarmar una bomba sana y gasta el juego un ano antes.
+  const planViejo = await prisma.maintenancePlan.create({
+    data: {
+      organizationId: org.id, name: "Plan con múltiplos", maintenanceType: "PREVENTIVE",
+      triggerType: "CALENDAR", intervalDays: 30, estimatedHours: 2, active: true,
+      leadTimeDays: 0, priority: "MEDIUM",
+      tasks: {
+        create: [
+          { position: 0, title: "Lubricar", taskType: "CHECK", required: true, cadaCuantas: 1 },
+          { position: 1, title: "Alinear acoplamiento", taskType: "CHECK", required: true, cadaCuantas: 3 },
+          { position: 2, title: "Cambio de rodamientos", taskType: "CHECK", required: true, cadaCuantas: 12 },
+        ],
+      },
+    },
+  });
+  const bomba = await prisma.asset.create({
+    data: { organizationId: org.id, siteId: sitio.id, code: "BOM-900", name: "Bomba 900", status: "OPERATIONAL" },
+  });
+  const vence = addDays(HOY, 5);
+  await prisma.planAsset.create({
+    data: {
+      organizationId: org.id, planId: planViejo.id, assetId: bomba.id,
+      active: true, nextDueDate: vence, ejecuciones: 0,
+    },
+  });
+  await sembrarLoQueFalte(org.id, bomba.id);
+  const dePlanViejo = await prisma.planTaskAsset.findMany({
+    where: { assetId: bomba.id },
+    select: { proximaEl: true, planTask: { select: { title: true, cadaCuantas: true } } },
+  });
+  const fechaDe = (t: string) => iso(dePlanViejo.find((x) => x.planTask.title === t)?.proximaEl);
+  revisar(
+    "la de cada ciclo (1×) vence cuando vencía el plan",
+    fechaDe("Lubricar") === iso(vence),
+    fechaDe("Lubricar"),
+  );
+  revisar(
+    "la de cada 3 ciclos NO se adelanta: cae 2 ciclos después (60 d)",
+    fechaDe("Alinear acoplamiento") === iso(addDays(vence, 60)),
+    fechaDe("Alinear acoplamiento"),
+  );
+  revisar(
+    "la anual (12×) sigue a ~11 meses, no vencida hoy",
+    fechaDe("Cambio de rodamientos") === iso(addDays(vence, 330)),
+    fechaDe("Cambio de rodamientos"),
+  );
 
   console.log("\nUna orden VIEJA, sin el vínculo a la actividad, también cuenta");
   // El caso real: `WorkOrderTask.planTaskId` es reciente. Al publicar el

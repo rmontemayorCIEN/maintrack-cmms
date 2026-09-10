@@ -554,6 +554,34 @@ export async function sembrarCalendarioDelPlan(organizationId: string, planId: s
 }
 
 /**
+ * En que ciclo del plan le toca a una actividad, con el mecanismo VIEJO.
+ *
+ * Antes la actividad salia cuando el numero de ejecucion era multiplo de su
+ * `cadaCuantas`. Al sembrar hay que respetar donde iba cada una en ese ciclo:
+ * poner todas en la fecha del plan ADELANTA las que todavia no tocaban, y no
+ * es un detalle —un "cambio de rodamientos" con multiplo 12 en un plan mensual
+ * tocaba dentro de once meses; adelantarlo a hoy manda a desarmar una bomba
+ * sana y a gastar el juego de rodamientos un ano antes—.
+ *
+ * Devuelve los DIAS que hay que sumarle a la fecha del plan. Con multiplo 1
+ * —110 de las 116 actividades que habia al migrar— da cero, que es la fecha
+ * del plan tal cual.
+ */
+export function desfaseDelCiclo(
+  cadaCuantas: number | null | undefined,
+  ejecuciones: number,
+  base: number | null | undefined,
+): number {
+  const m = Math.max(cadaCuantas ?? 1, 1);
+  const b = base && base > 0 ? base : 0;
+  if (m === 1 || !b) return 0;
+  const siguiente = ejecuciones + 1;
+  // El primer ciclo, a partir del siguiente, en que esta actividad toca.
+  const tocaEn = Math.ceil(siguiente / m) * m;
+  return (tocaEn - siguiente) * b;
+}
+
+/**
  * Siembra los relojes de las asignaciones que todavia no los tienen.
  *
  * Existe porque una asignacion puede nacer por muchas puertas —la pantalla, la
@@ -588,7 +616,13 @@ export async function sembrarLoQueFalte(
       planId: true,
       nextDueDate: true,
       lastCompletedAt: true,
-      plan: { select: { tasks: { select: { id: true } } } },
+      ejecuciones: true,
+      plan: {
+        select: {
+          intervalDays: true,
+          tasks: { select: { id: true, cadaCuantas: true } },
+        },
+      },
     },
   });
   if (!asignaciones.length) return 0;
@@ -604,6 +638,19 @@ export async function sembrarLoQueFalte(
   for (const a of asignaciones) {
     const faltan = a.plan.tasks.some((t) => !conReloj.has(`${t.id}:${a.assetId}`));
     if (!faltan) continue;
+
+    const base = a.nextDueDate ?? hoy;
+    // Cada actividad arranca donde le tocaba en el ciclo viejo, no todas
+    // juntas en la fecha del plan.
+    const arranques = new Map<string, { fecha: Date; esUltima: boolean }>();
+    for (const t of a.plan.tasks) {
+      const dias = desfaseDelCiclo(t.cadaCuantas, a.ejecuciones, a.plan.intervalDays);
+      if (!dias) continue;
+      const f = new Date(base);
+      f.setDate(f.getDate() + dias);
+      arranques.set(t.id, { fecha: f, esUltima: false });
+    }
+
     await sembrarCalendario({
       organizationId,
       planId: a.planId,
@@ -612,7 +659,8 @@ export async function sembrarLoQueFalte(
       // VENCIMIENTO. Tratarlo como ultima ejecucion correria cada actividad un
       // intervalo completo hacia adelante y el cliente veria su programa
       // desaparecer un mes, sin un solo mensaje.
-      arranquePorOmision: { fecha: a.nextDueDate ?? hoy, esUltima: false },
+      arranquePorOmision: { fecha: base, esUltima: false },
+      arranques,
     });
     sembradas += 1;
   }

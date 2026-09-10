@@ -22,7 +22,7 @@
  */
 import { prisma } from "../lib/db";
 import { desdeDias, describirIntervalo, type Unidad } from "../lib/calendario";
-import { sembrarLoQueFalte } from "../lib/calendario-actividad";
+import { sembrarLoQueFalte, desfaseDelCiclo } from "../lib/calendario-actividad";
 
 const APLICAR = process.argv.includes("--aplicar");
 
@@ -135,7 +135,66 @@ async function main() {
   }
   if (!totalFaltantes) console.log("   (ninguna: todas ya tienen sus relojes)");
 
-  // ── 3 · Comprobacion ────────────────────────────────────────────────────
+  // ── 3 · Corregir el desfase del ciclo ───────────────────────────────────
+  //
+  // Una siembra anterior pudo poner TODAS las actividades en la fecha del plan,
+  // ignorando en que punto del ciclo iba cada una. Adelantar un "cambio de
+  // rodamientos" de multiplo 12 en un plan mensual lo trae once meses antes:
+  // manda a desarmar una bomba sana y gasta el juego un ano antes de tiempo.
+  //
+  // Se corrige solo lo que nunca se ha ejecutado bajo el calendario nuevo
+  // (`ultimaEl` nulo). Lo que ya corrio tiene historia propia y no se toca.
+  console.log("\nDesfase del ciclo viejo\n");
+  const conMultiplo = await prisma.planTaskAsset.findMany({
+    where: { ultimaEl: null, planTask: { cadaCuantas: { gt: 1 } } },
+    select: {
+      id: true, arranqueEl: true, proximaEl: true, assetId: true,
+      asset: { select: { code: true } },
+      planTask: {
+        select: { title: true, cadaCuantas: true, planId: true, plan: { select: { intervalDays: true } } },
+      },
+    },
+  });
+
+  const porCorregir: Array<{ id: string; fecha: Date; linea: string }> = [];
+  for (const r of conMultiplo) {
+    if (!r.arranqueEl) continue;
+    const asign = await prisma.planAsset.findUnique({
+      where: { planId_assetId: { planId: r.planTask.planId, assetId: r.assetId } },
+      select: { ejecuciones: true },
+    });
+    const dias = desfaseDelCiclo(
+      r.planTask.cadaCuantas,
+      asign?.ejecuciones ?? 0,
+      r.planTask.plan.intervalDays,
+    );
+    if (!dias) continue;
+    const fecha = new Date(r.arranqueEl);
+    fecha.setDate(fecha.getDate() + dias);
+    if (iso(fecha) === iso(r.proximaEl)) continue;
+    porCorregir.push({
+      id: r.id,
+      fecha,
+      linea: `${r.asset.code.padEnd(9)} ${r.planTask.title.slice(0, 32).padEnd(32)} ${String(r.planTask.cadaCuantas).padStart(2)}× · ${iso(r.proximaEl)} → ${iso(fecha)} (+${dias} d)`,
+    });
+  }
+
+  if (!porCorregir.length) {
+    console.log("   (ninguno: todos ya están donde les toca)");
+  } else {
+    for (const c of porCorregir) console.log(`   ${c.linea}`);
+    if (APLICAR) {
+      for (const c of porCorregir) {
+        await prisma.planTaskAsset.update({
+          where: { id: c.id },
+          data: { arranqueEl: c.fecha, proximaEl: c.fecha },
+        });
+      }
+      console.log(`\n   ${porCorregir.length} relojes corregidos.`);
+    }
+  }
+
+  // ── 4 · Comprobacion ────────────────────────────────────────────────────
   if (APLICAR) {
     console.log("\n=== COMPROBACIÓN ===\n");
     const quedanSinFrecuencia = await prisma.planTask.count({
