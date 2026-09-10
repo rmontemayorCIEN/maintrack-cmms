@@ -200,7 +200,10 @@ export default async function ReportsPage({
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      {/* `grid-cols-[minmax(0,1fr)]`: en el telefono es una sola columna, y una
+          columna implicita se mide por el contenido —las tablas de aqui abajo la
+          inflaban y sacaban de lado la pantalla completa. */}
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader
             title="Pareto de activos por costo"

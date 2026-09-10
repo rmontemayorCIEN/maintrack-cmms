@@ -74,6 +74,17 @@ npx tsx scripts/revisar-ayuda.ts
   actividades el boton de completar quedaba inalcanzable, sin nada en pantalla
   que lo explicara. Estaba asi en 12 de 21 ventanas. Con `pie`, el encabezado y
   los botones quedan fijos y solo se desliza el contenido.
+- **Una rejilla de una sola columna se sale de lado en el telefono.** `grid`
+  sin columnas declaradas —o con `lg:grid-cols-3`, que abajo de `lg` es lo
+  mismo— arma una columna implicita de tamano `auto`, y una pista `auto` se
+  mide por el CONTENIDO, no por la pantalla. Con una tabla adentro la pista
+  crece a mil pixeles y arrastra a la tarjeta, a la barra de filtros y al
+  documento entero; el `overflow-x: auto` de `.table-wrap` nunca alcanza a
+  desplazarse porque su contenedor tambien crecio. Y con el documento
+  desbordado, los dialogos `position: fixed` se miden contra ese ancho inflado
+  y sus campos quedan fuera de la pantalla. La cura es declarar la pista:
+  `grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3`. Se compruebe siempre
+  con `document.documentElement.scrollWidth === clientWidth` a 375 px de ancho.
 - **Un `<select>` cuyo valor no esta entre sus opciones miente**: muestra la
   primera y conserva el valor viejo. Deriva el valor efectivo en cada render.
 - **Movil primero en lo que el usuario lee de golpe.** Casi todos los reportes
