@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "./db";
+import { resolverCadenciaDelPlan } from "./frecuencias";
 
 /**
  * Las actividades de un plan y los recursos que cada una requiere.
@@ -21,6 +22,8 @@ export const esquemaTarea = z.object({
   minValue: z.coerce.number().optional().nullable(),
   maxValue: z.coerce.number().optional().nullable(),
   required: z.boolean().default(true),
+  /** Cada cuantos dias va esta actividad. Nulo: la cadencia del plan. */
+  cadaDias: z.coerce.number().int().min(1).optional().nullable(),
   labor: z.array(z.object({
     specialtyId: z.string().min(1),
     personas: z.coerce.number().int().min(1).max(99).default(1),
@@ -78,8 +81,11 @@ export async function validarRecursos(orgId: string, tareas: TareaDePlan[]): Pro
 }
 
 /** Traduce las tareas del formulario a un `create` anidado de Prisma. */
-export function crearTareas(tareas: TareaDePlan[]) {
+export function crearTareas(tareas: TareaDePlan[], multiplos?: number[]) {
   return tareas.map((t, index) => ({
+    // El multiplo lo calcula resolverCadenciaDelPlan a partir de los dias; si
+    // no viene, es 1 y la actividad sale en cada ejecucion —lo de siempre—.
+    cadaCuantas: multiplos?.[index] ?? 1,
     position: index,
     title: t.title,
     description: t.description || null,
@@ -101,11 +107,25 @@ export function crearTareas(tareas: TareaDePlan[]) {
  * tareas de un plan son una plantilla, no historia. Lo que ya se ejecuto vive
  * copiado en las ordenes generadas y no se toca.
  */
-export async function reemplazarTareas(planId: string, tareas: TareaDePlan[]) {
+export async function reemplazarTareas(
+  planId: string,
+  tareas: TareaDePlan[],
+  intervalBase?: number | null,
+) {
+  // La cadencia se recalcula al editar: cambiar la frecuencia de una actividad
+  // puede mover la del plan entero, y guardar los multiplos contra una base
+  // vieja daria un calendario que nadie puede cumplir.
+  const cadencia = resolverCadenciaDelPlan(intervalBase, tareas);
   await prisma.$transaction([
     prisma.planTask.deleteMany({ where: { planId } }),
-    ...crearTareas(tareas).map((data) => prisma.planTask.create({ data: { ...data, planId } })),
+    ...crearTareas(tareas, cadencia.multiplos).map((data) =>
+      prisma.planTask.create({ data: { ...data, planId } }),
+    ),
+    ...(cadencia.base != null
+      ? [prisma.maintenancePlan.update({ where: { id: planId }, data: { intervalDays: cadencia.base } })]
+      : []),
   ]);
+  return cadencia;
 }
 
 type TareaConRecursos = {

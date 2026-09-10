@@ -16,7 +16,7 @@
  */
 import { prisma } from "../lib/db";
 import { generateScheduledWorkOrders } from "../lib/scheduler";
-import { derivarCadencia, tocanEn, diasDe } from "../lib/frecuencias";
+import { derivarCadencia, tocanEn, diasDe, resolverCadenciaDelPlan } from "../lib/frecuencias";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -50,6 +50,25 @@ async function main() {
   revisar("ejecución 6: las TRES —el anidamiento—",
     tocanEn(act, 6).map((a) => a.id).join(",") === "aceite,filtro,frenos");
   revisar("ejecución 0 no toca nada", tocanEn(act, 0).length === 0);
+
+  console.log("\nLa cadencia que se guarda sale de las frecuencias");
+  const r1 = resolverCadenciaDelPlan(30, [{ cadaDias: null }, { cadaDias: 90 }, { cadaDias: 180 }]);
+  revisar("plan mensual con actividades de 90 y 180: la base se queda en 30",
+    r1.base === 30 && JSON.stringify(r1.multiplos) === "[1,3,6]",
+    `base ${r1.base}, múltiplos ${r1.multiplos.join(",")}`);
+
+  // El caso que hay que ENSEÑAR antes de guardar: la cadencia BAJA.
+  const r2 = resolverCadenciaDelPlan(30, [{ cadaDias: 45 }]);
+  revisar("una actividad cada 45 días en un plan mensual BAJA la base a 15",
+    r2.base === 15 && r2.multiplos[0] === 3, `base ${r2.base}`);
+
+  const r3 = resolverCadenciaDelPlan(null, [{ cadaDias: 90 }]);
+  revisar("un plan por medidor no deriva nada y todo sale siempre",
+    r3.base === null && r3.multiplos[0] === 1);
+
+  const r4 = resolverCadenciaDelPlan(30, [{ cadaDias: null }, { cadaDias: null }]);
+  revisar("sin frecuencias propias, la base no se mueve y todo es cada 1",
+    r4.base === 30 && r4.multiplos.every((m) => m === 1));
 
   console.log("\nContra la base: un plan, tres frecuencias");
   const sello = `prueba-frec-${Date.now()}`;

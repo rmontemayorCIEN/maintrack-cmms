@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { derivarCadencia } from "@/lib/frecuencias";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Button, BotonEditar } from "@/components/ui";
@@ -19,6 +20,14 @@ export type Task = {
   labor: LineaMO[];
   parts: LineaRef[];
   services: LineaSrv[];
+  /**
+   * Cada cuantos dias se hace ESTA actividad. Vacio = la del plan.
+   *
+   * El usuario piensa en dias; el programador necesita multiplos de una
+   * cadencia base. La traduccion vive en lib/frecuencias.ts y se hace al
+   * guardar, no aqui.
+   */
+  cadaDias?: string;
 };
 
 /** Un plan ya guardado, tal como lo manda la pagina para editarlo. */
@@ -179,6 +188,33 @@ export function PlanDialog({
     return { horas, mo, ref, srv, total: mo + ref + srv };
   }, [tasks, catEsp, catSrv, refacciones]);
 
+  /**
+   * Que cadencia queda si se guardan estas frecuencias.
+   *
+   * Se calcula en vivo para poder ENSEÑARLO antes de guardar: si alguien pone
+   * una actividad cada 45 dias en un plan mensual, la cadencia baja a 15 y el
+   * equipo se visita mas seguido. Eso no puede ser una sorpresa.
+   */
+  const cadencia = useMemo(() => {
+    if (form.triggerType !== "CALENDAR") return null;
+    const base = Number(form.intervalDays) || 0;
+    if (base < 1) return null;
+    const conTitulo = tasks.filter((t) => t.title.trim());
+    if (!conTitulo.length) return null;
+    const dias = conTitulo.map((t) => Number(t.cadaDias) || base);
+    const d = derivarCadencia([{ cadaDias: base }, ...dias.map((x) => ({ cadaDias: x }))]);
+    return {
+      base: d.base,
+      cambia: d.base !== base,
+      // Lo que lleva cada visita, hasta la que junta todo.
+      actividades: conTitulo.map((t, i) => ({
+        titulo: t.title,
+        dias: dias[i],
+        cadaCuantas: Math.max(Math.round(dias[i] / d.base), 1),
+      })),
+    };
+  }, [tasks, form.triggerType, form.intervalDays]);
+
   function set(key: keyof typeof form, value: string | boolean) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -228,6 +264,7 @@ export function PlanDialog({
           minValue: t.minValue ? Number(t.minValue) : null,
           maxValue: t.maxValue ? Number(t.maxValue) : null,
           required: t.required,
+          cadaDias: Number(t.cadaDias) || null,
           labor: t.labor.filter((l) => l.specialtyId).map((l) => ({
             specialtyId: l.specialtyId,
             personas: Number(l.personas || 1),
@@ -436,7 +473,8 @@ export function PlanDialog({
             <div>
               <p className="text-sm font-semibold text-slate-800">Actividades y recursos</p>
               <p className="text-[0.6875rem] text-slate-500">
-                Cada actividad puede llevar mano de obra propia, refacciones y servicios externos.
+                Cada actividad puede llevar su propia frecuencia, mano de obra, refacciones y
+                servicios. En blanco, la frecuencia es la del plan.
               </p>
             </div>
             <Button
@@ -458,12 +496,49 @@ export function PlanDialog({
             </p>
           ) : (
             <div className="grid gap-2">
+              {/*
+                Lo que va a pasar, ANTES de guardar.
+
+                Poner una actividad cada 45 dias en un plan mensual baja la
+                cadencia a 15 y el equipo se visita mas seguido. Eso no puede
+                ser una sorpresa que alguien descubra en la bandeja de ordenes.
+              */}
+              {cadencia && cadencia.actividades.some((a) => a.cadaCuantas > 1) ? (
+                <div className="mb-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-[0.6875rem] leading-relaxed text-slate-700">
+                  {cadencia.cambia ? (
+                    <p className="mb-1 font-medium text-amber-800">
+                      Con estas frecuencias, el equipo se visita cada {cadencia.base} días —no cada{" "}
+                      {form.intervalDays}—, porque es el ritmo que las hace encajar todas.
+                    </p>
+                  ) : (
+                    <p className="mb-1 font-medium">
+                      El equipo se visita cada {cadencia.base} días. En cada visita entra:
+                    </p>
+                  )}
+                  <ul className="grid gap-0.5">
+                    {cadencia.actividades.map((a, i) => (
+                      <li key={i} className="flex flex-wrap gap-x-1.5">
+                        <span className="font-mono text-slate-500">
+                          {a.cadaCuantas === 1 ? "cada visita" : `1 de cada ${a.cadaCuantas}`}
+                        </span>
+                        <span>· {a.titulo || "(sin nombre)"}</span>
+                        <span className="text-slate-500">— cada {a.dias} días</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-slate-500">
+                    Las visitas donde coinciden varias salen en <strong>una sola orden</strong>: el
+                    técnico va una vez y hace todo lo que toca.
+                  </p>
+                </div>
+              ) : null}
+
               {tasks.map((task, index) => {
                 const recursos = task.labor.length + task.parts.length + task.services.length;
                 const desplegada = abierta === index;
                 return (
                   <div key={index} className="rounded-lg border border-slate-200 p-2">
-                    <div className="grid gap-2 md:grid-cols-[1fr_130px_90px_90px_90px_32px]">
+                    <div className="grid gap-2 md:grid-cols-[1fr_130px_92px_80px_80px_80px_32px]">
                       <input
                         className="field"
                         placeholder="Descripción de la actividad"
@@ -480,6 +555,20 @@ export function PlanDialog({
                         <option value="TEXT">Texto</option>
                         <option value="REPLACE">Reemplazo</option>
                       </select>
+                      {/*
+                        Cada cuantos DIAS, no cada cuantas ejecuciones: nadie
+                        piensa en multiplos. La traduccion se hace al guardar.
+                        Vacio hereda la frecuencia del plan, que es el caso de
+                        siempre y por eso es lo que no hay que capturar.
+                      */}
+                      <input
+                        className="field"
+                        placeholder={form.triggerType === "CALENDAR" ? `cada ${form.intervalDays || "?"} d` : "cada"}
+                        title="Cada cuántos días se hace esta actividad. Vacío: la frecuencia del plan."
+                        inputMode="numeric"
+                        value={task.cadaDias ?? ""}
+                        onChange={(e) => cambiarTarea(index, { cadaDias: e.target.value.replace(/[^0-9]/g, "") })}
+                      />
                       <input
                         className="field" placeholder="Unidad"
                         value={task.unit ?? ""}

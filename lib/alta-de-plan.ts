@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { parseDate } from "@/lib/api";
 import { crearTareas, validarRecursos } from "@/lib/plan-tasks";
+import { resolverCadenciaDelPlan } from "@/lib/frecuencias";
 import { asignarPlan } from "@/lib/asignaciones";
 
 /**
@@ -52,9 +53,19 @@ export async function altaDePlan(
   const problema = await validarRecursos(organizationId, tasks);
   if (problema) return { error: problema };
 
+  /**
+   * La cadencia base sale de las frecuencias, no al reves.
+   *
+   * Si una actividad va cada 45 dias en un plan mensual, el equipo se visita
+   * cada 15 —el ritmo que hace encajar las dos— y cada actividad lleva su
+   * multiplo. La pantalla lo enseña antes de guardar para que no sorprenda.
+   */
+  const cadencia = resolverCadenciaDelPlan(rest.intervalDays, tasks);
+
   const plan = await prisma.maintenancePlan.create({
     data: {
       ...rest,
+      intervalDays: cadencia.base,
       assetId: rest.assetId || null,
       organizationId,
       meterId: rest.meterId || null,
@@ -62,8 +73,8 @@ export async function altaDePlan(
       teamId: rest.teamId || null,
       nextDueDate:
         parseDate(rest.nextDueDate) ??
-        new Date(Date.now() + (rest.intervalDays ?? 30) * 86_400_000),
-      tasks: { create: crearTareas(tasks) },
+        new Date(Date.now() + (cadencia.base ?? 30) * 86_400_000),
+      tasks: { create: crearTareas(tasks, cadencia.multiplos) },
     },
     select: { id: true, name: true },
   });

@@ -82,3 +82,41 @@ export function tocanEn<T extends { cadaCuantas: number }>(actividades: T[], n: 
 export function diasDe(cadaCuantas: number, base: number): number {
   return Math.max(cadaCuantas, 1) * base;
 }
+
+/**
+ * La cadencia del plan y el multiplo de cada actividad, listos para guardar.
+ *
+ * El usuario captura el intervalo del plan y, opcionalmente, cada cuantos dias
+ * va cada actividad. De ahi salen las dos cosas que se persisten:
+ * `MaintenancePlan.intervalDays` —la cadencia base— y `PlanTask.cadaCuantas`.
+ *
+ * Los dias NO se guardan: se guarda el multiplo, y los dias se vuelven a
+ * calcular cuando hacen falta. Guardar los dos dejaria abierta la puerta a que
+ * se contradigan el dia que alguien cambie la base.
+ *
+ * Ojo con el efecto que hay que enseñar en pantalla: una actividad cada 45
+ * dias dentro de un plan mensual BAJA la cadencia a 15, porque es el ritmo que
+ * hace encajar las dos. El equipo se visita mas seguido, y eso no puede ser una
+ * sorpresa.
+ */
+export function resolverCadenciaDelPlan(
+  intervalBase: number | null | undefined,
+  tareas: Array<{ cadaDias?: number | null }>,
+): { base: number | null; multiplos: number[] } {
+  const base = Number(intervalBase);
+  // Sin cadencia en dias —un plan por medidor— no hay de que derivar. Todas
+  // las actividades salen siempre, que es el comportamiento de siempre.
+  if (!Number.isFinite(base) || base < 1) {
+    return { base: intervalBase ?? null, multiplos: tareas.map(() => 1) };
+  }
+
+  const dias = tareas.map((t) => {
+    const d = Number(t.cadaDias);
+    return Number.isFinite(d) && d >= 1 ? d : base;
+  });
+  const derivada = derivarCadencia([{ cadaDias: base }, ...dias.map((cadaDias) => ({ cadaDias }))]);
+  return {
+    base: derivada.base,
+    multiplos: derivada.actividades.slice(1).map((a) => a.cadaCuantas),
+  };
+}

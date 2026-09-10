@@ -135,6 +135,13 @@ export default async function PlansPage() {
         minValue: t.minValue != null ? String(t.minValue) : undefined,
         maxValue: t.maxValue != null ? String(t.maxValue) : undefined,
         required: t.required,
+        // Se guarda el multiplo, no los dias: aqui se vuelven dias para la
+        // pantalla. Con multiplo 1 el campo va vacio, que es lo que significa
+        // "la frecuencia del plan" y es el caso de siempre.
+        cadaDias:
+          t.cadaCuantas > 1 && plan.intervalDays
+            ? String(t.cadaCuantas * plan.intervalDays)
+            : undefined,
         labor: t.labor.map((l) => ({
           specialtyId: l.specialtyId, personas: String(l.personas), hours: String(l.hours),
         })),

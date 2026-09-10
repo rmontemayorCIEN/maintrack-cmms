@@ -452,7 +452,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Un plan no hace nada por sí solo: el programador es el que convierte planes en órdenes.",
       "Cada plan dispara con anticipación: si vence el día 5 y anticipa 3 días, la orden nace el día 2.",
       "Al cerrar la orden generada, el plan recalcula su próximo vencimiento.",
-    ],
+          "Cada actividad puede llevar su propia frecuencia, en días. En blanco toma la del plan, que es el caso de siempre. Así un solo plan cubre el aceite mensual y el líquido de frenos semestral, sin partirlo en dos.",
+      "El plan se visita a la CADENCIA BASE: el ritmo que hace encajar todas sus frecuencias. Si pone una actividad cada 45 días en un plan mensual, la base baja a 15 —y la pantalla se lo dice antes de guardar, con el calendario que va a quedar—.",
+      "Cuando varias actividades coinciden en la misma visita, salen en UNA sola orden: el técnico va una vez y hace todo lo que toca. Y si un ciclo no lleva ninguna, no se genera orden vacía.",
+],
     tablaConfigurable: true,
     campos: [
       { nombre: "Equipos", explica: "A cuántos equipos se aplica este plan. Cuando es uno solo se muestra cuál; cuando son varios, lo que importa es cuántos." },

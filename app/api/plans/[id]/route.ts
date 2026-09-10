@@ -69,7 +69,10 @@ export async function PATCH(request: Request, { params }: Params) {
     if (trigger === "METER") data.intervalDays = null;
 
     const plan = await prisma.maintenancePlan.update({ where: { id }, data });
-    if (tasks) await reemplazarTareas(id, tasks);
+    // Se pasa la cadencia que quedo guardada —no la del formulario— porque
+    // reemplazarTareas la puede bajar si alguna actividad no encaja, y de ahi
+    // salen los multiplos que se persisten.
+    if (tasks) await reemplazarTareas(id, tasks, plan.intervalDays);
 
     await logAudit({
       organizationId: orgId,
