@@ -151,6 +151,12 @@ npx tsx scripts/prueba-equipo-de-baja.ts >/dev/null 2>&1 \
   && echo "     Los equipos de baja no generan preventivos." \
   || { echo "     ERROR: la prueba de equipos de baja fallo."; npx tsx scripts/prueba-equipo-de-baja.ts; exit 1; }
 
+# Un reporte que llega sin equipo debe poder recibirlo al revisarse. Sin eso
+# se convertia en una orden sin activo, que no entra al expediente de nadie.
+npx tsx scripts/prueba-solicitud-sin-equipo.ts >/dev/null 2>&1 \
+  && echo "     Las solicitudes sin equipo se pueden asignar al revisar." \
+  || { echo "     ERROR: la prueba de solicitudes sin equipo fallo."; npx tsx scripts/prueba-solicitud-sin-equipo.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

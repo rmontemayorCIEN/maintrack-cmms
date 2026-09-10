@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui";
+import { SelectorBuscable } from "@/components/selector-buscable";
 import { TIPOS_SOLICITUD, esTipoValido, type ClaveTipoSolicitud } from "@/lib/tipos-solicitud";
 
 export function ReviewActions({
@@ -11,9 +12,15 @@ export function ReviewActions({
   technicians,
   tipoActual,
   tipoSugerido,
+  assets,
+  assetActual,
 }: {
   requestId: string;
   technicians: Array<{ id: string; name: string }>;
+  /** El catalogo, para que quien revisa pueda poner el equipo. */
+  assets: Array<{ id: string; code: string; name: string }>;
+  /** El equipo que ya traia, si el punto del QR lo dijo. */
+  assetActual?: string | null;
   /** Lo que ya se haya clasificado, si alguien la reviso antes. */
   tipoActual?: string | null;
   /** Lo que propuso la IA en el triage, si corrio. */
@@ -34,6 +41,19 @@ export function ReviewActions({
     tipoActual ?? (esTipoValido(tipoSugerido) ? tipoSugerido : "FALLA"),
   );
   const [notes, setNotes] = useState("");
+  /**
+   * El equipo lo pone QUIEN REVISA cuando el reporte llego sin el.
+   *
+   * Llega sin equipo mas seguido de lo que parece: el QR de un area no lo
+   * trae, y a quien reporta desde su celular no se le exige adivinar la clave
+   * —un equipo mal escogido ensucia el historial de uno que no fallo y deja
+   * sin registro al que si—. Quien conoce el catalogo es el gestor.
+   *
+   * Hasta hoy no tenia donde ponerlo: la solicitud se convertia en una orden
+   * SIN ACTIVO, para siempre. Esa orden no entra al expediente de ningun
+   * equipo, no cuenta en su Pareto y no suma a su costo de paro.
+   */
+  const [assetId, setAssetId] = useState(assetActual ?? "");
 
   async function submit() {
     setLoading(true);
@@ -44,6 +64,7 @@ export function ReviewActions({
         action: open,
         reviewNotes: notes || undefined,
         assignedToId: assignedToId || null,
+        assetId: assetId || null,
         tipo,
       }),
     });
@@ -85,6 +106,24 @@ export function ReviewActions({
               {open === "APPROVE" ? "Aprobar y generar orden" : "Rechazar solicitud"}
             </h3>
             <div className="mt-4 grid gap-4">
+              {open === "APPROVE" ? (
+                <div>
+                  <label className="label">Equipo afectado</label>
+                  <SelectorBuscable
+                    valor={assetId}
+                    onCambio={setAssetId}
+                    opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+                    vacio="Sin equipo identificado"
+                    marcador="Busque por clave o nombre"
+                  />
+                  {!assetActual ? (
+                    <p className="mt-1 text-[0.6875rem] leading-relaxed text-amber-700">
+                      Este reporte llegó sin equipo. Si lo deja así, la orden no va a entrar al
+                      expediente de ningún equipo ni va a contar en su historial de fallas.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {open === "APPROVE" ? (
                 <div>
                   <label className="label">De que se trata</label>

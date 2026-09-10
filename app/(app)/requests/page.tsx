@@ -141,7 +141,7 @@ export default async function RequestsPage() {
                     {canReview ? (
                       <td className="text-right">
                         {request.status === "PENDING" ? (
-                          <ReviewActions requestId={request.id} technicians={technicians} tipoActual={request.tipo} tipoSugerido={request.iaTipo} />
+                          <ReviewActions requestId={request.id} technicians={technicians} assets={assets} assetActual={request.assetId} tipoActual={request.tipo} tipoSugerido={request.iaTipo} />
                         ) : null}
                       </td>
                     ) : null}

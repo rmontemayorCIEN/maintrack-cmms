@@ -1,14 +1,24 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { nextWorkOrderNumber } from "@/lib/numbering";
-import { logAudit, notify } from "@/lib/audit";
-import { tipoDeTrabajo } from "@/lib/tipos-solicitud";
+import { notify } from "@/lib/audit";
+import { aprobarSolicitud, ErrorDeSolicitud } from "@/lib/solicitudes";
 
 const schema = z.object({
   action: z.enum(["APPROVE", "REJECT"]),
   reviewNotes: z.string().optional(),
   assignedToId: z.string().optional().nullable(),
+  /**
+   * El equipo, puesto por quien revisa.
+   *
+   * Un reporte puede llegar sin equipo y es lo normal: el QR del area no lo
+   * trae, y a quien reporta desde su celular no se le exige adivinar la clave.
+   * Quien SI conoce el catalogo es el gestor, y hasta hoy no tenia donde
+   * ponerlo: la solicitud se convertia en una orden sin activo, para siempre.
+   * Esa orden no entra al historial de ningun equipo, no cuenta en su Pareto
+   * y no suma a su costo de paro. Se veia bien y desaparecia del expediente.
+   */
+  assetId: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
   /**
    * OT existente a la que se suma el reporte, en vez de abrir una nueva.
@@ -68,100 +78,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
      * cada reporte entra como su propia actividad, con su origen y su tipo, y
      * al cerrar se le pregunta su causa por separado.
      */
-    let workOrder: { id: string; number: string };
-
-    if (input.workOrderId) {
-      const destino = await prisma.workOrder.findFirst({
-        where: { id: input.workOrderId, organizationId: orgId },
-        select: { id: true, number: true, status: true, assetId: true },
-      });
-      if (!destino) return fail("La orden de trabajo no existe", 404);
-      if (["COMPLETED", "CANCELLED"].includes(destino.status)) {
-        return fail("Esa orden ya esta cerrada. Elija otra o abra una nueva.", 409);
-      }
-      // Sumar a una orden de otro equipo mezclaria el historial de dos activos.
-      if (workRequest.assetId && destino.assetId && workRequest.assetId !== destino.assetId) {
-        return fail("La orden es de otro equipo. El reporte debe ir a una orden del mismo activo.", 409);
-      }
-      workOrder = destino;
-    } else {
-      const number = await nextWorkOrderNumber(orgId);
-      workOrder = await prisma.workOrder.create({
-        data: {
-          organizationId: orgId,
-          number,
-          title: workRequest.title,
-          description: workRequest.description,
-          // Del tipo de la solicitud, no a fuego: una mejora o un apoyo no
-          // deben entrar como falla y ensuciar el Pareto.
-          maintenanceType: tipoDeTrabajo(input.tipo ?? workRequest.tipo),
-          status: input.assignedToId ? "ASSIGNED" : "OPEN",
-          priority: workRequest.priority,
-          assetId: workRequest.assetId,
-          siteId: workRequest.siteId,
-          locationId: workRequest.locationId,
-          assignedToId: input.assignedToId || null,
-          createdById: user.id,
-          dueDate: input.dueDate ? new Date(input.dueDate) : new Date(Date.now() + 3 * 86_400_000),
-          estimatedHours: 2,
-        },
-        select: { id: true, number: true },
-      });
-    }
-
-    const ultima = await prisma.workOrderTask.aggregate({
-      where: { workOrderId: workOrder.id },
-      _max: { position: true },
-    });
-    await prisma.workOrderTask.create({
-      data: {
-        workOrderId: workOrder.id,
-        position: (ultima._max.position ?? -1) + 1,
-        origen: "SOLICITUD",
-        origenRequestId: workRequest.id,
-        maintenanceType: tipoDeTrabajo(input.tipo ?? workRequest.tipo),
-        title: workRequest.title,
-        description: workRequest.description,
-        taskType: "CHECK",
-        required: true,
-      },
-    });
-
-    const number = workOrder.number;
-
-    const updated = await prisma.workRequest.update({
-      where: { id },
-      data: {
-        status: "CONVERTED",
-        tipo: input.tipo ?? workRequest.tipo,
-        reviewedById: user.id,
-        reviewedAt: new Date(),
-        reviewNotes: input.reviewNotes,
-        workOrderId: workOrder.id,
-      },
-    });
-
-    await logAudit({
-      organizationId: orgId,
-      userId: user.id,
-      entity: "WorkRequest",
-      entityId: id,
-      action: "CONVERTED",
-      summary: `${workRequest.number} → ${number}`,
-    });
-
-    if (workRequest.requestedById) {
-      await notify({
+    try {
+      const resultado = await aprobarSolicitud({
         organizationId: orgId,
-        userId: workRequest.requestedById,
-        title: `Solicitud ${workRequest.number} aprobada`,
-        body: `Se genero la orden ${number}`,
-        link: `/work-orders/${workOrder.id}`,
-        kind: "SUCCESS",
-        tag: workRequest.number,
+        userId: user.id,
+        solicitudId: id,
+        assetId: input.assetId,
+        tipo: input.tipo,
+        assignedToId: input.assignedToId,
+        dueDate: input.dueDate,
+        reviewNotes: input.reviewNotes,
+        workOrderId: input.workOrderId,
       });
+      return ok(resultado, 201);
+    } catch (e) {
+      if (e instanceof ErrorDeSolicitud) return fail(e.message, e.codigo);
+      throw e;
     }
-
-    return ok({ request: updated, workOrder }, 201);
   });
 }

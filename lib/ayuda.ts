@@ -834,7 +834,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Es la puerta de entrada del trabajo correctivo desde el resto de la empresa.",
-      "Lo que llega por código QR trae ya el sitio, el área y el equipo, más la foto de quien reportó.",
+      "Lo que llega por código QR trae el contexto que ese punto tenga: un QR pegado a un equipo trae el equipo; uno a la entrada de un área trae solo el área. Quien reporta nunca escoge equipo, y es a propósito — quien no trae el código tampoco se sabe la clave, y un equipo mal escogido ensucia el historial de uno que no falló y deja sin registro al que sí.",
+      "Por eso el equipo lo pone QUIEN REVISA. Al aprobar aparece el buscador de equipos; si la solicitud llegó sin uno, la pantalla lo advierte: una orden sin activo no entra al expediente de ningún equipo ni cuenta en su historial de fallas.",
+      "Quien tiene cuenta en el sistema no necesita ningún QR: levanta la solicitud desde aquí, con el buscador de equipos y su foto. El portal público existe para quien NO tiene cuenta.",
       "Al recibir, el sistema revisa el texto en busca de condiciones de riesgo —gas, cable expuesto, humo— y si encuentra alguna, el aviso sale como crítico de inmediato.",
       "Al aprobarla nace una orden de trabajo con su folio propio.",
     ],

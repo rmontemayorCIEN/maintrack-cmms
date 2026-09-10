@@ -79,6 +79,16 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
       })
     : [];
 
+  // El catalogo, para que quien revisa pueda ponerle equipo a un reporte que
+  // llego sin el —el QR de un area no lo trae—.
+  const equipos = can(user.role, "request:review")
+    ? await prisma.asset.findMany({
+        where: { organizationId: user.organizationId, active: true },
+        select: { id: true, code: true, name: true },
+        orderBy: { code: "asc" },
+      })
+    : [];
+
   // El autor puede seguir documentando su reporte; el personal de
   // mantenimiento tambien, para dejar constancia del diagnostico.
   const puedeAdjuntar =
@@ -96,7 +106,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         }
         actions={
           solicitud.status === "PENDING" && can(user.role, "request:review") ? (
-            <ReviewActions requestId={solicitud.id} technicians={tecnicos} tipoActual={solicitud.tipo} tipoSugerido={solicitud.iaTipo} />
+            <ReviewActions requestId={solicitud.id} technicians={tecnicos} assets={equipos} assetActual={solicitud.assetId} tipoActual={solicitud.tipo} tipoSugerido={solicitud.iaTipo} />
           ) : null
         }
       />
