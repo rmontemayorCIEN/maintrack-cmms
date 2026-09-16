@@ -48,16 +48,44 @@ export function startOfDay(date: Date) {
   return copy;
 }
 
+/**
+ * El dia de calendario que representa una fecha de DIA COMPLETO, como medianoche
+ * local de quien la lee. Es la misma regla de `formatDia`: la medianoche UTC
+ * exacta es un dia calculado en el servidor y se lee en UTC; cualquier otra hora
+ * es un momento real y se lee en la hora local.
+ *
+ * Sirve para `getDate()`, `getDay()` y para comparar dias en el navegador, donde
+ * `new Date("...T00:00:00.000Z").getDate()` en Mexico da el dia ANTERIOR.
+ */
+export function diaDeCalendario(value: Date | string): Date {
+  const d = typeof value === "string" ? new Date(value) : value;
+  const esMedianocheUtc =
+    d.getUTCHours() === 0 && d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+  return esMedianocheUtc
+    ? new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** "aaaa-mm-dd" del dia que representa la fecha (ver `diaDeCalendario`), para un `<input type="date">`. */
+export function claveDia(value: Date | string): string {
+  const d = diaDeCalendario(value);
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
 /** Etiqueta relativa de vencimiento usada en listados y tableros. */
 export function dueLabel(due?: Date | string | null) {
   if (!due) return { text: "Sin fecha", tone: "muted" as const };
   const date = typeof due === "string" ? new Date(due) : due;
-  const diff = daysBetween(startOfDay(date), startOfDay(new Date()));
+  // Un vencimiento es un dia completo: contarlo contra el dia que representa, no
+  // contra la medianoche UTC que en Mexico cae la tarde anterior.
+  const diff = daysBetween(diaDeCalendario(date), startOfDay(new Date()));
   if (diff < 0) return { text: `Vencida ${Math.abs(diff)}d`, tone: "danger" as const };
   if (diff === 0) return { text: "Vence hoy", tone: "warning" as const };
   if (diff === 1) return { text: "Vence mañana", tone: "warning" as const };
   if (diff <= 7) return { text: `En ${diff} dias`, tone: "info" as const };
-  return { text: formatDate(date), tone: "muted" as const };
+  return { text: formatDia(date), tone: "muted" as const };
 }
 
 export function initials(name: string) {
@@ -89,4 +117,52 @@ export function toCsv(rows: Record<string, unknown>[]) {
     headers.join(","),
     ...rows.map((row) => headers.map((h) => escape(row[h])).join(",")),
   ].join("\n");
+}
+
+/**
+ * Un dia de calendario capturado como "aaaa-mm-dd", a la medianoche LOCAL.
+ *
+ * `new Date("2026-09-21")` lo lee como medianoche UTC, que en Mexico es el 20 a
+ * las 6 de la tarde: al pasarlo por `startOfDay` se convierte en el dia 20. Una
+ * fecha que el usuario escribio como 21 no puede guardarse como 20.
+ *
+ * Cualquier otro texto se interpreta tal cual.
+ */
+export function diaLocal(valor?: string | null): Date | null {
+  if (!valor) return null;
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? new Date(`${valor}T00:00:00`) : new Date(valor);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Muestra una fecha de DIA COMPLETO —vencimientos, ultima vez que se hizo—
+ * sin que la zona horaria del navegador la recorra.
+ *
+ * En la base conviven dos clases de valor, y cada una se lee distinto:
+ *
+ *  - **Medianoche UTC exacta** (`...T00:00:00.000Z`): un dia calculado en el
+ *    servidor, que en produccion corre en UTC. Un navegador en Mexico lo
+ *    pintaria como el dia ANTERIOR a las 6 de la tarde, asi que se lee en UTC.
+ *  - **Cualquier otra hora**: un momento real —la medianoche de Mexico que
+ *    manda el navegador (06:00 UTC), o un vencimiento contado desde la hora de
+ *    un cierre (05:33 UTC = 11:33 pm en Monterrey)—. Ese se lee en la hora de
+ *    quien mira. Leerlo en UTC mostraba el dia SIGUIENTE, que fue justo lo que
+ *    delato la regla anterior: una asignacion decia 22 y sus actividades 21.
+ *
+ * No sirve para fechas CON hora —un cierre, un comentario—; para esas esta
+ * `formatDateTime`.
+ */
+export function formatDia(value?: Date | string | null, opciones: { anio?: boolean } = {}) {
+  if (!value) return "—";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+  const esMedianocheUtc =
+    date.getUTCHours() === 0 && date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    ...(opciones.anio === false ? {} : { year: "numeric" }),
+    ...(esMedianocheUtc ? { timeZone: "UTC" } : {}),
+  }).format(date);
 }

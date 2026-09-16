@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarDays, Check, Loader2, Plus, Trash2 } from "lucid
 import { Badge, Card } from "@/components/ui";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { ArranqueConIa } from "./arranque";
-import { cn } from "@/lib/utils";
+import { cn, diaDeCalendario } from "@/lib/utils";
 
 type PlanDeEquipo = {
   asignacionId: string; planId: string; nombre: string;
@@ -96,7 +96,7 @@ export function PanelCobertura({
   }
 
   const fmt = (iso: string | null) =>
-    iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(iso)) : null;
+    iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(iso)) : null;
 
   return (
     <div className="grid gap-4">

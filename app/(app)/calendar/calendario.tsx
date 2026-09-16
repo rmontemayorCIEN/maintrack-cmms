@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, OPEN_STATUSES } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { claveDia, cn, diaDeCalendario } from "@/lib/utils";
 
 const DIAS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
@@ -88,7 +88,7 @@ export function Calendario({
   );
   const hayFiltro = Boolean(tecnico || tipo || soloAbiertas || equipos.length || familia);
 
-  const primero = new Date(dias[0]);
+  const primero = diaDeCalendario(dias[0]);
   const offset = (primero.getDay() + 6) % 7;
   const celdas: (string | null)[] = [
     ...Array.from({ length: offset }, () => null),
@@ -97,7 +97,8 @@ export function Calendario({
   while (celdas.length % 7 !== 0) celdas.push(null);
 
   const [anio, mesNum] = mes.split("-").map(Number);
-  const hoy = new Date().toISOString().slice(0, 10);
+  // El hoy de quien mira: en UTC, despues de las 6 pm en Mexico ya era mañana.
+  const hoy = claveDia(new Date());
 
   const corrimiento = (dias_: number) => {
     const d = new Date(semana);
@@ -130,7 +131,7 @@ export function Calendario({
     vista === "dia"
       ? new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dia}T12:00:00`))
       : vista === "semana"
-        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(new Date(dias[dias.length - 1]))}`
+        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(diaDeCalendario(dias[dias.length - 1]))}`
         : new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(anio, mesNum - 1, 1));
 
   const delDia = (fecha: string) => visibles.filter((o) => o.dueDate && mismoDia(o.dueDate, fecha));
@@ -349,7 +350,7 @@ export function Calendario({
             const proys = proyeccionesDe(fecha);
             const total = delDiaOrdenes.length + proys.length;
             const esHoy = fecha.slice(0, 10) === hoy;
-            const numero = new Date(fecha).getDate();
+            const numero = diaDeCalendario(fecha).getDate();
 
             return (
               <button
@@ -455,7 +456,7 @@ function DetalleDia({
   sinMarco?: boolean;
 }) {
   const fecha = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" })
-    .format(new Date(dia.fecha));
+    .format(diaDeCalendario(dia.fecha));
 
   const Marco = sinMarco
     ? ({ children }: { children: React.ReactNode }) => <div>{children}</div>
@@ -602,7 +603,7 @@ function RejillaSemana({
           {dias.map((fecha) => {
             const c = cargaDe(fecha);
             const esHoy = fecha.slice(0, 10) === hoy;
-            const d = new Date(fecha);
+            const d = diaDeCalendario(fecha);
             return (
               <button
                 key={fecha}

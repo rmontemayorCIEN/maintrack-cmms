@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { SelectorBuscable, type OpcionBuscable } from "@/components/selector-buscable";
 import type { TrabajoDisponible } from "@/lib/armar-ot";
 import { VENTANAS, type Ventana } from "@/lib/calendario";
+import { diaDeCalendario } from "@/lib/utils";
 
 export function Armador({
   activos,
@@ -176,7 +177,7 @@ export function Armador({
               </select>
             </div>
             <p className="pb-2 text-[0.6875rem] text-slate-500">
-              Hasta el {new Date(disponible.hasta).toLocaleDateString("es-MX", {
+              Hasta el {diaDeCalendario(disponible.hasta).toLocaleDateString("es-MX", {
                 weekday: "short", day: "numeric", month: "short",
               })}. Las atrasadas se ven siempre.
             </p>

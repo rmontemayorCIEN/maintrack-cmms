@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AlertTriangle, Loader2, Sparkles, ThumbsUp, X } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
 import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, diaDeCalendario } from "@/lib/utils";
 
 type Persona = {
   id: string; nombre: string; color: string; rol: string; puesto: string | null;
@@ -55,7 +55,7 @@ export function PanelEquipo({ datos, veTodo, conIa }: { datos: Datos; veTodo: bo
     setRevision(cuerpo.revision);
   }
 
-  const fmt = (d: string) => new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(d));
+  const fmt = (d: string) => new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(d));
 
   return (
     <div className="grid gap-4">
@@ -186,7 +186,7 @@ export function PanelEquipo({ datos, veTodo, conIa }: { datos: Datos; veTodo: bo
                     />
                   </div>
                   <p className="mt-0.5 text-center text-[9px] text-slate-400">
-                    {new Date(d.fecha).getDate()}
+                    {diaDeCalendario(d.fecha).getDate()}
                   </p>
                 </div>
               ))}

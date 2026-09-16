@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { cn, diaDeCalendario } from "@/lib/utils";
 
 const SEMANA = [
   { n: 1, corto: "Lun" }, { n: 2, corto: "Mar" }, { n: 3, corto: "Mie" },
@@ -96,7 +96,7 @@ export function ConfiguracionJornada({
   const anioSiguiente = new Date().getFullYear() + 1;
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
-      .format(new Date(iso));
+      .format(diaDeCalendario(iso));
 
   return (
     <div className="grid gap-4">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Check, Loader2, Printer, RotateCcw, X } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDia } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 type Cargo = {
@@ -149,7 +149,7 @@ export function PanelCobranza({
                         {formatCurrency(c.importe, c.moneda)}
                       </td>
                       <td className={`text-xs ${atrasado ? "font-medium text-red-600" : "text-slate-500"}`}>
-                        {formatDate(c.venceEl)}
+                        {formatDia(c.venceEl)}
                       </td>
                       <td>
                         <Badge tone={c.status === "PAID" ? "success" : atrasado ? "danger" : c.status === "CANCELLED" ? "muted" : "warning"}>

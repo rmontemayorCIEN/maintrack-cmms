@@ -9,7 +9,7 @@ import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-
 import {
   ASSET_STATUS_COLORS, ASSET_STATUS_LABELS, CRITICALITY_COLORS, CRITICALITY_LABELS,
 } from "@/lib/constants";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDia } from "@/lib/utils";
 
 export type FilaActivo = {
   id: string; code: string; name: string;
@@ -69,13 +69,13 @@ const COLUMNAS: Columna<FilaActivo>[] = [
     pinta: (a) =>
       a.warrantyExpiry
         ? new Date(a.warrantyExpiry) > new Date()
-          ? <Badge tone="success">Vigente {formatDate(new Date(a.warrantyExpiry))}</Badge>
+          ? <Badge tone="success">Vigente {formatDia(a.warrantyExpiry)}</Badge>
           : <span className="text-slate-400">Vencida</span>
         : "—",
   },
   { id: "costoReemplazo", etiqueta: "Costo de reemplazo", alineaDerecha: true, texto: (a) => (a.replacementCost ? formatCurrency(a.replacementCost) : "—") },
   { id: "costoCompra", etiqueta: "Costo de compra", alineaDerecha: true, texto: (a) => (a.purchaseCost ? formatCurrency(a.purchaseCost) : "—") },
-  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => (a.commissionedAt ? formatDate(new Date(a.commissionedAt)) : "—") },
+  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => formatDia(a.commissionedAt) },
   { id: "vidaUtil", etiqueta: "Vida útil (años)", alineaDerecha: true, texto: (a) => (a.expectedLifeYears ? `${a.expectedLifeYears}` : "—") },
 ];
 

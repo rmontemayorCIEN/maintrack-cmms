@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "./auth";
 import { can, type Permission } from "./rbac";
 import { estadoSuscripcion } from "./planes";
+import { diaLocal } from "./utils";
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json(data, { status: init ?? 200 });
@@ -85,8 +86,11 @@ function mensajeDeValidacion(error: z.ZodError): string {
   return `Revise ${unico ? "este dato" : "estos datos"} — ${problemas.join("; ")}`;
 }
 
+/**
+ * Fecha que llega del navegador. Un "aaaa-mm-dd" de un `<input type="date">` es
+ * un dia, y se guarda a la medianoche local (`diaLocal`): leido como medianoche
+ * UTC, en una maquina con hora de Mexico se guardaba el dia anterior.
+ */
 export function parseDate(value?: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return diaLocal(value);
 }

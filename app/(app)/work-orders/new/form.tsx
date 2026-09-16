@@ -7,6 +7,7 @@ import { Button, Card, CardHeader } from "@/components/ui";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/constants";
+import { claveDia } from "@/lib/utils";
 import { CampoTitulo } from "@/components/campo-titulo";
 
 type Option = { id: string; name: string; code?: string };
@@ -37,7 +38,7 @@ export function NewWorkOrderForm({
     assetId: "",
     assignedToId: "",
     teamId: "",
-    dueDate: new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10),
+    dueDate: claveDia(new Date(Date.now() + 3 * 86_400_000)),
     scheduledStart: "",
     estimatedHours: "2",
     requiresShutdown: false,

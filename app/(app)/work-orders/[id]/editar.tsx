@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/constants";
+import { claveDia } from "@/lib/utils";
 import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type OrdenEditable = {
@@ -24,7 +25,8 @@ export type OrdenEditable = {
   safetyNotes: string | null;
 };
 
-const fecha = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
+// El dia que representa, no el recorte UTC del texto (ver claveDia).
+const fecha = (iso: string | null) => (iso ? claveDia(iso) : "");
 
 /**
  * Edicion de la orden.
