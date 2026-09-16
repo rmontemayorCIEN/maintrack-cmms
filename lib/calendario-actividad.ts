@@ -845,3 +845,45 @@ export async function candadoDeOrdenes(
   return (planTaskId, planId, assetId) =>
     porActividad.get(`${planTaskId}:${assetId}`) ?? porPlan.get(`${planId}:${assetId}`) ?? null;
 }
+
+/**
+ * Que actividades de plan estan esperando en el backlog, y de que orden salieron.
+ *
+ * Una actividad LIBERADA —el tecnico la solto por falta de refaccion, de
+ * acceso, de mano de obra— no ocupa su orden, pero tampoco esta libre: espera
+ * en el backlog a que alguien la retome. Retomarla desde ahi es lo que conserva
+ * la cadena "se trabo en esta orden, se hizo en aquella" y lo que la saca del
+ * backlog.
+ *
+ * El programador automatico no la veia. El candado de ordenes ignora lo
+ * liberado a proposito, asi que en el barrido de la hora siguiente generaba
+ * OTRA orden para la misma actividad: el balero que no llego volvia a salir en
+ * una orden nueva, igual de trabada, y ademas se quedaba en el backlog para
+ * siempre porque esa orden no la marcaba como retomada.
+ *
+ * Es el mismo criterio que usa `backlog()`: liberada y nadie la ha retomado.
+ * Devuelve una funcion que contesta por actividad y equipo con el folio de la
+ * orden donde se libero, o nulo.
+ */
+export async function candadoDeBacklog(
+  organizationId: string,
+  opciones: { assetId?: string } = {},
+): Promise<(planTaskId: string, assetId: string) => string | null> {
+  const esperando = await prisma.workOrderTask.findMany({
+    where: {
+      liberadaAt: { not: null },
+      retomadaPor: null,
+      planTaskId: { not: null },
+      workOrder: {
+        organizationId,
+        ...(opciones.assetId ? { assetId: opciones.assetId } : {}),
+      },
+    },
+    select: { planTaskId: true, workOrder: { select: { assetId: true, number: true } } },
+  });
+  const mapa = new Map<string, string>();
+  for (const t of esperando) {
+    mapa.set(`${t.planTaskId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
+  }
+  return (planTaskId, assetId) => mapa.get(`${planTaskId}:${assetId}`) ?? null;
+}

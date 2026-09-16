@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
 import {
   actividadesPendientes,
+  candadoDeBacklog,
   candadoDeOrdenes,
   sembrarLoQueFalte,
 } from "@/lib/calendario-actividad";
@@ -355,6 +356,25 @@ export async function armarOrden(p: {
       error: `Ya están en una orden abierta: ${ocupadas
         .map((x) => `${x.t.title} (${x.orden})`)
         .join(", ")}. Actualice la pantalla.`,
+      codigo: 409 as const,
+    };
+  }
+
+  /**
+   * Y una actividad que espera en el backlog se retoma DESDE el backlog.
+   *
+   * Elegirla como actividad del plan la pondria en una orden nueva sin marcar
+   * la liberada como retomada: se haria, y el backlog la seguiria mostrando
+   * como trabada para siempre. La pantalla ya solo la ofrece por el backlog;
+   * esto lo hace cumplir.
+   */
+  const enBacklog = await candadoDeBacklog(p.organizationId, { assetId: asset.id });
+  const esperando = tareas.filter((t) => enBacklog(t.id, asset.id));
+  if (esperando.length) {
+    return {
+      error: `Están en «Quedó pendiente»: ${esperando
+        .map((t) => `${t.title} (liberada en ${enBacklog(t.id, asset.id)})`)
+        .join(", ")}. Retómelas desde ahí.`,
       codigo: 409 as const,
     };
   }

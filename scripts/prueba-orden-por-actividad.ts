@@ -313,6 +313,75 @@ async function main() {
   const genAuto = await generateScheduledWorkOrders(org.id, {});
   revisar("vuelve a generar", genAuto.generated >= 1, `${genAuto.generated}`);
 
+  console.log("\nEn modo AUTOMÁTICO, lo liberado espera en el backlog: no se regenera");
+  // El defecto: el candado ignora lo liberado, y el barrido de la hora
+  // siguiente armaba OTRA orden para el mismo balero que no llegó —igual de
+  // trabada— mientras el backlog la seguía mostrando para siempre.
+  const molino = await prisma.asset.create({
+    data: { organizationId: org.id, siteId: sitio.id, code: "MOL-900", name: "Molino 900", status: "OPERATIONAL" },
+  });
+  const planMolino = await prisma.maintenancePlan.create({
+    data: {
+      organizationId: org.id, name: "Preventivo molino", maintenanceType: "PREVENTIVE",
+      triggerType: "CALENDAR", intervalDays: 30, active: true, leadTimeDays: 0, priority: "MEDIUM",
+      tasks: { create: [{ position: 0, title: "Cambiar balero", taskType: "CHECK", required: true, cadaCuanto: 1, unidadFrecuencia: "MESES" }] },
+    },
+    include: { tasks: true },
+  });
+  const balero = planMolino.tasks[0];
+  await asignarPlan({
+    organizationId: org.id, planId: planMolino.id, userId: gestor.id,
+    equipos: [{ assetId: molino.id, desde: HOY, desdeEsUltima: false }],
+  });
+  const ordenesDelMolino = () => prisma.workOrder.count({ where: { organizationId: org.id, assetId: molino.id } });
+
+  await generateScheduledWorkOrders(org.id, {});
+  const otA = await prisma.workOrder.findFirstOrThrow({ where: { organizationId: org.id, assetId: molino.id } });
+  revisar("el programador arma la orden del balero", (await ordenesDelMolino()) === 1);
+
+  await prisma.workOrderTask.updateMany({
+    where: { workOrderId: otA.id },
+    data: { liberadaAt: new Date(), motivoLiberacion: "SIN_REFACCION" },
+  });
+  const genLib = await generateScheduledWorkOrders(org.id, {});
+  revisar("liberada con su orden abierta, el barrido siguiente NO arma otra",
+    (await ordenesDelMolino()) === 1, `${await ordenesDelMolino()} órdenes`);
+  revisar("y dice por qué: espera en el backlog",
+    genLib.details.some((d) => d.reason?.includes("MOL-900") && d.reason.includes("backlog")),
+    genLib.details.find((d) => d.reason?.includes("MOL-900"))?.reason ?? "(sin motivo)");
+
+  await cerrar(otA.id, org.id, gestor.id);
+  await generateScheduledWorkOrders(org.id, {});
+  revisar("tampoco después de cerrar esa orden", (await ordenesDelMolino()) === 1, `${await ordenesDelMolino()} órdenes`);
+
+  const directa = await armarOrden({
+    organizationId: org.id, userId: gestor.id, assetId: molino.id,
+    title: "Por la puerta de atrás", actividades: [balero.id], reportes: [], backlog: [],
+  });
+  revisar("elegirla como actividad del plan se rechaza: se retoma desde el backlog",
+    "error" in directa && directa.codigo === 409 && directa.error.includes("pendiente"),
+    "error" in directa ? directa.error : "SE COLÓ");
+
+  const dMolino = await trabajoDisponible(org.id, molino.id, { ventana: "DIAS_7" });
+  const trabado = dMolino.backlog.find((b) => b.title === "Cambiar balero");
+  revisar("el armador la ofrece en «Quedó pendiente»", !!trabado);
+  const retomar = await armarOrden({
+    organizationId: org.id, userId: gestor.id, assetId: molino.id,
+    title: "Ya llegó el balero", actividades: [], reportes: [], backlog: [trabado!.id],
+  });
+  if ("error" in retomar) throw new Error(retomar.error);
+  await generateScheduledWorkOrders(org.id, {});
+  revisar("retomada, el programador no duplica mientras la orden está abierta",
+    (await ordenesDelMolino()) === 2, `${await ordenesDelMolino()} órdenes`);
+  await cerrar(retomar.orden.id, org.id, gestor.id);
+  const relojBalero = await prisma.planTaskAsset.findFirstOrThrow({
+    where: { assetId: molino.id, planTaskId: balero.id }, select: { proximaEl: true },
+  });
+  const dFinal = await trabajoDisponible(org.id, molino.id, { ventana: "DIAS_7" });
+  revisar("al cerrarla su reloj avanza un mes", (relojBalero.proximaEl?.getTime() ?? 0) > addDays(HOY, 25).getTime(),
+    iso(relojBalero.proximaEl));
+  revisar("y sale del backlog", !dFinal.backlog.some((b) => b.title === "Cambiar balero"));
+
   // ── Limpieza ─────────────────────────────────────────────────────────────
   await prisma.workOrderTask.deleteMany({ where: { workOrder: { organizationId: org.id } } });
   await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

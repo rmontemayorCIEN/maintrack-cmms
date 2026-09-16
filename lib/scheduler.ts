@@ -7,6 +7,7 @@ import { esHabil, jornada } from "./agenda";
 import { can } from "./rbac";
 import {
   actividadesPendientes,
+  candadoDeBacklog,
   candadoDeOrdenes,
   proyectarActividades,
   reglaDeOrganizacion,
@@ -671,6 +672,8 @@ async function generarPorActividad(
   // Lo que ya esta en una orden viva no se vuelve a ofrecer. El candado es el
   // mismo que usa el armado a mano: vive en un solo lugar a proposito.
   const enOrdenAbierta = await candadoDeOrdenes(organizationId);
+  // Y lo liberado espera en el backlog: no se le arma otra orden encima.
+  const enBacklog = await candadoDeBacklog(organizationId);
 
   // Agrupadas por equipo y plan. No se mezclan planes en una sola orden: el
   // encabezado lleva UN planId y 23 de 24 asignaciones reales son un equipo
@@ -683,6 +686,15 @@ async function generarPorActividad(
       result.details.push({
         plan: a.planNombre,
         reason: `${a.assetCode} · ${a.titulo}: ya está en ${enOrden}`,
+      });
+      continue;
+    }
+    const liberadaEn = enBacklog(a.planTaskId, a.assetId);
+    if (liberadaEn) {
+      result.skipped += 1;
+      result.details.push({
+        plan: a.planNombre,
+        reason: `${a.assetCode} · ${a.titulo}: espera en el backlog (liberada en ${liberadaEn})`,
       });
       continue;
     }
@@ -861,14 +873,20 @@ export async function avisarAtrasadas(
   opciones: { dryRun?: boolean } = {},
 ): Promise<number> {
   const hoy = startOfDay(new Date());
-  const [vencidas, candado] = await Promise.all([
+  const [vencidas, candado, enBacklog] = await Promise.all([
     actividadesPendientes(organizationId, {
       hasta: new Date(hoy.getTime() - 1),
       triggerType: "CALENDAR",
     }),
     candadoDeOrdenes(organizationId),
+    candadoDeBacklog(organizationId),
   ]);
-  const atrasadas = vencidas.filter((a) => !candado(a.planTaskId, a.planId, a.assetId));
+  // Lo que espera en el backlog no cuenta como atrasado sin orden: ya tiene su
+  // lugar, y el armador tampoco lo cuenta. Dos cifras distintas para la misma
+  // pregunta es justo lo que hace que nadie confie en ninguna.
+  const atrasadas = vencidas.filter(
+    (a) => !candado(a.planTaskId, a.planId, a.assetId) && !enBacklog(a.planTaskId, a.assetId),
+  );
   if (!atrasadas.length || opciones.dryRun) return atrasadas.length;
 
   const TITULO = "Actividades preventivas atrasadas sin orden";
