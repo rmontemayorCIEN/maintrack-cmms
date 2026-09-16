@@ -18,7 +18,8 @@ import { Button, BotonEditar } from "@/components/ui";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { RecursosTarea, type LineaMO, type LineaRef, type LineaSrv, type Opcion } from "./recursos-tarea";
-import { SelectorBuscable } from "@/components/selector-buscable";
+import { SelectorMultiple } from "@/components/selector-multiple";
+import { EquiposDelPlan } from "./equipos-del-plan";
 
 export type Task = {
   title: string;
@@ -49,7 +50,11 @@ export type PlanExistente = {
   id: string;
   name: string;
   description: string | null;
-  assetId: string | null;
+  /**
+   * Los equipos a los que se aplica, solo para mostrarlos. Se administran —y se
+   * corrigen las fechas de cada actividad— en «Equipos», no desde aqui.
+   */
+  equipos: string[];
   maintenanceType: string;
   triggerType: string;
   intervalDays: number | null;
@@ -61,7 +66,6 @@ export type PlanExistente = {
   assignedToId: string | null;
   requiresShutdown: boolean;
   safetyNotes: string | null;
-  nextDueDate: string | null;
   tasks: Task[];
 };
 
@@ -128,7 +132,8 @@ export function PlanDialog({
    * Borrador con el que abrir el formulario ya lleno —hoy lo produce la IA—.
    * Sigue siendo un alta: nada se guarda hasta que alguien revise y confirme.
    */
-  borrador?: Omit<PlanExistente, "id" | "assetId" | "intervalMeter" | "meterId" | "leadTimeDays" | "assignedToId" | "nextDueDate"> & {
+  borrador?: Omit<PlanExistente, "id" | "equipos" | "intervalMeter" | "meterId" | "leadTimeDays" | "assignedToId"> & {
+    /** El equipo con el que la IA lo redacto: se propone como primer equipo. */
     assetId: string;
   };
   /** Aviso a mostrar dentro del formulario, ej. lo que la IA no encontro. */
@@ -162,12 +167,10 @@ export function PlanDialog({
   const [form, setForm] = useState({
     name: inicial?.name ?? "",
     description: inicial?.description ?? "",
-    assetId: inicial?.assetId ?? "",
     maintenanceType: inicial?.maintenanceType ?? "PREVENTIVE",
     triggerType: inicial?.triggerType ?? "CALENDAR",
     intervalDays: inicial?.intervalDays != null ? String(inicial.intervalDays) : "30",
     intervalMeter: plan?.intervalMeter != null ? String(plan.intervalMeter) : "",
-    meterId: plan?.meterId ?? "",
     leadTimeDays: String(plan?.leadTimeDays ?? 3),
     priority: inicial?.priority ?? "MEDIUM",
     estimatedHours: String(inicial?.estimatedHours ?? 2),
@@ -175,13 +178,18 @@ export function PlanDialog({
     requiresShutdown: inicial?.requiresShutdown ?? false,
     procedure: "",
     safetyNotes: inicial?.safetyNotes ?? "",
-    nextDueDate: plan?.nextDueDate ?? new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
   });
 
-  const assetMeters = useMemo(
-    () => meters.filter((m) => m.assetId === form.assetId),
-    [meters, form.assetId],
-  );
+  /**
+   * Solo al CREAR: a que equipos se aplica de entrada, y desde cuando.
+   *
+   * Un plan es para uno o varios equipos iguales. Al editar no se capturan aqui:
+   * viven en las asignaciones, y se administran en «Equipos», donde tambien se
+   * corrige la fecha de cada actividad en cada equipo.
+   */
+  const [equipos, setEquipos] = useState<string[]>(borrador?.assetId ? [borrador.assetId] : []);
+  const [desde, setDesde] = useState(new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10));
+  const [desdeEsUltima, setDesdeEsUltima] = useState(false);
 
   /** Costo estimado del plan completo, en vivo mientras se captura. */
   const estimado = useMemo(() => {
@@ -270,10 +278,16 @@ export function PlanDialog({
       ...form,
       intervalDays: form.triggerType === "CALENDAR" ? Number(form.intervalDays) : null,
       intervalMeter: form.triggerType === "METER" ? Number(form.intervalMeter) : null,
-      meterId: form.triggerType === "METER" ? form.meterId : null,
       leadTimeDays: Number(form.leadTimeDays),
       estimatedHours: Number(form.estimatedHours),
       assignedToId: form.assignedToId || null,
+      ...(plan
+        ? {}
+        : {
+            assetIds: equipos,
+            desde: equipos.length && form.triggerType === "CALENDAR" ? desde : null,
+            desdeEsUltima,
+          }),
       tasks: tasks
         .filter((t) => t.title.trim())
         .map((t) => ({
@@ -384,20 +398,55 @@ export function PlanDialog({
             <label className="label">Descripción</label>
             <input className="field" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
-          <div>
-            <label className="label">Asignar a un equipo</label>
-            <SelectorBuscable
-              valor={form.assetId}
-              onCambio={(id) => set("assetId", id)}
-              vacio="Solo al catálogo, sin asignar todavía"
-              marcador="Busque por clave o nombre del equipo"
-              opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
-            />
-            <p className="mt-1 text-[0.6875rem] text-slate-500">
-              {form.assetId
-                ? "El plan queda asignado a ese equipo y empieza a generar órdenes."
-                : "El plan queda en el catálogo. Para que genere, asignelo en Equipos y sus planes."}
-            </p>
+          {/*
+            Un plan es para UNO O VARIOS equipos iguales.
+
+            Aqui habia un selector de un solo equipo, resto de cuando un plan era
+            de un equipo. Al crear servia de atajo; al EDITAR solo guardaba un
+            dato que el programador no lee: cambiarlo dejaba el plan viendose
+            asignado a un equipo al que nunca le generaba ordenes.
+          */}
+          <div className="md:col-span-2">
+            {plan ? (
+              <>
+                <label className="label">Equipos a los que se aplica</label>
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="min-w-0 flex-1 text-sm text-slate-700">
+                    {plan.equipos.length
+                      ? plan.equipos.join(", ")
+                      : "Ninguno todavía: el plan está en el catálogo y no genera órdenes."}
+                  </span>
+                  <EquiposDelPlan
+                    planId={plan.id}
+                    nombre={plan.name}
+                    intervaloDias={plan.intervalDays}
+                    porMedidor={plan.triggerType === "METER"}
+                    editable
+                    activos={assets}
+                  />
+                </div>
+                <p className="mt-1 text-[0.6875rem] text-slate-500">
+                  En «Equipos» se agregan o quitan, y en «Fechas de sus actividades» se dice cuándo
+                  se hizo por última vez cada actividad en cada equipo.
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="label">Aplicar a los equipos</label>
+                <SelectorMultiple
+                  valores={equipos}
+                  onCambio={setEquipos}
+                  vacio="Agregar equipo"
+                  marcador="Busque por clave o nombre del equipo"
+                  opciones={assets.map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
+                />
+                <p className="mt-1 text-[0.6875rem] text-slate-500">
+                  {equipos.length
+                    ? `El plan se aplica a ${equipos.length === 1 ? "ese equipo" : `esos ${equipos.length} equipos`} y empieza a generar órdenes.`
+                    : "Sin equipos, el plan queda en el catálogo. Se aplica después con el botón «Equipos»."}
+                </p>
+              </>
+            )}
           </div>
           <div>
             <label className="label">Tipo</label>
@@ -421,20 +470,15 @@ export function PlanDialog({
             </div>
           ) : (
             <>
-              <div>
-                <label className="label">Medidor</label>
-                <select className="field" value={form.meterId} onChange={(e) => set("meterId", e.target.value)} required>
-                  <option value="">Seleccione…</option>
-                  {assetMeters.map((meter) => (
-                    <option key={meter.id} value={meter.id}>
-                      {meter.name} ({meter.unit}) — actual {meter.currentValue}
-                    </option>
-                  ))}
-                </select>
-                {assetMeters.length === 0 ? (
-                  <p className="mt-1 text-[0.6875rem] text-amber-600">Este activo no tiene medidores registrados.</p>
-                ) : null}
-              </div>
+              {/*
+                El medidor no es del plan: cada equipo usa el suyo, y se toma al
+                aplicarle el plan. Antes se elegia el medidor de UN equipo, que no
+                sirve para un plan de varios compresores.
+              */}
+              <p className="self-end pb-2 text-[0.6875rem] leading-relaxed text-slate-500">
+                Cada equipo usa <b>su propio medidor</b>, que se toma al aplicarle el plan. Un equipo
+                sin medidor no genera órdenes, y se marca en «Equipos».
+              </p>
               <div>
                 <label className="label">Intervalo del medidor</label>
                 <input type="number" min="1" className="field" value={form.intervalMeter} onChange={(e) => set("intervalMeter", e.target.value)} required />
@@ -475,10 +519,35 @@ export function PlanDialog({
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">{editando ? "Proximo vencimiento" : "Primer vencimiento"}</label>
-            <input type="date" className="field" value={form.nextDueDate} onChange={(e) => set("nextDueDate", e.target.value)} />
-          </div>
+          {/*
+            La fecha: solo al crear con equipos, y dice que significa. Al editar
+            no hay "proximo vencimiento del plan": cada actividad tiene el suyo en
+            cada equipo, y se corrige en «Fechas de sus actividades».
+          */}
+          {!editando && equipos.length && form.triggerType === "CALENDAR" ? (
+            <div>
+              <label className="label">Las actividades…</label>
+              <div className="flex gap-1.5">
+                <span className="w-[9.5rem] shrink-0">
+                  <select
+                    className="field"
+                    aria-label="Qué significa la fecha"
+                    value={desdeEsUltima ? "ULTIMA" : "ARRANCA"}
+                    onChange={(e) => setDesdeEsUltima(e.target.value === "ULTIMA")}
+                  >
+                    <option value="ARRANCA">Arrancan el</option>
+                    <option value="ULTIMA">Se hicieron el</option>
+                  </select>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <input type="date" className="field" aria-label="Fecha" value={desde} onChange={(e) => setDesde(e.target.value)} />
+                </span>
+              </div>
+              <p className="mt-1 text-[0.6875rem] text-slate-500">
+                Si alguna va distinta, se corrige después en «Equipos → Fechas de sus actividades».
+              </p>
+            </div>
+          ) : null}
           <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
             <input type="checkbox" checked={form.requiresShutdown} onChange={(e) => set("requiresShutdown", e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
             Requiere paro del equipo

@@ -33,6 +33,11 @@ const schema = z.object({
   safetyNotes: z.string().optional().nullable(),
   nextDueDate: z.string().optional().nullable(),
   active: z.coerce.boolean().default(true),
+  /** Los equipos a los que se aplica desde el alta. */
+  assetIds: z.array(z.string().min(1)).default([]),
+  /** La fecha comun de sus actividades, y que significa. */
+  desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  desdeEsUltima: z.boolean().optional(),
   tasks: z.array(esquemaTarea).default([]),
 });
 
@@ -67,6 +72,6 @@ export async function POST(request: Request) {
       action: "CREATED",
       summary: plan.name,
     });
-    return ok({ plan }, 201);
+    return ok({ plan, sinMedidor: r.sinMedidor }, 201);
   });
 }

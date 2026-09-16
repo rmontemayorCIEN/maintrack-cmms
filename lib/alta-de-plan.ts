@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { parseDate } from "@/lib/api";
+import { diaLocal } from "@/lib/utils";
 import { crearTareas, validarRecursos } from "@/lib/plan-tasks";
 import { resolverCadenciaDelPlan } from "@/lib/frecuencias";
 import { asignarPlan } from "@/lib/asignaciones";
@@ -34,20 +34,35 @@ export type EntradaAltaDePlan = {
   nextDueDate?: string | null;
   active: boolean;
   tasks: Parameters<typeof crearTareas>[0];
+  /**
+   * Los equipos a los que se aplica desde el alta. Un plan es para uno O VARIOS
+   * equipos iguales; el campo de un solo equipo del encabezado era un resto de
+   * cuando no era asi, y al editarlo escribia un dato que el programador no lee.
+   * `assetId` se sigue aceptando como un equipo mas, por compatibilidad.
+   */
+  assetIds?: string[];
+  /** La fecha comun de las actividades en esos equipos (aaaa-mm-dd). */
+  desde?: string | null;
+  /** Si `desde` es "la ultima vez que se hizo" o "cuando arranca". */
+  desdeEsUltima?: boolean;
 };
 
 export async function altaDePlan(
   organizationId: string,
   userId: string | null,
   entrada: EntradaAltaDePlan,
-): Promise<{ plan: { id: string; name: string } } | { error: string }> {
-  const { tasks, ...rest } = entrada;
+): Promise<{ plan: { id: string; name: string }; sinMedidor: string[] } | { error: string }> {
+  const { tasks, assetIds, desde, desdeEsUltima, ...rest } = entrada;
+  const equipos = [...new Set([...(assetIds ?? []), ...(rest.assetId ? [rest.assetId] : [])])];
 
   if (rest.triggerType === "CALENDAR" && !rest.intervalDays) {
     return { error: "Un plan por calendario requiere intervalo en días" };
   }
-  if (rest.triggerType === "METER" && (!rest.intervalMeter || !rest.meterId)) {
-    return { error: "Un plan por medidor requiere medidor e intervalo" };
+  // El medidor NO es del plan: cada equipo usa el suyo, y se toma al asignarlo.
+  // Exigir uno aqui obligaba a elegir el medidor de un solo equipo para un plan
+  // que se aplica a varios.
+  if (rest.triggerType === "METER" && !rest.intervalMeter) {
+    return { error: "Un plan por medidor requiere el intervalo del medidor" };
   }
 
   const problema = await validarRecursos(organizationId, tasks);
@@ -66,13 +81,15 @@ export async function altaDePlan(
     data: {
       ...rest,
       intervalDays: cadencia.base,
-      assetId: rest.assetId || null,
+      // El equipo con el que nacio, solo como referencia historica: lo que
+      // genera ordenes son las asignaciones de abajo.
+      assetId: equipos[0] ?? null,
       organizationId,
       meterId: rest.meterId || null,
       assignedToId: rest.assignedToId || null,
       teamId: rest.teamId || null,
       nextDueDate:
-        parseDate(rest.nextDueDate) ??
+        diaLocal(rest.nextDueDate) ??
         new Date(Date.now() + (cadencia.base ?? 30) * 86_400_000),
       tasks: { create: crearTareas(tasks, cadencia.multiplos) },
     },
@@ -89,18 +106,23 @@ export async function altaDePlan(
    * Sin equipo no se asigna nada y esta bien: el plan queda en el catalogo,
    * para asignarlo despues en Equipos y sus planes.
    */
-  if (rest.assetId) {
-    await asignarPlan({
+  let sinMedidor: string[] = [];
+  if (equipos.length) {
+    const fecha = diaLocal(desde ?? rest.nextDueDate);
+    const r = await asignarPlan({
       organizationId,
       planId: plan.id,
-      equipos: [{
-        assetId: rest.assetId,
-        desde: parseDate(rest.nextDueDate),
-        meterId: rest.meterId || null,
-      }],
+      equipos: equipos.map((assetId) => ({
+        assetId,
+        desde: fecha,
+        desdeEsUltima: desdeEsUltima ?? false,
+        // Con un solo equipo, el medidor elegido (si vino) es el suyo.
+        meterId: equipos.length === 1 ? rest.meterId || null : null,
+      })),
       userId,
     });
+    sinMedidor = r.sinMedidor;
   }
 
-  return { plan };
+  return { plan, sinMedidor };
 }

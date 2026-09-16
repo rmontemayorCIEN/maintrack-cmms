@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { almacenPorOmision, aplicarMovimiento } from "./almacen";
 import type { Recurso } from "./planes";
+import { asignarPlan } from "./asignaciones";
 
 /**
  * Importacion desde CSV.
@@ -399,7 +400,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ──────────────────────────────────────────────────────────── Planes
   planes: {
     titulo: "Planes de mantenimiento",
-    descripcion: "Los planes preventivos por calendario. El programador empieza a generar órdenes en cuanto se importan.",
+    descripcion: "Los planes preventivos por calendario, cada uno ya aplicado a su equipo. Para que generen órdenes les faltan sus actividades: se agregan después, abriendo cada plan.",
     requisitos: "Los activos deben existir.",
     columnas: [
       { nombre: "nombre", requerido: true, ejemplo: "Lubricacion mensual de bomba" },
@@ -446,7 +447,31 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
         },
       };
     },
-    insertar: (orgId, d) => prisma.maintenancePlan.create({ data: { ...d, organizationId: orgId } as never }),
+    /**
+     * El plan Y su asignacion al equipo.
+     *
+     * Antes solo se creaba el plan con el equipo en el encabezado, y el
+     * programador no lee el encabezado: itera asignaciones. Cada plan importado
+     * se veia perfecto en la lista, con su fecha, y no generaba una sola orden
+     * nunca, sin avisar —el mismo defecto que ya dejo diez planes muertos en el
+     * alta a mano—.
+     *
+     * La fecha del renglon es un VENCIMIENTO ("primer_vencimiento"), asi que se
+     * asigna como "arranca ese dia", no como "la ultima vez se hizo".
+     */
+    insertar: async (orgId, d) => {
+      const { nextDueDate, ...datosPlan } = d as { nextDueDate: Date; assetId: string } & Record<string, unknown>;
+      const plan = await prisma.maintenancePlan.create({
+        data: { ...datosPlan, nextDueDate, organizationId: orgId } as never,
+        select: { id: true },
+      });
+      await asignarPlan({
+        organizationId: orgId,
+        planId: plan.id,
+        equipos: [{ assetId: datosPlan.assetId as string, desde: nextDueDate, desdeEsUltima: false }],
+      });
+      return plan;
+    },
     existentes: async (orgId) => {
       const filas = await prisma.maintenancePlan.findMany({
         where: { organizationId: orgId },

@@ -177,6 +177,10 @@ npx tsx scripts/prueba-orden-por-actividad.ts >/dev/null 2>&1 \
   && echo "     ok" \
   || { echo "     ERROR: armar ordenes actividad por actividad fallo."; npx tsx scripts/prueba-orden-por-actividad.ts; exit 1; }
 
+npx tsx scripts/prueba-fechas-de-actividad.ts >/dev/null 2>&1 \
+  && echo "     ok" \
+  || { echo "     ERROR: fechas por actividad y equipo fallo."; npx tsx scripts/prueba-fechas-de-actividad.ts; exit 1; }
+
 # ── 2. Migracion, con la puerta abierta el menor tiempo posible ──────────────
 if [ "$MIGRAR" = "1" ]; then
   echo ""

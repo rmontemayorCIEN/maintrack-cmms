@@ -55,9 +55,22 @@ export async function construirExpediente(organizationId: string, dias = 30) {
         where: { organizationId, active: true, minQuantity: { gt: 0 } },
         select: { code: true, name: true, quantityOnHand: true, minQuantity: true, unit: true, unitCost: true },
       }),
-      prisma.maintenancePlan.findMany({
-        where: { organizationId, active: true, nextDueDate: { lt: hasta } },
-        select: { name: true, nextDueDate: true, asset: { select: { code: true } } },
+      /**
+       * Lo vencido sale de las ASIGNACIONES —un renglon por plan y equipo—, no
+       * del encabezado del plan.
+       *
+       * La fecha del encabezado dejo de moverse cuando el calendario paso a
+       * vivir en cada equipo, y luego en cada actividad: leerla le reportaba a
+       * la IA atrasos que no eran, y le escondia los de los equipos que no
+       * fueran el del encabezado.
+       */
+      prisma.planAsset.findMany({
+        where: {
+          organizationId, active: true, nextDueDate: { lt: hasta },
+          plan: { active: true },
+          asset: { active: true, status: { not: "RETIRED" } },
+        },
+        select: { nextDueDate: true, plan: { select: { name: true } }, asset: { select: { code: true } } },
         orderBy: { nextDueDate: "asc" },
         take: 10,
       }),
@@ -221,8 +234,8 @@ export async function construirExpediente(organizationId: string, dias = 30) {
         criticidad: a.criticality,
       })),
       planesVencidos: planesVencidos.map((p) => ({
-        plan: p.name,
-        activo: p.asset?.code ?? "sin activo",
+        plan: p.plan.name,
+        activo: p.asset.code,
         vencioEl: p.nextDueDate?.toISOString().slice(0, 10) ?? null,
         diasDeAtraso: p.nextDueDate
           ? Math.floor((hasta.getTime() - p.nextDueDate.getTime()) / DIA)

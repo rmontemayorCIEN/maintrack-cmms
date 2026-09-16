@@ -15,7 +15,8 @@
  */
 import { prisma } from "./db";
 import { jornada } from "./agenda";
-import { siguienteFecha, type ReglaCalendario, type Unidad } from "./calendario";
+import { describirIntervalo, siguienteFecha, type ReglaCalendario, type Unidad } from "./calendario";
+import { logAudit } from "./audit";
 import { startOfDay } from "./utils";
 
 /** El reloj de una actividad, sin la base de datos de por medio. */
@@ -886,4 +887,236 @@ export async function candadoDeBacklog(
     mapa.set(`${t.planTaskId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
   }
   return (planTaskId, assetId) => mapa.get(`${planTaskId}:${assetId}`) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Las fechas de las actividades de UN equipo en UN plan, para verlas y
+// corregirlas a mano.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class ErrorDeFechas extends Error {
+  constructor(mensaje: string, public codigo: 400 | 404 | 409 = 400) {
+    super(mensaje);
+  }
+}
+
+export type FechaDeActividad = {
+  planTaskId: string;
+  titulo: string;
+  /** "Mensual", "Cada 15 días"… como lo diria una persona. */
+  frecuencia: string;
+  proximaEl: Date | null;
+  ultimaEl: Date | null;
+  arranqueEl: Date | null;
+  arranqueEsUltima: boolean;
+  atrasada: boolean;
+  /**
+   * Por que no se puede corregir ahora, si no se puede: ya va en una orden
+   * abierta o espera en el backlog. Cambiarle la fecha a algo que ya esta en
+   * curso dejaria dos verdades sobre la misma actividad.
+   */
+  bloqueo: string | null;
+};
+
+/**
+ * Las actividades del plan en este equipo, cada una con su fecha.
+ *
+ * Existe porque al asignar un plan todas las actividades nacen con la misma
+ * fecha —la que se dio en comun— y la realidad casi nunca es asi: la vibracion
+ * se midio en agosto, el aceite se cambio la semana pasada. Sin una pantalla
+ * para decirlo, el sistema programaba todo junto y nadie tenia donde
+ * corregirlo sin quitar y volver a asignar el equipo.
+ */
+export async function fechasDeAsignacion(organizationId: string, planAssetId: string) {
+  const asignacion = await prisma.planAsset.findFirst({
+    where: { id: planAssetId, organizationId },
+    select: {
+      id: true, assetId: true, meterId: true,
+      asset: { select: { code: true, name: true } },
+      plan: {
+        select: {
+          id: true, name: true, triggerType: true, intervalDays: true,
+          tasks: {
+            orderBy: { position: "asc" },
+            select: { id: true, title: true, cadaCuanto: true, unidadFrecuencia: true, cadaCuantas: true },
+          },
+        },
+      },
+    },
+  });
+  if (!asignacion) return null;
+
+  const porMedidor = asignacion.plan.triggerType === "METER";
+  const base = {
+    asignacionId: asignacion.id,
+    equipo: `${asignacion.asset.code} — ${asignacion.asset.name}`,
+    plan: asignacion.plan.name,
+    porMedidor,
+    /** Un plan por medidor sin medidor en este equipo no genera nunca. */
+    sinMedidor: porMedidor && !asignacion.meterId,
+  };
+  // Los planes por medidor no tienen fecha por actividad: la calcula la lectura.
+  if (porMedidor) return { ...base, actividades: [] as FechaDeActividad[] };
+
+  await sembrarLoQueFalte(organizationId, asignacion.assetId);
+
+  const [relojes, enOrden, enBacklog] = await Promise.all([
+    prisma.planTaskAsset.findMany({
+      where: { organizationId, assetId: asignacion.assetId, planTask: { planId: asignacion.plan.id } },
+      select: { planTaskId: true, proximaEl: true, ultimaEl: true, arranqueEl: true, arranqueEsUltima: true },
+    }),
+    candadoDeOrdenes(organizationId, { assetId: asignacion.assetId }),
+    candadoDeBacklog(organizationId, { assetId: asignacion.assetId }),
+  ]);
+  const reloj = new Map(relojes.map((r) => [r.planTaskId, r]));
+  const hoy = startOfDay(new Date());
+
+  const actividades: FechaDeActividad[] = asignacion.plan.tasks.map((t) => {
+    const r = reloj.get(t.id);
+    const orden = enOrden(t.id, asignacion.plan.id, asignacion.assetId);
+    const backlog = enBacklog(t.id, asignacion.assetId);
+    const dias = t.cadaCuanto ? null : respaldoEnDias(t.cadaCuantas, asignacion.plan.intervalDays);
+    return {
+      planTaskId: t.id,
+      titulo: t.title,
+      frecuencia: t.cadaCuanto
+        ? describirIntervalo(t.cadaCuanto, (t.unidadFrecuencia as Unidad) ?? "DIAS")
+        : dias
+          ? `Cada ${dias} días (del plan)`
+          : "Sin frecuencia",
+      proximaEl: r?.proximaEl ?? null,
+      ultimaEl: r?.ultimaEl ?? null,
+      arranqueEl: r?.arranqueEl ?? null,
+      arranqueEsUltima: r?.arranqueEsUltima ?? true,
+      atrasada: !!r?.proximaEl && r.proximaEl < hoy && !orden && !backlog,
+      bloqueo: orden ? `va en ${orden}` : backlog ? `espera en el backlog (liberada en ${backlog})` : null,
+    };
+  });
+
+  return { ...base, actividades };
+}
+
+/**
+ * Corrige la fecha de una o varias actividades de un equipo.
+ *
+ * Dos formas de decirla, las mismas que al asignar:
+ *
+ *  - **"La ultima vez se hizo el X".** Se cuenta un intervalo desde X, con las
+ *    mismas reglas del programador —dias habiles, meses de calendario—. Si ese
+ *    intervalo ya paso, la actividad queda atrasada, que es la verdad.
+ *  - **"Toca el X".** Esa fecha es la proxima, tal cual.
+ *
+ * Todo o nada: se valida cada cambio antes de escribir el primero, para que un
+ * error en la quinta actividad no deje las cuatro primeras cambiadas y la
+ * persona sin saber cuales si.
+ *
+ * Una actividad que ya va en una orden abierta o espera en el backlog no se
+ * toca: su fecha la mueve el cierre de esa orden.
+ */
+export async function corregirFechas(p: {
+  organizationId: string;
+  userId: string | null;
+  planAssetId: string;
+  cambios: Array<{ planTaskId: string; fecha: Date; esUltima: boolean }>;
+}) {
+  if (!p.cambios.length) throw new ErrorDeFechas("No hay cambios que guardar.");
+
+  const asignacion = await prisma.planAsset.findFirst({
+    where: { id: p.planAssetId, organizationId: p.organizationId },
+    select: {
+      id: true, assetId: true,
+      asset: { select: { code: true } },
+      plan: {
+        select: {
+          id: true, triggerType: true, intervalDays: true,
+          tasks: { select: { id: true, title: true, cadaCuanto: true, unidadFrecuencia: true, cadaCuantas: true } },
+        },
+      },
+    },
+  });
+  if (!asignacion) throw new ErrorDeFechas("Esa asignación no existe en su empresa.", 404);
+  if (asignacion.plan.triggerType !== "CALENDAR") {
+    throw new ErrorDeFechas("Este plan va por medidor: su fecha la calcula la lectura del equipo, no se captura.");
+  }
+
+  await sembrarLoQueFalte(p.organizationId, asignacion.assetId);
+  const [regla, enOrden, enBacklog, relojes] = await Promise.all([
+    reglaDeOrganizacion(p.organizationId),
+    candadoDeOrdenes(p.organizationId, { assetId: asignacion.assetId }),
+    candadoDeBacklog(p.organizationId, { assetId: asignacion.assetId }),
+    prisma.planTaskAsset.findMany({
+      where: { organizationId: p.organizationId, assetId: asignacion.assetId, planTask: { planId: asignacion.plan.id } },
+      select: { id: true, planTaskId: true, proximaEl: true },
+    }),
+  ]);
+  const tareas = new Map(asignacion.plan.tasks.map((t) => [t.id, t]));
+  const reloj = new Map(relojes.map((r) => [r.planTaskId, r]));
+  const finDeHoy = new Date();
+  finDeHoy.setHours(23, 59, 59, 999);
+
+  const escrituras: Array<{ id: string; data: Record<string, unknown>; titulo: string; antes: Date | null; despues: Date | null }> = [];
+  const vistos = new Set<string>();
+
+  for (const c of p.cambios) {
+    const t = tareas.get(c.planTaskId);
+    if (!t) throw new ErrorDeFechas("Alguna actividad no es de este plan.", 404);
+    if (vistos.has(c.planTaskId)) throw new ErrorDeFechas(`«${t.title}» viene dos veces.`);
+    vistos.add(c.planTaskId);
+    if (!(c.fecha instanceof Date) || Number.isNaN(c.fecha.getTime())) {
+      throw new ErrorDeFechas(`«${t.title}»: la fecha no es válida.`);
+    }
+    if (c.esUltima && c.fecha > finDeHoy) {
+      throw new ErrorDeFechas(`«${t.title}»: la última vez que se hizo no puede ser en el futuro.`);
+    }
+    const r = reloj.get(c.planTaskId);
+    if (!r) throw new ErrorDeFechas(`«${t.title}» no tiene calendario en este equipo.`, 404);
+    const orden = enOrden(t.id, asignacion.plan.id, asignacion.assetId);
+    if (orden) throw new ErrorDeFechas(`«${t.title}» ya va en ${orden}: su fecha se mueve al cerrar esa orden.`, 409);
+    const backlog = enBacklog(t.id, asignacion.assetId);
+    if (backlog) throw new ErrorDeFechas(`«${t.title}» espera en el backlog (liberada en ${backlog}). Retómela desde ahí.`, 409);
+
+    const fecha = startOfDay(c.fecha);
+    let proxima: Date | null;
+    let data: Record<string, unknown>;
+    if (c.esUltima) {
+      proxima = proximaDe(
+        {
+          cadaCuanto: t.cadaCuanto,
+          unidadFrecuencia: (t.unidadFrecuencia as Unidad) ?? "DIAS",
+          respaldoDias: respaldoEnDias(t.cadaCuantas, asignacion.plan.intervalDays),
+          arranqueEl: fecha,
+          arranqueEsUltima: true,
+          ultimaEl: null,
+          proximaEl: null,
+        },
+        regla,
+        { desdeProgramado: regla.desdeProgramado },
+      );
+      if (!proxima) throw new ErrorDeFechas(`«${t.title}» no tiene frecuencia: capture primero cada cuánto se hace.`);
+      data = { arranqueEl: fecha, arranqueEsUltima: true, ultimaEl: fecha, proximaEl: startOfDay(proxima) };
+    } else {
+      proxima = fecha;
+      data = { arranqueEl: fecha, arranqueEsUltima: false, proximaEl: fecha };
+    }
+    escrituras.push({ id: r.id, data, titulo: t.title, antes: r.proximaEl, despues: startOfDay(proxima) });
+  }
+
+  await prisma.$transaction(
+    escrituras.map((e) => prisma.planTaskAsset.update({ where: { id: e.id }, data: e.data })),
+  );
+  await sincronizarAsignaciones(p.organizationId, asignacion.assetId);
+
+  const corta = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
+  await logAudit({
+    organizationId: p.organizationId,
+    userId: p.userId,
+    entity: "PlanAsset",
+    entityId: asignacion.id,
+    action: "UPDATED",
+    summary: `Fechas de ${asignacion.asset.code}: ${escrituras
+      .map((e) => `${e.titulo} ${corta(e.antes)} → ${corta(e.despues)}`)
+      .join("; ")}`.slice(0, 500),
+  });
+
+  return { cambiadas: escrituras.map((e) => ({ titulo: e.titulo, antes: e.antes, despues: e.despues })) };
 }
