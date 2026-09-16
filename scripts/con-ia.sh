@@ -19,6 +19,7 @@
 #   ./scripts/con-ia.sh --todas
 #
 set -euo pipefail
+source "$(dirname "$0")/proyecto.sh"
 cd "$(dirname "$0")/.."
 
 command -v gcloud >/dev/null || { echo "ERROR: gcloud no esta en el PATH."; exit 1; }

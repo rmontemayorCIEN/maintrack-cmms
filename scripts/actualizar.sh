@@ -13,6 +13,7 @@
 # la base quedaba expuesta a una IP de internet sin que nadie se enterara.
 # Aqui el cierre esta en una trampa de salida: corre pase lo que pase.
 set -euo pipefail
+source "$(dirname "$0")/proyecto.sh"
 
 cd "$(dirname "$0")/.."
 

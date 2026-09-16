@@ -9,6 +9,7 @@
 #   ./scripts/revisar.sh "Casa Montemayor"
 #
 set -euo pipefail
+source "$(dirname "$0")/proyecto.sh"
 cd "$(dirname "$0")/.."
 
 INSTANCIA_SQL="maintrack-db"

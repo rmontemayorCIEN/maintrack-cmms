@@ -7,6 +7,7 @@
 # si cambia el dominio de la aplicacion — la regla CORS lista los origenes
 # permitidos y hay que actualizarla, o el navegador bloqueara las subidas.
 set -euo pipefail
+source "$(dirname "$0")/proyecto.sh"
 
 PROYECTO=$(gcloud config get-value project 2>/dev/null)
 [ -z "$PROYECTO" ] && { echo "ERROR: gcloud no tiene proyecto configurado."; exit 1; }

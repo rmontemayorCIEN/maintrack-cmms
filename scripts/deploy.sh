@@ -6,6 +6,7 @@
 # Sube el contenido de esta carpeta, Cloud Build arma la imagen a partir del
 # Dockerfile y Cloud Run la pone en linea. No hace falta Docker ni GitHub.
 set -euo pipefail
+source "$(dirname "$0")/proyecto.sh"
 
 cd "$(dirname "$0")/.."
 
