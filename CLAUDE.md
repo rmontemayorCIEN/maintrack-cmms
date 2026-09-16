@@ -174,6 +174,20 @@ paso: se publico la revision 00108 y el detalle de ordenes quedo caido.
 Para saber si hay pendientes: comparar `prisma/migrations` contra lo ultimo que
 se aplico. Ante la duda, `actualizar` sirve para los dos casos.
 
+### El proyecto de Google Cloud va fijo, no el de la maquina
+
+En esta Mac conviven sistemas independientes —MainTrack y Avisos de
+Obligaciones, cada uno con su proyecto de GCP— y **no se mezclan**. La
+configuracion global de `gcloud` es de la maquina y cambia segun en cual se
+este trabajando: con ella apuntando a `avisos-obligaciones-4821`, `actualizar`
+fallo buscando `maintrack-db` ahi, y un `deploy` habria publicado MainTrack
+dentro del otro proyecto.
+
+Todo script que llama a gcloud carga `scripts/proyecto.sh`, que exporta
+`CLOUDSDK_CORE_PROJECT=maintrack-cmms-4821` solo para ese proceso. Un comando
+gcloud suelto se corre con esa variable o con `--project`. **Nunca**
+`gcloud config set project`: rompe lo que este abierto en el otro sistema.
+
 Nunca un `gcloud run deploy` a mano. El servicio de produccion, el que ven los
 clientes, se llama **`maintrack-cmms`** (no `cmms`).
 
