@@ -49,7 +49,12 @@ export default async function PlansPage() {
         asignaciones: {
           where: { active: true },
           orderBy: { nextDueDate: "asc" },
-          select: { nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true },
+          select: {
+            nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true,
+            // Los equipos REALES del plan: el del encabezado es solo con el que nacio.
+            asset: { select: { code: true, name: true } },
+            meter: { select: { unit: true, currentValue: true } },
+          },
         },
         tasks: incluirTareas,
         links: {
@@ -115,7 +120,7 @@ export default async function PlansPage() {
       id: plan.id,
       name: plan.name,
       description: plan.description,
-      assetId: plan.assetId,
+      equipos: plan.asignaciones.map((a) => a.asset.code),
       maintenanceType: plan.maintenanceType,
       triggerType: plan.triggerType,
       intervalDays: plan.intervalDays,
@@ -127,7 +132,6 @@ export default async function PlansPage() {
       assignedToId: plan.assignedToId,
       requiresShutdown: plan.requiresShutdown,
       safetyNotes: plan.safetyNotes,
-      nextDueDate: plan.nextDueDate ? plan.nextDueDate.toISOString().slice(0, 10) : null,
       tasks: plan.tasks.map((t) => ({
         title: t.title,
         taskType: t.taskType,
@@ -162,25 +166,29 @@ export default async function PlansPage() {
 
   const filas: FilaPlan[] = plans.map((plan) => {
     const costo = costearPlan(plan.tasks);
+    // El medidor es de cada equipo; el del plan solo existe en planes viejos.
+    const medidor = plan.meter ?? plan.asignaciones.find((a) => a.meter)?.meter ?? null;
     const frecuencia =
       plan.triggerType === "CALENDAR"
         ? `Cada ${plan.intervalDays} dias`
         : plan.triggerType === "METER"
-          ? `Cada ${formatNumber(plan.intervalMeter ?? 0, 0)} ${plan.meter?.unit ?? ""}`
+          ? `Cada ${formatNumber(plan.intervalMeter ?? 0, 0)} ${medidor?.unit ?? ""}`
           : "Por condición";
     return {
       id: plan.id,
       name: plan.name,
       description: plan.description,
-      activo: plan.asset?.name ?? null,
-      activoCodigo: plan.asset?.code ?? null,
+      // De las asignaciones, no del encabezado: con un solo equipo se muestra ese,
+      // y el encabezado podia apuntar a otro o a ninguno.
+      activo: plan.asignaciones.length === 1 ? plan.asignaciones[0].asset.name : null,
+      activoCodigo: plan.asignaciones.length === 1 ? plan.asignaciones[0].asset.code : null,
       maintenanceType: plan.maintenanceType,
       triggerType: plan.triggerType,
       priority: plan.priority,
       frecuencia,
       medidorActual:
-        plan.triggerType === "METER" && plan.meter
-          ? `Actual ${formatNumber(plan.meter.currentValue, 0)} ${plan.meter.unit}`
+        plan.triggerType === "METER" && medidor && plan.asignaciones.length <= 1
+          ? `Actual ${formatNumber(medidor.currentValue, 0)} ${medidor.unit}`
           : null,
       // La mas proxima de sus equipos: es lo que le interesa a quien mira la
       // lista —cuando vuelve a tocar este plan— sin importar en cual equipo.

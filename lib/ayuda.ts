@@ -454,6 +454,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
+      "Cada actividad lleva su fecha en CADA equipo. Al aplicar el plan todas arrancan con la fecha que se dé en común; las que en la realidad van distinto se corrigen en «Equipos → Fechas de sus actividades».",
       "Qué equipos van en cada plan lo decide usted: dos compresores de la misma categoría pueden llevar planes distintos si cambia una actividad o la frecuencia. Lo que el sistema sí vigila es que ningún equipo se quede sin plan, y lo avisa en «Equipos y sus planes».",
       "Cada equipo conserva su propia fecha. Al aplicar el plan, el sistema ofrece repartir las fechas para que no se paren todos el mismo día —los críticos primero— o ponerlas todas iguales si así conviene.",
       "Mejorar el plan una vez lo mejora para todos los equipos en su siguiente ciclo.",
@@ -492,7 +493,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Genera órdenes demasiado seguido", porque: "Revise el intervalo del plan. Un plan llamado «mensual» con intervalo de 3 días va a generar cada tres días: manda el número, no el nombre." },
     ],
     preguntas: [
-      { pregunta: "¿Por qué el campo de activo dice «solo al catálogo»?", respuesta: "Porque un plan es un catálogo, no una propiedad de un equipo. «Preventivo mensual compresor» describe el trabajo; los compresores que lo siguen se asignan aparte, cada uno con su propio calendario. Si el plan es para un solo equipo, elíjalo aquí y queda creado y asignado de un golpe. Si va a servir a varios, déjelo en blanco y asígnelos en Equipos y sus planes." },
+      { pregunta: "¿Por qué el plan ya no tiene un campo de un solo equipo?", respuesta: "Porque un plan es para uno o varios equipos iguales. Al crearlo se eligen todos los equipos a los que se aplica. Al editarlo, los equipos se ven arriba y se administran con «Equipos»: el campo de un solo equipo que había antes, al editarlo, guardaba un dato que el programador no lee, y el plan se veía asignado a un equipo al que nunca le generaba órdenes." },
+      { pregunta: "¿Dónde digo cuándo se hizo por última vez cada actividad?", respuesta: "En «Equipos», en el renglón de cada equipo, con «Fechas de sus actividades». Ahí se ve cada actividad con su frecuencia, la última vez y la próxima, y se captura por actividad «la última vez se hizo el…» (la próxima se calcula con las reglas de su empresa) o «toca el…» (esa fecha tal cual). Cada equipo lleva sus fechas: corregir uno no mueve a los demás. Lo que ya va en una orden abierta no se corrige ahí: su fecha se mueve al cerrarla. Al aplicar el plan a equipos nuevos también se puede dar una fecha distinta a algunas actividades." },
+      { pregunta: "Un plan por horas, ¿de qué medidor toma la lectura?", respuesta: "Del medidor de cada equipo, que se toma al aplicarle el plan. Por eso el plan ya no pide elegir un medidor. Un equipo sin medidor dado de alta aparece marcado «Sin medidor: no genera» en «Equipos»." },
       { pregunta: "Cree un plan y no genera órdenes. ¿Por qué?", respuesta: "Un plan solo genera para los equipos que tiene asignados. Si lo dejó en el catálogo sin asignar, no va a generar nada —es lo correcto, pero conviene saberlo. Vaya a Planes → Equipos y sus planes y asígnele los equipos." },
       { pregunta: "¿El botón de generar plan con IA crea el plan?", respuesta: "No. Lee ese equipo —marca, modelo, historial, medidores— y le propone un borrador que llena el formulario. Usted revisa, ajusta y decide si lo guarda. Nada se guarda hasta que usted lo acepta." },
 

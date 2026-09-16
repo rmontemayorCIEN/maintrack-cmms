@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Loader2, Plus, Trash2, Users, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Loader2, Plus, Trash2, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { SelectorMultiple } from "@/components/selector-multiple";
-import { cn } from "@/lib/utils";
+import { cn, formatDia } from "@/lib/utils";
+import { FechasDelEquipo } from "./fechas-del-equipo";
 
 type Asignacion = {
   id: string;
   nextDueDate: string | null;
   lastCompletedAt: string | null;
   active: boolean;
+  meterId: string | null;
   asset: { id: string; code: string; name: string; criticality: string };
 };
 
@@ -50,12 +52,39 @@ export function EquiposDelPlan({
   const [desdeEsUltima, setDesdeEsUltima] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  /** Las actividades del plan, para dar fechas distintas al asignar. */
+  const [actividades, setActividades] = useState<Array<{ id: string; title: string }>>([]);
+  /** Solo las actividades que el usuario cambio respecto a la fecha comun. */
+  const [porActividad, setPorActividad] = useState<Record<string, { fecha: string; esUltima: boolean }>>({});
+  /** De que equipo se estan viendo las fechas. */
+  const [fechasDe, setFechasDe] = useState<string | null>(null);
+
+  /**
+   * Si algo cambio mientras el dialogo estuvo abierto.
+   *
+   * La pagina se refresca al CERRAR, no en cada guardado: `router.refresh()`
+   * vuelve a armar la tabla, el renglon se monta de nuevo y el dialogo se
+   * cerraba solo a la mitad del trabajo —justo despues de corregir las fechas
+   * de un equipo, cuando lo natural es seguir con el siguiente—.
+   */
+  const [huboCambios, setHuboCambios] = useState(false);
+  function cerrar() {
+    setAbierto(false);
+    setFechasDe(null);
+    if (huboCambios) {
+      setHuboCambios(false);
+      router.refresh();
+    }
+  }
 
   async function cargar() {
-    setCargando(true);
+    // Solo la primera vez se muestra la espera: recargar despues de guardar no
+    // debe desmontar el panel que la persona esta usando.
+    if (lista === null) setCargando(true);
     const res = await fetch(`/api/plans/asignaciones?planId=${planId}`);
     const c = await res.json().catch(() => null);
     setLista(res.ok ? c.asignaciones : []);
+    setActividades(res.ok ? (c.actividades ?? []) : []);
     setCargando(false);
   }
   useEffect(() => { if (abierto) cargar(); }, [abierto]);
@@ -68,6 +97,12 @@ export function EquiposDelPlan({
       body: JSON.stringify({
         planId, assetIds: elegidos, escalonar,
         desde: desde || null, desdeEsUltima: desde ? desdeEsUltima : false,
+        // Solo las que difieren de la fecha comun; las demas la heredan.
+        porActividad: desde
+          ? Object.entries(porActividad)
+              .filter(([, v]) => v.fecha && (v.fecha !== desde || v.esUltima !== desdeEsUltima))
+              .map(([planTaskId, v]) => ({ planTaskId, fecha: v.fecha, esUltima: v.esUltima }))
+          : [],
       }),
     });
     setGuardando(false);
@@ -80,8 +115,9 @@ export function EquiposDelPlan({
         "hasta que se le dé de alta su medidor.",
       );
     }
-    setElegidos([]); setDesde("");
-    cargar(); router.refresh();
+    setElegidos([]); setDesde(""); setPorActividad({});
+    setHuboCambios(true);
+    cargar();
   }
 
   async function quitar(id: string) {
@@ -89,14 +125,14 @@ export function EquiposDelPlan({
       method: "DELETE", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    cargar(); router.refresh();
+    setHuboCambios(true);
+    cargar();
   }
 
   const yaAsignados = new Set((lista ?? []).map((a) => a.asset.id));
   const disponibles = activos.filter((a) => !yaAsignados.has(a.id));
-  const fmt = (iso: string | null) =>
-    iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" })
-      .format(new Date(iso)) : "sin fecha";
+  // Dias completos, sin que la zona del navegador los recorra un dia (ver formatDia).
+  const fmt = (iso: string | null) => (iso ? formatDia(iso) : "sin fecha");
 
   return (
     <>
@@ -115,7 +151,7 @@ export function EquiposDelPlan({
             <div
               className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-900/40 p-4"
               role="dialog" aria-modal="true"
-              onClick={(e) => e.target === e.currentTarget && setAbierto(false)}
+              onClick={(e) => e.target === e.currentTarget && cerrar()}
             >
               <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div className="flex items-start justify-between gap-3">
@@ -123,7 +159,7 @@ export function EquiposDelPlan({
                     <h3 className="text-sm font-semibold text-slate-800">Equipos a los que se aplica</h3>
                     <p className="mt-0.5 text-xs text-slate-500">{nombre}</p>
                   </div>
-                  <button type="button" onClick={() => setAbierto(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar">
+                  <button type="button" onClick={cerrar} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -138,14 +174,40 @@ export function EquiposDelPlan({
                         <span className="font-medium text-slate-800">{a.asset.code}</span>
                         <span className="min-w-0 flex-1 truncate text-slate-600">{a.asset.name}</span>
                         {a.asset.criticality === "A" ? <Badge tone="danger">Crítico</Badge> : null}
+                        {porMedidor && !a.meterId ? (
+                          <Badge tone="warning">Sin medidor: no genera</Badge>
+                        ) : null}
                         <span className="inline-flex items-center gap-1 text-slate-500">
                           <CalendarDays className="h-3 w-3" />
                           {porMedidor ? "según su medidor" : fmt(a.nextDueDate)}
                         </span>
+                        {/*
+                          Las fechas de CADA actividad en este equipo. Al asignar
+                          todas nacen con la fecha comun; aqui se corrigen las que
+                          en la realidad van distinto, sin quitar el equipo.
+                        */}
+                        <button
+                          type="button"
+                          onClick={() => setFechasDe(fechasDe === a.id ? null : a.id)}
+                          className="inline-flex items-center gap-1 rounded border border-slate-200 px-1.5 py-0.5 text-[0.6875rem] text-slate-600 hover:bg-slate-50"
+                          aria-expanded={fechasDe === a.id}
+                        >
+                          Fechas de sus actividades
+                          <ChevronDown className={cn("h-3 w-3 transition-transform", fechasDe === a.id && "rotate-180")} />
+                        </button>
                         {editable ? (
                           <button type="button" onClick={() => quitar(a.id)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label="Quitar">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
+                        ) : null}
+                        {fechasDe === a.id ? (
+                          <div className="basis-full border-t border-slate-100 pt-2">
+                            <FechasDelEquipo
+                              asignacionId={a.id}
+                              editable={editable}
+                              onGuardado={() => { setHuboCambios(true); cargar(); }}
+                            />
+                          </div>
                         ) : null}
                       </li>
                     ))}
@@ -254,6 +316,59 @@ export function EquiposDelPlan({
                           </label>
                         </div>
                       </div>
+                    ) : null}
+
+                    {/*
+                      Fechas distintas por actividad.
+
+                      La fecha comun rara vez es la de todas: el aceite se cambio
+                      la semana pasada y la vibracion se midio en agosto. Cada
+                      renglon nace con la fecha y el significado comunes, y solo
+                      se mandan los que el usuario cambia.
+                    */}
+                    {desde && !porMedidor && actividades.length > 1 ? (
+                      <details className="mt-2 rounded-lg border border-slate-200 p-2.5">
+                        <summary className="cursor-pointer text-xs font-medium text-slate-800">
+                          Algunas actividades van en otra fecha
+                          {Object.keys(porActividad).length ? (
+                            <span className="ml-1 font-normal text-slate-500">
+                              ({Object.values(porActividad).filter((v) => v.fecha && (v.fecha !== desde || v.esUltima !== desdeEsUltima)).length} distinta(s))
+                            </span>
+                          ) : null}
+                        </summary>
+                        <ul className="mt-2 grid gap-1.5">
+                          {actividades.map((t) => {
+                            const v = porActividad[t.id] ?? { fecha: desde, esUltima: desdeEsUltima };
+                            const fijar = (parcial: Partial<{ fecha: string; esUltima: boolean }>) =>
+                              setPorActividad((prev) => ({ ...prev, [t.id]: { ...v, ...parcial } }));
+                            return (
+                              <li key={t.id} className="grid gap-1.5 md:grid-cols-[minmax(0,1fr)_10.5rem_9.5rem] md:items-center">
+                                <span className="truncate text-xs text-slate-700">{t.title}</span>
+                                <select
+                                  className="field"
+                                  aria-label={`Qué significa la fecha de ${t.title}`}
+                                  value={v.esUltima ? "ULTIMA" : "ARRANCA"}
+                                  onChange={(e) => fijar({ esUltima: e.target.value === "ULTIMA" })}
+                                >
+                                  <option value="ARRANCA">Arranca el</option>
+                                  <option value="ULTIMA">La última vez fue</option>
+                                </select>
+                                <input
+                                  type="date"
+                                  className="field"
+                                  aria-label={`Fecha de ${t.title}`}
+                                  value={v.fecha}
+                                  onChange={(e) => fijar({ fecha: e.target.value })}
+                                />
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="mt-1.5 text-[0.6875rem] text-slate-500">
+                          Se aplica igual a todos los equipos que eligió. Después se puede corregir
+                          equipo por equipo en «Fechas de sus actividades».
+                        </p>
+                      </details>
                     ) : null}
 
                     {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}

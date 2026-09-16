@@ -90,3 +90,51 @@ export function toCsv(rows: Record<string, unknown>[]) {
     ...rows.map((row) => headers.map((h) => escape(row[h])).join(",")),
   ].join("\n");
 }
+
+/**
+ * Un dia de calendario capturado como "aaaa-mm-dd", a la medianoche LOCAL.
+ *
+ * `new Date("2026-09-21")` lo lee como medianoche UTC, que en Mexico es el 20 a
+ * las 6 de la tarde: al pasarlo por `startOfDay` se convierte en el dia 20. Una
+ * fecha que el usuario escribio como 21 no puede guardarse como 20.
+ *
+ * Cualquier otro texto se interpreta tal cual.
+ */
+export function diaLocal(valor?: string | null): Date | null {
+  if (!valor) return null;
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? new Date(`${valor}T00:00:00`) : new Date(valor);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Muestra una fecha de DIA COMPLETO —vencimientos, ultima vez que se hizo—
+ * sin que la zona horaria del navegador la recorra.
+ *
+ * En la base conviven dos clases de valor, y cada una se lee distinto:
+ *
+ *  - **Medianoche UTC exacta** (`...T00:00:00.000Z`): un dia calculado en el
+ *    servidor, que en produccion corre en UTC. Un navegador en Mexico lo
+ *    pintaria como el dia ANTERIOR a las 6 de la tarde, asi que se lee en UTC.
+ *  - **Cualquier otra hora**: un momento real —la medianoche de Mexico que
+ *    manda el navegador (06:00 UTC), o un vencimiento contado desde la hora de
+ *    un cierre (05:33 UTC = 11:33 pm en Monterrey)—. Ese se lee en la hora de
+ *    quien mira. Leerlo en UTC mostraba el dia SIGUIENTE, que fue justo lo que
+ *    delato la regla anterior: una asignacion decia 22 y sus actividades 21.
+ *
+ * No sirve para fechas CON hora —un cierre, un comentario—; para esas esta
+ * `formatDateTime`.
+ */
+export function formatDia(value?: Date | string | null, opciones: { anio?: boolean } = {}) {
+  if (!value) return "—";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+  const esMedianocheUtc =
+    date.getUTCHours() === 0 && date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0;
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    ...(opciones.anio === false ? {} : { year: "numeric" }),
+    ...(esMedianocheUtc ? { timeZone: "UTC" } : {}),
+  }).format(date);
+}

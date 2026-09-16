@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { diaLocal } from "@/lib/utils";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAsignacion, asignarPlan, quitarAsignacion } from "@/lib/asignaciones";
@@ -13,11 +14,16 @@ export async function GET(request: Request) {
       where: { organizationId: orgId, planId },
       orderBy: { nextDueDate: "asc" },
       select: {
-        id: true, nextDueDate: true, lastCompletedAt: true, active: true,
+        id: true, nextDueDate: true, lastCompletedAt: true, active: true, meterId: true,
         asset: { select: { id: true, code: true, name: true, criticality: true } },
       },
     });
-    return ok({ asignaciones });
+    // Las actividades del plan, para dar una fecha distinta a cada una al asignar.
+    const plan = await prisma.maintenancePlan.findFirst({
+      where: { id: planId, organizationId: orgId },
+      select: { tasks: { orderBy: { position: "asc" }, select: { id: true, title: true } } },
+    });
+    return ok({ asignaciones, actividades: plan?.tasks ?? [] });
   });
 }
 
@@ -30,18 +36,34 @@ const crear = z.object({
   desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   /** Si `desde` es la ultima ejecucion (y no el arranque). */
   desdeEsUltima: z.boolean().optional(),
+  /**
+   * Fechas distintas para actividades puntuales. Las que no vengan usan la
+   * fecha comun. Se aplican igual a todos los equipos elegidos.
+   */
+  porActividad: z
+    .array(z.object({
+      planTaskId: z.string().min(1),
+      fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      esUltima: z.boolean(),
+    }))
+    .default([]),
 });
 
 export async function POST(request: Request) {
   return withAuth("plan:write", async ({ user, orgId }) => {
     const input = crear.parse(await request.json());
-    const desde = input.desde ? new Date(`${input.desde}T00:00:00`) : null;
+    const desde = input.desde ? diaLocal(input.desde)! : null;
     try {
       const r = await asignarPlan({
         organizationId: orgId,
         planId: input.planId,
         equipos: input.assetIds.map((assetId) => ({
           assetId, desde, desdeEsUltima: input.desdeEsUltima ?? false,
+          porActividad: input.porActividad.map((x) => ({
+            planTaskId: x.planTaskId,
+            fecha: diaLocal(x.fecha)!,
+            esUltima: x.esUltima,
+          })),
         })),
         escalonarAuto: input.escalonar && !desde,
         userId: user.id,

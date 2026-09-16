@@ -24,6 +24,7 @@ import {
   type ReglaCalendario,
 } from "../lib/calendario";
 import type { Jornada } from "../lib/agenda";
+import { diaLocal, formatDia } from "../lib/utils";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
@@ -201,6 +202,19 @@ function main() {
     revisar(`${n} ${u} se lee «${esperado}»`, describirIntervalo(n, u) === esperado, describirIntervalo(n, u));
   }
   revisar("trimestral aproxima 91 días para ordenar", diasAproximados(3, "MESES") === 91, String(diasAproximados(3, "MESES")));
+
+  console.log("\nUn día capturado no se recorre por la zona horaria");
+  const capturado = diaLocal("2026-09-21");
+  revisar("«2026-09-21» se guarda como el día 21 local, no como el 20 a las 6 pm",
+    !!capturado && capturado.getDate() === 21 && capturado.getHours() === 0, capturado?.toString());
+  revisar("a medianoche UTC (como calcula producción) se muestra el 21",
+    formatDia(new Date("2026-09-21T00:00:00.000Z")).includes("21"), formatDia(new Date("2026-09-21T00:00:00.000Z")));
+  revisar("a medianoche de México (como manda el navegador) también el 21",
+    formatDia(new Date("2026-09-21T06:00:00.000Z")).includes("21"), formatDia(new Date("2026-09-21T06:00:00.000Z")));
+  const conHora = new Date("2026-09-22T05:33:45.227Z");
+  revisar("un momento con hora se lee en la hora de quien mira (05:33 UTC en Monterrey es el 21)",
+    formatDia(conHora).includes(String(conHora.getDate())), `${formatDia(conHora)} · local ${conHora.toString()}`);
+  revisar("sin fecha se dice", formatDia(null) === "—");
 
   console.log(fallos ? `\n${fallos} fallas\n` : "\nTodo bien\n");
   process.exit(fallos ? 1 : 0);
