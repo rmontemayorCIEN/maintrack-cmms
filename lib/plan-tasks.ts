@@ -244,3 +244,53 @@ export function costearPlan(tareas: TareaConRecursos[]) {
   }
   return { horas, manoObra, refacciones, servicios, total: manoObra + refacciones + servicios };
 }
+
+/**
+ * Que actividades del plan trae DE VERDAD una orden.
+ *
+ * Una orden ya no trae el plan completo: el gestor puede mandar tres de cinco
+ * actividades en una y dos en otra, y el programador solo mete las que tocan.
+ * Todo lo que se deriva "del plan" para una orden —los recursos a preparar, la
+ * requisicion al almacen— tiene que salir de las actividades de la orden, no
+ * del plan entero. Si no, una orden con solo el cambio de aceite pediria al
+ * almacen tambien los rodamientos de la revision anual, cada mes.
+ *
+ * Las ordenes viejas no dicen de que actividad salio cada renglon
+ * (`planTaskId` es reciente). Para esas se cae al plan completo, que es lo que
+ * se hacia antes: de mas, pero igual que siempre.
+ *
+ * Devuelve el filtro para `planTask.findMany`, o nulo si la orden no trae nada
+ * de ningun plan.
+ */
+export async function filtroDeActividadesDeLaOrden(
+  workOrderId: string,
+): Promise<Prisma.PlanTaskWhereInput | null> {
+  const [orden, renglones] = await Promise.all([
+    prisma.workOrder.findUnique({ where: { id: workOrderId }, select: { planId: true } }),
+    prisma.workOrderTask.findMany({
+      where: { workOrderId },
+      select: { planTaskId: true, origen: true, origenPlanId: true },
+    }),
+  ]);
+
+  const ids = [...new Set(renglones.map((r) => r.planTaskId).filter(Boolean) as string[])];
+  const planesSinVinculo = [
+    ...new Set(
+      renglones
+        .filter((r) => r.origen === "PLAN" && !r.planTaskId)
+        .map((r) => r.origenPlanId ?? orden?.planId)
+        .filter(Boolean) as string[],
+    ),
+  ];
+  // Una orden de plan sin renglones todavia —recien creada a mano— se sigue
+  // leyendo por su encabezado.
+  if (!ids.length && !planesSinVinculo.length && orden?.planId && !renglones.length) {
+    planesSinVinculo.push(orden.planId);
+  }
+
+  const condiciones: Prisma.PlanTaskWhereInput[] = [];
+  if (ids.length) condiciones.push({ id: { in: ids } });
+  if (planesSinVinculo.length) condiciones.push({ planId: { in: planesSinVinculo } });
+  if (!condiciones.length) return null;
+  return condiciones.length === 1 ? condiciones[0] : { OR: condiciones };
+}

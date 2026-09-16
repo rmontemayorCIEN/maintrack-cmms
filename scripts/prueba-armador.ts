@@ -83,13 +83,12 @@ async function main() {
     const d = await trabajoDisponible(org.id, activo.id);
     revisar("ofrece 1 plan", d.planes.length === 1, `${d.planes.length}`);
     revisar("el plan trae sus 2 actividades", d.planes[0]?.actividades.length === 2);
-    revisar("marca que ya toca", d.planes[0]?.yaToca === true);
+    revisar("marca lo que ya toca", (d.planes[0]?.actividades ?? []).some((a) => a.faltan != null && a.faltan <= 0));
     revisar("ofrece los 2 reportes", d.reportes.length === 2, `${d.reportes.length}`);
     revisar("ofrece 1 pendiente del backlog", d.backlog.length === 1, `${d.backlog.length}`);
     revisar("dice de que orden venia", d.backlog[0]?.deLaOrden === "OT-VIEJA");
 
     // ── Armar la orden con TODO, llamando la funcion real ───────────────────
-    const asignacion = await prisma.planAsset.findFirstOrThrow({ where: { planId: plan.id } });
     const reportesIds = d.reportes.map((r) => r.id);
     const backlogIds = d.backlog.map((b) => b.id);
 
@@ -98,7 +97,8 @@ async function main() {
       userId: user.id,
       assetId: activo.id,
       title: "Todo junto en un viaje",
-      asignaciones: [asignacion.id],
+      // Las actividades se eligen sueltas; aqui van las dos que ofrece el plan.
+      actividades: d.planes[0].actividades.map((a) => a.id),
       reportes: reportesIds,
       backlog: backlogIds,
     });
@@ -162,7 +162,10 @@ async function main() {
     const r2 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
       title: "Los dos planes de un viaje",
-      asignaciones: [asig1.id, asig2.id], reportes: [], backlog: [],
+      actividades: (await prisma.planTask.findMany({
+        where: { planId: { in: [plan.id, plan2.id] } }, select: { id: true },
+      })).map((t) => t.id),
+      reportes: [], backlog: [],
     });
     if ("error" in r2) throw new Error(`No armo: ${r2.error}`);
 
@@ -230,11 +233,11 @@ async function main() {
         assetId: activo.id, status: "PENDING", priority: "MEDIUM",
       },
     });
-    const asigPlan3 = await prisma.planAsset.findFirstOrThrow({ where: { planId: plan3.id } });
     const mezclado = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
       title: "Mezcla no permitida",
-      asignaciones: [asigPlan3.id], reportes: [nuevoReporte.id], backlog: [],
+      actividades: (await prisma.planTask.findMany({ where: { planId: plan3.id }, select: { id: true } })).map((t) => t.id),
+      reportes: [nuevoReporte.id], backlog: [],
     });
     revisar("rechaza mezclar cuando esta apagado", "error" in mezclado,
       "error" in mezclado ? "rechazado" : "SE COLO");
@@ -242,7 +245,7 @@ async function main() {
     const unSoloOrigen = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
       title: "Un solo origen si",
-      asignaciones: [], reportes: [nuevoReporte.id], backlog: [],
+      actividades: [], reportes: [nuevoReporte.id], backlog: [],
     });
     revisar("pero un solo origen si pasa", !("error" in unSoloOrigen));
 

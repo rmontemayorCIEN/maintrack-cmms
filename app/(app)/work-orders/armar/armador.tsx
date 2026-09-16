@@ -6,6 +6,7 @@ import { AlertTriangle, CalendarClock, Loader2, PackageX, Wrench } from "lucide-
 import { Button } from "@/components/ui";
 import { SelectorBuscable, type OpcionBuscable } from "@/components/selector-buscable";
 import type { TrabajoDisponible } from "@/lib/armar-ot";
+import { VENTANAS, type Ventana } from "@/lib/calendario";
 
 export function Armador({
   activos,
@@ -21,7 +22,8 @@ export function Armador({
   disponible: TrabajoDisponible | null;
 }) {
   const router = useRouter();
-  const [planes, setPlanes] = useState<string[]>([]);
+  /** Las actividades de plan elegidas, por id de actividad. */
+  const [actividades, setActividades] = useState<string[]>([]);
   const [reportes, setReportes] = useState<string[]>([]);
   const [pendientes, setPendientes] = useState<string[]>([]);
   const [titulo, setTitulo] = useState("");
@@ -38,11 +40,8 @@ export function Armador({
    * mueve y entiende la regla sin leer nada. El servidor la hace cumplir de
    * todos modos.
    */
-  function alternar(cual: "plan" | "reporte" | "backlog", id: string) {
-    const listas = { plan: planes, reporte: reportes, backlog: pendientes };
-    const setters = { plan: setPlanes, reporte: setReportes, backlog: setPendientes };
-    const actual = listas[cual];
-    const nueva = actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id];
+  function fijar(cual: "plan" | "reporte" | "backlog", nueva: string[]) {
+    const setters = { plan: setActividades, reporte: setReportes, backlog: setPendientes };
     setters[cual](nueva);
     if (!disponible?.multiOrigen && nueva.length) {
       for (const otro of ["plan", "reporte", "backlog"] as const) {
@@ -51,31 +50,51 @@ export function Armador({
     }
   }
 
-  /**
-   * Cuantas actividades van a quedar en la orden. Los planes aportan varias
-   * cada uno, y verlo antes de crear evita la sorpresa de una orden con
-   * cuarenta pasos.
-   */
-  const cuantas = useMemo(() => {
-    if (!disponible) return 0;
-    const dePlan = disponible.planes
-      .filter((p) => planes.includes(p.asignacionId))
-      .reduce((s, p) => s + p.actividades.length, 0);
-    return dePlan + reportes.length + pendientes.length;
-  }, [disponible, planes, reportes, pendientes]);
+  function alternar(cual: "plan" | "reporte" | "backlog", id: string) {
+    const actual = { plan: actividades, reporte: reportes, backlog: pendientes }[cual];
+    fijar(cual, actual.includes(id) ? actual.filter((x) => x !== id) : [...actual, id]);
+  }
+
+  /** Marca o desmarca todas las actividades de un plan de un jalón. */
+  function alternarPlan(ids: string[]) {
+    const todas = ids.every((id) => actividades.includes(id));
+    fijar(
+      "plan",
+      todas
+        ? actividades.filter((id) => !ids.includes(id))
+        : [...new Set([...actividades, ...ids])],
+    );
+  }
+
+  const cuantas = actividades.length + reportes.length + pendientes.length;
 
   /** Un titulo razonable, que el usuario puede cambiar. */
   const tituloSugerido = useMemo(() => {
     if (!disponible || !nombreActivo) return "";
     const partes: string[] = [];
-    const p = disponible.planes.filter((x) => planes.includes(x.asignacionId));
-    if (p.length === 1) partes.push(p[0].nombre);
-    else if (p.length > 1) partes.push(`${p.length} planes`);
+    const planes = disponible.planes.filter((x) =>
+      x.actividades.some((a) => actividades.includes(a.id)),
+    );
+    if (planes.length === 1) {
+      const suyas = planes[0].actividades.filter((a) => actividades.includes(a.id)).length;
+      partes.push(
+        suyas === planes[0].actividades.length
+          ? planes[0].nombre
+          : `${planes[0].nombre} (${suyas} de ${planes[0].actividades.length})`,
+      );
+    } else if (planes.length > 1) partes.push(`${planes.length} planes`);
     if (reportes.length) partes.push(`${reportes.length} reporte(s)`);
     if (pendientes.length) partes.push(`${pendientes.length} pendiente(s)`);
     if (!partes.length) return "";
     return `${partes.join(" + ")} — ${nombreActivo.split(" — ")[0]}`;
-  }, [disponible, nombreActivo, planes, reportes, pendientes]);
+  }, [disponible, nombreActivo, actividades, reportes, pendientes]);
+
+  function cambiarVentana(v: string) {
+    const q = new URLSearchParams();
+    if (activoElegido) q.set("activo", activoElegido);
+    q.set("ventana", v);
+    router.push(`/work-orders/armar?${q.toString()}`);
+  }
 
   async function crear() {
     setGuardando(true);
@@ -89,7 +108,7 @@ export function Armador({
         assignedToId: responsable || null,
         dueDate: fecha || null,
         priority: prioridad,
-        asignaciones: planes,
+        actividades,
         reportes,
         backlog: pendientes,
       }),
@@ -109,7 +128,12 @@ export function Armador({
         <label className="label">Equipo</label>
         <SelectorBuscable
           valor={activoElegido}
-          onCambio={(v) => router.push(v ? `/work-orders/armar?activo=${v}` : "/work-orders/armar")}
+          onCambio={(v) => {
+            const q = new URLSearchParams();
+            if (v) q.set("activo", v);
+            if (disponible?.ventana) q.set("ventana", disponible.ventana);
+            router.push(`/work-orders/armar${q.size ? `?${q.toString()}` : ""}`);
+          }}
           opciones={activos}
           vacio="Elija el equipo"
           marcador="Busque por clave o nombre"
@@ -129,30 +153,131 @@ export function Armador({
             </p>
           ) : null}
 
+          {/*
+            Que tan adelante mirar. Lo atrasado se muestra con cualquier
+            ventana: una ventana que lo escondiera seria la forma mas facil de
+            que se quedara atrasado.
+          */}
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="min-w-[12rem]">
+              <label className="label">Ver actividades de</label>
+              <select
+                className="field"
+                value={disponible.ventana}
+                onChange={(e) => cambiarVentana(e.target.value)}
+              >
+                {(Object.keys(VENTANAS) as Ventana[]).map((v) => (
+                  <option key={v} value={v}>
+                    {v === "CONFIGURADA"
+                      ? `Los próximos ${disponible.horizonteDias} días (la de la empresa)`
+                      : VENTANAS[v].etiqueta}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="pb-2 text-[0.6875rem] text-slate-500">
+              Hasta el {new Date(disponible.hasta).toLocaleDateString("es-MX", {
+                weekday: "short", day: "numeric", month: "short",
+              })}. Las atrasadas se ven siempre.
+            </p>
+          </div>
+
+          {disponible.atrasadas > 0 ? (
+            <p className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                <b>
+                  {disponible.atrasadas === 1
+                    ? "1 actividad atrasada"
+                    : `${disponible.atrasadas} actividades atrasadas`}
+                </b>{" "}
+                — ya pasó su fecha y no está en ninguna orden. Van primero en cada plan.
+              </span>
+            </p>
+          ) : null}
+
           <Grupo
             icono={<CalendarClock className="h-3.5 w-3.5" />}
             titulo="Mantenimiento preventivo"
-            vacio="Este equipo no tiene planes asignados."
-            cuantos={disponible.planes.length}
+            vacio="Nada del plan de este equipo cae dentro de la ventana."
+            cuantos={disponible.planes.reduce((n, p) => n + p.actividades.length, 0)}
           >
-            {disponible.planes.map((p) => (
-              <Fila
-                key={p.asignacionId}
-                marcado={planes.includes(p.asignacionId)}
-                onMarcar={() => alternar("plan", p.asignacionId)}
-                titulo={p.nombre}
-                detalle={`${p.actividades.length} actividad(es)${p.horasEstimadas ? ` · ${p.horasEstimadas} h` : ""}`}
-                señal={
-                  p.yaToca
-                    ? { texto: "Ya toca", tono: "urgente" }
-                    : p.diasParaVencer !== null
-                      ? { texto: `En ${p.diasParaVencer} d`, tono: "suave" }
-                      : { texto: "Sin fecha", tono: "suave" }
-                }
-              >
-                <Actividades lista={p.actividades} />
-              </Fila>
-            ))}
+            {disponible.planes.map((p) => {
+              const ids = p.actividades.map((a) => a.id);
+              const marcadas = ids.filter((id) => actividades.includes(id)).length;
+              return (
+                <div
+                  key={p.asignacionId}
+                  className={`rounded-lg border ${
+                    marcadas ? "border-brand-300 bg-brand-50/40" : "border-slate-200"
+                  }`}
+                >
+                  {/*
+                    El plan es un encabezado, no una casilla que arrastra todo.
+                    Marcar todas es un atajo; lo normal es elegir renglon por
+                    renglon.
+                  */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-slate-200/70 px-2.5 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800">
+                      {p.nombre}
+                    </span>
+                    {p.atrasadas > 0 ? (
+                      <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[0.625rem] font-medium text-rose-700">
+                        {p.atrasadas} atrasada{p.atrasadas === 1 ? "" : "s"}
+                      </span>
+                    ) : null}
+                    {ids.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => alternarPlan(ids)}
+                        className="text-[0.6875rem] font-medium text-brand-700 hover:underline"
+                      >
+                        {marcadas === ids.length ? "Quitar todas" : "Marcar todas"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <ul className="grid">
+                    {p.actividades.map((a) => {
+                      const marcado = actividades.includes(a.id);
+                      return (
+                        <li key={a.id}>
+                          <label
+                            className={`flex cursor-pointer items-center gap-2.5 px-2.5 py-1.5 ${
+                              marcado ? "bg-brand-50" : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={marcado}
+                              onChange={() => alternar("plan", a.id)}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-xs text-slate-700">
+                              {a.title}
+                            </span>
+                            <Vence actividad={a} />
+                          </label>
+                        </li>
+                      );
+                    })}
+                    {p.yaEnOrden.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex items-center gap-2.5 px-2.5 py-1.5 text-xs text-slate-400"
+                        title="Ya está en una orden abierta. No se puede poner en dos órdenes a la vez."
+                      >
+                        <span className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate line-through decoration-slate-300">
+                          {a.title}
+                        </span>
+                        <span className="shrink-0 text-[0.6875rem]">ya va en {a.orden}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </Grupo>
 
           <Grupo
@@ -324,37 +449,39 @@ function Fila({
 }
 
 /**
- * Lo que trae adentro un plan: sus actividades, cada una con su vencimiento.
+ * Cuando toca una actividad, dicho de forma que se decida con un vistazo.
  *
- * Antes bastaba con decir "3 actividad(es)" porque todas compartian la fecha
- * del plan. Con el calendario por actividad ya no: la orden puede llevar el
- * engrase que vencio ayer y el aceite que vence en seis dias, y quien arma la
- * orden necesita ver esa diferencia para decidir si adelanta o espera.
+ * Rojo si ya se paso: es la que no se puede perder de vista. Las de medidor no
+ * tienen fecha propia y dicen la lectura contra la meta.
  */
-function Actividades({
-  lista,
+function Vence({
+  actividad,
 }: {
-  lista: Array<{ id: string; title: string; faltan: number }>;
+  actividad: { faltan: number | null; atrasada: boolean; porMedidor: string | null };
 }) {
-  if (!lista.length) return null;
+  const { faltan, atrasada, porMedidor } = actividad;
+  const texto = atrasada
+    ? faltan != null && faltan < 0
+      ? `atrasada ${Math.abs(faltan)} d`
+      : "atrasada"
+    : porMedidor
+      ? porMedidor
+      : faltan === 0
+        ? "vence hoy"
+        : faltan != null
+          ? `en ${faltan} d`
+          : "sin fecha";
   return (
-    <ul className="border-t border-slate-200/70 px-2.5 py-1.5">
-      {lista.map((a) => (
-        <li key={a.id} className="flex items-baseline gap-2 py-0.5 text-[0.6875rem]">
-          <span className="min-w-0 flex-1 truncate text-slate-600">{a.title}</span>
-          <span
-            className={`shrink-0 tabular-nums ${
-              a.faltan < 0 ? "font-medium text-rose-600" : "text-slate-400"
-            }`}
-          >
-            {a.faltan < 0
-              ? `vencida ${Math.abs(a.faltan)} d`
-              : a.faltan === 0
-                ? "vence hoy"
-                : `en ${a.faltan} d`}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <span
+      className={`shrink-0 text-[0.6875rem] tabular-nums ${
+        atrasada
+          ? "rounded-full bg-rose-100 px-1.5 py-0.5 font-medium text-rose-700"
+          : faltan === 0
+            ? "font-medium text-amber-700"
+            : "text-slate-400"
+      }`}
+    >
+      {texto}
+    </span>
   );
 }

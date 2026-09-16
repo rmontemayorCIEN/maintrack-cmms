@@ -782,3 +782,66 @@ export async function proyectarActividades(
 
   return visitas.sort((a, b) => +a.fecha - +b.fecha);
 }
+
+/** Los estados en que una orden todavia esta viva y puede recibir trabajo. */
+export const ORDEN_ABIERTA = ["DRAFT", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] as const;
+
+/**
+ * En que orden abierta ya esta cada actividad, si esta en alguna.
+ *
+ * Es el candado que impide que la misma actividad termine en dos ordenes. Lo
+ * usan el programador automatico y el armado a mano, y por eso vive aqui y no
+ * en cada uno: con dos copias, un dia una veria una orden que la otra no, y el
+ * cambio de aceite saldria dos veces con las dos ordenes viendose legitimas.
+ *
+ * Devuelve una funcion que contesta por actividad y equipo, con el folio de la
+ * orden que la tiene o nulo si esta libre.
+ *
+ * Dos detalles que no son obvios:
+ *
+ *  - Las LIBERADAS no ocupan: se soltaron de su orden y vuelven a estar
+ *    disponibles —por el backlog—.
+ *  - Las ordenes VIEJAS no dicen de que actividad salio cada renglon:
+ *    `planTaskId` es reciente, y al publicarlo habia 67 actividades de origen
+ *    PLAN en ordenes abiertas sin ese vinculo. Cuando una orden abierta trae
+ *    trabajo de un plan que no se puede identificar actividad por actividad,
+ *    se da por cubierto el plan entero en ese equipo. Es de mas, pero el error
+ *    va del lado seguro, y se drena solo conforme esas ordenes se cierran.
+ */
+export async function candadoDeOrdenes(
+  organizationId: string,
+  opciones: { assetId?: string } = {},
+): Promise<(planTaskId: string, planId: string, assetId: string) => string | null> {
+  const enOrden = {
+    organizationId,
+    status: { in: [...ORDEN_ABIERTA] },
+    ...(opciones.assetId ? { assetId: opciones.assetId } : {}),
+  };
+
+  const [conVinculo, sinVinculo] = await Promise.all([
+    prisma.workOrderTask.findMany({
+      where: { workOrder: enOrden, liberadaAt: null, planTaskId: { not: null } },
+      select: { planTaskId: true, workOrder: { select: { assetId: true, number: true } } },
+    }),
+    prisma.workOrderTask.findMany({
+      where: { workOrder: enOrden, liberadaAt: null, origen: "PLAN", planTaskId: null },
+      select: {
+        origenPlanId: true,
+        workOrder: { select: { assetId: true, number: true, planId: true } },
+      },
+    }),
+  ]);
+
+  const porActividad = new Map<string, string>();
+  for (const t of conVinculo) {
+    porActividad.set(`${t.planTaskId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
+  }
+  const porPlan = new Map<string, string>();
+  for (const t of sinVinculo) {
+    const planId = t.origenPlanId ?? t.workOrder.planId;
+    if (planId) porPlan.set(`${planId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
+  }
+
+  return (planTaskId, planId, assetId) =>
+    porActividad.get(`${planTaskId}:${assetId}`) ?? porPlan.get(`${planId}:${assetId}`) ?? null;
+}

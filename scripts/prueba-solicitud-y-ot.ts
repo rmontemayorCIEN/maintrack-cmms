@@ -54,7 +54,7 @@ async function main() {
     const sol = await nuevaSolicitud("SOL-1", "El torno hace ruido");
     const r = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Atender el ruido", asignaciones: [], reportes: [sol.id], backlog: [],
+      title: "Atender el ruido", actividades: [], reportes: [sol.id], backlog: [],
     });
     if ("error" in r) throw new Error(r.error);
     const ot = r.orden;
@@ -80,7 +80,7 @@ async function main() {
     console.log("\nY se puede volver a atender");
     const r2 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Segundo intento", asignaciones: [], reportes: [sol.id], backlog: [],
+      title: "Segundo intento", actividades: [], reportes: [sol.id], backlog: [],
     });
     revisar("la vuelve a aceptar una orden nueva", !("error" in r2),
       "error" in r2 ? r2.error : "aceptada");
@@ -107,7 +107,7 @@ async function main() {
     const sol2 = await nuevaSolicitud("SOL-2", "Otra cosa");
     const r3 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Se va a cancelar", asignaciones: [], reportes: [sol2.id], backlog: [],
+      title: "Se va a cancelar", actividades: [], reportes: [sol2.id], backlog: [],
     });
     if ("error" in r3) throw new Error(r3.error);
     await transitionWorkOrder({ workOrderId: r3.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
@@ -121,14 +121,14 @@ async function main() {
     const sol3 = await nuevaSolicitud("SOL-3", "Tercera");
     const r4 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Se cancela tambien", asignaciones: [], reportes: [sol3.id], backlog: [],
+      title: "Se cancela tambien", actividades: [], reportes: [sol3.id], backlog: [],
     });
     if ("error" in r4) throw new Error(r4.error);
     await transitionWorkOrder({ workOrderId: r4.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
     // Alguien mas la atiende mientras tanto.
     const r5 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Alguien mas la tomo", asignaciones: [], reportes: [sol3.id], backlog: [],
+      title: "Alguien mas la tomo", actividades: [], reportes: [sol3.id], backlog: [],
     });
     if ("error" in r5) throw new Error(r5.error);
     // Y ahora se reabre la primera.
@@ -142,7 +142,7 @@ async function main() {
     const sol4 = await nuevaSolicitud("SOL-4", "Cuarta");
     const r6 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
-      title: "Se va a borrar", asignaciones: [], reportes: [sol4.id], backlog: [],
+      title: "Se va a borrar", actividades: [], reportes: [sol4.id], backlog: [],
     });
     if ("error" in r6) throw new Error(r6.error);
     await prisma.workRequest.updateMany({
@@ -169,7 +169,7 @@ async function main() {
       });
       const rx = await armarOrden({
         organizationId: org.id, userId: user.id, assetId: activo.id,
-        title: `Orden ${tipo}`, asignaciones: [], reportes: [sx.id], backlog: [],
+        title: `Orden ${tipo}`, actividades: [], reportes: [sx.id], backlog: [],
       });
       if ("error" in rx) throw new Error(rx.error);
       const t = await prisma.workOrderTask.findFirstOrThrow({

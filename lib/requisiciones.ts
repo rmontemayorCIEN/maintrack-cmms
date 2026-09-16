@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { filtroDeActividadesDeLaOrden } from "./plan-tasks";
 import { prisma } from "./db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
 
@@ -261,33 +262,36 @@ export { ErrorDeAlmacen };
 export async function refaccionesDelPlan(organizationId: string, workOrderId: string) {
   const orden = await prisma.workOrder.findFirst({
     where: { id: workOrderId, organizationId },
+    select: { id: true, planId: true, plan: { select: { name: true } } },
+  });
+  if (!orden) return null;
+
+  // Solo las actividades que trae ESTA orden. Pedir las del plan completo
+  // mandaba al almacen, cada mes, los rodamientos de la revision anual.
+  const filtro = await filtroDeActividadesDeLaOrden(orden.id);
+  if (!filtro) return null;
+  const tareas = await prisma.planTask.findMany({
+    where: { ...filtro, plan: { organizationId } },
+    orderBy: { position: "asc" },
     select: {
-      id: true, planId: true,
-      plan: {
+      title: true,
+      plan: { select: { name: true } },
+      parts: {
         select: {
-          name: true,
-          tasks: {
-            orderBy: { position: "asc" },
-            select: {
-              title: true,
-              parts: {
-                select: {
-                  quantity: true,
-                  part: { select: { id: true, code: true, name: true, unit: true } },
-                },
-              },
-            },
-          },
+          quantity: true,
+          part: { select: { id: true, code: true, name: true, unit: true } },
         },
       },
     },
   });
-  if (!orden?.plan) return null;
+  if (!tareas.length) return null;
+  const nombrePlan =
+    orden.plan?.name ?? ([...new Set(tareas.map((t) => t.plan.name))].join(" · ") || "Plan");
 
   // Lo que pide el plan, sumando la misma refaccion si aparece en varias
   // actividades: al almacen se le pide una vez, no una por actividad.
   const pide = new Map<string, { code: string; name: string; unit: string; cantidad: number; actividades: string[] }>();
-  for (const t of orden.plan.tasks) {
+  for (const t of tareas) {
     for (const p of t.parts) {
       const previo = pide.get(p.part.id);
       if (previo) {
@@ -301,7 +305,7 @@ export async function refaccionesDelPlan(organizationId: string, workOrderId: st
       }
     }
   }
-  if (!pide.size) return { plan: orden.plan.name, renglones: [] };
+  if (!pide.size) return { plan: nombrePlan, renglones: [] };
 
   const ids = [...pide.keys()];
   const [pedidas, consumidas] = await Promise.all([
@@ -331,7 +335,7 @@ export async function refaccionesDelPlan(organizationId: string, workOrderId: st
   const yaConsumido = suma(consumidas);
 
   return {
-    plan: orden.plan.name,
+    plan: nombrePlan,
     renglones: [...pide.entries()].map(([partId, v]) => {
       const pedido = yaPedido.get(partId) ?? 0;
       const consumido = yaConsumido.get(partId) ?? 0;

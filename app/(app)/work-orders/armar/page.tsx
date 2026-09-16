@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { trabajoDisponible } from "@/lib/armar-ot";
+import { esVentana } from "@/lib/calendario";
 import { Card } from "@/components/ui";
 import { Armador } from "./armador";
 
@@ -24,12 +25,12 @@ export const metadata = { title: "Armar orden de trabajo" };
 export default async function ArmarOrdenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ activo?: string }>;
+  searchParams: Promise<{ activo?: string; ventana?: string }>;
 }) {
   const user = await requireUser();
   if (!can(user.role, "workorder:write")) redirect("/work-orders");
 
-  const { activo } = await searchParams;
+  const { activo, ventana } = await searchParams;
 
   const [activos, tecnicos] = await Promise.all([
     prisma.asset.findMany({
@@ -48,7 +49,12 @@ export default async function ArmarOrdenPage({
     }),
   ]);
 
-  const disponible = activo ? await trabajoDisponible(user.organizationId, activo) : null;
+  // Una ventana que no se reconoce cae a la de la empresa, en vez de romper.
+  const disponible = activo
+    ? await trabajoDisponible(user.organizationId, activo, {
+        ventana: esVentana(ventana) ? ventana : undefined,
+      })
+    : null;
   const elegido = activos.find((a) => a.id === activo) ?? null;
 
   return (
@@ -62,8 +68,8 @@ export default async function ArmarOrdenPage({
         </Link>
         <h1 className="mt-1 text-xl font-semibold text-slate-900">Armar una orden</h1>
         <p className="text-xs text-slate-500">
-          Elija el equipo y vea todo lo que se le debe. Lo que marque se va en una sola orden,
-          y cada actividad conserva de donde vino.
+          Elija el equipo y vea todo lo que se le debe. Marque actividad por actividad lo que
+          va en esta orden: lo que no marque queda disponible para otra.
         </p>
       </div>
 

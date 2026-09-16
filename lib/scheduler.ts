@@ -4,8 +4,10 @@ import { tocanEn } from "./frecuencias";
 import { addDays, startOfDay } from "./utils";
 import { logAudit, notify } from "./audit";
 import { esHabil, jornada } from "./agenda";
+import { can } from "./rbac";
 import {
   actividadesPendientes,
+  candadoDeOrdenes,
   proyectarActividades,
   reglaDeOrganizacion,
   sembrarLoQueFalte,
@@ -588,8 +590,6 @@ function avanzar(
   return null;
 }
 
-/** Los estados en que una orden todavia esta viva y puede recibir trabajo. */
-const ORDEN_ABIERTA = ["DRAFT", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] as const;
 
 /**
  * El camino de los planes POR CALENDARIO: una orden por equipo y plan, con las
@@ -624,6 +624,28 @@ async function generarPorActividad(
   const regla = await reglaDeOrganizacion(organizationId, today);
   const j = regla.jornada;
 
+  /**
+   * En modo MANUAL el gestor arma las ordenes: el programador no se le adelanta.
+   *
+   * Pero tampoco calla. Apagar la generacion sin avisar dejaria vencer el
+   * mantenimiento sin que nadie se entere —la pantalla se veria tranquila con
+   * cinco actividades atrasadas adentro—. Se avisa una vez al dia a quien puede
+   * armar ordenes.
+   */
+  const modo = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { otGeneracion: true },
+  });
+  if (modo?.otGeneracion === "MANUAL") {
+    await sembrarLoQueFalte(organizationId);
+    const atrasadas = await avisarAtrasadas(organizationId, { dryRun: options.dryRun });
+    result.details.push({
+      plan: "Calendario",
+      reason: `Modo manual: no se generan órdenes de calendario. ${atrasadas} actividad(es) atrasada(s) sin orden.`,
+    });
+    return result;
+  }
+
   // Lo primero: que ninguna asignacion se quede sin reloj. Una asignacion sin
   // relojes no genera nada y se ve idéntica a una al corriente.
   await sembrarLoQueFalte(organizationId);
@@ -646,65 +668,16 @@ async function generarPorActividad(
   });
   if (!pendientes.length) return result;
 
-  // Lo que ya esta en una orden viva no se vuelve a ofrecer.
-  const enOrdenAbierta = await prisma.workOrderTask.findMany({
-    where: {
-      workOrder: { organizationId, status: { in: [...ORDEN_ABIERTA] } },
-      liberadaAt: null,
-      planTaskId: { in: pendientes.map((p) => p.planTaskId) },
-    },
-    select: { planTaskId: true, workOrder: { select: { assetId: true, number: true } } },
-  });
-  const ocupadas = new Map<string, string>();
-  for (const t of enOrdenAbierta) {
-    ocupadas.set(`${t.planTaskId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
-  }
-
-  /**
-   * Las ordenes viejas, que no dicen de que actividad salio cada renglon.
-   *
-   * `WorkOrderTask.planTaskId` es reciente: al publicar esto habia 67
-   * actividades de origen PLAN en ordenes ABIERTAS sin ese vinculo. El candado
-   * por actividad no las ve, asi que el programador habria emitido una orden
-   * duplicada por cada una de esas ordenes —seis de golpe en una sola cuenta—
-   * y las dos se verian legitimas.
-   *
-   * Cuando una orden abierta trae trabajo de un plan que NO se puede
-   * identificar actividad por actividad, se da por cubierto el plan entero en
-   * ese equipo. Es de mas —puede retener una actividad que si tocaba— pero el
-   * error va del lado seguro: repetir un mantenimiento cuesta plata y confianza,
-   * posponerlo unos dias hasta que se cierre la orden abierta, no.
-   *
-   * Se drena solo: conforme esas ordenes se cierran, todo pasa al candado
-   * preciso. No hay que acordarse de quitarlo.
-   */
-  const sinVinculo = await prisma.workOrderTask.findMany({
-    where: {
-      workOrder: { organizationId, status: { in: [...ORDEN_ABIERTA] } },
-      liberadaAt: null,
-      origen: "PLAN",
-      planTaskId: null,
-    },
-    select: {
-      origenPlanId: true,
-      workOrder: { select: { assetId: true, number: true, planId: true } },
-    },
-  });
-  const planesCubiertos = new Map<string, string>();
-  for (const t of sinVinculo) {
-    const planId = t.origenPlanId ?? t.workOrder.planId;
-    if (!planId) continue;
-    planesCubiertos.set(`${planId}:${t.workOrder.assetId ?? ""}`, t.workOrder.number);
-  }
+  // Lo que ya esta en una orden viva no se vuelve a ofrecer. El candado es el
+  // mismo que usa el armado a mano: vive en un solo lugar a proposito.
+  const enOrdenAbierta = await candadoDeOrdenes(organizationId);
 
   // Agrupadas por equipo y plan. No se mezclan planes en una sola orden: el
   // encabezado lleva UN planId y 23 de 24 asignaciones reales son un equipo
   // con un solo plan, asi que mezclar complicaria el caso raro para nadie.
   const grupos = new Map<string, typeof pendientes>();
   for (const a of pendientes) {
-    const enOrden =
-      ocupadas.get(`${a.planTaskId}:${a.assetId}`) ??
-      planesCubiertos.get(`${a.planId}:${a.assetId}`);
+    const enOrden = enOrdenAbierta(a.planTaskId, a.planId, a.assetId);
     if (enOrden) {
       result.skipped += 1;
       result.details.push({
@@ -868,4 +841,58 @@ export async function generateScheduledWorkOrders(
     skipped: porActividad.skipped + porMedidor.skipped,
     details: [...porActividad.details, ...porMedidor.details],
   };
+}
+
+/**
+ * Avisa, una vez al dia, cuantas actividades vencieron sin estar en una orden.
+ *
+ * Solo tiene sentido en modo MANUAL, donde nadie mas va a armar esas ordenes.
+ * Se avisa a quien puede armarlas —los roles con `workorder:write`—, con liga
+ * directa al armador.
+ *
+ * Una vez al dia y no en cada barrido: el programador corre cada hora, y un
+ * aviso repetido veinticuatro veces es la forma segura de que la gente deje de
+ * leerlos. Se busca si ya salio hoy con el mismo titulo antes de mandarlo.
+ *
+ * Devuelve cuantas hay, se mande o no el aviso.
+ */
+export async function avisarAtrasadas(
+  organizationId: string,
+  opciones: { dryRun?: boolean } = {},
+): Promise<number> {
+  const hoy = startOfDay(new Date());
+  const [vencidas, candado] = await Promise.all([
+    actividadesPendientes(organizationId, {
+      hasta: new Date(hoy.getTime() - 1),
+      triggerType: "CALENDAR",
+    }),
+    candadoDeOrdenes(organizationId),
+  ]);
+  const atrasadas = vencidas.filter((a) => !candado(a.planTaskId, a.planId, a.assetId));
+  if (!atrasadas.length || opciones.dryRun) return atrasadas.length;
+
+  const TITULO = "Actividades preventivas atrasadas sin orden";
+  const equipos = new Set(atrasadas.map((a) => a.assetCode));
+  const destinatarios = await prisma.user.findMany({
+    where: { organizationId, active: true },
+    select: { id: true, role: true },
+  });
+
+  for (const u of destinatarios.filter((d) => can(d.role, "workorder:write"))) {
+    const yaSalio = await prisma.notification.findFirst({
+      where: { organizationId, userId: u.id, title: TITULO, createdAt: { gte: hoy } },
+      select: { id: true },
+    });
+    if (yaSalio) continue;
+    await notify({
+      organizationId,
+      userId: u.id,
+      title: TITULO,
+      body: `${atrasadas.length} actividad(es) en ${equipos.size} equipo(s) ya vencieron y no están en ninguna orden.`,
+      link: "/work-orders/armar",
+      kind: "WARNING",
+      tag: "atrasadas",
+    });
+  }
+  return atrasadas.length;
 }

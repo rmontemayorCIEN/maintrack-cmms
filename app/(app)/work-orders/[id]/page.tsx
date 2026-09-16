@@ -14,7 +14,7 @@ import {
   WO_STATUS_LABELS,
 } from "@/lib/constants";
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/utils";
-import { incluirTareas } from "@/lib/plan-tasks";
+import { filtroDeActividadesDeLaOrden, incluirTareas } from "@/lib/plan-tasks";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { WorkOrderActions } from "./actions";
@@ -217,8 +217,16 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   // Lo que el plan preveia para este trabajo. Es referencia, no compromiso: el
   // tecnico carga lo que realmente uso. Sirve para preparar el material antes
   // de bajar a piso y para comparar planeado contra real.
-  const planeado = wo.planId
-    ? await prisma.planTask.findMany({ where: { planId: wo.planId }, ...incluirTareas })
+  //
+  // Solo de las actividades que trae ESTA orden, no del plan completo: con tres
+  // de cinco actividades, preparar el material de las cinco manda al tecnico a
+  // piso con refacciones que no va a usar.
+  const filtroPlaneado = await filtroDeActividadesDeLaOrden(wo.id);
+  const planeado = filtroPlaneado
+    ? await prisma.planTask.findMany({
+        where: { ...filtroPlaneado, plan: { organizationId: user.organizationId } },
+        ...incluirTareas,
+      })
     : [];
 
   const moPlaneada = new Map<string, { nombre: string; horas: number }>();
@@ -377,7 +385,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             <Card>
               <CardHeader
                 title="Recursos planeados"
-                subtitle="Lo que el plan preve para esta rutina. Prepare el material antes de bajar a piso."
+                subtitle="Lo que el plan prevé para las actividades de esta orden. Prepare el material antes de bajar a piso."
               />
               <div className="grid gap-4 sm:grid-cols-3">
                 <ListaPlaneada

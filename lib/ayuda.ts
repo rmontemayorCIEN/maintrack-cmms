@@ -308,12 +308,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Junta en una sola orden todo lo que se le debe a un equipo: el preventivo que ya toca, las fallas que le reportaron y lo que quedó trabado la vez pasada.",
     hacer: [
       "Elegir el equipo y ver los tres orígenes juntos",
-      "Marcar qué se va en esta orden",
+      "Marcar actividad por actividad qué va en esta orden —lo que no marque queda para otra—",
+      "Elegir qué tan adelante mirar: esta semana, este mes, los próximos 30 días",
       "Asignar responsable, fecha y prioridad",
     ],
     flujo: [
       "El técnico va a bajar a esa bomba de todos modos. Verlo todo junto antes de bajar evita hacer tres viajes por tres órdenes.",
-      "Los planes se ofrecen aunque no hayan vencido: si ya va a bajar, adelantar el que vence en cuatro días sale más barato que un segundo viaje. La etiqueta dice cuál ya toca.",
+      "Del plan se eligen ACTIVIDADES, no el plan entero. De cinco que caen la misma semana puede mandar tres en esta orden y dos en otra: con otro técnico, otro día de paro. Elegir una no arrastra a las demás.",
+      "Lo ATRASADO —ya pasó su fecha y no está en ninguna orden— sale en rojo y primero, con cualquier ventana que elija.",
+      "Una actividad que ya va en una orden abierta aparece tachada con el folio de esa orden. No se puede poner en dos órdenes a la vez; si alguien la tomó mientras usted armaba, el sistema lo detiene y le dice en cuál está.",
+      "Se ofrecen también las que no han vencido, dentro de la ventana: si ya va a bajar, adelantar la que vence en cuatro días sale más barato que un segundo viaje.",
       "Cada actividad conserva de dónde vino y su propio tipo. Por eso al cerrar se pide la causa solo de las correctivas, y el paro de un correctivo colado en un preventivo se cuenta como no planeado.",
       "Los reportes que marque quedan ligados a la orden y se dan por atendidos.",
     ],
@@ -322,15 +326,18 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     noPuedo: [
       { sintoma: "No veo esta pantalla", porque: "Armar órdenes requiere perfil de supervisor o superior." },
-      { sintoma: "El equipo no tiene nada que ofrecer", porque: "No tiene planes asignados, ni fallas reportadas, ni pendientes. Para asignarle un plan vaya a Planes → Equipos y sus planes." },
+      { sintoma: "El equipo no tiene nada que ofrecer", porque: "Nada de su plan cae dentro de la ventana elegida, y no tiene fallas reportadas ni pendientes. Pruebe con una ventana más amplia. Si no tiene plan asignado, vaya a Planes → Equipos y sus planes." },
+      { sintoma: "Una actividad aparece tachada y sin casilla", porque: "Ya va en otra orden abierta —el folio está a la derecha—. Cuando esa orden se cierre o la actividad se libere, vuelve a estar disponible." },
     ],
     preguntas: [
-      { pregunta: "¿Por qué no aparece un plan que sí tiene el equipo?", respuesta: "Porque ninguna de sus actividades vence dentro del plazo que configuró. En Configuración → Órdenes de trabajo se define cuánto se puede adelantar un preventivo. En cero solo se ofrece lo ya vencido. Adelantar de más gasta el mantenimiento antes de tiempo, así que conviene un plazo corto salvo que la planta pare pocas veces al año." },
+      { pregunta: "¿Por qué no aparece un plan que sí tiene el equipo?", respuesta: "Porque ninguna de sus actividades vence dentro de la ventana que eligió arriba. Amplíela a «este mes» o «próximos 30 días». La opción «la de la empresa» usa el plazo configurado en Configuración → Órdenes de trabajo. Adelantar de más gasta el mantenimiento antes de tiempo." },
+      { pregunta: "Marqué tres de cinco. ¿Qué pasa con las otras dos?", respuesta: "Siguen disponibles para otra orden, con su propia fecha. Si esa fecha pasa sin que estén en ninguna orden, aparecen como atrasadas. Cada actividad avanza su calendario solo cuando se cierra la orden que la trae." },
+      { pregunta: "¿Qué es «Marcar todas»?", respuesta: "Un atajo que marca de un jalón las actividades que el plan ofrece en esta ventana. Lo normal es elegir renglón por renglón." },
       { pregunta: "El plan aparece pero con menos actividades de las que tiene. ¿Se perdieron?", respuesta: "No. Cada actividad lleva su propia frecuencia, y solo se ofrecen las que tocan. La revisión semestral no aparece en la orden de esta semana porque no toca todavía: aparecerá cuando venza. Cada renglón muestra su vencimiento —vencida, vence hoy, en 6 días— para que usted decida si adelanta." },
       { pregunta: "Marco algo de un grupo y se borra lo de otro. ¿Por qué?", respuesta: "Porque su organización tiene apagada la opción de juntar varios orígenes en una orden: cada origen lleva su propia orden. Se cambia en Configuración → Órdenes de trabajo." },
 
       { pregunta: "¿En qué se diferencia de «Nueva orden»?", respuesta: "«Nueva orden» captura un trabajo suelto a mano. «Armar» parte de lo que el sistema ya sabe que se le debe a ese equipo y lo junta. Si solo va a levantar un correctivo que nadie reportó, use Nueva orden." },
-      { pregunta: "¿Qué pasa con el preventivo si lo adelanto?", respuesta: "El plan de ESE equipo avanza desde la fecha en que se hizo, no desde la que tocaba. Los demás equipos del mismo plan siguen su propio calendario." },
+      { pregunta: "¿Qué pasa con la actividad si la adelanto?", respuesta: "Su calendario en ESE equipo avanza al cerrar la orden, contado desde que se hizo o desde la fecha en que tocaba, según lo configurado. Las demás actividades del plan y los demás equipos siguen su propio calendario." },
     ],
   },
   "/work-orders": {
@@ -1137,6 +1144,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [
+      { nombre: "Las órdenes preventivas las arma…", explica: "«El sistema, solo»: cuando a un equipo le toca mantenimiento, el programador junta en una orden todo lo que cae dentro del plazo. «El gestor»: el sistema no arma órdenes de calendario; usted decide en «Armar una orden» qué actividades van juntas. Las que se pasen de fecha sin orden se marcan atrasadas y quien puede armar órdenes recibe un aviso una vez al día. Los planes por medidor se siguen generando solos en los dos casos." },
       { nombre: "Los intervalos en días se cuentan…", explica: "«Corridos» cuenta días de calendario; «hábiles» cuenta días de trabajo, saltando los que su empresa no labora. Un cambio de aceite cada 15 días hecho el viernes 4 de septiembre cae el sábado 19 contando corridos, y el martes 22 contando hábiles en una planta de lunes a sábado. Cuente en hábiles si el mantenimiento va por desgaste —la máquina se gasta operando, no en el almanaque—. Los días laborables y los festivos son los de «Jornada y calendario», no una lista aparte. Aplica solo a los intervalos en días: una actividad semanal, mensual o trimestral se cuenta siempre por calendario. Cambiarlo no recalcula lo ya programado." },
       { nombre: "Cuando un preventivo se cierra tarde", explica: "Decide desde dónde se cuenta el siguiente. «Desde que se hizo» sirve cuando importa cuánto lleva operando el equipo —engrasado, cambios de aceite—; «desde la fecha en que tocaba» mantiene el calendario fijo, que es lo que necesita quien reporta cumplimiento contra un programa anual. En los dos casos no se salta ninguna actividad: cerrar tarde mueve la fecha, nunca se brinca el ciclo." },
 

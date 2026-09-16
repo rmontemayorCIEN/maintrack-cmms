@@ -14,7 +14,7 @@ import { Button, Card } from "@/components/ui";
  * cuenta el siguiente cuando uno se cierra tarde.
  */
 export function ConfiguracionOrdenes({
-  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, editable,
+  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, generacion, editable,
 }: {
   multiOrigen: boolean;
   horizonteDias: number;
@@ -24,6 +24,8 @@ export function ConfiguracionOrdenes({
   diasHabiles: boolean;
   /** Los dias laborables ya configurados, para poder nombrarlos aqui. */
   jornadaDias: string;
+  /** AUTOMATICA | MANUAL. Quien arma las ordenes preventivas. */
+  generacion: string;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -31,6 +33,7 @@ export function ConfiguracionOrdenes({
   const [dias, setDias] = useState(String(horizonteDias));
   const [desde, setDesde] = useState(recalculo === "PROGRAMADO" ? "PROGRAMADO" : "CIERRE");
   const [habiles, setHabiles] = useState(diasHabiles);
+  const [modo, setModo] = useState(generacion === "MANUAL" ? "MANUAL" : "AUTOMATICA");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -62,6 +65,7 @@ export function ConfiguracionOrdenes({
         otHorizonteDias: Number(dias) || 0,
         recalculoPlan: desde,
         otDiasHabiles: habiles,
+        otGeneracion: modo,
       }),
     });
     setGuardando(false);
@@ -77,6 +81,30 @@ export function ConfiguracionOrdenes({
           <p className="mt-0.5 text-xs text-slate-500">
             De aquí sale que puede juntar el generador de órdenes y que tanto se puede
             adelantar un preventivo.
+          </p>
+        </div>
+
+        <div>
+          <label className="label">Las órdenes preventivas las arma…</label>
+          <select
+            className="field"
+            value={modo}
+            disabled={!editable}
+            onChange={(e) => setModo(e.target.value)}
+          >
+            <option value="AUTOMATICA">El sistema, solo</option>
+            <option value="MANUAL">El gestor, eligiendo actividad por actividad</option>
+          </select>
+          <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+            <b>El sistema, solo</b>: cuando a un equipo le toca mantenimiento, el programador arma
+            una orden con todas las actividades que caen dentro del plazo de abajo.
+            <br />
+            <b>El gestor</b>: el sistema no arma órdenes de calendario. Usted decide en «Armar
+            una orden» qué actividades van juntas —tres de un plan con un técnico, las otras dos
+            con otro—. Las que se pasen de fecha sin estar en ninguna orden se marcan como{" "}
+            <b>atrasadas</b>, y quien puede armar órdenes recibe un aviso una vez al día.
+            <br />
+            Los planes <b>por medidor</b> se siguen generando solos en los dos casos.
           </p>
         </div>
 

@@ -8,8 +8,11 @@ const schema = z.object({
   assignedToId: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
-  /** Los planes cuyas actividades se incluyen, por id de asignacion. */
-  asignaciones: z.array(z.string()).default([]),
+  /**
+   * Las actividades de plan que van en la orden, por id de actividad. Se eligen
+   * sueltas: tres de las cinco de un plan pueden ir aqui y dos en otra orden.
+   */
+  actividades: z.array(z.string()).default([]),
   /** Los reportes de falla que se atienden en esta orden. */
   reportes: z.array(z.string()).default([]),
   /** Las actividades del backlog que se retoman. */

@@ -69,6 +69,10 @@ export async function backlog(organizationId: string, opciones?: { assetId?: str
       id: true, title: true, description: true, taskType: true,
       unit: true, minValue: true, maxValue: true, required: true,
       origen: true, origenPlanId: true, origenRequestId: true, maintenanceType: true,
+      // De que actividad del plan salio. Sin esto, al retomarla la orden nueva
+      // no sabria que reloj avanzar al cerrarse, y la actividad se quedaria
+      // marcada como atrasada para siempre aunque ya se hubiera hecho.
+      planTaskId: true,
       liberadaAt: true, motivoLiberacion: true, motivoDetalle: true,
       bloqueadaPorPartId: true,
       // El id va ademas del nombre: sin el no se le puede avisar a esa persona

@@ -110,6 +110,23 @@ model Organization {
   /// la planta cierre dos semanas.
   otDiasHabiles Boolean @default(false)
 
+  /// Quien arma las ordenes preventivas: AUTOMATICA | MANUAL.
+  ///
+  /// AUTOMATICA —lo de siempre— deja que el programador junte en una orden
+  /// todo lo que le toca a un equipo dentro de la ventana.
+  ///
+  /// MANUAL es para el departamento donde el gestor decide que va en cada
+  /// orden: de un plan de cinco actividades que caen la misma semana manda tres
+  /// con un tecnico y dos con otro. Ahi el programador automatico le ganaria la
+  /// mano armando una sola orden con las cinco antes de que el decida. En MANUAL
+  /// el programador NO crea ordenes de calendario: avisa una vez al dia cuantas
+  /// actividades estan atrasadas sin orden, porque apagarlo sin avisar seria
+  /// dejar vencer el mantenimiento en silencio.
+  ///
+  /// Los planes POR MEDIDOR siguen automaticos en los dos modos: todavia no
+  /// tienen reloj por actividad, y en MANUAL no habria quien los programara.
+  otGeneracion String @default("AUTOMATICA")
+
   /// Desde donde se cuenta el siguiente preventivo: CIERRE | PROGRAMADO.
   ///
   /// CIERRE —lo de siempre— cuenta desde que se hizo de verdad. Si el

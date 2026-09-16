@@ -137,7 +137,7 @@ async function main() {
 
   const armada = await armarOrden({
     organizationId: org.id, userId: user.id, assetId: equipo.id,
-    title: "A mano", asignaciones: [disponible.planes[0].asignacionId], reportes: [], backlog: [],
+    title: "A mano", actividades: conFecha.map((a) => a.id), reportes: [], backlog: [],
   });
   if ("error" in armada) throw new Error(armada.error);
   const guardadas = await prisma.workOrderTask.findMany({

@@ -189,3 +189,67 @@ export function describirIntervalo(cadaCuanto: number, unidad: Unidad): string {
   if (unidad === "SEMANAS" && n === 2) return "Quincenal";
   return `Cada ${n} ${ETIQUETA_UNIDAD[unidad].plural}`;
 }
+
+/**
+ * Que tan adelante mira quien arma una orden.
+ *
+ * El gestor no siempre quiere ver lo mismo: el lunes planea la semana, el
+ * primero del mes planea el mes, y a veces solo quiere lo que ya se le paso.
+ * Son preguntas distintas y no se contestan con un numero fijo de dias: "esta
+ * semana" un jueves son tres dias, y "este mes" el dia 28 son dos.
+ *
+ * Lo ATRASADO se ve siempre, con cualquier ventana. Una ventana que escondiera
+ * lo vencido seria la forma mas facil de que se quedara vencido.
+ */
+export const VENTANAS = {
+  ATRASADAS: { etiqueta: "Solo atrasadas y de hoy" },
+  SEMANA: { etiqueta: "Esta semana" },
+  DIAS_7: { etiqueta: "Próximos 7 días" },
+  MES: { etiqueta: "Este mes" },
+  DIAS_30: { etiqueta: "Próximos 30 días" },
+  DIAS_90: { etiqueta: "Próximos 90 días" },
+  CONFIGURADA: { etiqueta: "La de la empresa" },
+} as const;
+
+export type Ventana = keyof typeof VENTANAS;
+
+export function esVentana(v: unknown): v is Ventana {
+  return typeof v === "string" && v in VENTANAS;
+}
+
+/**
+ * El ultimo instante que entra en la ventana.
+ *
+ * La semana termina el domingo —semana de lunes a domingo, la de un calendario
+ * de trabajo en Mexico—. "Este mes" termina el ultimo dia del mes, no a los 30
+ * dias. Se devuelve el FINAL del dia para que una actividad que vence ese dia
+ * a cualquier hora entre.
+ */
+export function limiteDeVentana(ventana: Ventana, hoy: Date, diasDeLaEmpresa: number): Date {
+  const fin = new Date(hoy);
+  fin.setHours(23, 59, 59, 999);
+  switch (ventana) {
+    case "ATRASADAS":
+      return fin;
+    case "SEMANA": {
+      // getDay: domingo 0 … sabado 6. Dias que faltan para el domingo.
+      const faltan = (7 - fin.getDay()) % 7;
+      fin.setDate(fin.getDate() + faltan);
+      return fin;
+    }
+    case "DIAS_7":
+      fin.setDate(fin.getDate() + 7);
+      return fin;
+    case "MES":
+      return new Date(fin.getFullYear(), fin.getMonth() + 1, 0, 23, 59, 59, 999);
+    case "DIAS_30":
+      fin.setDate(fin.getDate() + 30);
+      return fin;
+    case "DIAS_90":
+      fin.setDate(fin.getDate() + 90);
+      return fin;
+    case "CONFIGURADA":
+      fin.setDate(fin.getDate() + Math.max(diasDeLaEmpresa, 0));
+      return fin;
+  }
+}
