@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
-import { MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
+import { CONSUMO_GENERAL, MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
+import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
 import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type Opcion = { id: string; etiqueta: string };
@@ -13,9 +14,12 @@ export type RefaccionOpcion = { id: string; code: string; name: string; unit: st
 /** Existencia por almacen y por refaccion. Sin entrada significa cero. */
 export type Existencias = Record<string, Record<string, number>>;
 /** Renglones que llegan ya armados, por ejemplo del plan de una orden. */
-export type Precargado = { partId: string; cantidad: number };
+export type Precargado = { partId: string; cantidad: number; taskId?: string | null };
 
-type Renglon = { partId: string; descripcion: string; cantidad: string };
+/** Una actividad de la orden elegida, con el tipo que hereda el material. */
+type Actividad = { id: string; title: string; tipo: string };
+
+type Renglon = { partId: string; descripcion: string; cantidad: string; taskId: string };
 
 export function RequisicionDialog({
   almacenes, ordenes, activos, refacciones, existencias,
@@ -42,11 +46,38 @@ export function RequisicionDialog({
   const [nota, setNota] = useState("");
   const [renglones, setRenglones] = useState<Renglon[]>(
     precargados?.length
-      ? precargados.map((p) => ({ partId: p.partId, descripcion: "", cantidad: String(p.cantidad) }))
-      : [{ partId: "", descripcion: "", cantidad: "" }],
+      ? precargados.map((p) => ({ partId: p.partId, descripcion: "", cantidad: String(p.cantidad), taskId: p.taskId ?? "" }))
+      : [{ partId: "", descripcion: "", cantidad: "", taskId: "" }],
   );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Las actividades de la orden elegida.
+   *
+   * El material se liga a la actividad que lo necesita, no a la orden: una
+   * misma orden puede traer el preventivo del mes y una falla reportada, y su
+   * material no es del mismo tipo.
+   */
+  const [actividades, setActividades] = useState<Actividad[]>([]);
+
+  async function cargarActividades(id: string) {
+    setActividades([]);
+    if (!id) return;
+    const res = await fetch(`/api/work-orders/${id}`);
+    if (!res.ok) return;
+    const { workOrder } = await res.json().catch(() => ({ workOrder: null }));
+    setActividades(
+      (workOrder?.tasks ?? [])
+        .filter((t: { liberadaAt: string | null }) => !t.liberadaAt)
+        .map((t: { id: string; title: string; maintenanceType: string | null }) => ({
+          id: t.id, title: t.title, tipo: t.maintenanceType ?? workOrder.maintenanceType,
+        })),
+    );
+  }
+
+  useEffect(() => {
+    if (ordenFija?.id) void cargarActividades(ordenFija.id);
+  }, [ordenFija?.id]);
 
   const orden = useMemo(
     () => ordenFija ?? ordenes.find((o) => o.id === workOrderId) ?? null,
@@ -115,6 +146,7 @@ export function RequisicionDialog({
         partId: r.partId || null,
         descripcion: r.partId ? `${porId.get(r.partId)?.code} — ${porId.get(r.partId)?.name}` : r.descripcion.trim(),
         cantidadSolicitada: Number(r.cantidad),
+        taskId: workOrderId ? r.taskId || null : null,
       }));
     if (!validos.length) { setError("Agregue al menos un renglón con cantidad"); return; }
 
@@ -172,7 +204,14 @@ export function RequisicionDialog({
                   <SelectorBuscable
                     className="mt-0.5"
                     valor={workOrderId}
-                    onCambio={(id) => { setWorkOrderId(id); setAssetId(""); setError(null); }}
+                    onCambio={(id) => {
+                      setWorkOrderId(id); setAssetId(""); setError(null);
+                      // Cambiar de orden invalida las actividades elegidas: dejar
+                      // una de la orden anterior ligaria el material a un trabajo
+                      // que no es.
+                      setRenglones((prev) => prev.map((r) => ({ ...r, taskId: "" })));
+                      void cargarActividades(id);
+                    }}
                     vacio="Sin orden"
                     marcador="Busque por folio o título"
                     opciones={ordenes.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
@@ -202,13 +241,22 @@ export function RequisicionDialog({
                   />
                 )}
               </div>
-              <div className="sm:col-span-2">
-                <label className="text-[0.6875rem] font-medium text-slate-600">Motivo</label>
-                <select value={motivo} onChange={(e) => setMotivo(e.target.value as keyof typeof MOTIVOS)}
-                  className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
-                  {Object.entries(MOTIVOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
+              {/* Con orden, la clasificación la pone la ACTIVIDAD de cada renglón:
+                  preguntarla otra vez arriba abriría la puerta a que se contradigan. */}
+              {orden ? (
+                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[0.6875rem] text-slate-600">
+                  El tipo de mantenimiento lo pone la actividad que se elija en cada renglón. Si el
+                  material es de la orden completa, elija «{CONSUMO_GENERAL}».
+                </div>
+              ) : (
+                <div className="sm:col-span-2">
+                  <label className="text-[0.6875rem] font-medium text-slate-600">Motivo</label>
+                  <select value={motivo} onChange={(e) => setMotivo(e.target.value as keyof typeof MOTIVOS)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+                    {Object.entries(MOTIVOS).filter(([k]) => k !== "MIXTA").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 grid gap-1.5">
@@ -260,6 +308,27 @@ export function RequisicionDialog({
                           ) : null}
                         </p>
                       ) : null}
+                      {orden ? (
+                        <div className="grid gap-0.5">
+                          <select
+                            value={r.taskId}
+                            onChange={(e) => actualizar(i, { taskId: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-2 py-1 text-[0.6875rem]"
+                          >
+                            <option value="">{CONSUMO_GENERAL}</option>
+                            {actividades.map((a) => (
+                              <option key={a.id} value={a.id}>{a.title}</option>
+                            ))}
+                          </select>
+                          <p className="text-[0.625rem] text-slate-500">
+                            {r.taskId
+                              ? `Se clasifica como ${(MAINTENANCE_TYPE_LABELS[actividades.find((a) => a.id === r.taskId)?.tipo ?? ""] ?? "—").toLowerCase()}, por la actividad`
+                              : actividades.length
+                                ? "Material de la orden completa: no se le pone tipo"
+                                : "Esta orden no tiene actividades: el material queda como consumo general"}
+                          </p>
+                        </div>
+                      ) : null}
                       {!r.partId ? (
                         // Se puede pedir lo que no esta en el catalogo: es como
                         // llega a compras lo que todavia nadie ha dado de alta.
@@ -290,7 +359,7 @@ export function RequisicionDialog({
               })}
               <button
                 type="button"
-                onClick={() => setRenglones((prev) => [...prev, { partId: "", descripcion: "", cantidad: "" }])}
+                onClick={() => setRenglones((prev) => [...prev, { partId: "", descripcion: "", cantidad: "", taskId: "" }])}
                 className="w-fit text-xs font-medium text-brand-600 hover:underline"
               >
                 + Agregar renglón

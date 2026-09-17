@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { almacenPorOmision } from "@/lib/almacen";
 import { siguienteFolio } from "@/lib/numbering";
-import { motivoDeLaOrden } from "@/lib/requisiciones-datos";
+import { motivoDeLaOrden, motivoDeRenglones } from "@/lib/requisiciones-datos";
+import { tipoDeActividad } from "@/lib/fallas";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -19,11 +20,21 @@ const schema = z.object({
       descripcion: z.string().trim().min(2).max(200),
       cantidadSolicitada: z.coerce.number().positive(),
       nota: z.string().trim().max(200).optional().nullable(),
+      /**
+       * La actividad de la orden que necesita este material. Nulo = consumo
+       * general de la orden; es una eleccion, no un olvido.
+       */
+      taskId: z.string().optional().nullable(),
     }),
   ).min(1).max(80),
 });
 
 /** Alta de requisicion de material. Pedir no mueve existencia. */
+/** Un renglon que no cuadra con la orden elegida. */
+class ErrorDeRenglon extends Error {
+  readonly codigo = 422;
+}
+
 export async function POST(request: Request) {
   return withAuth("requisition:create", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
@@ -47,17 +58,34 @@ export async function POST(request: Request) {
     // guardar dos copias solo abre la puerta a que se contradigan. Ademas se
     // valida que la orden sea de esta organizacion.
     let assetId = input.assetId || null;
-    // Con orden, el motivo SALE del tipo de trabajo: dejarlo al formulario
-    // clasifico como correctivas las requisiciones de preventivos.
+    /**
+     * Con orden, la clasificacion NO sale del formulario ni del encabezado:
+     * sale de la actividad de cada renglon. Una misma orden puede traer el
+     * preventivo del mes y una falla reportada, y su material no es del mismo
+     * tipo. El motivo del encabezado queda como resumen.
+     */
     let motivo: string = input.motivo;
+    const tiposPorRenglon: Array<string | null> = input.renglones.map(() => null);
     if (input.workOrderId) {
       const orden = await prisma.workOrder.findFirst({
         where: { id: input.workOrderId, organizationId: orgId },
-        select: { assetId: true, maintenanceType: true },
+        select: {
+          assetId: true, maintenanceType: true,
+          tasks: { select: { id: true, maintenanceType: true, liberadaAt: true } },
+        },
       });
       if (!orden) return fail("Orden de trabajo no encontrada", 404);
       assetId = orden.assetId;
-      motivo = motivoDeLaOrden(orden.maintenanceType);
+
+      const tareas = new Map(orden.tasks.map((t) => [t.id, t]));
+      input.renglones.forEach((r, i) => {
+        if (!r.taskId) return;
+        const tarea = tareas.get(r.taskId);
+        if (!tarea) throw new ErrorDeRenglon("Una de las actividades elegidas no es de esa orden de trabajo");
+        if (tarea.liberadaAt) throw new ErrorDeRenglon("Esa actividad se envió al backlog: no se le puede pedir material");
+        tiposPorRenglon[i] = tipoDeActividad(tarea.maintenanceType, orden.maintenanceType);
+      });
+      motivo = motivoDeRenglones(tiposPorRenglon, motivoDeLaOrden(orden.maintenanceType));
     } else if (assetId) {
       const activo = await prisma.asset.findFirst({
         where: { id: assetId, organizationId: orgId },
@@ -81,6 +109,8 @@ export async function POST(request: Request) {
         renglones: {
           create: input.renglones.map((r) => ({
             partId: r.partId || null,
+            // La actividad que necesita el material. Nula = consumo general.
+            taskId: r.taskId || null,
             descripcion: r.descripcion,
             cantidadSolicitada: r.cantidadSolicitada,
             nota: r.nota || null,
@@ -93,7 +123,8 @@ export async function POST(request: Request) {
     await logAudit({
       organizationId: orgId, userId: user.id,
       entity: "MaterialRequest", entityId: req.id, action: "CREATED",
-      summary: `Requisicion ${req.folio}: ${input.renglones.length} renglones`,
+      summary: `Requisicion ${req.folio}: ${input.renglones.length} renglones` +
+        (input.workOrderId ? ` · ${tiposPorRenglon.filter(Boolean).length} con actividad` : ""),
     });
 
     return ok({ id: req.id, folio: req.folio }, 201);

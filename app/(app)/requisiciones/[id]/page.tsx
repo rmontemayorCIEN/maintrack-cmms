@@ -1,3 +1,4 @@
+import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
 import { cubiertoPorCompras } from "@/lib/compras";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,7 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ESTADOS, MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
+import { CONSUMO_GENERAL, ESTADOS, MOTIVOS, SIN_ACTIVIDAD, URGENCIAS } from "@/lib/requisiciones-datos";
+import { tipoDeActividad } from "@/lib/fallas";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesRequisicion, type RenglonVale } from "./acciones";
 import { CompraDialog } from "../../compras/compra-dialog";
@@ -26,9 +28,14 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
     include: {
       warehouse: { select: { id: true, name: true } },
       solicitante: { select: { name: true } },
-      workOrder: { select: { id: true, number: true, title: true } },
+      workOrder: { select: { id: true, number: true, title: true, maintenanceType: true } },
       asset: { select: { id: true, code: true, name: true } },
-      renglones: { include: { part: { select: { id: true, code: true, unit: true, unitCost: true } } } },
+      renglones: {
+        include: {
+          part: { select: { id: true, code: true, unit: true, unitCost: true } },
+          task: { select: { id: true, title: true, maintenanceType: true } },
+        },
+      },
       movements: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -82,6 +89,10 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
     // Una refaccion sin costo entra a la orden en cero y el costo por equipo
     // sale corto. Se avisa aqui, que es donde alguien puede capturarlo.
     sinCosto: !!r.partId && (r.part?.unitCost ?? 0) <= 0,
+    // De qué actividad es este material. Sin actividad puede ser consumo
+    // general de la orden o un vale anterior a que se guardara: no se adivina.
+    actividad: r.task?.title ?? null,
+    tipoActividad: r.task ? tipoDeActividad(r.task.maintenanceType, req.workOrder?.maintenanceType ?? "") : null,
   }));
   const sinCosto = renglones.filter((r) => r.sinCosto);
 
@@ -154,6 +165,13 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
                       <tr key={r.id}>
                         <td>
                           <p className="font-medium text-slate-800">{r.descripcion}</p>
+                          <p className="text-[0.625rem] text-slate-500">
+                            {r.actividad
+                              ? <>Para: {r.actividad} · <span className="text-slate-600">{MAINTENANCE_TYPE_LABELS[r.tipoActividad ?? ""] ?? ""}</span></>
+                              : req.workOrderId
+                                ? CONSUMO_GENERAL
+                                : SIN_ACTIVIDAD}
+                          </p>
                           {r.disponible === null ? (
                             <p className="text-[0.625rem] text-amber-700">No está en el catálogo — va a compras</p>
                           ) : null}

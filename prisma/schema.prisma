@@ -988,18 +988,19 @@ model WorkOrderTask {
   /// contador que se desincroniza.
   retomaDeTaskId String? @unique
 
-  workOrder        WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  completedBy      User?              @relation(fields: [completedById], references: [id])
-  liberadaPor      User?              @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
-  bloqueadaPor     Part?              @relation(fields: [bloqueadaPorPartId], references: [id])
+  workOrder        WorkOrder             @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  completedBy      User?                 @relation(fields: [completedById], references: [id])
+  liberadaPor      User?                 @relation("TareaLiberadaPor", fields: [liberadaPorId], references: [id])
+  bloqueadaPor     Part?                 @relation(fields: [bloqueadaPorPartId], references: [id])
   cargosRefaccion  WorkOrderPart[]
+  materialPedido   MaterialRequestLine[]
   cargosManoDeObra WorkOrderLabor[]
   cargosServicio   WorkOrderService[]
-  failureCode      FailureCode?       @relation(fields: [failureCodeId], references: [id])
-  rootCause        RootCause?         @relation(fields: [rootCauseId], references: [id])
-  origenRequest    WorkRequest?       @relation("SolicitudAtendida", fields: [origenRequestId], references: [id])
-  retomaDe         WorkOrderTask?     @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
-  retomadaPor      WorkOrderTask?     @relation("CadenaDeRetoma")
+  failureCode      FailureCode?          @relation(fields: [failureCodeId], references: [id])
+  rootCause        RootCause?            @relation(fields: [rootCauseId], references: [id])
+  origenRequest    WorkRequest?          @relation("SolicitudAtendida", fields: [origenRequestId], references: [id])
+  retomaDe         WorkOrderTask?        @relation("CadenaDeRetoma", fields: [retomaDeTaskId], references: [id])
+  retomadaPor      WorkOrderTask?        @relation("CadenaDeRetoma")
 
   @@index([workOrderId])
   @@index([liberadaAt])
@@ -1757,6 +1758,14 @@ model MaterialRequest {
 model MaterialRequestLine {
   id                 String  @id @default(cuid())
   requestId          String
+  /// La ACTIVIDAD de la orden que necesita este material.
+  ///
+  /// Una misma orden puede traer el preventivo del mes y la fuga que se
+  /// reporto: el material de cada una es de distinto tipo y no se puede
+  /// clasificar por el encabezado. Nulo a proposito cuando el material es de
+  /// la orden completa («consumo general») o cuando el vale es historico: ahi
+  /// no se inventa una actividad, se muestra como no especificada.
+  taskId             String?
   /// Nulo cuando se pide algo que no esta en el catalogo. La descripcion
   /// siempre va: es lo que permite pedir lo que todavia no existe.
   partId             String?
@@ -1768,10 +1777,12 @@ model MaterialRequestLine {
 
   request MaterialRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
   part    Part?                 @relation(fields: [partId], references: [id])
+  task    WorkOrderTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
   /// Las compras que se generaron por lo que falto de este renglon.
   compras PurchaseRequestLine[]
 
   @@index([requestId])
+  @@index([taskId])
 }
 
 model StockTransferLine {

@@ -13,7 +13,15 @@ export const MOTIVOS = {
   CORRECTIVO: "Mantenimiento correctivo",
   MINIMO: "Reposición de mínimo",
   PROYECTO: "Proyecto especial",
+  /// Una misma requisicion puede llevar material de actividades de distinto
+  /// tipo: el preventivo del mes y la fuga que se reporto. El encabezado lo
+  /// dice, y cada renglon conserva el suyo.
+  MIXTA: "Varios tipos (ver cada renglón)",
 } as const;
+
+/** Texto de la actividad que origina un renglon cuando no hay ninguna. */
+export const SIN_ACTIVIDAD = "Actividad no especificada";
+export const CONSUMO_GENERAL = "Consumo general de la OT";
 
 export const URGENCIAS = {
   NORMAL: "Normal",
@@ -57,6 +65,20 @@ export function motivoDeLaOrden(maintenanceType: string | null | undefined): Mot
     default:
       return "CORRECTIVO";
   }
+}
+
+/**
+ * El motivo del encabezado, deducido de los tipos de sus renglones.
+ *
+ * Deja de ser el dato que clasifica —eso lo hace cada renglon con su
+ * actividad— y pasa a ser un resumen: si todo el vale es del mismo tipo lo
+ * dice, y si mezcla lo dice tambien en vez de escoger uno y mentir.
+ */
+export function motivoDeRenglones(tipos: Array<string | null>, sinOrden?: Motivo): Motivo {
+  const conTipo = tipos.filter(Boolean) as string[];
+  if (!conTipo.length) return sinOrden ?? "PROYECTO";
+  const motivos = new Set(conTipo.map((t) => motivoDeLaOrden(t)));
+  return motivos.size === 1 ? [...motivos][0] : "MIXTA";
 }
 
 /**

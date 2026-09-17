@@ -1,3 +1,4 @@
+import { costoDeMaterialPorTipo } from "@/lib/material-por-actividad";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -9,6 +10,7 @@ import { CostRankingChart, DonutChart, MixChart, TrendChart } from "@/components
 import {
   CRITICALITY_COLORS,
   CRITICALITY_LABELS,
+  MAINTENANCE_TYPE_COLORS,
   MAINTENANCE_TYPE_LABELS,
   PRIORITY_LABELS,
 } from "@/lib/constants";
@@ -31,7 +33,7 @@ export default async function ReportsPage({
   const orgId = user.organizationId;
   const periodo = await periodoDeLaEmpresa(orgId, days);
 
-  const [kpis, trend, ranking, byTechnician, failureCodes, backlogAging] = await Promise.all([
+  const [kpis, trend, ranking, byTechnician, failureCodes, backlogAging, materialPorTipo] = await Promise.all([
     calcularIndicadores(orgId, periodo),
     tendenciaMensual(orgId, 12),
     costoYParoPorActivo(orgId, periodo, 10),
@@ -49,6 +51,7 @@ export default async function ReportsPage({
       where: { organizationId: orgId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } },
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
     }),
+    costoDeMaterialPorTipo(orgId, periodo.desde, periodo.hasta),
   ]);
 
   const [technicians, codes] = await Promise.all([
@@ -201,6 +204,41 @@ export default async function ReportsPage({
           <DonutChart data={priorityData} />
         </Card>
       </div>
+
+      {materialPorTipo.length ? (
+        <div className="mt-4">
+          <Card>
+            <CardHeader
+              title="Costo de material por tipo de mantenimiento"
+              subtitle="Se atribuye a la ACTIVIDAD que consumió la refacción, no al tipo del encabezado: una orden puede traer el preventivo del mes y una falla en el mismo viaje."
+            />
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th className="text-right">Costo de material</th>
+                    <th className="text-right">Atribuido por actividad</th>
+                    <th className="text-right">Sin actividad (va por el tipo de la orden)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materialPorTipo.map((m) => (
+                    <tr key={m.tipo}>
+                      <td>
+                        <Badge className={MAINTENANCE_TYPE_COLORS[m.tipo]}>{MAINTENANCE_TYPE_LABELS[m.tipo] ?? m.tipo}</Badge>
+                      </td>
+                      <td className="text-right tabular-nums">{formatCurrency(m.costo, currency)}</td>
+                      <td className="text-right tabular-nums text-slate-600">{formatCurrency(m.deLaActividad, currency)}</td>
+                      <td className="text-right tabular-nums text-slate-500">{formatCurrency(m.delEncabezado, currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       {/* `grid-cols-[minmax(0,1fr)]`: en el telefono es una sola columna, y una
           columna implicita se mide por el contenido —las tablas de aqui abajo la

@@ -33,6 +33,7 @@ import { esFalla, tipoDeActividad } from "@/lib/fallas";
 import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
 import { faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
 import { BitacoraDeEstados } from "./bitacora";
+import { MaterialPorActividad } from "./material-actividad";
 
 export const dynamic = "force-dynamic";
 
@@ -639,6 +640,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               editable={canExecute}
             />
           </Card>
+
+          <MaterialPorActividad organizationId={user.organizationId} workOrderId={wo.id} moneda={currency} />
 
           <BitacoraDeEstados organizationId={user.organizationId} workOrderId={wo.id} zona={zona} />
         </div>

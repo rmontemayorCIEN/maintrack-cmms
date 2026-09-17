@@ -406,6 +406,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Al guardar me aparece «Revise la programación»", porque: "La fecha no es laborable o el responsable ya no tiene horas libres ese día. Elija uno de los días o personas propuestos, o marque «Programar así de todos modos»." },
     ],
     preguntas: [
+      { pregunta: "¿Cómo sé cuánto material llevó cada actividad de la orden?", respuesta: "En la orden, el bloque «Material por actividad» muestra por cada tarea lo pedido, lo entregado, lo pendiente, lo que se mandó a comprar, lo devuelto y su costo neto. El material que se cargó a la orden completa aparece aparte, sin tipo." },
       { pregunta: "¿Puedo cambiar el orden en que se ejecutan las actividades?", respuesta: "Sí. Cada actividad trae flechas para subirla o bajarla un lugar. El plan y la IA proponen un orden; usted decide el definitivo, que para eso conoce la planta. Se mueve de a un lugar y no arrastrando, porque en tableta y con guantes arrastrar se presta a errores." },
       { pregunta: "¿Por qué no me deja mover una actividad?", respuesta: "Porque ya se resolvió, o porque quiere pasarla arriba de una que ya se hizo. Lo que ya ocurrió se queda donde ocurrió: moverlo diría que se ejecutó en un orden que no fue. Tampoco se reordena una orden cerrada." },
       { pregunta: "Un grupo aparece dos veces en la lista. ¿Está mal?", respuesta: "No. Los grupos son tramos: si usted decidió «tres pasos del plan, luego atender la fuga, luego el resto del plan», la pantalla muestra exactamente esa secuencia. Por eso la numeración siempre asciende y coincide con la hoja impresa." },
@@ -772,7 +773,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Pedir no descuenta existencia. El almacén baja hasta que se surte.",
-      "El motivo lo pone el tipo de la orden: una requisición de un preventivo entra como preventiva, no como correctiva.",
+      "Cada renglón se liga a la ACTIVIDAD de la orden que necesita ese material, y de ahí sale su tipo: una misma requisición puede llevar el engrase del preventivo y el sello de una falla, cada uno con su clasificación.",
+      "Si el material es de la orden completa se elige «Consumo general de la OT» y no se le inventa tipo. Los vales anteriores a este cambio se muestran como «Actividad no especificada»: no se les asigna una actividad sin evidencia.",
       "Lo surtido contra una orden de trabajo se carga como consumo de esa orden y actualiza su costo en el momento.",
       "Lo devuelto baja ese consumo: el cargo original no se borra, se le anota lo que regresó y el costo de la orden queda en lo que de verdad se usó.",
       "Lo que el almacén no puede cubrir se manda a compras sin volver a capturarlo. Lo que ya está en una compra abierta deja de aparecer como faltante, para no comprarlo dos veces.",
@@ -785,6 +787,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Estado", explica: "Se calcula de los renglones, no se captura: solicitada, surtida en parte, surtida." },
       { nombre: "Urgencia", explica: "Normal, alta o equipo parado. Las de paro salen resaltadas y se cuentan aparte arriba." },
       { nombre: "Por surtir", explica: "Lo que falta entregar. Es la columna que le dice al almacenista que tiene pendiente." },
+      { nombre: "Actividad", explica: "La tarea de la orden que pidió ese material. De ella sale el tipo de mantenimiento con que se cuenta el costo." },
       { nombre: "Devuelto", explica: "Lo que regreso sin usarse. Mucha devolución significa que se esta pidiendo de mas por si acaso. Al devolver, el costo de la orden baja solo." },
     ],
     botones: [
@@ -1196,6 +1199,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Los indicadores son los mismos del Panel de control y del Diagnóstico IA: una sola fuente de cálculo.",
       "El periodo son días completos en la zona horaria de la empresa, hoy incluido.",
       "El costo cuenta órdenes TERMINADAS en el periodo; las canceladas no suman. El paro sale de los eventos de paro, y el planeado se reporta aparte: no resta disponibilidad.",
+      "El costo de material por tipo de mantenimiento se atribuye a la ACTIVIDAD que consumió la refacción. Una orden preventiva que además atendió una falla reparte su material entre los dos tipos; lo que se cargó sin actividad se cuenta con el tipo de la orden y se muestra en su propia columna.",
     ],
   },
 

@@ -129,6 +129,10 @@ export async function surtir(params: {
           data: {
             workOrderId: req.workOrderId,
             partId: renglon.partId,
+            // El cargo cae en la ACTIVIDAD que pidio el material, no en el
+            // encabezado: es lo que permite decir cuanto costo el preventivo y
+            // cuanto la falla que venia en la misma orden.
+            taskId: renglon.taskId,
             quantity: entrega.cantidad,
             unitCost: part?.unitCost ?? 0,
             cost: entrega.cantidad * (part?.unitCost ?? 0),
@@ -221,8 +225,10 @@ export async function devolver(params: {
        */
       if (req.workOrderId) {
         let porRepartir = dev.cantidad;
+        // Se descuenta del cargo de LA MISMA actividad: devolver material del
+        // preventivo no puede abaratar la falla que iba en la misma orden.
         const cargos = await tx.workOrderPart.findMany({
-          where: { workOrderId: req.workOrderId, partId: renglon.partId },
+          where: { workOrderId: req.workOrderId, partId: renglon.partId, taskId: renglon.taskId },
           orderBy: { id: "asc" },
         });
         for (const cargo of cargos) {
@@ -303,6 +309,7 @@ export async function refaccionesDelPlan(organizationId: string, workOrderId: st
     where: { ...filtro, plan: { organizationId } },
     orderBy: { position: "asc" },
     select: {
+      id: true,
       title: true,
       plan: { select: { name: true } },
       parts: {
@@ -319,17 +326,34 @@ export async function refaccionesDelPlan(organizationId: string, workOrderId: st
 
   // Lo que pide el plan, sumando la misma refaccion si aparece en varias
   // actividades: al almacen se le pide una vez, no una por actividad.
-  const pide = new Map<string, { code: string; name: string; unit: string; cantidad: number; actividades: string[] }>();
+  /**
+   * La actividad de ESTA orden que corresponde a cada actividad del plan.
+   *
+   * Sirve para que la requisición nazca ligada a la actividad y no al
+   * encabezado: el material del engrase se clasifica como preventivo aunque la
+   * orden traiga además una falla.
+   */
+  const deLaOrden = await prisma.workOrderTask.findMany({
+    where: { workOrderId: orden.id, planTaskId: { in: tareas.map((t) => t.id) }, liberadaAt: null },
+    select: { id: true, planTaskId: true },
+  });
+  const tareaDeLaOrden = new Map(deLaOrden.map((t) => [t.planTaskId!, t.id]));
+
+  const pide = new Map<string, { code: string; name: string; unit: string; cantidad: number; actividades: string[]; taskId: string | null }>();
   for (const t of tareas) {
     for (const p of t.parts) {
       const previo = pide.get(p.part.id);
       if (previo) {
         previo.cantidad += p.quantity;
         if (!previo.actividades.includes(t.title)) previo.actividades.push(t.title);
+        // Si la misma refacción la piden dos actividades, ya no es de una sola:
+        // se deja como consumo general y quien la pide elige si la reparte.
+        if (previo.taskId !== (tareaDeLaOrden.get(t.id) ?? null)) previo.taskId = null;
       } else {
         pide.set(p.part.id, {
           code: p.part.code, name: p.part.name, unit: p.part.unit,
           cantidad: p.quantity, actividades: [t.title],
+          taskId: tareaDeLaOrden.get(t.id) ?? null,
         });
       }
     }
@@ -374,6 +398,7 @@ export async function refaccionesDelPlan(organizationId: string, workOrderId: st
       return {
         partId, code: v.code, name: v.name, unidad: v.unit,
         actividades: v.actividades,
+        taskId: v.taskId,
         pide: v.cantidad,
         yaPedido: pedido,
         yaConsumido: consumido,

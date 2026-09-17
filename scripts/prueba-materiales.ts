@@ -13,7 +13,8 @@
 import { prisma } from "../lib/db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "../lib/almacen";
 import { ErrorDeRequisicion, devolver, surtir } from "../lib/requisiciones";
-import { motivoDeLaOrden } from "../lib/requisiciones-datos";
+import { motivoDeLaOrden, motivoDeRenglones } from "../lib/requisiciones-datos";
+import { materialPorActividad, costoDeMaterialPorTipo } from "../lib/material-por-actividad";
 import {
   ErrorDeCompra, autorizar, crearRequisicionDeCompra, cubiertoPorCompras, enCompra, recibir,
 } from "../lib/compras";
@@ -79,7 +80,7 @@ async function main() {
         maintenanceType: "PREVENTIVE", status: "IN_PROGRESS", assignedToId: almacenista.id, startedAt: new Date(),
       },
     });
-    const vale = async (renglones: Array<{ partId?: string; descripcion: string; cantidad: number }>) =>
+    const vale = async (renglones: Array<{ partId?: string; descripcion: string; cantidad: number; taskId?: string | null }>) =>
       prisma.materialRequest.create({
         data: {
           organizationId: org.id, folio: `RM-${Math.random().toString(36).slice(2, 7)}`,
@@ -327,6 +328,104 @@ async function main() {
         ultimo?.balanceAfter === stock.quantity && total.quantityOnHand === stock.quantity,
         { kardex: ultimo?.balanceAfter, existencia: stock.quantity, total: total.quantityOnHand });
     }
+    // ───────────────────────── 12. Material ligado a la ACTIVIDAD ───
+    console.log("\n12. Una orden con preventivo y correctivo: cada material a su actividad");
+    const otMixta = await prisma.workOrder.create({
+      data: {
+        organizationId: org.id, number: "OT-M2", title: "Preventivo con falla encontrada", assetId: activo.id,
+        maintenanceType: "PREVENTIVE", status: "IN_PROGRESS", assignedToId: almacenista.id, startedAt: new Date(),
+      },
+    });
+    const actPrev = await prisma.workOrderTask.create({
+      data: { workOrderId: otMixta.id, title: "Engrase mensual", maintenanceType: "PREVENTIVE", position: 0, origen: "PLAN" },
+    });
+    const actCorr = await prisma.workOrderTask.create({
+      data: { workOrderId: otMixta.id, title: "Fuga en sello reportada", maintenanceType: "CORRECTIVE", position: 1, origen: "SOLICITUD" },
+    });
+    const grasa = await parte("GRA-1", 10, 40);
+    const empaque = await parte("EMP-2", 10, 25);
+    const trapo = await parte("TRA-1", 10, 5);
+
+    const valeMixto = await prisma.materialRequest.create({
+      data: {
+        organizationId: org.id, folio: "RM-MIX", warehouseId: almacen.id, workOrderId: otMixta.id, assetId: activo.id,
+        solicitanteId: almacenista.id,
+        motivo: motivoDeRenglones(["PREVENTIVE", "CORRECTIVE", null], "PREVENTIVO"),
+        renglones: {
+          create: [
+            { partId: grasa.id, descripcion: "GRA-1 grasa", cantidadSolicitada: 2, taskId: actPrev.id },
+            { partId: empaque.id, descripcion: "EMP-2 empaque", cantidadSolicitada: 3, taskId: actCorr.id },
+            { partId: trapo.id, descripcion: "TRA-1 trapo", cantidadSolicitada: 1 },
+          ],
+        },
+      },
+      include: { renglones: true },
+    });
+    revisar("una requisición con actividades de distinto tipo se marca «varios tipos», no una sola",
+      valeMixto.motivo === "MIXTA", valeMixto.motivo);
+
+    const rGrasa = valeMixto.renglones.find((r) => r.partId === grasa.id)!;
+    const rEmpaque = valeMixto.renglones.find((r) => r.partId === empaque.id)!;
+    const rTrapo = valeMixto.renglones.find((r) => r.partId === trapo.id)!;
+    await surtir({
+      organizationId: org.id, requestId: valeMixto.id, userId: almacenista.id, entregadoA: "Miguel",
+      renglones: [
+        { lineId: rGrasa.id, cantidad: 2 },
+        { lineId: rEmpaque.id, cantidad: 3 },
+        { lineId: rTrapo.id, cantidad: 1 },
+      ],
+    });
+    const cargosMixta = await prisma.workOrderPart.findMany({ where: { workOrderId: otMixta.id }, include: { part: true } });
+    revisar("cada cargo cae en la actividad que pidió el material, y el general sin actividad",
+      cargosMixta.find((c) => c.partId === grasa.id)?.taskId === actPrev.id &&
+      cargosMixta.find((c) => c.partId === empaque.id)?.taskId === actCorr.id &&
+      cargosMixta.find((c) => c.partId === trapo.id)?.taskId === null,
+      cargosMixta.map((c) => [c.part.code, c.taskId === actPrev.id ? "preventiva" : c.taskId === actCorr.id ? "correctiva" : "general"]));
+
+    // Se devuelve material del preventivo: no puede abaratar la falla.
+    await devolver({
+      organizationId: org.id, requestId: valeMixto.id, userId: almacenista.id, devuelvePor: "Miguel",
+      renglones: [{ lineId: rGrasa.id, cantidad: 1 }],
+    });
+    const resumen = await materialPorActividad(org.id, otMixta.id);
+    const grupoPrev = resumen.find((g) => g.taskId === actPrev.id)!;
+    const grupoCorr = resumen.find((g) => g.taskId === actCorr.id)!;
+    const grupoGeneral = resumen.find((g) => g.taskId === null)!;
+    revisar("desde la actividad preventiva se ve lo pedido, entregado, devuelto y su costo neto (1 × $40)",
+      grupoPrev.tipo === "PREVENTIVE" && grupoPrev.solicitado === 2 && grupoPrev.entregado === 2 &&
+      grupoPrev.devuelto === 1 && grupoPrev.costoNeto === 40,
+      { tipo: grupoPrev.tipo, neto: grupoPrev.costoNeto });
+    revisar("la actividad correctiva conserva su costo completo (3 × $25)",
+      grupoCorr.tipo === "CORRECTIVE" && grupoCorr.costoNeto === 75 && grupoCorr.devuelto === 0, grupoCorr.costoNeto);
+    revisar("el consumo general de la orden queda sin tipo, sin inventarle uno",
+      grupoGeneral.tipo === null && grupoGeneral.costoNeto === 5);
+
+    await prisma.workOrder.update({ where: { id: otMixta.id }, data: { status: "COMPLETED", completedAt: new Date(), resolution: "Hecho" } });
+    const porTipo = await costoDeMaterialPorTipo(org.id, new Date(Date.now() - 86_400_000), new Date(Date.now() + 86_400_000));
+    const prev = porTipo.find((t) => t.tipo === "PREVENTIVE")!;
+    const corr = porTipo.find((t) => t.tipo === "CORRECTIVE")!;
+    revisar("el costo por tipo usa la actividad: $40 preventivo y $75 correctivo en la misma orden preventiva",
+      prev.costo >= 40 && corr.costo === 75 && corr.deLaActividad === 75,
+      porTipo.map((t) => [t.tipo, t.costo, t.deLaActividad, t.delEncabezado]));
+    revisar("lo cargado sin actividad se cuenta con el tipo de la orden y se dice aparte",
+      prev.delEncabezado === 5, { prev });
+
+    // Un vale historico: sin actividad, no se le inventa ninguna.
+    const historico = await prisma.materialRequest.create({
+      data: {
+        organizationId: org.id, folio: "RM-HIST", warehouseId: almacen.id, workOrderId: otMixta.id,
+        assetId: activo.id, solicitanteId: almacenista.id, motivo: "CORRECTIVO",
+        renglones: { create: [{ partId: trapo.id, descripcion: "TRA-1 trapo (histórico)", cantidadSolicitada: 1 }] },
+      },
+      include: { renglones: true },
+    });
+    const resumen2 = await materialPorActividad(org.id, otMixta.id);
+    revisar("un vale sin actividad se muestra como no especificada, sin asignarle una tarea",
+      resumen2.find((g) => g.taskId === null)!.renglones.some((r) => r.folioVale === historico.folio) &&
+      historico.renglones[0].taskId === null);
+
+    // La validacion de que la actividad sea de esa orden vive en la ruta, y se
+    // prueba por HTTP en scripts/prueba-http-materiales.ts.
   } finally {
     for (const id of [org.id, orgB.id]) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
   }

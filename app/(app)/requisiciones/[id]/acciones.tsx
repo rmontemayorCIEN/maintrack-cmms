@@ -12,6 +12,9 @@ export type RenglonVale = {
   disponible: number | null;
   /** La refaccion no tiene costo capturado: lo que se entregue entraria en $0. */
   sinCosto?: boolean;
+  /** La actividad que necesita este material, si se indicó. */
+  actividad?: string | null;
+  tipoActividad?: string | null;
 };
 
 export function AccionesRequisicion({

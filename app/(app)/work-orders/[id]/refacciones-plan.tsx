@@ -12,7 +12,7 @@ import {
 } from "../../requisiciones/requisicion-dialog";
 
 export type RenglonPlan = {
-  partId: string; code: string; name: string; unidad: string;
+  partId: string; code: string; name: string; unidad: string; taskId?: string | null;
   actividades: string[];
   pide: number; yaPedido: number; yaConsumido: number; falta: number;
 };
@@ -58,7 +58,7 @@ export function RefaccionesDelPlan({
                 refacciones={refacciones}
                 existencias={existencias}
                 ordenFija={orden}
-                precargados={pendientes.map((r) => ({ partId: r.partId, cantidad: r.falta }))}
+                precargados={pendientes.map((r) => ({ partId: r.partId, cantidad: r.falta, taskId: r.taskId ?? null }))}
                 etiqueta="Generar requisición"
               />
             ) : null}
