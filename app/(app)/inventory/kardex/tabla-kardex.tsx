@@ -104,7 +104,9 @@ const crearColumnas = (zona: string): Columna<FilaKardex>[] => [
 ];
 
 /** La vista de fabrica: el kardex clásico, entrada-salida-saldo. */
-const DE_FABRICA = ["tipo", "almacen", "entrada", "salida", "saldo", "documento", "entregadoA"];
+// «Registro» entra de fabrica: una entrada de compra no tiene a quien se le
+// entrego, y sin esta columna el movimiento no decia quien lo hizo.
+const DE_FABRICA = ["tipo", "almacen", "entrada", "salida", "saldo", "documento", "entregadoA", "usuario"];
 
 export function TablaKardex({ movimientos, vistaInicial }: { movimientos: FilaKardex[]; vistaInicial: Vista }) {
   const zona = useZona();

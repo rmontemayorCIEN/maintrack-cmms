@@ -1303,6 +1303,10 @@ model StockMovement {
   workOrderId       String?
   transferId        String?
   materialRequestId String?
+  /// La recepcion de compra que origino la entrada. Sin esto el kardex mostraba
+  /// «—» en el documento y la entrada quedaba huerfana: la compra conservaba
+  /// todo y el almacen no podia volver a ella.
+  goodsReceiptId    String?
   userId            String?
   /// A quien se le entrego fisicamente. Puede no ser quien pidio —un ayudante
   /// pasa por el material— y por eso no basta con el solicitante de la
@@ -1326,6 +1330,7 @@ model StockMovement {
   workOrder       WorkOrder?       @relation(fields: [workOrderId], references: [id])
   transfer        StockTransfer?   @relation(fields: [transferId], references: [id], onDelete: Cascade)
   materialRequest MaterialRequest? @relation(fields: [materialRequestId], references: [id])
+  goodsReceipt    GoodsReceipt?    @relation(fields: [goodsReceiptId], references: [id])
   user            User?            @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
@@ -1489,6 +1494,7 @@ model GoodsReceipt {
   supplier        Supplier?          @relation(fields: [supplierId], references: [id])
   recibidoPor     User?              @relation(fields: [recibidoPorId], references: [id])
   renglones       GoodsReceiptLine[]
+  movimientos     StockMovement[]
 
   @@unique([organizationId, folio])
   @@unique([organizationId, clave])

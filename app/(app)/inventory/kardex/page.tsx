@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { documentoDeMovimiento, quienRecibio } from "@/lib/kardex-datos";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -63,21 +64,18 @@ export default async function KardexPage({
         workOrder: { select: { id: true, number: true } },
         materialRequest: { select: { id: true, folio: true } },
         transfer: { select: { id: true, folio: true } },
+        goodsReceipt: {
+          select: {
+            id: true, folio: true,
+            purchaseRequest: { select: { id: true, folio: true } },
+            recibidoPor: { select: { name: true } },
+          },
+        },
       },
     }),
   ]);
 
   const filas: FilaKardex[] = movimientos.map((m) => {
-    // El documento que lo origino, en orden de cercania: el vale dice mas que
-    // la orden, y la orden mas que nada.
-    const documento = m.materialRequest
-      ? { texto: m.materialRequest.folio, href: `/requisiciones/${m.materialRequest.id}` }
-      : m.transfer
-        ? { texto: m.transfer.folio, href: "/inventory/traspasos" }
-        : m.workOrder
-          ? { texto: m.workOrder.number, href: `/work-orders/${m.workOrder.id}` }
-          : null;
-
     return {
       id: m.id,
       fecha: m.createdAt.toISOString(),
@@ -89,9 +87,9 @@ export default async function KardexPage({
       saldoDespues: m.balanceAfter,
       costoUnitario: m.unitCost,
       referencia: m.reference,
-      entregadoA: m.entregadoA,
+      entregadoA: quienRecibio(m),
       usuario: m.user?.name ?? null,
-      documento,
+      documento: documentoDeMovimiento(m),
       moneda,
     };
   });

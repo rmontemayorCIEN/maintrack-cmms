@@ -18,6 +18,8 @@ import { materialPorActividad, costoDeMaterialPorTipo } from "../lib/material-po
 import {
   ErrorDeCompra, autorizar, crearRequisicionDeCompra, cubiertoPorCompras, enCompra, recibir,
 } from "../lib/compras";
+import { documentoDeMovimiento, quienRecibio } from "../lib/kardex-datos";
+import { AUTORIZACION_AUTOMATICA, quienAutorizo } from "../lib/estados-compra";
 import { can } from "../lib/rbac";
 import { consumePart } from "../lib/workorders";
 
@@ -187,9 +189,15 @@ async function main() {
       organizationId: org.id, userId: almacenista.id, warehouseId: almacen.id, urgencia: "NORMAL", montoAutorizacion: 5000,
       renglones: [{ partId: rodamiento.id, descripcion: "ROD-1", cantidadSolicitada: 1, costoEstimado: 100 }],
     });
+    const chicaD = await prisma.purchaseRequest.findUniqueOrThrow({ where: { id: chica.id } });
     revisar("por debajo del umbral se autoriza sola y dice por qué",
-      chica.estado === "AUTORIZADA" &&
-      /debajo del umbral/.test((await prisma.purchaseRequest.findUniqueOrThrow({ where: { id: chica.id } })).justificacion ?? ""));
+      chica.estado === "AUTORIZADA" && /debajo del umbral/.test(chicaD.justificacion ?? ""));
+    // Nadie firmo, pero hay fecha de autorizacion: la pantalla lo dice en vez
+    // de mostrar un guion que parece dato perdido.
+    revisar("una compra autorizada sola se lee «Autorización automática», no «—»",
+      quienAutorizo(null, chicaD.autorizadaEl) === AUTORIZACION_AUTOMATICA &&
+      quienAutorizo("Ana", chicaD.autorizadaEl) === "Ana" &&
+      quienAutorizo(null, null) === null);
     await rechaza("sin autorizar no se puede colocar la compra",
       () => enCompra({ organizationId: org.id, requestId: compra.id, ordenCompra: "OC-999" }),
       "Falta autorizar");
@@ -227,8 +235,30 @@ async function main() {
     revisar("recepción parcial: la compra queda «recibida en parte» y el inventario sube solo lo recibido",
       trasParcial.estado === "RECIBIDA_PARCIAL" && trasParcial.renglones[0].cantidadRecibida === 1 && stockSello.quantity === 1,
       { estado: trasParcial.estado, existencia: stockSello.quantity });
-    const movIn = await prisma.stockMovement.findFirst({ where: { partId: sello2.id, movementType: "IN" }, orderBy: { createdAt: "desc" } });
+    const movIn = await prisma.stockMovement.findFirst({
+      where: { partId: sello2.id, movementType: "IN" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        goodsReceipt: {
+          select: {
+            id: true, folio: true,
+            purchaseRequest: { select: { id: true, folio: true } },
+            recibidoPor: { select: { name: true } },
+          },
+        },
+      },
+    });
     revisar("el kardex registra la entrada con su referencia de recepción", movIn?.quantity === 1 && /Recepcion/.test(movIn.reference ?? ""));
+    // Desde el almacen se tiene que poder volver a la compra: la referencia de
+    // texto no basta, el movimiento guarda la recepcion.
+    revisar("la entrada guarda de qué recepción vino y quién la registró",
+      movIn?.goodsReceipt?.purchaseRequest?.id === compra.id && movIn?.userId === jefe.id,
+      { recepcion: movIn?.goodsReceipt?.folio, compra: movIn?.goodsReceipt?.purchaseRequest?.folio });
+    const doc = documentoDeMovimiento(movIn!);
+    revisar("el kardex muestra recepción y compra, con enlace a la compra",
+      doc?.texto === `${movIn!.goodsReceipt!.folio} · ${compraD.folio}` && doc?.href === `/compras/${compra.id}`, doc);
+    revisar("«Recibió» de una entrada dice quien firmó la recepción, no queda vacío",
+      quienRecibio(movIn!) === jefe.name, quienRecibio(movIn!));
     const repetida = await recibir({
       organizationId: org.id, userId: jefe.id, purchaseRequestId: compra.id, warehouseId: almacen.id,
       supplierId: proveedor.id, remision: "R-1", clave: `${sello}-r1`,

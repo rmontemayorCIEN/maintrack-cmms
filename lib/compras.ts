@@ -429,6 +429,7 @@ async function registrarRecepcion(
           cantidad: r.cantidad,
           costoUnitario: r.costoUnitario,
           userId: params.userId,
+          goodsReceiptId: recepcion.id,
           referencia: `Recepcion ${recepcion.folio}${params.remision ? ` · remision ${params.remision}` : ""}`,
         },
         tx,

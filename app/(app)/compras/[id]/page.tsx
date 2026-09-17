@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ESTADOS_COMPRA } from "@/lib/estados-compra";
+import { ESTADOS_COMPRA, quienAutorizo } from "@/lib/estados-compra";
 import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesCompra, type RenglonCompra } from "./acciones";
@@ -203,7 +203,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
                 <dd className="text-right text-slate-800">{formatDateTime(compra.createdAt)}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-slate-500">Autorizó</dt>
                 <dd className="text-right text-slate-800">
-                  {compra.autorizadaPor?.name ?? "—"}
+                  {quienAutorizo(compra.autorizadaPor?.name, compra.autorizadaEl) ?? "—"}
                   {compra.autorizadaEl ? <span className="block text-[0.625rem] text-slate-400">{formatDateTime(compra.autorizadaEl)}</span> : null}
                 </dd></div>
               <div className="flex justify-between gap-3"><dt className="text-slate-500">Orden de compra</dt>

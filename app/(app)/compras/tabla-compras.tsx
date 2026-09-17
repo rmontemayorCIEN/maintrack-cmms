@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
-import { ESTADOS_COMPRA } from "@/lib/estados-compra";
+import { ESTADOS_COMPRA, quienAutorizo } from "@/lib/estados-compra";
 import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -67,7 +67,7 @@ const crearColumnas = (zona: string): Columna<FilaCompra>[] => [
   { id: "monto", etiqueta: "Monto estimado", alineaDerecha: true, texto: (c) => formatCurrency(c.montoEstimado, c.moneda) },
   { id: "almacen", etiqueta: "Entra a", agrupable: true, texto: (c) => c.almacen },
   { id: "solicitante", etiqueta: "Solicitó", agrupable: true, texto: (c) => guion(c.solicitante) },
-  { id: "autorizo", etiqueta: "Autorizó", agrupable: true, texto: (c) => guion(c.autorizadaPor) },
+  { id: "autorizo", etiqueta: "Autorizó", agrupable: true, texto: (c) => guion(quienAutorizo(c.autorizadaPor, c.autorizadaEl)) },
   { id: "proveedor", etiqueta: "Proveedor sugerido", agrupable: true, texto: (c) => guion(c.proveedorSugerido) },
   {
     id: "orden", etiqueta: "Orden de compra", texto: (c) => guion(c.ordenCompra),

@@ -22,3 +22,21 @@ export const ESTADOS_COMPRA = {
 } as const;
 
 export type EstadoCompra = keyof typeof ESTADOS_COMPRA;
+
+/** Lo que se lee en «Autorizó» cuando la compra pasó por el umbral, sin firma. */
+export const AUTORIZACION_AUTOMATICA = "Autorización automática";
+
+/**
+ * Quien autorizo la compra.
+ *
+ * Debajo del umbral la requisicion nace autorizada y nadie firma, asi que no
+ * hay persona que poner. Mostrar «—» junto a una fecha de autorizacion parecia
+ * un dato perdido; se dice lo que de verdad paso.
+ */
+export function quienAutorizo(
+  autorizadaPor: string | null | undefined,
+  autorizadaEl: Date | string | null | undefined,
+): string | null {
+  if (autorizadaPor) return autorizadaPor;
+  return autorizadaEl ? AUTORIZACION_AUTOMATICA : null;
+}

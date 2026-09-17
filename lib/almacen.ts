@@ -35,6 +35,9 @@ export type Movimiento = {
   workOrderId?: string | null;
   transferId?: string | null;
   materialRequestId?: string | null;
+  /// La recepcion de compra que lo origino. Es lo que deja al kardex volver a
+  /// la compra: sin esto la entrada solo tenia un texto de referencia.
+  goodsReceiptId?: string | null;
   /// A quien se le entrego fisicamente. Solo aplica en salidas y devoluciones.
   entregadoA?: string | null;
   userId?: string | null;
@@ -139,6 +142,7 @@ export async function aplicarMovimiento(m: Movimiento, tx?: Cliente): Promise<nu
       workOrderId: m.workOrderId ?? null,
       transferId: m.transferId ?? null,
       materialRequestId: m.materialRequestId ?? null,
+      goodsReceiptId: m.goodsReceiptId ?? null,
       entregadoA: m.entregadoA ?? null,
       userId: m.userId ?? null,
       movementType: m.tipo,
