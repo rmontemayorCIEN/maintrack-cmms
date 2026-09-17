@@ -8,6 +8,13 @@
  * semana» revisaba la del 31 de agosto aunque fuera 17 de septiembre.
  */
 const DIA = 86_400_000;
+
+/**
+ * Donde se pinta el resultado de «Revisar la semana»: un ancla debajo del
+ * encabezado del calendario. Antes salia en un panel fijo al pie de la
+ * pantalla, fuera de la vista, y parecia que no habia pasado nada.
+ */
+export const ANCLA_REVISION = "resultado-revision-semana";
 const aFecha = (clave: string) => new Date(`${clave}T12:00:00Z`);
 const aClave = (d: Date) => d.toISOString().slice(0, 10);
 

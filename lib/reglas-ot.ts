@@ -218,3 +218,30 @@ export function motivoSinOtActiva(
   }
   return null;
 }
+
+// ─────────────────────────────────────────── Inicio sin responsable ───
+
+/**
+ * Lo que una persona puede hacer para iniciar una orden sin responsable,
+ * segun su rol. El mismo criterio que aplica `transitionWorkOrder`:
+ *
+ *   - Quien ejecuta (tecnico en adelante) puede TOMARLA: queda como responsable.
+ *   - Supervisor, administracion y propietario pueden, ademas, iniciarla sin
+ *     responsable como EXCEPCION, con motivo. Queda en el historial, en la
+ *     bitacora, y la orden sigue contando en «activas sin responsable».
+ *   - Solicitante y consulta no pueden iniciarla.
+ */
+export function inicioSinResponsable(rol: string | undefined): {
+  puedeTomarla: boolean;
+  puedeExcepcion: boolean;
+  texto: string;
+} {
+  const puedeTomarla = can(rol, "workorder:execute");
+  const puedeExcepcion = can(rol, "workorder:write");
+  const texto = !puedeTomarla
+    ? "Esta orden no tiene responsable. Su rol no puede iniciarla: un técnico o supervisor debe tomarla."
+    : puedeExcepcion
+      ? "Esta orden no tiene responsable. Para iniciarla, asígnela o tómela usted; solo como excepción puede iniciarla sin responsable, indicando el motivo (queda registrado y la orden sigue contando como «sin responsable»)."
+      : "Esta orden no tiene responsable. Para iniciarla, tómela usted: quedará como responsable. Iniciarla sin responsable solo lo autoriza un supervisor.";
+  return { puedeTomarla, puedeExcepcion, texto };
+}

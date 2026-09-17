@@ -27,6 +27,11 @@ export async function POST(request: Request) {
     const resultado = await revisarSemana(org, { desde, userId: user.id });
     if (!resultado.ok) return fail(resultado.motivo, 422);
 
-    return ok({ revision: resultado.revision, costoUsd: resultado.costoUsd });
+    return ok({
+      revision: resultado.revision,
+      semana: resultado.semana,
+      reutilizada: resultado.reutilizada,
+      generadaEl: resultado.generadaEl,
+    });
   });
 }

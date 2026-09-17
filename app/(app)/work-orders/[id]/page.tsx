@@ -31,7 +31,7 @@ import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
 import { esFalla, tipoDeActividad } from "@/lib/fallas";
 import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
-import { faltantesDeCierre } from "@/lib/reglas-ot";
+import { faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
 import { BitacoraDeEstados } from "./bitacora";
 
 export const dynamic = "force-dynamic";
@@ -264,6 +264,22 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
   const currency = user.organization.currency;
 
+  // Orden activa sin responsable: se dice en la orden, no solo al presionar «Iniciar».
+  const activaSinResponsable = !wo.assignedToId && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status);
+  const excepcionDeInicio = activaSinResponsable && wo.startedAt
+    ? await prisma.auditLog.findFirst({
+        where: {
+          organizationId: user.organizationId, entity: "WorkOrder", entityId: wo.id,
+          action: "STATUS_CHANGED", changes: { contains: "iniciadaSinResponsable" },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { changes: true, createdAt: true, user: { select: { name: true } } },
+      })
+    : null;
+  const motivoExcepcion = excepcionDeInicio
+    ? (() => { try { return (JSON.parse(excepcionDeInicio.changes) as { motivo?: string }).motivo ?? null; } catch { return null; } })()
+    : null;
+
   // Lo que se revisa al completar y al cerrar: el mismo armado que usa el servidor.
   const evidenciaRequerida = requiereEvidencia(user.organization, wo);
   const horasRegistradas = wo.labor.reduce((a, l) => a + l.hours, 0);
@@ -368,6 +384,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </Badge>
         <Badge className={PRIORITY_COLORS[wo.priority]}>Prioridad {PRIORITY_LABELS[wo.priority]}</Badge>
         {wo.requiresShutdown ? <Badge tone="danger">Requiere paro</Badge> : null}
+        {activaSinResponsable ? (
+          <Badge tone="warning">{wo.startedAt ? "En curso sin responsable" : "Sin responsable"}</Badge>
+        ) : null}
         {wo.plan ? (
           <Link href="/plans" className="text-xs text-slate-500 hover:text-brand-600">
             Generada por el plan: {wo.plan.name}
@@ -383,6 +402,25 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Link>
         ))}
       </div>
+
+      {activaSinResponsable ? (
+        <div role="note" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {wo.startedAt ? (
+            <>
+              <span className="font-semibold">En curso sin responsable. </span>
+              {excepcionDeInicio
+                ? `Se inició como excepción el ${formatDateTime(excepcionDeInicio.createdAt, zona)} por ${excepcionDeInicio.user?.name ?? "alguien"}${motivoExcepcion ? `: «${motivoExcepcion}»` : ""}. `
+                : "Se inició antes de que se exigiera responsable. "}
+              Sigue contando en «activas sin responsable» hasta que se asigne.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">Sin responsable. </span>
+              {inicioSinResponsable(user.role).texto.replace("Esta orden no tiene responsable. ", "")}
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="grid content-start gap-4 lg:col-span-2">
@@ -627,6 +665,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                     <Avatar name={wo.assignedTo.name} color={wo.assignedTo.color} />
                     {wo.assignedTo.name}
                   </span>
+                ) : activaSinResponsable ? (
+                  <span className="font-medium text-amber-700">Sin responsable</span>
                 ) : (
                   <span className="text-slate-400">Sin asignar</span>
                 )}

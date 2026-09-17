@@ -7,6 +7,7 @@
  * puede esperar y que no, que conviene juntar en una sola visita, y en que
  * orden conviene atacarlo.
  */
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../db";
 import { cargaPorDia, esHabil, jornada } from "../agenda";
@@ -56,12 +57,32 @@ export type RevisionSemana = z.infer<typeof esquema>;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** Cuanto tiempo se puede entregar una revision ya pagada si los datos no cambiaron. */
+export const VIGENCIA_REVISION_MS = 24 * 3_600_000;
+
+export type ResultadoRevision =
+  | {
+      ok: true;
+      revision: RevisionSemana;
+      costoUsd: number;
+      /** Lunes revisado, aaaa-mm-dd. */
+      semana: string;
+      /**
+       * Se entrego una revision ya generada con los mismos datos: no se llamo
+       * al modelo ni se descontaron operaciones.
+       */
+      reutilizada: boolean;
+      generadaEl: Date;
+    }
+  | { ok: false; motivo: string };
+
 export async function revisarSemana(
   org: OrgConIa,
-  params: { desde: Date; userId?: string | null; operador?: boolean },
-): Promise<{ ok: true; revision: RevisionSemana; costoUsd: number } | { ok: false; motivo: string }> {
-  const veredicto = await puedeUsarIa(org, "AGENDA", { operador: params.operador });
-  if (!veredicto.permitido) return { ok: false, motivo: veredicto.motivo };
+  params: { desde: Date; userId?: string | null; operador?: boolean; ahora?: Date },
+  /** Para las pruebas: el modelo real cuesta y no corre sin llave. */
+  dependencias: { analizar?: typeof analizarConIa } = {},
+): Promise<ResultadoRevision> {
+  const analizar = dependencias.analizar ?? analizarConIa;
 
   const lunes = new Date(params.desde);
   lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
@@ -204,7 +225,39 @@ export async function revisarSemana(
     mismoActivoEnLaSemana: coincidencias,
   };
 
-  const resultado = await analizarConIa({
+  /**
+   * ¿Ya se pago una revision con EXACTAMENTE estos datos?
+   *
+   * Si la respuesta anterior no llego a la pantalla (red caida, tiempo
+   * agotado, pestaña cerrada), el modelo ya habia contestado y la operacion ya
+   * se habia descontado. Volver a intentar entrega ese resultado sin cobrar
+   * otra vez. Cualquier cambio en la semana —una orden movida, otra persona,
+   * otro dia— cambia la huella y se genera una revision nueva.
+   */
+  const semana = iso(lunes);
+  const huella = createHash("sha256").update(JSON.stringify(contexto)).digest("hex");
+  const ahora = params.ahora ?? new Date();
+  const previa = await prisma.revisionAgenda.findFirst({
+    where: {
+      organizationId: org.id, semana, huella,
+      createdAt: { gte: new Date(ahora.getTime() - VIGENCIA_REVISION_MS) },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (previa) {
+    await prisma.revisionAgenda.update({ where: { id: previa.id }, data: { reutilizaciones: { increment: 1 } } });
+    return {
+      ok: true, revision: JSON.parse(previa.contenido) as RevisionSemana, costoUsd: 0,
+      semana, reutilizada: true, generadaEl: previa.createdAt,
+    };
+  }
+
+  // Solo se revisa el cupo cuando de verdad se va a llamar al modelo: entregar
+  // una revision ya pagada no consume nada, ni siquiera con el cupo agotado.
+  const veredicto = await puedeUsarIa(org, "AGENDA", { operador: params.operador });
+  if (!veredicto.permitido) return { ok: false, motivo: veredicto.motivo };
+
+  const resultado = await analizar({
     organizationId: org.id,
     userId: params.userId ?? null,
     funcion: "AGENDA",
@@ -241,5 +294,13 @@ export async function revisarSemana(
     noMover: resultado.datos.noMover.filter((n) => numeros.has(n.orden)),
   };
 
-  return { ok: true, revision, costoUsd: resultado.costoUsd };
+  const guardada = await prisma.revisionAgenda.create({
+    data: {
+      organizationId: org.id, userId: params.userId ?? null, semana, huella,
+      contenido: JSON.stringify(revision), costoUsd: resultado.costoUsd,
+    },
+    select: { createdAt: true },
+  });
+
+  return { ok: true, revision, costoUsd: resultado.costoUsd, semana, reutilizada: false, generadaEl: guardada.createdAt };
 }

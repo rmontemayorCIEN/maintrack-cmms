@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2, Pause, Play, Sparkles } from "lucide-react";
 import { Dialogo } from "@/components/ui/dialogo";
 import { Button } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
-import { accionesDisponibles, motivoValido, type AccionOt } from "@/lib/reglas-ot";
+import { accionesDisponibles, inicioSinResponsable, motivoValido, type AccionOt } from "@/lib/reglas-ot";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 /**
@@ -221,7 +221,8 @@ export function WorkOrderActions({
   const [revisandoCierre, setRevisandoCierre] = useState(false);
   const [excepciones, setExcepciones] = useState({ motivoSinHoras: "", sinParoConfirmado: false, motivoSinDiagnostico: "" });
   const sinHoras = cierre.horas <= 0;
-  const puedeIniciarSinResponsable = ["OWNER", "ADMIN", "SUPERVISOR"].includes(rol);
+  const reglaInicio = inicioSinResponsable(rol);
+  const puedeIniciarSinResponsable = reglaInicio.puedeExcepcion;
 
   function elegir(accion: AccionOt) {
     setError(null);
@@ -289,15 +290,16 @@ export function WorkOrderActions({
             : accion.a === "ON_HOLD" ? <Pause className="h-3.5 w-3.5" />
             : accion.a === "COMPLETED" && status === "IN_PROGRESS" ? <CheckCircle2 className="h-3.5 w-3.5" />
             : null}
-          {accion.etiqueta}
+          {/* Sin responsable, iniciar es tomarla: el boton lo dice antes del clic. */}
+          {accion.a === "IN_PROGRESS" && accion.etiqueta === "Iniciar" && !conResponsable ? "Tomar e iniciar" : accion.etiqueta}
         </Button>
       ))}
 
       {pidiendo ? (
         <Dialogo
-          titulo={sinResponsableAlIniciar ? "Iniciar orden sin responsable" : pidiendo.etiqueta}
+          titulo={sinResponsableAlIniciar ? "Iniciar una orden sin responsable" : pidiendo.etiqueta}
           descripcion={sinResponsableAlIniciar
-            ? "Una orden en proceso necesita a alguien que responda por ella."
+            ? reglaInicio.texto
             : pidiendo.preguntaMotivo}
           onCerrar={() => setPidiendo(null)}
           pie={
@@ -332,7 +334,7 @@ export function WorkOrderActions({
                 {puedeIniciarSinResponsable ? (
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <input type="radio" checked={!tomarla} onChange={() => setTomarla(false)} />
-                    Iniciarla sin responsable (excepción, con motivo)
+                    Iniciarla sin responsable: excepción con motivo, queda registrada
                   </label>
                 ) : null}
               </>

@@ -250,6 +250,7 @@ model Organization {
   equivalencias     EquivalenciaRefaccion[]
   asignacionesPlan  PlanAsset[]
   calendariosTarea  PlanTaskAsset[]
+  revisionesAgenda  RevisionAgenda[]
 }
 
 model User {
@@ -650,17 +651,17 @@ model MeterReading {
   justificacion String?
 
   /// El valor tal como se capturo la primera vez, si luego se corrigio.
-  valorOriginal     Float?
-  fechaOriginal     DateTime?
+  valorOriginal    Float?
+  fechaOriginal    DateTime?
   /// El tipo con que se capturo, si una correccion lo cambio (p. ej. un
   /// reinicio que era sustitucion).
-  tipoOriginal      String?
+  tipoOriginal     String?
   /// En un REINICIO o SUSTITUCION: el valor del medidor justo antes. Con el se
   /// recorren los planes al registrarlo y se deshace al anularlo o corregirlo.
-  valorAnterior     Float?
-  correccionPorId   String?
-  correccionEl      DateTime?
-  correccionMotivo  String?
+  valorAnterior    Float?
+  correccionPorId  String?
+  correccionEl     DateTime?
+  correccionMotivo String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meter        Meter        @relation(fields: [meterId], references: [id], onDelete: Cascade)
@@ -783,17 +784,17 @@ model PlanTask {
   ///
   /// "Cada lunes" no necesita un tipo propio: es una semana anclada en lunes,
   /// y el ancla la pone `PlanTaskAsset`.
-  unidadFrecuencia String  @default("DIAS")
+  unidadFrecuencia String @default("DIAS")
 
   /// Una frecuencia diaria es valida en rutinas de turno, pero tambien es el
   /// error de captura mas caro (365 visitas al ano). Se confirma explicitamente
   /// y se guarda quien y cuando; nulo en una diaria = advertencia de calidad.
   diariaConfirmadaPorId String?
   diariaConfirmadaEl    DateTime?
-  unit             String?
-  minValue         Float?
-  maxValue         Float?
-  required         Boolean @default(true)
+  unit                  String?
+  minValue              Float?
+  maxValue              Float?
+  required              Boolean   @default(true)
 
   plan        MaintenancePlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
   labor       PlanTaskLabor[]
@@ -844,22 +845,22 @@ model WorkOrder {
   /// Excepcion justificada al completar sin horas de mano de obra (p. ej. lo
   /// hizo un contratista cuyo costo va en servicios). Sin horas ni motivo no
   /// se puede completar.
-  motivoSinHoras        String?
+  motivoSinHoras       String?
   /// Requeria paro pero al final no hubo: se confirma expresamente al
   /// completar. Distingue «no hubo paro» de «no se capturo».
-  sinParoConfirmado     Boolean @default(false)
+  sinParoConfirmado    Boolean  @default(false)
   /// En una falla, por que queda sin codigo o sin causa raiz («Sin determinar»).
-  motivoSinDiagnostico  String?
+  motivoSinDiagnostico String?
   /// Por que esta en espera. Se limpia al reanudar; la historia queda en auditoria.
-  motivoEspera          String?
-  motivoCancelacion     String?
-  laborCost        Float     @default(0)
-  partsCost        Float     @default(0)
-  serviceCost      Float     @default(0)
-  otherCost        Float     @default(0)
-  totalCost        Float     @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  motivoEspera         String?
+  motivoCancelacion    String?
+  laborCost            Float    @default(0)
+  partsCost            Float    @default(0)
+  serviceCost          Float    @default(0)
+  otherCost            Float    @default(0)
+  totalCost            Float    @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset         Asset?             @relation(fields: [assetId], references: [id])
@@ -1981,9 +1982,9 @@ model PredictiveAlert {
   condicion String?
 
   /// Ultima evaluacion del punto (`lib/predictive.ts` evaluarPunto).
-  estadoActual          String?   // NORMAL | ADVERTENCIA | CRITICO | SIN_DATOS
-  tendencia             String?   // EMPEORA | MEJORA | ESTABLE | SIN_DATOS
-  confianza             String?   // ALTA | MEDIA | BAJA | INSUFICIENTE
+  estadoActual          String? // NORMAL | ADVERTENCIA | CRITICO | SIN_DATOS
+  tendencia             String? // EMPEORA | MEJORA | ESTABLE | SIN_DATOS
+  confianza             String? // ALTA | MEDIA | BAJA | INSUFICIENTE
   lecturasUsadas        Int?
   fechaCruceAdvertencia DateTime?
   fechaCruceCritico     DateTime?
@@ -2000,12 +2001,12 @@ model PredictiveAlert {
 
   /// Quien cerro la alerta, cuando y con que nota. Aparte de `acknowledgedBy`
   /// para no perder quien la reconocio.
-  resueltaPorId String?
-  resueltaEl    DateTime?
-  resolucion    String?
-  acknowledgedById   String?
-  acknowledgedAt     DateTime?
-  createdAt          DateTime  @default(now())
+  resueltaPorId    String?
+  resueltaEl       DateTime?
+  resolucion       String?
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
+  createdAt        DateTime  @default(now())
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sensor         Sensor?      @relation(fields: [sensorId], references: [id], onDelete: Cascade)
@@ -2062,6 +2063,32 @@ model AiUsage {
 }
 
 /// El diagnostico que la IA genera cada semana para una organizacion.
+/// Resultado de «Revisar la semana», guardado al generarse.
+///
+/// Si la respuesta no llega a la pantalla —se cae la red, se agota el tiempo,
+/// se cierra la pestaña— la operacion ya se cobro. Guardarla permite entregar
+/// ese mismo resultado al volver a intentar, sin volver a llamar al modelo ni
+/// descontar operaciones, mientras los datos de la semana no hayan cambiado
+/// (la `huella` es el hash exacto de lo que se le envio al modelo).
+model RevisionAgenda {
+  id              String   @id @default(cuid())
+  organizationId  String
+  userId          String?
+  /// Lunes de la semana revisada, aaaa-mm-dd.
+  semana          String
+  huella          String
+  /// La revision validada, serializada.
+  contenido       String
+  costoUsd        Float    @default(0)
+  /// Cuantas veces se entrego sin volver a generarla.
+  reutilizaciones Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, semana, huella])
+}
+
 model AiReport {
   id             String   @id @default(cuid())
   organizationId String

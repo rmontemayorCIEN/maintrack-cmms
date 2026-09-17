@@ -9,7 +9,7 @@ import { RevisarSemana } from "./revisar-semana";
 import { Calendario } from "./calendario";
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
-import { semanaARevisar } from "@/lib/semana";
+import { ANCLA_REVISION, semanaARevisar } from "@/lib/semana";
 import { claveDiaEnZona } from "@/lib/periodos";
 
 export const metadata = { title: "Calendario" };
@@ -147,6 +147,8 @@ export default async function CalendarPage({
           <RunSchedulerButton />
         </div>
       </div>
+      {/* Aqui aparece el resultado de «Revisar la semana», a la vista. */}
+      <div id={ANCLA_REVISION} className="scroll-mt-20" />
       <Calendario
         vista={vista}
         mes={`${year}-${String(month + 1).padStart(2, "0")}`}
