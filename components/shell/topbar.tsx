@@ -34,11 +34,20 @@ export function Topbar({
 
   useEffect(() => {
     let cancelled = false;
+    /**
+     * La campana se consulta cada minuto y puede fallar por cosas del lado del
+     * navegador —wifi que cambia, una extension que bloquea la peticion—. Sin
+     * atrapar el error, cada intento dejaba un «Uncaught (in promise): Failed
+     * to fetch» en la consola. No avisar en ese minuto es suficiente: al
+     * siguiente se vuelve a intentar.
+     */
     async function load() {
-      const res = await fetch("/api/notifications");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!cancelled) setItems(data.notifications ?? []);
+      try {
+        const res = await fetch("/api/notifications");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setItems(data.notifications ?? []);
+      } catch { /* sin red: se reintenta en el siguiente minuto */ }
     }
     load();
     const timer = setInterval(load, 60_000);
@@ -51,12 +60,16 @@ export function Topbar({
   const unread = items.filter((n) => !n.read).length;
 
   async function markRead() {
-    await fetch("/api/notifications", { method: "PATCH" });
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await fetch("/api/notifications", { method: "PATCH" });
+      setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch { /* si no hay red, siguen marcados como no leidos */ }
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    // La sesion se cierra igual aunque la peticion falle: la cookie expira y
+    // el destino es la pantalla de entrada.
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* sin red */ }
     router.push("/login");
     router.refresh();
   }
