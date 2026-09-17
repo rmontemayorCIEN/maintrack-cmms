@@ -57,6 +57,12 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   export ANTHROPIC_API_KEY
 fi
 
-DATABASE_URL="postgresql://maintrack:$CLAVE@$IP_DB:5432/maintrack?sslmode=require" \
+# Pocas conexiones a proposito. La instancia es chica (db-f1-micro, ~25
+# conexiones) y la aplicacion en Cloud Run ya usa las suyas: un script con el
+# grupo de conexiones que Prisma abre por omision (uno por CPU x2 + 1) se las
+# come y los CLIENTES empiezan a ver errores de base. Paso al correr la lista
+# de saneamiento con el servicio caliente. Tres alcanzan de sobra para un
+# script de consola, que es secuencial.
+DATABASE_URL="postgresql://maintrack:$CLAVE@$IP_DB:5432/maintrack?sslmode=require&connection_limit=3&pool_timeout=30" \
   npx tsx "$SCRIPT" "$@"
 unset CLAVE
