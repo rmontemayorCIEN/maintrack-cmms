@@ -257,6 +257,15 @@ async function main() {
     revisar("hay datos posteriores al diagnóstico → se avisa que los indicadores pueden haber cambiado", diag?.datosPosteriores === true);
     revisar("el diagnóstico guardado no se recalcula", diag?.resumen === "viejo");
     revisar("otra empresa no ve ese diagnóstico", (await ultimoDiagnostico(orgB.id)) === null);
+    // Diagnostico generado despues de todo: sin datos posteriores no se avisa.
+    const lectura = await prisma.meterReading.findFirstOrThrow({ where: { meterId: medidor.id, value: 18420 } });
+    const fotoNueva = await prisma.aiReport.create({ data: { organizationId: orgA.id, desde: hace(30), hasta: hace(0), resumen: "nuevo", contenido: JSON.stringify({}), modelo: "x", createdAt: new Date(Date.now() + 60_000) } });
+    const alDia = await ultimoDiagnostico(orgA.id);
+    revisar("sin nada posterior → no se avisa, y se conserva el anterior", alDia?.datosPosteriores === false && alDia?.diagnosticosAnteriores === 1, alDia);
+    // Una lectura vieja anulada despues del diagnostico si cambia las cifras.
+    await anularLectura({ organizationId: orgA.id, readingId: lectura.id, userId: user.id, motivo: "Prueba", ahora: new Date(Date.now() + 120_000) });
+    const trasCorregir = await ultimoDiagnostico(orgA.id);
+    revisar("una lectura anterior anulada después del diagnóstico → se avisa", trasCorregir?.datosPosteriores === true && trasCorregir.id === fotoNueva.id);
   } finally {
     await prisma.organization.delete({ where: { id: orgA.id } });
     await prisma.organization.delete({ where: { id: orgB.id } });
