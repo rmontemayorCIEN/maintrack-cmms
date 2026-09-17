@@ -17,7 +17,8 @@ export type Permission =
   | "predictive:write"
   | "settings:write"
   | "user:manage"
-  | "billing:manage";
+  | "billing:manage"
+  | "data:export";
 
 const MATRIX: Record<Permission, string[]> = {
   "asset:write": ["OWNER", "ADMIN", "SUPERVISOR"],
@@ -46,6 +47,10 @@ const MATRIX: Record<Permission, string[]> = {
   "settings:write": ["OWNER", "ADMIN"],
   "user:manage": ["OWNER", "ADMIN"],
   "billing:manage": ["OWNER"],
+  // Bajar la informacion completa en CSV no es una consulta mas: es llevarse el
+  // padron de equipos, los costos y el inventario. Lo hace quien responde por
+  // esos datos, no cualquiera con sesion.
+  "data:export": ["OWNER", "ADMIN", "SUPERVISOR"],
 };
 
 export function can(role: string | undefined, permission: Permission) {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, revocarSesiones } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { LARGO_MINIMO_CLAVE, puedeReponerClave } from "@/lib/reponer-clave";
 
@@ -39,6 +39,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       where: { id },
       data: { passwordHash: await hashPassword(input.nuevaClave) },
     });
+    // Reponer la contrasena tambien cierra las sesiones de esa persona: es
+    // justo el caso de «se fue y dejo la sesion abierta».
+    await revocarSesiones(id);
 
     /**
      * Queda registrado QUIEN la repuso y a quien, nunca el valor.

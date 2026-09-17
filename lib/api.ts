@@ -20,6 +20,15 @@ export async function withAuth<T>(
     user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
     orgId: string;
   }) => Promise<T>,
+  /**
+   * `esLectura` marca un permiso que protege una CONSULTA, no una escritura.
+   *
+   * Existe por un caso concreto: exportar. Exportar pide permiso —no cualquiera
+   * se lleva la base en un CSV— pero no escribe nada, y una cuenta con la prueba
+   * vencida tiene que poder sacar su informacion. Sin esta distincion, dejar de
+   * pagar equivaldria a perder el acceso a los propios datos.
+   */
+  opciones?: { esLectura?: boolean },
 ) {
   const user = await getCurrentUser();
   if (!user) return fail("No autenticado", 401);
@@ -31,7 +40,7 @@ export async function withAuth<T>(
   //
   // El operador de la plataforma queda exento: necesita poder entrar a una
   // cuenta vencida justamente para reactivarla o revisarla.
-  if (permission && !user.isSuperAdmin) {
+  if (permission && !opciones?.esLectura && !user.isSuperAdmin) {
     const suscripcion = estadoSuscripcion(user.organization);
     if (suscripcion.soloLectura) return fail(suscripcion.motivo!, 402);
   }

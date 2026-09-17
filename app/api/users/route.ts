@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
 import { verificarCupo } from "@/lib/planes";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   name: z.string().min(2),
@@ -55,6 +56,15 @@ export async function POST(request: Request) {
         color: palette[posicion % palette.length],
       },
       select: { id: true, name: true, email: true, role: true },
+    });
+
+    await logAudit({
+      organizationId: orgId, userId: user.id,
+      entity: "User", entityId: created.id,
+      action: "USER_CREATED",
+      summary: `Alta de ${created.name} como ${created.role}`,
+      // La contrasena no va a la bitacora, ni su hash.
+      changes: { correo: created.email, rol: created.role },
     });
     return ok({ user: created }, 201);
   });

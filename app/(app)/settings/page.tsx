@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, UserCog, Users, ClipboardList } from "lucide-react";
+import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -28,11 +28,12 @@ import { ConfiguracionOrdenes } from "./ordenes";
 import { ContextoDelNegocio } from "./contexto";
 import { contextoEnvejecido, PREGUNTAS, type ClavePregunta } from "@/lib/contexto-negocio";
 import { PanelAvisos } from "./avisos";
+import { PanelSeguridad } from "./seguridad";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "avisos", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
@@ -42,6 +43,7 @@ const DESCRIPCIONES: Record<Seccion, string> = {
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
   avisos: "Avisos al teléfono: si la empresa los manda y cómo activar cada aparato.",
+  seguridad: "Sus sesiones, las contraseñas del equipo y la exportación de su información.",
   suscripcion: "Plan contratado, consumo y carga inicial de información.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
   usuarios: "Quien entra al sistema, con que rol y a que tarifa.",
@@ -70,6 +72,7 @@ export default async function SettingsPage({
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
     { clave: "avisos", titulo: "Avisos", icono: <BellRing className="h-4 w-4" /> },
+    { clave: "seguridad", titulo: "Seguridad y sesiones", icono: <ShieldCheck className="h-4 w-4" /> },
     { clave: "suscripcion", titulo: "Suscripción", icono: <CreditCard className="h-4 w-4" /> },
     { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
@@ -185,6 +188,13 @@ export default async function SettingsPage({
         <PanelAvisos
           encendidoInicial={org.avisosPush}
           puedeEditar={can(user.role, "settings:write")}
+        />
+      ) : null}
+
+      {activa === "seguridad" ? (
+        <PanelSeguridad
+          puedeExportar={can(user.role, "data:export")}
+          ultimoAcceso={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : null}
         />
       ) : null}
 

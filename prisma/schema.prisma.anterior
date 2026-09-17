@@ -251,38 +251,46 @@ model Organization {
   asignacionesPlan  PlanAsset[]
   calendariosTarea  PlanTaskAsset[]
   revisionesAgenda  RevisionAgenda[]
+  passwordResets    PasswordReset[]
 }
 
 model User {
-  id             String    @id @default(cuid())
-  organizationId String
-  email          String    @unique
-  name           String
-  passwordHash   String
-  role           String    @default("TECHNICIAN") // OWNER|ADMIN|SUPERVISOR|TECHNICIAN|REQUESTER|VIEWER
+  id                String    @id @default(cuid())
+  organizationId    String
+  email             String    @unique
+  name              String
+  passwordHash      String
+  role              String    @default("TECHNICIAN") // OWNER|ADMIN|SUPERVISOR|TECHNICIAN|REQUESTER|VIEWER
   /// Operador de la plataforma. Trasciende la organizacion: puede dar de alta
   /// empresas cliente y entrar a cualquiera de ellas. No es un rol mas de la
   /// lista de arriba, porque esos son siempre dentro de UNA organizacion.
-  isSuperAdmin   Boolean   @default(false)
-  phone          String?
-  jobTitle       String?
-  employeeNo     String?
-  hourlyRate     Float     @default(0)
-  color          String    @default("#2563eb")
-  active         Boolean   @default(true)
-  lastLoginAt    DateTime?
+  isSuperAdmin      Boolean   @default(false)
+  phone             String?
+  jobTitle          String?
+  employeeNo        String?
+  hourlyRate        Float     @default(0)
+  color             String    @default("#2563eb")
+  active            Boolean   @default(true)
+  lastLoginAt       DateTime?
+  /// Desde cuando valen las sesiones de esta persona.
+  ///
+  /// La sesion es un JWT firmado de siete dias: una vez emitido, nadie lo puede
+  /// retirar. Con esta fecha si: al cambiar la contrasena, al cambiarle el rol
+  /// o al cerrar sesion en todos lados se pone «ahora», y toda sesion emitida
+  /// antes deja de servir en la siguiente peticion. Nula = valen todas.
+  sessionsValidFrom DateTime?
   /// NORMAL | GRANDE | MAYOR
-  escalaUi       String    @default("NORMAL")
+  escalaUi          String    @default("NORMAL")
   /// COMPACTA | COMODA | AMPLIA
-  densidadUi     String    @default("COMODA")
+  densidadUi        String    @default("COMODA")
   /// Como quiere ver cada tabla del sistema: que columnas, en que orden y con
   /// que agrupacion. Es un objeto por tabla —activos, ordenes, refacciones,
   /// planes— para no agregar una columna cada vez que otra lista se vuelve
   /// configurable. Va por usuario y no por organizacion porque el almacenista
   /// y el jefe de mantenimiento no miran lo mismo.
-  vistasTabla    String    @default("{}")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  vistasTabla       String    @default("{}")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   teamMemberships      TeamMember[]
@@ -297,6 +305,8 @@ model User {
   notifications        Notification[]
   pushSubscriptions    PushSubscription[]
   auditLogs            AuditLog[]
+  passwordResets       PasswordReset[]         @relation("ResetDeUsuario")
+  resetsEmitidos       PasswordReset[]         @relation("ResetEmitidoPor")
   acknowledgedAlerts   PredictiveAlert[]
   completedTasks       WorkOrderTask[]
   attachments          Attachment[]
@@ -339,6 +349,47 @@ model Invitation {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+/// Restablecimiento de contrasena: un solo uso y con vencimiento.
+///
+/// El token en claro NO se guarda: solo su hash. Quien tenga acceso a la base
+/// no puede entrar con lo que ahi vea, y la liga sirve una sola vez. Las emite
+/// la administracion de la empresa para su propia gente —no hay correo saliente
+/// todavia— y por eso lleva quien la genero.
+model PasswordReset {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("ResetDeUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("ResetEmitidoPor", fields: [createdById], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+/// Intento de entrada al sistema.
+///
+/// Existe para dos cosas: frenar a quien prueba contrasenas una tras otra, y
+/// poder responder «quien entro y cuando» sin depender de los registros de
+/// Cloud Run. No guarda la contrasena ni nada parecido, solo el correo tecleado.
+model AccessAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ip        String?
+  exito     Boolean  @default(false)
+  /// CLAVE_MAL | SIN_CUENTA | BLOQUEADO | EMPRESA_SUSPENDIDA | OK
+  motivo    String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
 }
 
 model Team {

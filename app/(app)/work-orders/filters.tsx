@@ -10,8 +10,11 @@ import {
 
 export function WorkOrderFilters({
   technicians,
+  puedeExportar,
 }: {
   technicians: Array<{ id: string; name: string }>;
+  /** El servidor rechaza la exportacion sin permiso; aqui no se ofrece el botón. */
+  puedeExportar: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -70,12 +73,14 @@ export function WorkOrderFilters({
         </button>
       ) : null}
 
-      <a
-        href={`/api/export/work-orders?${params.toString()}`}
-        className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-      >
-        <Download className="h-3.5 w-3.5" /> Exportar CSV
-      </a>
+      {puedeExportar ? (
+        <a
+          href={`/api/export/work-orders?${params.toString()}`}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+        >
+          <Download className="h-3.5 w-3.5" /> Exportar CSV
+        </a>
+      ) : null}
     </div>
   );
 }

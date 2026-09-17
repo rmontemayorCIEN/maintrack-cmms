@@ -1253,12 +1253,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Decidir cómo se arman las órdenes: si los días se cuentan corridos o hábiles, cuánto se puede adelantar un preventivo y desde dónde se recalcula",
       "Dar de alta usuarios y revisar la bitácora",
       "Encender los avisos al teléfono y activar cada aparato",
+      "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [
       "Los permisos van por rol. Cambiar el rol de alguien cambia lo que puede hacer en todas las pantallas.",
       "En «Jornada y calendario» se define de cuántas horas es un día de trabajo. De ahí sale si un día del calendario cabe y en qué fechas puede programar el programador.",
       "La capacidad se define por excepción: la organización fija el número general y solo quien trabaje distinto lleva el suyo.",
       "Los avisos al teléfono llevan DOS llaves: el administrador enciende la de la empresa, y además cada persona activa su propio aparato. Encender la de la empresa no activa a nadie.",
+      "En «Seguridad y sesiones» puede cerrar su sesión en todos los dispositivos: la del teléfono que perdió deja de servir en ese momento, no cuando caduque. Cambiar una contraseña —la propia o una repuesta por administración— también cierra las demás sesiones de esa cuenta.",
+      "En «Usuarios», el botón de liga genera una dirección para que la persona elija su propia contraseña. Vence en una hora, sirve una sola vez y solo se ve al generarla: si se cierra la caja, se genera otra.",
+      "Exportar información pide permiso —propietario, administrador o supervisor— y cada exportación queda en la bitácora con quién la hizo.",
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [
@@ -1357,6 +1361,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
  * distinga entre "no lleva ayuda" y "se nos olvido".
  */
 export const SIN_AYUDA = [
+  // Se entra por una liga y sin sesion: no hay panel de ayuda donde mostrarla,
+  // y la propia pantalla explica lo unico que hay que saber.
+  "/restablecer",
   "/work-orders/[id]/print",
   "/billing/[id]/print",
   "/requests/puntos/imprimir",

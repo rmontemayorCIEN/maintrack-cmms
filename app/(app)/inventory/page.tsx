@@ -252,9 +252,11 @@ export default async function InventoryPage({
         <button type="submit" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
           Filtrar
         </button>
-        <a href="/api/export/inventory" className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
-          Exportar CSV
-        </a>
+        {can(user.role, "data:export") ? (
+          <a href="/api/export/inventory" className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            Exportar CSV
+          </a>
+        ) : null}
       </form>
 
       {filtered.length === 0 ? (

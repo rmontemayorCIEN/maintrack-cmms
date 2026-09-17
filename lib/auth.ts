@@ -21,7 +21,20 @@ export type SessionPayload = {
   /** Empresa cliente en la que el operador de la plataforma esta trabajando.
    *  Solo tiene efecto si el usuario es superadministrador. */
   actingOrganizationId?: string;
+  /** Cuando se emitio, en segundos. Lo pone jose; se lee para revocar. */
+  iat?: number;
 };
+
+/**
+ * Invalida TODAS las sesiones abiertas de una persona.
+ *
+ * Se llama al cambiar la contrasena —propia o puesta por administracion—, al
+ * cambiarle el rol y al desactivarla. Es la contraparte de que la sesion sea un
+ * token firmado: sin esto, cambiar la contrasena no echaba a nadie.
+ */
+export async function revocarSesiones(userId: string) {
+  await prisma.user.update({ where: { id: userId }, data: { sessionsValidFrom: new Date() } });
+}
 
 export async function hashPassword(plain: string) {
   return bcrypt.hash(plain, 10);
@@ -86,6 +99,24 @@ export async function getCurrentUser() {
     include: { organization: true },
   });
   if (!user || !user.active) return null;
+
+  /**
+   * Sesiones revocadas.
+   *
+   * El JWT dura siete dias y, una vez firmado, no hay forma de quitarselo a
+   * quien lo tenga: por eso se compara contra `sessionsValidFrom`. Cambiar la
+   * contrasena, cambiarle el rol a alguien o cerrar sesion en todos lados mueve
+   * esa fecha, y la sesion vieja —la del telefono perdido, la del navegador que
+   * quedo abierto— deja de servir en la siguiente peticion.
+   *
+   * La comparacion es al SEGUNDO, que es la resolucion de `iat` en un JWT. Una
+   * sesion emitida en el mismo segundo del corte sobrevive, y eso es lo que se
+   * quiere: al cambiar la contrasena se revoca y en seguida se emite la sesion
+   * nueva de este navegador. Lo que se corta es todo lo anterior.
+   */
+  if (user.sessionsValidFrom && session.iat) {
+    if (session.iat < Math.floor(user.sessionsValidFrom.getTime() / 1000)) return null;
+  }
 
   const destino = session.actingOrganizationId;
   if (!destino || destino === user.organizationId) {

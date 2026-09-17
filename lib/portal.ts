@@ -6,6 +6,7 @@ import { nextRequestNumber } from "./numbering";
 import { clasificar, construirRuta, guardarArchivo } from "./almacenamiento";
 import { notify } from "./audit";
 import { evaluarRiesgo } from "./riesgo";
+import { estaFrenado, registrarIntento } from "./acceso";
 
 /**
  * Portal publico de reportes.
@@ -277,10 +278,25 @@ export async function seguimientoDe(tok: string) {
  *
  * Si aun asi quedan dos, se niega. Ante la duda no se entrega nada.
  */
+/**
+ * Recuperar pide folio Y celular. Sin freno, quien conozca un folio puede
+ * probar numeros hasta dar con el del reportante: por eso pasa por el mismo
+ * contador de intentos que el inicio de sesion (lib/acceso.ts).
+ */
 export async function recuperarSeguimiento(folio: string, celular: string) {
   const limpio = (t: string) => t.replace(/\D/g, "");
   const digitos = limpio(celular);
   if (!digitos) return null;
+
+  // El freno va por folio, que es lo unico que el atacante ya tiene; lo que
+  // estaria probando es el celular.
+  const clave = `portal:${folio.trim().toUpperCase()}`;
+  const freno = await estaFrenado(clave);
+  if (freno.frenado) {
+    throw new ErrorDePortal(
+      `Demasiados intentos con ese folio. Vuelva a intentar en ${freno.minutos} minuto(s).`,
+    );
+  }
 
   const candidatas = await prisma.workRequest.findMany({
     where: { number: folio.trim().toUpperCase() },
@@ -291,7 +307,11 @@ export async function recuperarSeguimiento(folio: string, celular: string) {
   const suyas = candidatas.filter(
     (c) => c.publicToken && c.reporterCelular && limpio(c.reporterCelular) === digitos,
   );
-  if (suyas.length !== 1) return null;
+  if (suyas.length !== 1) {
+    await registrarIntento({ email: clave, exito: false, motivo: "PORTAL_FOLIO" });
+    return null;
+  }
+  await registrarIntento({ email: clave, exito: true, motivo: "PORTAL_FOLIO" });
   return suyas[0].publicToken;
 }
 

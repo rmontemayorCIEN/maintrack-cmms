@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { hashPassword, verifyPassword } from "@/lib/auth";
+import { createSession, hashPassword, revocarSesiones, verifyPassword } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -27,6 +27,16 @@ export async function POST(request: Request) {
     await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash: await hashPassword(input.newPassword) },
+    });
+    // Cambiar la contrasena cierra las demas sesiones: si alguien mas la tenia,
+    // ahi termina. La de este navegador se vuelve a emitir en seguida.
+    await revocarSesiones(user.id);
+    await createSession({
+      userId: user.id, organizationId: user.organizacionPropia.id,
+      email: user.email, name: user.name, role: user.rolPropio,
+      // Si es el operador trabajando dentro de una empresa cliente, se queda
+      // donde estaba: cambiar su contrasena no tiene por que sacarlo de ahi.
+      ...(user.actuandoComoCliente ? { actingOrganizationId: user.organizationId } : {}),
     });
 
     await logAudit({

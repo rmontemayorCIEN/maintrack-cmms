@@ -10,12 +10,21 @@ import { guardarLocal, leerLocal, usaGCS } from "@/lib/almacenamiento";
  */
 type Params = { params: Promise<{ ruta: string[] }> };
 
+/**
+ * Una ruta con «..» pasa el `startsWith` y sale del prefijo de la organizacion:
+ * `org-A/../org-B/foto.jpg` empieza con `org-A/` y termina leyendo la carpeta
+ * de B. Se rechaza antes de tocar el disco.
+ */
+function rutaSegura(ruta: string, orgId: string) {
+  return ruta.startsWith(`org-${orgId}/`) && !ruta.split("/").includes("..");
+}
+
 export async function PUT(request: Request, { params }: Params) {
   if (usaGCS) return fail("No disponible: la instancia usa almacenamiento en la nube", 404);
   const { ruta } = await params;
   return withAuth(null, async ({ orgId }) => {
     const destino = decodeURIComponent(ruta.join("/"));
-    if (!destino.startsWith(`org-${orgId}/`)) return fail("Ruta invalida", 403);
+    if (!rutaSegura(destino, orgId)) return fail("Ruta invalida", 403);
     const datos = Buffer.from(await request.arrayBuffer());
     await guardarLocal(destino, datos);
     return NextResponse.json({ ok: true }, { status: 200 });
@@ -27,7 +36,7 @@ export async function GET(_request: Request, { params }: Params) {
   const { ruta } = await params;
   return withAuth(null, async ({ orgId }) => {
     const origen = decodeURIComponent(ruta.join("/"));
-    if (!origen.startsWith(`org-${orgId}/`)) return fail("Ruta invalida", 403);
+    if (!rutaSegura(origen, orgId)) return fail("Ruta invalida", 403);
     try {
       const datos = await leerLocal(origen);
       return new NextResponse(new Uint8Array(datos), {

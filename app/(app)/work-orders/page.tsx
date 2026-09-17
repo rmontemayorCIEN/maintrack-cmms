@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { can } from "@/lib/rbac";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Avatar, Badge, Card, EmptyState, LinkButton, PageHeader } from "@/components/ui";
@@ -137,7 +138,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
         }
       />
 
-      <WorkOrderFilters technicians={technicians} />
+      <WorkOrderFilters technicians={technicians} puedeExportar={can(user.role, "data:export")} />
 
       {workOrders.length === 0 ? (
         <EmptyState

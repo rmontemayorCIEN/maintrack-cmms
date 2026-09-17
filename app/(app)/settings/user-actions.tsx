@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Link2, Loader2 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/constants";
 
 export function UserRowActions({
@@ -22,6 +22,7 @@ export function UserRowActions({
   const [clave, setClave] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liga, setLiga] = useState<string | null>(null);
 
   async function reponerClave() {
     setBusy(true);
@@ -42,6 +43,27 @@ export function UserRowActions({
     setReponiendo(false);
     setAviso(`Lista. Entréguesela a ${userName.split(" ")[0]} y pídale que la cambie desde «Mi cuenta».`);
     router.refresh();
+  }
+
+  /**
+   * Emite la liga de restablecimiento y la muestra UNA vez.
+   *
+   * Es la alternativa a dictar una contrasena: la persona elige la suya, la liga
+   * vence en una hora y se gasta al usarse. El token no se guarda en claro, asi
+   * que si se cierra esta caja hay que emitir otra.
+   */
+  async function emitirLiga() {
+    setBusy(true);
+    setError(null);
+    setAviso(null);
+    const res = await fetch(`/api/users/${userId}/restablecer`, { method: "POST" });
+    const datos = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setError(datos.error ?? "No fue posible generar la liga");
+      return;
+    }
+    setLiga(`${window.location.origin}/restablecer?token=${datos.token}`);
   }
 
   async function patch(body: Record<string, unknown>) {
@@ -84,6 +106,18 @@ export function UserRowActions({
         <button
           type="button"
           disabled={busy}
+          onClick={emitirLiga}
+          title="Generar liga para que elija su contraseña"
+          aria-label={`Generar liga de restablecimiento para ${userName}`}
+          className="rounded-lg border border-slate-200 px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+        >
+          <Link2 className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {role !== "OWNER" ? (
+        <button
+          type="button"
+          disabled={busy}
           onClick={() => { setReponiendo((v) => !v); setAviso(null); setError(null); }}
           title="Reponer contraseña"
           aria-label={`Reponer la contraseña de ${userName}`}
@@ -93,6 +127,34 @@ export function UserRowActions({
         </button>
       ) : null}
       </div>
+
+      {liga ? (
+        <div className="grid w-full max-w-72 gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2">
+          <p className="text-[0.6875rem] font-medium text-emerald-900">
+            Liga para {userName}. Vence en una hora y sirve una sola vez.
+          </p>
+          <input readOnly value={liga} onFocus={(e) => e.currentTarget.select()} className="field px-2 py-1 text-[0.625rem]" />
+          <div className="flex justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => { navigator.clipboard?.writeText(liga); }}
+              className="rounded-lg border border-emerald-300 bg-white px-2 py-1 text-[0.6875rem] text-emerald-800"
+            >
+              Copiar
+            </button>
+            <button
+              type="button"
+              onClick={() => setLiga(null)}
+              className="rounded-lg border border-slate-200 px-2 py-1 text-[0.6875rem] text-slate-600 hover:bg-white"
+            >
+              Listo
+            </button>
+          </div>
+          <p className="text-[0.625rem] leading-relaxed text-emerald-800">
+            Al cerrar esta caja la liga ya no se puede volver a ver: se genera otra si hace falta.
+          </p>
+        </div>
+      ) : null}
 
       {reponiendo ? (
         <div className="grid w-full max-w-72 gap-1.5 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
