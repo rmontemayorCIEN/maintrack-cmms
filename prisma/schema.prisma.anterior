@@ -601,6 +601,13 @@ model Meter {
   /// el medidor se muestra "Sin lectura vigente" y no se proyecta nada.
   lecturaVigente Boolean @default(true)
 
+  /// Verdadero cuando alguna lectura vigente es invalida (menor que la anterior
+  /// o fisicamente imposible). Ninguna pantalla presenta fecha estimada ni el
+  /// programador genera por uso hasta que la lectura se corrija o se anule; el
+  /// recalculo lo apaga solo. `motivoSuspension` dice cual lectura y por que.
+  proyeccionSuspendida Boolean @default(false)
+  motivoSuspension     String?
+
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   readings     MeterReading[]

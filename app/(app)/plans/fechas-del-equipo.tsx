@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useEffect, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { formatDia } from "@/lib/utils";
@@ -27,7 +28,7 @@ type Respuesta = {
 type Cambio = { fecha: string; esUltima: boolean };
 
 // Dias completos, sin que la zona del navegador los recorra un dia (ver formatDia).
-const fmt = (iso: string | null) => formatDia(iso);
+const fmt = (iso: string | null, zona?: string) => formatDia(iso, { zona });
 
 /**
  * Las fechas de cada actividad del plan en UN equipo, para verlas y corregirlas.
@@ -49,6 +50,7 @@ export function FechasDelEquipo({
   editable: boolean;
   onGuardado?: () => void;
 }) {
+  const zona = useZona();
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(true);
   const [cambios, setCambios] = useState<Record<string, Cambio>>({});
@@ -146,10 +148,10 @@ export function FechasDelEquipo({
                 <p className="truncate text-xs font-medium text-slate-800">{a.titulo}</p>
                 <p className="text-[0.6875rem] text-slate-500">
                   {a.frecuencia}
-                  {" · "}última vez {fmt(a.ultimaEl)}
+                  {" · "}última vez {fmt(a.ultimaEl, zona)}
                   {" · "}
                   <span className={a.atrasada ? "font-medium text-rose-600" : ""}>
-                    {a.atrasada ? "atrasada, tocaba" : "próxima"} {fmt(a.proximaEl)}
+                    {a.atrasada ? "atrasada, tocaba" : "próxima"} {fmt(a.proximaEl, zona)}
                   </span>
                 </p>
               </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Plus } from "lucide-react";
@@ -21,9 +22,10 @@ type Contexto = {
 
 /** Lo que el servidor dice de una lectura que no paso limpia. */
 export function DetalleValidacion({ contexto }: { contexto: Contexto }) {
+  const zona = useZona();
   const u = contexto.unidad;
   const filas: Array<[string, string]> = [
-    ["Lectura anterior", contexto.anterior === null ? "—" : `${formatNumber(contexto.anterior, 1)} ${u}${contexto.anteriorEl ? ` · ${formatDateTime(contexto.anteriorEl)}` : ""}`],
+    ["Lectura anterior", contexto.anterior === null ? "—" : `${formatNumber(contexto.anterior, 1)} ${u}${contexto.anteriorEl ? ` · ${formatDateTime(contexto.anteriorEl, zona)}` : ""}`],
     ["Lectura nueva", `${formatNumber(contexto.nueva, 1)} ${u}`],
     ["Incremento", contexto.incremento === null ? "—" : `${formatNumber(contexto.incremento, 1)} ${u}`],
     ["Tiempo transcurrido", contexto.horasTranscurridas === null ? "—" : contexto.horasTranscurridas < 48 ? `${formatNumber(contexto.horasTranscurridas, 1)} h` : `${formatNumber(contexto.horasTranscurridas / 24, 1)} días`],

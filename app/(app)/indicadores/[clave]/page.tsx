@@ -36,6 +36,7 @@ export default async function IndicadorPage({
     ind.unidad === "MXN" ? formatCurrency(n, moneda) : esConteo ? formatNumber(n, 0) : `${formatNumber(n, 1)} h`;
   const suma = ind.detalle.reduce((s, r) => s + r.aporte, 0);
   const aFavor = ind.detalle.filter((r) => r.aFavor).length;
+  const conRazon = ind.detalle.some((r) => r.razon);
 
   return (
     <>
@@ -124,6 +125,7 @@ export default async function IndicadorPage({
                   <th>Descripción</th>
                   <th>Activo</th>
                   <th>Fecha</th>
+                  {conRazon ? <th>Por qué cuenta como falla</th> : null}
                   <th className="text-right">{esProporcion ? "Cuenta" : "Aporte"}</th>
                 </tr>
               </thead>
@@ -144,6 +146,7 @@ export default async function IndicadorPage({
                     <td className="whitespace-nowrap text-xs text-slate-600">
                       {r.fecha ? fechaHoraEnZona(r.fecha, zona) : "—"}
                     </td>
+                    {conRazon ? <td className="text-xs text-slate-600">{r.razon ?? "—"}</td> : null}
                     <td className="text-right text-xs tabular-nums">
                       {esProporcion ? (
                         <Badge tone={r.aFavor ? "success" : "danger"}>{r.aFavor ? "A favor" : "En contra"}</Badge>

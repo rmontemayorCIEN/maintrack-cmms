@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Send } from "lucide-react";
@@ -15,6 +16,7 @@ export function CommentsPanel({
   comments: Array<{ id: string; body: string; name: string; color: string; createdAt: string }>;
   editable: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,7 +49,7 @@ export function CommentsPanel({
               <div className="min-w-0 flex-1 rounded-lg bg-slate-50 px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-xs font-medium text-slate-700">{comment.name}</p>
-                  <p className="text-[0.625rem] text-slate-400">{formatDateTime(comment.createdAt)}</p>
+                  <p className="text-[0.625rem] text-slate-400">{formatDateTime(comment.createdAt, zona)}</p>
                 </div>
                 <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700">{comment.body}</p>
               </div>

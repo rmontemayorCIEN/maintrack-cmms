@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useZona } from "@/components/zona-empresa";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui";
@@ -21,7 +22,8 @@ export type FilaProveedor = ProveedorEditable & {
 
 const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 
-const COLUMNAS: Columna<FilaProveedor>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaProveedor>[] => [
   { id: "telefono", etiqueta: "Telefono", texto: (p) => guion(p.phone) },
   {
     id: "correo", etiqueta: "Correo", texto: (p) => guion(p.email),
@@ -51,7 +53,7 @@ const COLUMNAS: Columna<FilaProveedor>[] = [
   { id: "gasto", etiqueta: "Gasto acumulado", alineaDerecha: true, texto: (p) => formatCurrency(p.gastoAcumulado, p.moneda) },
   {
     id: "ultimo", etiqueta: "Último servicio",
-    texto: (p) => (p.ultimoServicio ? new Date(p.ultimoServicio).toLocaleDateString("es-MX") : "—"),
+    texto: (p) => (p.ultimoServicio ? new Date(p.ultimoServicio).toLocaleDateString("es-MX", { timeZone: zona }) : "—"),
   },
   {
     id: "relacion", etiqueta: "Relacion", agrupable: true,
@@ -74,6 +76,8 @@ export function TablaProveedores({
   vistaInicial: Vista;
   editable: boolean;
 }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
   const router = useRouter();
   const [borrando, setBorrando] = useState<string | null>(null);
 
@@ -133,7 +137,7 @@ export function TablaProveedores({
       <TablaConfigurable
         filas={proveedores}
         fijas={FIJAS}
-        columnas={COLUMNAS}
+        columnas={columnas}
         deFabrica={DE_FABRICA}
         vistaInicial={vistaInicial}
         clave="proveedores"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { AlertTriangle, Loader2, Sparkles, TrendingDown } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -51,6 +52,7 @@ export function Recurrencia({
   moneda: string;
   disponible: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +177,7 @@ export function Recurrencia({
             </Badge>
             {analizadoEl ? (
               <span className="text-[0.625rem] text-slate-400">
-                Analizado el {new Date(analizadoEl).toLocaleDateString("es-MX")}
+                Analizado el {new Date(analizadoEl).toLocaleDateString("es-MX", { timeZone: zona })}
               </span>
             ) : null}
           </div>

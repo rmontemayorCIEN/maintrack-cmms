@@ -20,6 +20,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default async function AlertsPage() {
   const user = await requireUser();
+  const zona = user.organization.timezone || "America/Mexico_City";
   const editable = can(user.role, "predictive:write");
 
   const alerts = await prisma.predictiveAlert.findMany({
@@ -66,7 +67,7 @@ export default async function AlertsPage() {
                     {alert.normalizadaEl ? (
                       <Badge tone="success">
                         Normalizada: por validar
-                        {alert.normalizacionValor != null ? ` · lectura ${formatNumber(alert.normalizacionValor, 2)} ${alert.sensor?.unit ?? ""} del ${formatDateTime(alert.normalizacionLecturaEl)}` : ""}
+                        {alert.normalizacionValor != null ? ` · lectura ${formatNumber(alert.normalizacionValor, 2)} ${alert.sensor?.unit ?? ""} del ${formatDateTime(alert.normalizacionLecturaEl, zona)}` : ""}
                       </Badge>
                     ) : null}
                     {alert.sensor ? (
@@ -81,7 +82,7 @@ export default async function AlertsPage() {
                     <span className="text-slate-400">Al detectar:</span> {alert.message}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-4 text-[0.6875rem] text-slate-500">
-                    <span>Detectada {formatDateTime(alert.createdAt)}</span>
+                    <span>Detectada {formatDateTime(alert.createdAt, zona)}</span>
                     {alert.value != null ? (
                       <span>
                         Valor {formatNumber(alert.value, 2)} {alert.sensor?.unit}
@@ -158,7 +159,7 @@ export default async function AlertsPage() {
                         </Badge>
                       </td>
                       <td><Badge tone="muted">{STATUS_LABELS[alert.status]}</Badge></td>
-                      <td className="text-xs text-slate-500">{formatDate(alert.createdAt)}</td>
+                      <td className="text-xs text-slate-500">{formatDate(alert.createdAt, zona)}</td>
                       <td className="text-xs">
                         {alert.workOrder ? (
                           <Link href={`/work-orders/${alert.workOrder.id}`} className="text-brand-600 hover:underline">

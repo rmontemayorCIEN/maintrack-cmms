@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, LogIn, Loader2, Plus, X } from "lucide-react";
@@ -43,6 +44,7 @@ export function PanelClientes({
   solicitudes: SolicitudPlan[];
   organizacionPropiaId: string;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [creando, setCreando] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -144,7 +146,7 @@ export function PanelClientes({
                     </span>
                   </p>
                   <p className="text-[0.6875rem] text-slate-500">
-                    {s.pedidoPor ? `Pedido por ${s.pedidoPor} · ` : ""}{formatDateTime(s.createdAt)}
+                    {s.pedidoPor ? `Pedido por ${s.pedidoPor} · ` : ""}{formatDateTime(s.createdAt, zona)}
                     {s.nota ? ` · "${s.nota}"` : ""}
                   </p>
                 </div>
@@ -320,7 +322,7 @@ export function PanelClientes({
                         <div className="flex items-center gap-1.5">
                           <Badge tone={e.tono}>{e.texto}</Badge>
                           {org.status === "TRIAL" && org.trialEndsAt ? (
-                            <span className="text-[0.625rem] text-slate-400">hasta {formatDate(org.trialEndsAt)}</span>
+                            <span className="text-[0.625rem] text-slate-400">hasta {formatDate(org.trialEndsAt, zona)}</span>
                           ) : null}
                         </div>
                       </td>
@@ -359,7 +361,7 @@ export function PanelClientes({
                       <td className="text-right tabular-nums text-xs text-slate-600">{org._count.users}</td>
                       <td className="text-right tabular-nums text-xs text-slate-600">{org._count.assets}</td>
                       <td className="text-right tabular-nums text-xs text-slate-600">{org._count.workOrders}</td>
-                      <td className="text-xs text-slate-500">{formatDate(org.createdAt)}</td>
+                      <td className="text-xs text-slate-500">{formatDate(org.createdAt, zona)}</td>
                       <td className="text-right">
                         <div className="flex justify-end gap-1.5">
                           {!propia ? (

@@ -1,5 +1,7 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
@@ -39,10 +41,10 @@ const TONO: Record<string, "success" | "danger" | "info" | "warning" | "muted"> 
 
 const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 
-const FIJAS: Columna<FilaKardex>[] = [
+const crearFijas = (zona: string): Columna<FilaKardex>[] => [
   {
-    id: "fecha", etiqueta: "Fecha", texto: (m) => formatDateTime(new Date(m.fecha)),
-    pinta: (m) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(new Date(m.fecha))}</span>,
+    id: "fecha", etiqueta: "Fecha", texto: (m) => formatDateTime(new Date(m.fecha), zona),
+    pinta: (m) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(new Date(m.fecha), zona)}</span>,
   },
   {
     id: "refaccion", etiqueta: "Refacción",
@@ -56,7 +58,8 @@ const FIJAS: Columna<FilaKardex>[] = [
   },
 ];
 
-const COLUMNAS: Columna<FilaKardex>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaKardex>[] => [
   {
     id: "tipo", etiqueta: "Movimiento", agrupable: true,
     texto: (m) => TIPOS[m.tipo] ?? m.tipo,
@@ -104,11 +107,14 @@ const COLUMNAS: Columna<FilaKardex>[] = [
 const DE_FABRICA = ["tipo", "almacen", "entrada", "salida", "saldo", "documento", "entregadoA"];
 
 export function TablaKardex({ movimientos, vistaInicial }: { movimientos: FilaKardex[]; vistaInicial: Vista }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
+  const fijas = useMemo(() => crearFijas(zona), [zona]);
   return (
     <TablaConfigurable
       filas={movimientos}
-      fijas={FIJAS}
-      columnas={COLUMNAS}
+      fijas={fijas}
+      columnas={columnas}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="kardex"

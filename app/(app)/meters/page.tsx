@@ -7,12 +7,14 @@ import { formatDia, formatNumber } from "@/lib/utils";
 import { MeterReadingForm } from "./reading-form";
 import { Lecturas } from "./lecturas";
 import { ConfigMedidor } from "./config-medidor";
+import { problemasDeCadena } from "@/lib/medidores";
 
 export const metadata = { title: "Medidores" };
 export const dynamic = "force-dynamic";
 
 export default async function MetersPage() {
   const user = await requireUser();
+  const zona = user.organization.timezone || "America/Mexico_City";
   const puedeCorregir = can(user.role, "asset:write");
 
   const meters = await prisma.meter.findMany({
@@ -33,6 +35,31 @@ export default async function MetersPage() {
     },
     orderBy: { lastReadingAt: "desc" },
   });
+
+  // Un medidor con proyeccion suspendida muestra mas historial: la lectura
+  // invalida puede no estar entre las 6 mas recientes y tiene que poder
+  // corregirse o anularse desde aqui.
+  const suspendidos = meters.filter((m) => m.proyeccionSuspendida).map((m) => m.id);
+  const invalidas = new Set<string>();
+  const primeraInvalida = new Map<string, string>();
+  if (suspendidos.length) {
+    const extra = await prisma.meterReading.findMany({
+      where: { organizationId: user.organizationId, meterId: { in: suspendidos } },
+      orderBy: [{ readingAt: "desc" }, { id: "desc" }],
+      take: 200,
+      include: { user: { select: { name: true } } },
+    });
+    for (const m of meters) {
+      if (!m.proyeccionSuspendida) continue;
+      m.readings = extra.filter((r) => r.meterId === m.id).slice(0, 40);
+      const problemas = problemasDeCadena(m.readings.filter((r) => r.estado !== "ANULADA"), m);
+      for (const [id, p] of problemas) {
+        if (!p.invalida) continue;
+        invalidas.add(id);
+        if (!primeraInvalida.has(m.id)) primeraInvalida.set(m.id, id);
+      }
+    }
+  }
 
   const idsCorrectores = [...new Set(meters.flatMap((m) => m.readings.map((r) => r.correccionPorId).filter(Boolean)))] as string[];
   const correctores = idsCorrectores.length
@@ -103,7 +130,24 @@ export default async function MetersPage() {
                   )}
                 </div>
 
-                {pending.length && meter.lecturaVigente ? (
+                {meter.proyeccionSuspendida ? (
+                  <div id={`medidor-${meter.id}`} className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[0.6875rem] text-amber-900">
+                    <p className="font-semibold">Proyección suspendida: el medidor contiene una lectura inválida.</p>
+                    <p className="mt-0.5">{meter.motivoSuspension}</p>
+                    <p className="mt-0.5">
+                      Mientras tanto no se estima fecha ni se generan órdenes por uso
+                      {pending.length ? ` para ${pending.map((p) => `«${p.name}»`).join(", ")}` : ""}. Corrija o anule la lectura marcada
+                      abajo y la proyección se reanuda sola.
+                    </p>
+                    {primeraInvalida.get(meter.id) ? (
+                      <a href={`#lectura-${primeraInvalida.get(meter.id)}`} className="mt-1 inline-block font-semibold text-brand-700 underline">
+                        Ir a la lectura inválida para corregirla
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {pending.length && meter.lecturaVigente && !meter.proyeccionSuspendida ? (
                   <ul className="mt-3 grid gap-1.5 rounded-lg bg-slate-50 p-2.5">
                     {pending.map((plan) => (
                       <li key={plan.id} className="flex items-center justify-between gap-2 text-[0.6875rem]">
@@ -119,7 +163,7 @@ export default async function MetersPage() {
                         >
                           {plan.remaining <= 0
                             ? "Vencido"
-                            : `Faltan ${formatNumber(plan.remaining, 0)} ${meter.unit}${plan.fecha ? ` · aprox. ${formatDia(plan.fecha)}` : ""}`}
+                            : `Faltan ${formatNumber(plan.remaining, 0)} ${meter.unit}${plan.fecha ? ` · aprox. ${formatDia(plan.fecha, { zona })}` : ""}`}
                         </span>
                       </li>
                     ))}
@@ -144,6 +188,7 @@ export default async function MetersPage() {
                     atipica: r.atipica,
                     justificacion: r.justificacion,
                     valorOriginal: r.valorOriginal,
+                    invalida: invalidas.has(r.id),
                     tipoOriginal: r.tipoOriginal,
                     valorAnterior: r.valorAnterior,
                     correccionMotivo: r.correccionMotivo,

@@ -6,7 +6,7 @@ import { evaluarPuntos } from "../predictive";
 import { saludDeDatos } from "../salud-datos";
 import { contextoDeLaEmpresa } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
-import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
+import { agruparPorCodigo, fallasCodificadas, filtroDeFalla } from "@/lib/fallas";
 
 /**
  * El expediente que se le entrega al modelo.
@@ -32,6 +32,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
   const desde = actual.periodo.desde;
   const desdePrevio = previo.periodo.desde;
 
+  const deFalla = await filtroDeFalla(organizationId);
   const [org, sitios, salud, topCosto] = await Promise.all([
     prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
@@ -94,7 +95,8 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       }),
       prisma.workOrder.groupBy({
         by: ["assetId"],
-        where: { organizationId, maintenanceType: "CORRECTIVE", status: { not: "CANCELLED" }, createdAt: { gte: desdePrevio }, assetId: { not: null } },
+        // Fallas repetidas con la regla unica de `lib/fallas`, no solo correctivas.
+        where: { ...deFalla, organizationId, createdAt: { gte: desdePrevio }, assetId: { not: null } },
         _count: { _all: true },
         having: { assetId: { _count: { gt: 2 } } },
       }),
@@ -103,6 +105,11 @@ export async function construirExpediente(organizationId: string, dias = 30) {
   // La misma evaluacion que Predictivo y Alertas: estado, tendencia y cruces
   // de hoy, no el mensaje guardado al detectar.
   const vivas = await evaluarPuntos(organizationId, alertas.map((a) => a.sensorId).filter(Boolean) as string[]);
+
+  const medidoresSuspendidos = await prisma.meter.findMany({
+    where: { organizationId, proyeccionSuspendida: true },
+    select: { name: true, motivoSuspension: true, asset: { select: { code: true } } },
+  });
 
   const sinPlan = await prisma.asset.findMany({
     // Por la ASIGNACION activa, no por el encabezado viejo del plan: un equipo
@@ -263,6 +270,10 @@ export async function construirExpediente(organizationId: string, dias = 30) {
     },
 
     preventivo: {
+      /** Planes por uso sin fecha confiable: su medidor tiene una lectura invalida. No inventar fecha. */
+      medidoresConProyeccionSuspendida: medidoresSuspendidos.map((m) => ({
+        activo: m.asset.code, medidor: m.name, motivo: m.motivoSuspension,
+      })),
       activosSinPlan: sinPlan.map((a) => ({
         activo: `${a.code} ${a.name}`,
         criticidad: a.criticality,

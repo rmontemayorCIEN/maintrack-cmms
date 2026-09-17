@@ -296,7 +296,7 @@ function resolveDueDate(plan: {
   nextDueMeter: number | null;
   lastCompletedAt: Date | null;
   createdAt: Date;
-  meter?: { currentValue: number; dailyAverage: number; lecturaVigente?: boolean } | null;
+  meter?: { currentValue: number; dailyAverage: number; lecturaVigente?: boolean; proyeccionSuspendida?: boolean } | null;
 }): Date | null {
   if (plan.triggerType === "CALENDAR") {
     if (plan.nextDueDate) return plan.nextDueDate;
@@ -309,7 +309,9 @@ function resolveDueDate(plan: {
     const meter = plan.meter;
     // Sin lectura vigente (todas anuladas) no hay de donde proyectar: no se
     // genera ni se estima nada hasta que llegue una lectura nueva.
-    if (!meter || !plan.intervalMeter || meter.lecturaVigente === false) return null;
+    // Con una lectura invalida vigente tampoco: la fecha y la meta alcanzada
+    // podrian salir de esa lectura. Se reanuda sola al corregirla o anularla.
+    if (!meter || !plan.intervalMeter || meter.lecturaVigente === false || meter.proyeccionSuspendida) return null;
     const target = plan.nextDueMeter ?? meter.currentValue + plan.intervalMeter;
     const remaining = target - meter.currentValue;
     if (remaining <= 0) return new Date();
@@ -579,14 +581,14 @@ function avanzar(
     triggerType: string;
     intervalDays: number | null;
     intervalMeter: number | null;
-    meter?: { dailyAverage: number; lecturaVigente?: boolean } | null;
+    meter?: { dailyAverage: number; lecturaVigente?: boolean; proyeccionSuspendida?: boolean } | null;
   },
   desde: Date,
 ): Date | null {
   if (plan.triggerType === "CALENDAR" && plan.intervalDays) {
     return addDays(desde, plan.intervalDays);
   }
-  if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter && plan.meter.lecturaVigente !== false) {
+  if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter && plan.meter.lecturaVigente !== false && !plan.meter.proyeccionSuspendida) {
     const rate = plan.meter.dailyAverage > 0 ? plan.meter.dailyAverage : 1;
     return addDays(desde, Math.ceil(plan.intervalMeter / rate));
   }

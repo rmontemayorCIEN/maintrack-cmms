@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarClock, Loader2, PackageX, Wrench } from "lucide-react";
@@ -22,6 +23,7 @@ export function Armador({
   tecnicos: Array<{ id: string; name: string }>;
   disponible: TrabajoDisponible | null;
 }) {
+  const zona = useZona();
   const router = useRouter();
   /** Las actividades de plan elegidas, por id de actividad. */
   const [actividades, setActividades] = useState<string[]>([]);
@@ -177,7 +179,7 @@ export function Armador({
               </select>
             </div>
             <p className="pb-2 text-[0.6875rem] text-slate-500">
-              Hasta el {diaDeCalendario(disponible.hasta).toLocaleDateString("es-MX", {
+              Hasta el {diaDeCalendario(disponible.hasta, zona).toLocaleDateString("es-MX", {
                 weekday: "short", day: "numeric", month: "short",
               })}. Las atrasadas se ven siempre.
             </p>
@@ -293,7 +295,7 @@ export function Armador({
                 marcado={reportes.includes(r.id)}
                 onMarcar={() => alternar("reporte", r.id)}
                 titulo={r.title}
-                detalle={`${r.number} · reportada el ${new Date(r.createdAt).toLocaleDateString("es-MX")}`}
+                detalle={`${r.number} · reportada el ${new Date(r.createdAt).toLocaleDateString("es-MX", { timeZone: zona })}`}
                 señal={
                   r.riesgo && r.riesgo !== "NINGUNO"
                     ? { texto: "Riesgo", tono: "urgente" }

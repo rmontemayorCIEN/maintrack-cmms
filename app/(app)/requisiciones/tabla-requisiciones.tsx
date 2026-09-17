@@ -1,5 +1,7 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
@@ -42,7 +44,8 @@ const FIJAS: Columna<FilaRequisicion>[] = [
   },
 ];
 
-const COLUMNAS: Columna<FilaRequisicion>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaRequisicion>[] => [
   {
     id: "estado", etiqueta: "Estado", agrupable: true,
     texto: (r) => ESTADOS[r.estado as keyof typeof ESTADOS] ?? r.estado,
@@ -75,8 +78,8 @@ const COLUMNAS: Columna<FilaRequisicion>[] = [
     texto: (r) => String(r.devuelto),
     pinta: (r) => (r.devuelto ? <span className="text-slate-700">{r.devuelto}</span> : <span className="text-slate-300">—</span>),
   },
-  { id: "creada", etiqueta: "Pedida", texto: (r) => formatDate(new Date(r.createdAt)) },
-  { id: "cerrada", etiqueta: "Cerrada", texto: (r) => (r.cerradaEl ? formatDate(new Date(r.cerradaEl)) : "—") },
+  { id: "creada", etiqueta: "Pedida", texto: (r) => formatDate(new Date(r.createdAt), zona) },
+  { id: "cerrada", etiqueta: "Cerrada", texto: (r) => (r.cerradaEl ? formatDate(new Date(r.cerradaEl), zona) : "—") },
   { id: "nota", etiqueta: "Nota", texto: (r) => guion(r.nota) },
 ];
 
@@ -84,11 +87,13 @@ const COLUMNAS: Columna<FilaRequisicion>[] = [
 const DE_FABRICA = ["estado", "urgencia", "almacen", "solicitante", "pedido", "pendiente", "creada"];
 
 export function TablaRequisiciones({ requisiciones, vistaInicial }: { requisiciones: FilaRequisicion[]; vistaInicial: Vista }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
   return (
     <TablaConfigurable
       filas={requisiciones}
       fijas={FIJAS}
-      columnas={COLUMNAS}
+      columnas={columnas}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="requisiciones"

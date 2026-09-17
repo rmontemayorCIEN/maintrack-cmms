@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -41,6 +42,7 @@ export function EquiposDelPlan({
   editable: boolean;
   activos: { id: string; code: string; name: string }[];
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [lista, setLista] = useState<Asignacion[] | null>(null);
@@ -132,7 +134,7 @@ export function EquiposDelPlan({
   const yaAsignados = new Set((lista ?? []).map((a) => a.asset.id));
   const disponibles = activos.filter((a) => !yaAsignados.has(a.id));
   // Dias completos, sin que la zona del navegador los recorra un dia (ver formatDia).
-  const fmt = (iso: string | null) => (iso ? formatDia(iso) : "sin fecha");
+  const fmt = (iso: string | null) => (iso ? formatDia(iso, { zona }) : "sin fecha");
 
   return (
     <>

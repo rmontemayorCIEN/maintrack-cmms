@@ -4,8 +4,25 @@
     {
       "name": "maintrack-cmms",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "maintrack-utc",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "TZ=UTC",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3001"
+      ],
+      "port": 3001
     }
   ]
 }

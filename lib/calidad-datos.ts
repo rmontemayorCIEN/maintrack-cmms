@@ -18,7 +18,7 @@
  * alguien los revise. Corregir en automatico seria esconder la inconsistencia.
  */
 import { prisma } from "./db";
-import { TIPOS_DE_FALLA } from "./fallas";
+import { filtroDeFalla } from "./fallas";
 import { ESTADOS_TERMINADOS } from "./vencimiento";
 
 const DIA = 86_400_000;
@@ -85,12 +85,8 @@ export function validarFechasDeActivo(
 
 export async function revisarCalidad(organizationId: string, ahora = new Date()): Promise<ResultadoRegla[]> {
   const terminadas = { organizationId, status: { in: [...ESTADOS_TERMINADOS] } };
-  const esFallaWhere = {
-    OR: [
-      { maintenanceType: { in: [...TIPOS_DE_FALLA] } },
-      { tasks: { some: { maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
-    ],
-  };
+  // La regla unica de falla; su `status` se sustituye por el de terminadas.
+  const { status: _sinCanceladas, ...esFallaWhere } = await filtroDeFalla(organizationId);
   const selOt = { id: true, number: true, title: true } as const;
   const selActivo = { id: true, code: true, name: true } as const;
   const enServicio = { organizationId, active: true, status: { not: "RETIRED" } };
@@ -227,7 +223,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
 
     prisma.predictiveAlert.findMany({
       where: { organizationId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
-      select: { id: true, title: true, createdAt: true, projectedFailureAt: true, fechaCruceCritico: true },
+      select: { id: true, title: true, createdAt: true, projectedFailureAt: true, fechaCruceCritico: true, fechaCruceAdvertencia: true },
     }),
 
     prisma.workOrder.count({ where: { ...terminadas, maintenanceType: "CORRECTIVE" } }),
@@ -271,13 +267,19 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
   }
 
   // ── Alertas con fechas incoherentes ─────────────────────────────────────
+  // Incoherente = anterior a la propia deteccion. Una fecha posterior que ya
+  // paso no es un error de dato: fue la proyeccion de su momento, y las
+  // pantallas la leen en vivo como «Proyección vencida».
   const alertasIncoherentes: Hallazgo[] = alertas
     .map((a) => {
-      const fecha = a.fechaCruceCritico ?? a.projectedFailureAt;
-      if (!fecha) return null;
-      if (fecha < a.createdAt) return { id: a.id, etiqueta: a.title, detalle: `fecha proyectada ${fecha.toISOString().slice(0, 10)} anterior a su detección`, enlace: "/alerts" };
-      if (fecha < ahora) return { id: a.id, etiqueta: a.title, detalle: `proyección vencida el ${fecha.toISOString().slice(0, 10)}`, enlace: "/alerts" };
-      return null;
+      const campos = [
+        ["cruce crítico", a.fechaCruceCritico],
+        ["cruce de advertencia", a.fechaCruceAdvertencia],
+        ["fecha proyectada", a.projectedFailureAt],
+      ] as const;
+      const mala = campos.find(([, f]) => f && f < a.createdAt);
+      if (!mala) return null;
+      return { id: a.id, etiqueta: a.title, detalle: `${mala[0]} ${(mala[1] as Date).toISOString().slice(0, 10)} anterior a su detección`, enlace: "/alerts" };
     })
     .filter(Boolean) as Hallazgo[];
 
@@ -345,7 +347,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       enlace: "/plans", peso: 1, total: nPlanes },
     actividadesDiarias.map((t) => ({ id: t.id, etiqueta: `${t.plan.name} · ${t.title}`, detalle: "cada día", enlace: "/plans" }))),
     regla({ clave: "alertas-fechas-incoherentes", titulo: "Alertas predictivas con fechas incoherentes", nivel: "ADVERTENCIA",
-      porque: "Una fecha proyectada anterior a la detección o ya vencida no puede presentarse como futura.",
+      porque: "Una fecha proyectada anterior a la propia detección es un dato imposible. Se sanea con scripts/sanear-fechas-predictivas.ts, que deja bitácora.",
       enlace: "/alerts", peso: 1, total: alertas.length }, alertasIncoherentes),
 
     // ── Recomendaciones ──

@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button } from "@/components/ui";
@@ -24,6 +25,8 @@ export type LecturaVista = {
   atipica: boolean;
   justificacion: string | null;
   valorOriginal: number | null;
+  /** Invalida: suspende la proyeccion del medidor hasta corregirla o anularla. */
+  invalida?: boolean;
   tipoOriginal: string | null;
   valorAnterior: number | null;
   correccionMotivo: string | null;
@@ -36,6 +39,7 @@ export type LecturaVista = {
  * original, anuladas tachadas con su motivo, atipicas con su justificacion.
  */
 export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaVista[]; unit: string; puedeCorregir: boolean }) {
+  const zona = useZona();
   const [accion, setAccion] = useState<{ lectura: LecturaVista; tipo: "corregir" | "anular" } | null>(null);
 
   if (!lecturas.length) return null;
@@ -45,10 +49,10 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
         {lecturas.map((l) => {
           const anulada = l.estado === "ANULADA";
           return (
-            <li key={l.id} className="text-[0.6875rem] text-slate-500">
+            <li key={l.id} id={`lectura-${l.id}`} className={`text-[0.6875rem] text-slate-500 ${l.invalida ? "rounded-md bg-red-50 p-1.5 ring-1 ring-red-200" : ""}`}>
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <span className="min-w-0">
-                  {formatDateTime(l.readingAt)} · {l.usuario ?? "Sistema"}
+                  {formatDateTime(l.readingAt, zona)} · {l.usuario ?? "Sistema"}
                 </span>
                 <span className={`tabular-nums ${anulada ? "line-through" : ""}`}>
                   {formatNumber(l.value, 1)} {unit}
@@ -60,6 +64,7 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
                 {l.tipo === "SUSTITUCION" ? <Badge tone="info">Sustitución{l.valorAnterior !== null ? ` · antes ${formatNumber(l.valorAnterior, 1)} ${unit}` : ""}</Badge> : null}
                 {l.tipoOriginal ? <Badge tone="muted">Capturado como {ETIQUETA_TIPO[l.tipoOriginal] ?? l.tipoOriginal}</Badge> : null}
                 {l.atipica ? <Badge tone="warning">Atípica</Badge> : null}
+                {l.invalida ? <Badge tone="danger">Inválida: suspende la proyección</Badge> : null}
                 {l.estado === "CORREGIDA" ? <Badge tone="muted">Corregida · original {formatNumber(l.valorOriginal ?? 0, 1)} {unit}</Badge> : null}
                 {anulada ? <Badge tone="danger">Anulada</Badge> : null}
                 {puedeCorregir && !anulada ? (
@@ -76,7 +81,7 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
               {l.justificacion ? <p className="mt-0.5 text-slate-400">Justificación: {l.justificacion}</p> : null}
               {l.correccionMotivo ? (
                 <p className="mt-0.5 text-slate-400">
-                  {anulada ? "Anulada" : "Corregida"} por {l.correccionPor ?? "—"} el {l.correccionEl ? formatDateTime(l.correccionEl) : "—"}: {l.correccionMotivo}
+                  {anulada ? "Anulada" : "Corregida"} por {l.correccionPor ?? "—"} el {l.correccionEl ? formatDateTime(l.correccionEl, zona) : "—"}: {l.correccionMotivo}
                 </p>
               ) : null}
             </li>
@@ -89,6 +94,7 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
 }
 
 function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo: "corregir" | "anular"; unit: string; onCerrar: () => void }) {
+  const zona = useZona();
   const router = useRouter();
   const [valor, setValor] = useState(String(lectura.value));
   const esEvento = lectura.tipo !== "LECTURA";
@@ -127,7 +133,7 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
   return (
     <Dialogo
       titulo={`${tipo === "corregir" ? "Corregir" : "Anular"} ${esEvento ? (ETIQUETA_TIPO[lectura.tipo] ?? "evento").toLowerCase() : "lectura"}`}
-      descripcion={`${formatNumber(lectura.value, 1)} ${unit} del ${formatDateTime(lectura.readingAt)} — se conserva el valor original y queda en la bitácora; el promedio y los planes por uso se recalculan.`}
+      descripcion={`${formatNumber(lectura.value, 1)} ${unit} del ${formatDateTime(lectura.readingAt, zona)} — se conserva el valor original y queda en la bitácora; el promedio y los planes por uso se recalculan.`}
       onCerrar={onCerrar}
       ancho="sm"
       onSubmit={(e) => {

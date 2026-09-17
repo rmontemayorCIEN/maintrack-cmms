@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ export function PanelCobranza({
 }: {
   cargos: Cargo[]; periodoActual: string; filtro: string;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -149,7 +151,7 @@ export function PanelCobranza({
                         {formatCurrency(c.importe, c.moneda)}
                       </td>
                       <td className={`text-xs ${atrasado ? "font-medium text-red-600" : "text-slate-500"}`}>
-                        {formatDia(c.venceEl)}
+                        {formatDia(c.venceEl, { zona })}
                       </td>
                       <td>
                         <Badge tone={c.status === "PAID" ? "success" : atrasado ? "danger" : c.status === "CANCELLED" ? "muted" : "warning"}>
@@ -157,7 +159,7 @@ export function PanelCobranza({
                         </Badge>
                         {c.pagadaEl ? (
                           <p className="mt-0.5 text-[0.625rem] text-slate-400">
-                            {formatDate(c.pagadaEl)}{c.formaPago ? ` · ${c.formaPago}` : ""}
+                            {formatDate(c.pagadaEl, zona)}{c.formaPago ? ` · ${c.formaPago}` : ""}
                           </p>
                         ) : null}
                       </td>

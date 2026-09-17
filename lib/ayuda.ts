@@ -976,6 +976,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Dice que la lectura es menor que la anterior", porque: "Un medidor no retrocede. Si se reinició o se cambió, regístrelo como tal; si la lectura anterior está mal, corríjala." },
       { sintoma: "Dice que un horómetro no puede sumar tantas horas", porque: "Entre las dos lecturas pasaron menos horas de reloj que las que marca. Es imposible, no atípico: revise la captura o la lectura anterior." },
       { sintoma: "No me deja anular un reinicio o una sustitución", porque: "Hay lecturas posteriores que se midieron contra ese punto de partida y quedarían sin continuidad; el mensaje dice cuáles. Corrija el valor o el tipo del evento, o anule primero esas lecturas. Al anularlo o corregirlo, la meta de los planes por uso se recorre sola." },
+      { sintoma: "Dice «Proyección suspendida»", porque: "El medidor tiene una lectura inválida (menor que la anterior o físicamente imposible). Mientras exista no se estima fecha ni se generan órdenes por uso, porque saldrían de esa lectura. Corríjala o anúlela —el aviso lleva a ella— y la proyección se reanuda sola." },
       { sintoma: "El medidor dice «Sin lectura vigente»", porque: "Todas sus lecturas están anuladas y no tiene un valor inicial registrado. No se muestra una lectura anulada como actual ni se proyecta nada con ella: registre una lectura nueva." },
     ],
   },
@@ -988,6 +989,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "El estado (Normal, Advertencia, Crítico, Sin datos suficientes) sale de la última lectura contra los umbrales. Sobre el crítico es Crítico aunque la tendencia sea estable.",
       "La tendencia y las fechas estimadas de cruce salen de una regresión lineal con al menos 5 lecturas que abarquen un día. Con menos, dice «Datos insuficientes para proyectar».",
+      "Estado, tendencia, pendiente, confianza y fecha salen de la MISMA regresión: la pendiente que se muestra es la que calcula la fecha (distancia al umbral ÷ pendiente, desde la última lectura).",
+      "«Estable» quiere decir que la pendiente no se distingue del ruido de las lecturas (estadístico t menor a 2). Una subida significativa hacia el umbral se llama «Empeorando» y lleva fecha de cruce.",
+      "Cuando no hay fecha, se dice por qué: umbral ya superado, datos insuficientes, pendiente no significativa, tendencia que se aleja del umbral, confianza insuficiente (R² bajo) o cruce a más de 10 años.",
       "Se estiman dos fechas: cuándo cruzaría el umbral de advertencia y cuándo el crítico. No es una fecha de falla: no hay modelo de falla.",
       "Cuando el punto entra en advertencia, en crítico, o su tendencia cruzaría el crítico en 30 días o menos, se abre UNA alerta por punto; si empeora, se escala la misma.",
     ],
@@ -1028,6 +1032,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Un análisis del estado de la operación, con fortalezas, riesgos y qué atender primero.",
     hacer: ["Generar el diagnóstico del periodo", "Revisar las áreas de oportunidad"],
     flujo: [
+      "Cada diagnóstico es una fotografía de la operación al momento de generarse: sus cifras no se recalculan. La pantalla muestra fecha, hora, periodo y zona, y avisa si hay datos registrados después.",
+      "«Generar diagnóstico actualizado» agrega uno nuevo; los anteriores se conservan.",
       "Los números se calculan en el sistema; la IA los interpreta pero no los inventa. Son los mismos indicadores, periodo y zona horaria que el Panel y Reportes.",
       "La calidad de la captura sale de las mismas reglas de calidad de datos: errores (datos imposibles), advertencias (datos sospechosos) y recomendaciones (datos que faltan). Cada una lleva a los registros exactos.",
       "Se genera solo cada semana, y puede pedirlo cuando quiera.",
@@ -1101,6 +1107,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Simular cuánto bajaría la pérdida sin un equipo",
     ],
     flujo: [
+      "El periodo es el mismo de Reportes e Indicadores: días completos en la zona horaria de la empresa, y la línea de tiempo termina en el último día incluido.",
+      "«Mantenimiento planeado» es todo paro planeado de cualquier equipo: la misma cifra que «Paro planeado» en Reportes. La pérdida en dinero cuenta solo el paro NO planeado de equipos que detienen la producción; el no planeado de equipos que no detienen se muestra por área, sin costo.",
       "En el croquis el COLOR es el daño y el tamaño es geografía: las cajas están donde usted las puso, no ordenadas por lo que costaron. Por eso cada una trae sus horas y sus pesos escritos adentro.",
       "El croquis arranca con las áreas repartidas en la rejilla. Ese acomodo no adivina su planta —acertar a medias sería peor—: es un punto de partida para que usted las arrastre a donde de verdad están.",
       "Soltar un área encima de otra las intercambia de lugar. Es la forma rápida de acomodar cuando la rejilla ya está llena y no hay hueco a dónde mover.",
@@ -1156,6 +1164,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Todos los indicadores con su definición y fórmula, y el detalle de cada uno: qué órdenes y paros cuentan, y los registros exactos que forman la cifra.",
     hacer: ["Cambiar el periodo", "Abrir un indicador y cada orden que aporta a su cifra"],
     flujo: [
+      "Una orden cuenta como FALLA (MTBF, MTTR, tiempo de respuesta) solo si es correctiva, tiene código de falla en la orden o en una actividad, o trae una actividad de una solicitud clasificada como falla. Una preventiva o de seguridad sin falla registrada no cuenta. El detalle dice por qué cuenta cada una.",
       "La suma del detalle es exactamente la cifra de la tarjeta (o su numerador, en porcentajes y promedios).",
       "«Con los datos de hoy» muestra la fórmula con los números reales del periodo.",
       "Completada es la fecha de finalización operativa; el cierre administrativo es aparte y no cambia el cumplimiento.",

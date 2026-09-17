@@ -45,7 +45,7 @@ type Analisis = {
  */
 export function MapaDeParos({
   periodo, areas, perdida, cambio, anterior,
-  horasQueDetienen, horasPlaneadas, cobertura, comoDecirlo,
+  horasQueDetienen, horasPlaneadas, cobertura, comoDecirlo, periodoTexto,
   eventos, desdeLinea, hastaLinea, ventana, puedeAcomodar, moneda,
 }: {
   periodo: ClavePeriodo;
@@ -55,6 +55,8 @@ export function MapaDeParos({
   anterior: { perdida: number };
   horasQueDetienen: number;
   horasPlaneadas: number;
+  /** «20 jun 2026 al 17 sep 2026 · America/Monterrey», del constructor central de periodos. */
+  periodoTexto?: string;
   cobertura: { equiposConParo: number; equiposDefinidos: number; areasConParo: number; areasConTarifa: number; completa: boolean };
   comoDecirlo: { prefijo: string; falta: string | null };
   eventos: Evento[];
@@ -194,8 +196,11 @@ export function MapaDeParos({
               <Flecha cambio={cambio} />
             </p>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-              {horasQueDetienen} horas que detuvieron producción, y {horasPlaneadas} h de
-              mantenimiento planeado que no se cuentan como pérdida.
+              {horasQueDetienen} h de paro no planeado en equipos que detienen la producción, y{" "}
+              {horasPlaneadas} h de mantenimiento planeado (todo paro planeado, de cualquier equipo; es la
+              misma cifra que «Paro planeado» en Reportes) que no se cuentan como pérdida. El paro no
+              planeado de equipos que no detienen la línea se muestra en cada área, sin costo.
+              {periodoTexto ? <> Periodo: {periodoTexto}.</> : null}
               {cambio !== null ? (
                 <> El periodo anterior fueron {formatCurrency(anterior.perdida, moneda)}.</>
               ) : null}

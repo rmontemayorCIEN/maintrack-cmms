@@ -1,3 +1,5 @@
+import { diaEnZona } from "./periodos";
+
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
@@ -64,19 +66,25 @@ export function startOfDay(date: Date) {
  * Sirve para `getDate()`, `getDay()` y para comparar dias en el navegador, donde
  * `new Date("...T00:00:00.000Z").getDate()` en Mexico da el dia ANTERIOR.
  */
-export function diaDeCalendario(value: Date | string): Date {
+export function diaDeCalendario(value: Date | string, zona?: string): Date {
   const d = typeof value === "string" ? new Date(value) : value;
   const esMedianocheUtc =
     d.getUTCHours() === 0 && d.getUTCMinutes() === 0 &&
     d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
-  return esMedianocheUtc
-    ? new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-    : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (esMedianocheUtc) return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  // Con zona, el dia es el de la EMPRESA: igual en el servidor (UTC) que en el
+  // navegador. Sin zona se usa la local, y un componente que se dibuja en los
+  // dos lados da dias distintos (error de hidratacion #418).
+  if (zona) {
+    const z = diaEnZona(d, zona);
+    return new Date(z.anio, z.mes - 1, z.dia);
+  }
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 /** "aaaa-mm-dd" del dia que representa la fecha (ver `diaDeCalendario`), para un `<input type="date">`. */
-export function claveDia(value: Date | string): string {
-  const d = diaDeCalendario(value);
+export function claveDia(value: Date | string, zona?: string): string {
+  const d = diaDeCalendario(value, zona);
   const dos = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
 }
@@ -159,7 +167,7 @@ export function diaLocal(valor?: string | null): Date | null {
  * No sirve para fechas CON hora —un cierre, un comentario—; para esas esta
  * `formatDateTime`.
  */
-export function formatDia(value?: Date | string | null, opciones: { anio?: boolean } = {}) {
+export function formatDia(value?: Date | string | null, opciones: { anio?: boolean; zona?: string } = {}) {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "—";
@@ -170,6 +178,6 @@ export function formatDia(value?: Date | string | null, opciones: { anio?: boole
     day: "numeric",
     month: "short",
     ...(opciones.anio === false ? {} : { year: "numeric" }),
-    ...(esMedianocheUtc ? { timeZone: "UTC" } : {}),
+    ...(esMedianocheUtc ? { timeZone: "UTC" } : opciones.zona ? { timeZone: opciones.zona } : {}),
   }).format(date);
 }

@@ -341,7 +341,7 @@ async function main() {
     const serie = (valores: number[], cadaHoras = 24) =>
       valores.map((value, j) => ({ value, readingAt: new Date(ahora.getTime() - (valores.length - 1 - j) * cadaHoras * 3_600_000) }));
     const pocas = evaluarPunto(serie([3, 3.2, 3.4]), umbrales, ahora);
-    revisar("con 3 lecturas: datos insuficientes, sin fecha", pocas.confianza === "INSUFICIENTE" && pocas.cruceCritico.texto === "Datos insuficientes para proyectar" && pocas.cruceCritico.fecha === null);
+    revisar("con 3 lecturas: datos insuficientes, sin fecha", pocas.confianza === "INSUFICIENTE" && pocas.cruceCritico.razon === "DATOS_INSUFICIENTES" && pocas.cruceCritico.texto.startsWith("Datos insuficientes para proyectar") && pocas.cruceCritico.fecha === null);
     const estableArriba = evaluarPunto(serie(Array(10).fill(8)), umbrales, ahora);
     revisar("estable sobre el crítico sigue siendo CRÍTICO", estableArriba.estado === "CRITICO" && estableArriba.tendencia === "ESTABLE", estableArriba.resumen);
     revisar("y lo dice: umbral crítico superado, sin mejora", /Umbral crítico superado/.test(estableArriba.resumen) && /sin mejora/.test(estableArriba.resumen) && estableArriba.cruceCritico.texto === "Umbral ya superado");

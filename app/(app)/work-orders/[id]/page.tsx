@@ -13,7 +13,7 @@ import {
   WO_STATUS_COLORS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatDia } from "@/lib/utils";
 import { filtroDeActividadesDeLaOrden, incluirTareas } from "@/lib/plan-tasks";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { iaConfigurada } from "@/lib/ia/cliente";
@@ -48,6 +48,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function WorkOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
+  const zona = user.organization.timezone || "America/Mexico_City";
 
   const wo = await prisma.workOrder.findFirst({
     where: { id, organizationId: user.organizationId },
@@ -588,10 +589,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 )}
               </Row>
               <Row label="Creada por">{wo.createdBy?.name ?? "Sistema"}</Row>
-              <Row label="Creada">{formatDateTime(wo.createdAt)}</Row>
-              <Row label="Compromiso">{formatDate(wo.dueDate)}</Row>
-              <Row label="Inicio real">{formatDateTime(wo.startedAt)}</Row>
-              <Row label="Termino">{formatDateTime(wo.completedAt)}</Row>
+              <Row label="Creada">{formatDateTime(wo.createdAt, zona)}</Row>
+              <Row label="Compromiso">{formatDia(wo.dueDate, { zona })}</Row>
+              <Row label="Inicio real">{formatDateTime(wo.startedAt, zona)}</Row>
+              <Row label="Termino">{formatDateTime(wo.completedAt, zona)}</Row>
               <Row label="Horas est. / real">
                 {formatNumber(wo.estimatedHours, 1)} / {formatNumber(wo.actualHours, 1)} h
               </Row>

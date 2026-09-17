@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +51,7 @@ export function Calendario({
   familias: { id: string; name: string }[];
   horasJornada: number;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [tecnico, setTecnico] = useState("");
   const [tipo, setTipo] = useState("");
@@ -90,7 +92,7 @@ export function Calendario({
   );
   const hayFiltro = Boolean(tecnico || tipo || soloAbiertas || equipos.length || familia);
 
-  const primero = diaDeCalendario(dias[0]);
+  const primero = diaDeCalendario(dias[0], zona);
   const offset = (primero.getDay() + 6) % 7;
   const celdas: (string | null)[] = [
     ...Array.from({ length: offset }, () => null),
@@ -99,8 +101,8 @@ export function Calendario({
   while (celdas.length % 7 !== 0) celdas.push(null);
 
   const [anio, mesNum] = mes.split("-").map(Number);
-  // El hoy de quien mira: en UTC, despues de las 6 pm en Mexico ya era mañana.
-  const hoy = claveDia(new Date());
+  // El hoy de la EMPRESA: igual en el servidor (UTC) que en el navegador.
+  const hoy = claveDia(new Date(), zona);
 
   const corrimiento = (dias_: number) => {
     const d = new Date(semana);
@@ -133,7 +135,7 @@ export function Calendario({
     vista === "dia"
       ? new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dia}T12:00:00`))
       : vista === "semana"
-        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(dias[0]))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(diaDeCalendario(dias[dias.length - 1]))}`
+        ? `${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(dias[0], zona))} al ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(diaDeCalendario(dias[dias.length - 1], zona))}`
         : new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(anio, mesNum - 1, 1));
 
   const delDia = (fecha: string) => visibles.filter((o) => o.dueDate && mismoDia(o.dueDate, fecha));
@@ -352,7 +354,7 @@ export function Calendario({
             const proys = proyeccionesDe(fecha);
             const total = delDiaOrdenes.length + proys.length;
             const esHoy = fecha.slice(0, 10) === hoy;
-            const numero = diaDeCalendario(fecha).getDate();
+            const numero = diaDeCalendario(fecha, zona).getDate();
 
             return (
               <button
@@ -457,8 +459,9 @@ function DetalleDia({
   /** En la vista de dia ya vive dentro de la tarjeta del calendario. */
   sinMarco?: boolean;
 }) {
+  const zona = useZona();
   const fecha = new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" })
-    .format(diaDeCalendario(dia.fecha));
+    .format(diaDeCalendario(dia.fecha, zona));
 
   const Marco = sinMarco
     ? ({ children }: { children: React.ReactNode }) => <div>{children}</div>
@@ -570,6 +573,7 @@ function RejillaSemana({
   hoy: string;
   onAbrirDia: (fecha: string) => void;
 }) {
+  const zona = useZona();
   // Las filas: quien tiene trabajo esta semana, y al final lo que no tiene
   // responsable —que es justo lo que hay que repartir.
   const personas = new Map<string, { id: string | null; nombre: string; color: string | null }>();
@@ -605,7 +609,7 @@ function RejillaSemana({
           {dias.map((fecha) => {
             const c = cargaDe(fecha);
             const esHoy = fecha.slice(0, 10) === hoy;
-            const d = diaDeCalendario(fecha);
+            const d = diaDeCalendario(fecha, zona);
             return (
               <button
                 key={fecha}

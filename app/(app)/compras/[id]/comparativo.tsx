@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, FileText, Loader2, Plus, Trophy } from "lucide-react";
@@ -42,6 +43,7 @@ export function Comparativo({
   editable: boolean;
   ordenEmitida: string | null;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [modo, setModo] = useState<"COTIZAR" | null>(null);
   const [supplierId, setSupplierId] = useState("");
@@ -172,7 +174,7 @@ export function Comparativo({
                 <td className="text-xs text-slate-600">Vigencia</td>
                 {cotizaciones.map((c) => (
                   <td key={c.id} className="text-right text-xs text-slate-600">
-                    {c.vigenciaHasta ? formatDate(new Date(c.vigenciaHasta)) : "—"}
+                    {c.vigenciaHasta ? formatDate(new Date(c.vigenciaHasta), zona) : "—"}
                   </td>
                 ))}
               </tr>

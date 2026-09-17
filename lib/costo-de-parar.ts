@@ -189,11 +189,16 @@ export async function costoDeParar(
     cobertura.equiposConParo === cobertura.equiposDefinidos &&
     cobertura.areasConParo === cobertura.areasConTarifa;
 
+  // Los totales salen de los MINUTOS, no de sumar horas ya redondeadas por
+  // area: asi se sumaban 28.8 h de planeado donde los indicadores daban 28.9
+  // con los mismos eventos. Redondear una sola vez, al final.
+  const minutos = (clave: "horasQueDetienen" | "horasPlaneadas") =>
+    [...porArea.values()].reduce((s, a) => s + a[clave], 0);
   return {
     areas,
     perdida: areas.reduce((s, a) => s + a.perdida, 0),
-    horasQueDetienen: Math.round(areas.reduce((s, a) => s + a.horasQueDetienen, 0) * 10) / 10,
-    horasPlaneadas: Math.round(areas.reduce((s, a) => s + a.horasPlaneadas, 0) * 10) / 10,
+    horasQueDetienen: h(minutos("horasQueDetienen")),
+    horasPlaneadas: h(minutos("horasPlaneadas")),
     cobertura,
   };
 }

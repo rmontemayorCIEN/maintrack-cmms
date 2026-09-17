@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { AlertTriangle, Loader2, Sparkles, ThumbsUp, X } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
@@ -41,6 +42,7 @@ const TEMAS: Record<string, string> = {
 };
 
 export function PanelEquipo({ datos, veTodo, conIa }: { datos: Datos; veTodo: boolean; conIa: boolean }) {
+  const zona = useZona();
   const [analizando, setAnalizando] = useState(false);
   const [revision, setRevision] = useState<{ resumen: string; hallazgos: Hallazgo[]; reconocer: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function PanelEquipo({ datos, veTodo, conIa }: { datos: Datos; veTodo: bo
     setRevision(cuerpo.revision);
   }
 
-  const fmt = (d: string) => new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(d));
+  const fmt = (d: string) => new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(d, zona));
 
   return (
     <div className="grid gap-4">
@@ -186,7 +188,7 @@ export function PanelEquipo({ datos, veTodo, conIa }: { datos: Datos; veTodo: bo
                     />
                   </div>
                   <p className="mt-0.5 text-center text-[9px] text-slate-400">
-                    {diaDeCalendario(d.fecha).getDate()}
+                    {diaDeCalendario(d.fecha, zona).getDate()}
                   </p>
                 </div>
               ))}

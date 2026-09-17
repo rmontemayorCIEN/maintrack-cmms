@@ -128,7 +128,19 @@ export async function ultimoDiagnostico(organizationId: string) {
   if (!fila) return null;
 
   const parseado = EsquemaDiagnostico.safeParse(JSON.parse(fila.contenido));
+  // Si algo cambio despues de generarlo: el diagnostico es una fotografia y no
+  // se recalcula; solo se avisa que los indicadores de hoy pueden ser otros.
+  const despues = { gt: fila.createdAt };
+  const [ordenes, paros, lecturas, sensores, anteriores] = await Promise.all([
+    prisma.workOrder.count({ where: { organizationId, updatedAt: despues } }),
+    prisma.downtimeEvent.count({ where: { asset: { organizationId }, startedAt: despues } }),
+    prisma.meterReading.count({ where: { organizationId, readingAt: despues } }),
+    prisma.sensorReading.count({ where: { organizationId, readingAt: despues } }),
+    prisma.aiReport.count({ where: { organizationId, createdAt: { lt: fila.createdAt } } }),
+  ]);
   return {
+    datosPosteriores: ordenes + paros + lecturas + sensores > 0,
+    diagnosticosAnteriores: anteriores,
     id: fila.id,
     desde: fila.desde,
     hasta: fila.hasta,

@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PredictivePage() {
   const user = await requireUser();
+  const zona = user.organization.timezone || "America/Mexico_City";
   const editable = can(user.role, "predictive:write");
 
   const [sensors, assets] = await Promise.all([
@@ -38,6 +39,8 @@ export default async function PredictivePage() {
     trend: evaluarPunto(
       sensor.readings.map((r) => ({ value: r.value, readingAt: r.readingAt })),
       sensor,
+      new Date(),
+      zona,
     ),
   }));
 
@@ -80,7 +83,7 @@ export default async function PredictivePage() {
             const series = [...sensor.readings]
               .reverse()
               .map((r) => ({
-                t: new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" }).format(r.readingAt),
+                t: new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", timeZone: zona }).format(r.readingAt),
                 value: r.value,
               }));
             const threshold = sensor.criticalThreshold ?? sensor.warningThreshold ?? 0;
@@ -105,7 +108,7 @@ export default async function PredictivePage() {
                       <p className="text-lg font-semibold tabular-nums text-slate-900">
                         {formatNumber(sensor.lastValue ?? 0, 2)} <span className="text-xs text-slate-400">{sensor.unit}</span>
                       </p>
-                      <p className="text-[0.625rem] text-slate-400">{formatDateTime(sensor.lastReadingAt)}</p>
+                      <p className="text-[0.625rem] text-slate-400">{formatDateTime(sensor.lastReadingAt, zona)}</p>
                     </div>
                   }
                 />
@@ -131,7 +134,7 @@ export default async function PredictivePage() {
                   <Metric
                     label="Tendencia"
                     value={trend.etiquetaTendencia}
-                    hint={trend.tendencia === "SIN_DATOS" ? trend.etiquetaConfianza : `${trend.pendientePorDia >= 0 ? "+" : ""}${formatNumber(trend.pendientePorDia, 3)} ${sensor.unit}/día hacia el umbral · ${trend.etiquetaConfianza.toLowerCase()} · ${trend.lecturasUsadas} lecturas`}
+                    hint={trend.tendencia === "SIN_DATOS" ? trend.etiquetaConfianza : `${trend.pendientePorDia >= 0 ? "+" : ""}${formatNumber(trend.pendientePorDia, 3)} ${sensor.unit}/día hacia el umbral · ${trend.etiquetaConfianza.toLowerCase()} (R² ${formatNumber(trend.r2 ?? 0, 2)}) · ${trend.tendencia === "ESTABLE" ? "no significativa" : "significativa"} · ${trend.lecturasUsadas} lecturas`}
                   />
                   <Metric label="Cruce de advertencia" value={trend.cruceAdvertencia.texto} hint={sensor.warningThreshold != null ? `Umbral ${formatNumber(sensor.warningThreshold, 2)} ${sensor.unit}` : ""} />
                   <Metric label="Cruce crítico" value={trend.cruceCritico.texto} hint={sensor.criticalThreshold != null ? `Umbral ${formatNumber(sensor.criticalThreshold, 2)} ${sensor.unit}` : ""} />

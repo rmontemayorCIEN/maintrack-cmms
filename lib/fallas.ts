@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 /**
@@ -11,7 +12,11 @@ import { prisma } from "@/lib/db";
  */
 export const TIPOS_DE_FALLA = ["CORRECTIVE", "SAFETY"] as const;
 
-/** True cuando ese tipo de mantenimiento representa una falla real. */
+/**
+ * Si un TIPO de actividad es de falla. Solo decide que actividades piden
+ * codigo, causa y paro al cerrar la orden. NO decide si la orden cuenta como
+ * falla en los indicadores: eso lo decide `clasificarFalla`.
+ */
 export function esFalla(maintenanceType: string | null | undefined): boolean {
   return !!maintenanceType && (TIPOS_DE_FALLA as readonly string[]).includes(maintenanceType);
 }
@@ -28,6 +33,84 @@ export function tipoDeActividad(
 ): string {
   return tipoActividad ?? tipoOrden;
 }
+
+// ─────────────────────────────────────── Que orden ES una falla ───
+
+/**
+ * La regla UNICA de si una orden cuenta como falla (MTBF, MTTR, tiempo de
+ * respuesta, recurrencia, calidad de datos y Diagnostico IA).
+ *
+ * Una orden es falla solo con una condicion operativa explicita:
+ *
+ *   1. Es una orden CORRECTIVA.
+ *   2. Es de SEGURIDAD y trae codigo (modo) de falla registrado.
+ *   3. Una actividad de tipo falla (correctiva o de seguridad, propia o
+ *      heredada del encabezado) trae codigo de falla: la falla se registro
+ *      durante la intervencion (una falla encontrada en un preventivo).
+ *   4. Una de sus actividades viene de una solicitud que quien la reviso
+ *      clasifico como FALLA.
+ *
+ * NO basta:
+ *   - El tipo de una actividad por si solo. Antes una actividad marcada como
+ *     correctiva convertia en falla a toda la orden preventiva, aunque nadie
+ *     hubiera registrado falla alguna.
+ *   - El tipo SEGURIDAD sin codigo de falla.
+ *   - Un codigo puesto en una actividad preventiva, de mejora o de apoyo: el
+ *     cierre solo pide codigo en actividades de falla, asi que ahi es un error
+ *     de captura. Un preventivo bien ejecutado no es una falla (CLAUDE.md).
+ *   - El titulo de la orden.
+ * Una orden cancelada nunca es falla.
+ */
+export type ClasificacionFalla = { esFalla: boolean; razon: string | null };
+
+type OrdenParaClasificar = {
+  status: string;
+  maintenanceType: string;
+  failureCodeId?: string | null;
+  tasks: Array<{ title?: string | null; maintenanceType?: string | null; failureCodeId?: string | null; origenRequestId?: string | null }>;
+};
+
+export function clasificarFalla(orden: OrdenParaClasificar, solicitudesDeFalla: ReadonlySet<string>): ClasificacionFalla {
+  if (orden.status === "CANCELLED") return { esFalla: false, razon: null };
+  if (orden.maintenanceType === "CORRECTIVE") return { esFalla: true, razon: "Orden correctiva" };
+  if (orden.maintenanceType === "SAFETY" && orden.failureCodeId) {
+    return { esFalla: true, razon: "Orden de seguridad con código de falla" };
+  }
+  const conCodigo = orden.tasks.find((t) => t.failureCodeId && esFalla(tipoDeActividad(t.maintenanceType, orden.maintenanceType)));
+  if (conCodigo) return { esFalla: true, razon: `Falla registrada en la actividad «${conCodigo.title ?? "sin título"}»` };
+  const deSolicitud = orden.tasks.find((t) => t.origenRequestId && solicitudesDeFalla.has(t.origenRequestId));
+  if (deSolicitud) return { esFalla: true, razon: `Actividad «${deSolicitud.title ?? "sin título"}» de una solicitud clasificada como falla` };
+  return { esFalla: false, razon: null };
+}
+
+/** Las solicitudes de la empresa que quien las reviso clasifico como FALLA. */
+export async function solicitudesDeFalla(organizationId: string): Promise<Set<string>> {
+  const filas = await prisma.workRequest.findMany({
+    where: { organizationId, tipo: "FALLA" },
+    select: { id: true },
+  });
+  return new Set(filas.map((f) => f.id));
+}
+
+/** La misma regla como filtro de Prisma, para consultas que cuentan en la base. */
+export async function filtroDeFalla(organizationId: string): Promise<Prisma.WorkOrderWhereInput> {
+  const ids = [...(await solicitudesDeFalla(organizationId))];
+  return {
+    status: { not: "CANCELLED" },
+    OR: [
+      { maintenanceType: "CORRECTIVE" },
+      { maintenanceType: "SAFETY", failureCodeId: { not: null } },
+      { tasks: { some: { failureCodeId: { not: null }, maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
+      // Actividad sin tipo propio: hereda el del encabezado.
+      { maintenanceType: "SAFETY", tasks: { some: { failureCodeId: { not: null }, maintenanceType: null } } },
+      ...(ids.length ? [{ tasks: { some: { origenRequestId: { in: ids } } } }] : []),
+    ],
+  };
+}
+
+/** Texto de alcance para las fichas de los indicadores. */
+export const REGLA_DE_FALLA =
+  "Orden correctiva; de seguridad con código de falla; con una actividad correctiva o de seguridad con código de falla; o con una actividad de una solicitud clasificada como falla (sin canceladas)";
 
 export type FallaContada = {
   failureCodeId: string;
@@ -99,6 +182,7 @@ export async function fallasCodificadas(
   const conActividades = new Set(actividades.map((a) => a.workOrder.id));
 
   const deActividades: FallaContada[] = actividades
+    // Misma regla que `clasificarFalla`: el codigo cuenta solo en actividades de falla.
     .filter((a) => esFalla(tipoDeActividad(a.maintenanceType, a.workOrder.maintenanceType)))
     .map((a) => ({
       failureCodeId: a.failureCodeId!,

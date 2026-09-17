@@ -1,6 +1,6 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
-import { TIPOS_DE_FALLA } from "@/lib/fallas";
+import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
 import { LectorPlaca } from "./lector-placa";
 import { iaConfigurada } from "@/lib/ia/cliente";
@@ -71,7 +71,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
         select: {
           id: true, active: true, nextDueDate: true, nextDueMeter: true,
           plan: { select: { id: true, name: true, active: true, triggerType: true } },
-          meter: { select: { unit: true, currentValue: true, lecturaVigente: true } },
+          meter: { select: { unit: true, currentValue: true, lecturaVigente: true, proyeccionSuspendida: true } },
         },
         orderBy: { nextDueDate: "asc" },
       },
@@ -136,6 +136,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   });
 
   const zona = await zonaDeLaEmpresa(user.organizationId);
+  const deFalla = await filtroDeFalla(user.organizationId);
   const [workOrders, costs, downtime, reparaciones] = await Promise.all([
     prisma.workOrder.findMany({
       where: { assetId: asset.id },
@@ -159,13 +160,10 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     // toda su historia —no solo de las ultimas 25 que se listan abajo.
     prisma.workOrder.findMany({
       where: {
+        ...deFalla,
         assetId: asset.id,
         status: { in: ["COMPLETED", "CLOSED"] },
         completedAt: { not: null },
-        OR: [
-          { maintenanceType: { in: [...TIPOS_DE_FALLA] } },
-          { tasks: { some: { maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
-        ],
       },
       select: { actualHours: true },
     }),
@@ -376,6 +374,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                       <p className="text-xs font-semibold text-amber-700">Sin lectura vigente</p>
                     )}
                   </div>
+                  {meter.proyeccionSuspendida ? (
+                    <p className="mt-0.5 text-[0.6875rem] font-medium text-amber-700">
+                      Proyección suspendida: el medidor contiene una lectura inválida.{" "}
+                      <Link href={`/meters#medidor-${meter.id}`} className="underline">Corregir en Medidores</Link>
+                    </p>
+                  ) : null}
                   <p className="mt-0.5 text-[0.6875rem] text-slate-400">
                     {meter.lecturaVigente
                       ? `Promedio ${formatNumber(meter.dailyAverage, 1)} ${meter.unit}/día · última lectura ${formatDate(meter.lastReadingAt, zona)}`
@@ -395,7 +399,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 {asset.planesAsignados.map((a) => {
                   const activo = a.active && a.plan.active;
                   const porUso = a.plan.triggerType === "METER" && a.nextDueMeter != null && a.meter;
-                  const due = porUso && a.meter!.lecturaVigente
+                  const due = porUso && a.meter!.proyeccionSuspendida
+                    ? { texto: "Proyección suspendida: lectura inválida", tono: "warning" as const }
+                    : porUso && a.meter!.lecturaVigente
                     ? a.nextDueMeter! - a.meter!.currentValue <= 0
                       ? { texto: "Meta de uso alcanzada", tono: "danger" as const }
                       : { texto: `Faltan ${formatNumber(a.nextDueMeter! - a.meter!.currentValue, 0)} ${a.meter!.unit}`, tono: "muted" as const }
@@ -424,6 +430,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 const trend = evaluarPunto(
                   sensor.readings.map((r) => ({ value: r.value, readingAt: r.readingAt })),
                   sensor,
+                  new Date(),
+                  zona,
                 );
                 const threshold = sensor.criticalThreshold ?? sensor.warningThreshold ?? 0;
                 const usage = threshold ? Math.min(100, ((sensor.lastValue ?? 0) / threshold) * 100) : 0;

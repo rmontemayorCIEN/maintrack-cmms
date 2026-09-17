@@ -53,7 +53,7 @@ export default async function PlansPage() {
             nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true,
             // Los equipos REALES del plan: el del encabezado es solo con el que nacio.
             asset: { select: { code: true, name: true } },
-            meter: { select: { unit: true, currentValue: true } },
+            meter: { select: { unit: true, currentValue: true, proyeccionSuspendida: true } },
           },
         },
         tasks: incluirTareas,
@@ -194,6 +194,8 @@ export default async function PlansPage() {
       // La mas proxima de sus equipos: es lo que le interesa a quien mira la
       // lista —cuando vuelve a tocar este plan— sin importar en cual equipo.
       nextDueDate: plan.asignaciones.find((a) => a.nextDueDate)?.nextDueDate?.toISOString() ?? null,
+      // Algun equipo del plan tiene el medidor con una lectura invalida.
+      proyeccionSuspendida: plan.asignaciones.some((a) => a.meter?.proyeccionSuspendida),
       lastCompletedAt: plan.asignaciones
         .map((a) => a.lastCompletedAt).filter(Boolean)
         .sort((x, y) => y!.getTime() - x!.getTime())[0]?.toISOString() ?? null,

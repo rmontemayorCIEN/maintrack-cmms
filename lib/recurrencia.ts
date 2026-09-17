@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { TIPOS_DE_FALLA } from "./fallas";
+import { filtroDeFalla } from "./fallas";
 import { periodoDeLaEmpresa } from "./indicadores";
 import { claveDiaEnZona, dentroDe } from "./periodos";
 
@@ -25,6 +25,7 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
   const periodo = await periodoDeLaEmpresa(organizationId, dias);
   const zona = periodo.zonaHoraria;
 
+  const deFalla = await filtroDeFalla(organizationId);
   const [activo, ordenes, paros] = await Promise.all([
     prisma.asset.findFirst({
       where: { id: assetId, organizationId },
@@ -39,13 +40,8 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
     prisma.workOrder.findMany({
       where: {
         organizationId, assetId,
-        // El criterio de falla de `lib/fallas`, en la orden o en una actividad,
-        // y sin canceladas: una falla que no ocurrio no es recurrencia.
-        status: { not: "CANCELLED" },
-        OR: [
-          { maintenanceType: { in: [...TIPOS_DE_FALLA] } },
-          { tasks: { some: { maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
-        ],
+        // La regla unica de falla (`lib/fallas`), sin canceladas.
+        ...deFalla,
         createdAt: dentroDe(periodo),
       },
       orderBy: { createdAt: "asc" },

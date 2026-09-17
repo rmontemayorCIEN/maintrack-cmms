@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +43,7 @@ export function PanelCobertura({
   sitios: { id: string; name: string }[];
   editable: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [categoria, setCategoria] = useState("");
   const [sitio, setSitio] = useState("");
@@ -96,7 +98,7 @@ export function PanelCobertura({
   }
 
   const fmt = (iso: string | null) =>
-    iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(iso)) : null;
+    iso ? new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(diaDeCalendario(iso, zona)) : null;
 
   return (
     <div className="grid gap-4">

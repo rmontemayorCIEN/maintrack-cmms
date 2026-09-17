@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
@@ -26,7 +27,7 @@ export type OrdenEditable = {
 };
 
 // El dia que representa, no el recorte UTC del texto (ver claveDia).
-const fecha = (iso: string | null) => (iso ? claveDia(iso) : "");
+const fecha = (iso: string | null, zona: string) => (iso ? claveDia(iso, zona) : "");
 
 /**
  * Edicion de la orden.
@@ -43,6 +44,7 @@ export function EditarOrden({
   activos: { id: string; code: string; name: string }[];
   editable: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [v, setV] = useState({
@@ -53,8 +55,8 @@ export function EditarOrden({
     assignedToId: orden.assignedToId ?? "",
     teamId: orden.teamId ?? "",
     assetId: orden.assetId ?? "",
-    dueDate: fecha(orden.dueDate),
-    scheduledStart: fecha(orden.scheduledStart),
+    dueDate: fecha(orden.dueDate, zona),
+    scheduledStart: fecha(orden.scheduledStart, zona),
     estimatedHours: String(orden.estimatedHours),
     requiresShutdown: orden.requiresShutdown,
     procedure: orden.procedure ?? "",

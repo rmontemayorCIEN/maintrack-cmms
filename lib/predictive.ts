@@ -74,12 +74,34 @@ export const ETIQUETA_CONFIANZA: Record<Confianza, string> = {
   INSUFICIENTE: "Datos insuficientes",
 };
 
+/** Por que NO hay fecha de cruce. Siempre una razon real, nunca un silencio. */
+export type RazonSinCruce =
+  | "UMBRAL_SUPERADO"
+  | "DATOS_INSUFICIENTES"
+  | "PENDIENTE_NO_SIGNIFICATIVA"
+  | "DIRECCION_CONTRARIA"
+  | "CONFIANZA_INSUFICIENTE"
+  | "FUERA_DE_HORIZONTE"
+  | "SIN_UMBRAL"
+  | "PROYECCION_VENCIDA";
+
 export type Cruce = {
   /** Solo cuando hay proyeccion futura valida. */
   fecha: Date | null;
   dias: number | null;
   texto: string;
+  /** Nulo cuando hay fecha. */
+  razon: RazonSinCruce | null;
 };
+
+/**
+ * Una pendiente es significativa cuando su estadistico t (pendiente entre su
+ * error estandar) llega a 2: con esa regresion, la probabilidad de ver esa
+ * inclinacion solo por ruido es de alrededor de 5%. Debajo de eso la tendencia
+ * es «Estable»: no se distingue del ruido. Es la misma regresion que da la
+ * fecha, asi que estado, tendencia y proyeccion nunca se contradicen.
+ */
+export const T_SIGNIFICATIVA = 2;
 
 export type EvaluacionPunto = {
   estado: EstadoPunto;
@@ -88,8 +110,12 @@ export type EvaluacionPunto = {
   lecturaEl: Date | null;
   tendencia: Tendencia;
   etiquetaTendencia: string;
-  /** Unidades por dia, en la direccion del umbral (positivo = hacia el umbral). */
+  /** Unidades por dia, en la direccion del umbral (positivo = hacia el umbral). ES la que usa la proyeccion. */
   pendientePorDia: number;
+  /** Estadistico t de la pendiente (|pendiente| / error estandar). Nulo sin datos. */
+  tPendiente: number | null;
+  /** R² del ajuste. Nulo sin datos. */
+  r2: number | null;
   confianza: Confianza;
   etiquetaConfianza: string;
   lecturasUsadas: number;
@@ -99,19 +125,20 @@ export type EvaluacionPunto = {
   resumen: string;
 };
 
-const fmtFecha = (d: Date) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(d);
+const fmtFecha = (d: Date, zona?: string) =>
+  new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", ...(zona ? { timeZone: zona } : {}) }).format(d);
 
 /**
  * El texto de una fecha de cruce vista HOY. Sirve igual para una evaluacion
  * nueva que para una fecha guardada: una fecha ya pasada nunca se presenta
  * como futura.
  */
-export function textoDeCruce(fecha: Date | null, ahora = new Date(), yaSuperado = false): Cruce {
-  if (yaSuperado) return { fecha: null, dias: null, texto: "Umbral ya superado" };
-  if (!fecha) return { fecha: null, dias: null, texto: "Sin cruce proyectado" };
+export function textoDeCruce(fecha: Date | null, ahora = new Date(), yaSuperado = false, zona?: string): Cruce {
+  if (yaSuperado) return { fecha: null, dias: null, texto: "Umbral ya superado", razon: "UMBRAL_SUPERADO" };
+  if (!fecha) return { fecha: null, dias: null, texto: "Sin cruce proyectado", razon: "DATOS_INSUFICIENTES" };
   const dias = Math.ceil((fecha.getTime() - ahora.getTime()) / DIA);
-  if (dias < 0) return { fecha: null, dias: null, texto: `Proyección vencida (era ${fmtFecha(fecha)})` };
-  return { fecha, dias, texto: dias === 0 ? `Estimado hoy` : `Estimado el ${fmtFecha(fecha)} (en ${dias} ${dias === 1 ? "día" : "días"})` };
+  if (dias < 0) return { fecha: null, dias: null, texto: `Proyección vencida (era ${fmtFecha(fecha, zona)})`, razon: "PROYECCION_VENCIDA" };
+  return { fecha, dias, razon: null, texto: dias === 0 ? `Estimado hoy` : `Estimado el ${fmtFecha(fecha, zona)} (en ${dias} ${dias === 1 ? "día" : "días"})` };
 }
 
 /**
@@ -125,6 +152,7 @@ export function evaluarPunto(
   lecturas: Array<{ value: number; readingAt: Date }>,
   sensor: Umbrales & { unit?: string },
   ahora = new Date(),
+  zona?: string,
 ): EvaluacionPunto {
   const puntos = [...lecturas]
     .sort((a, b) => a.readingAt.getTime() - b.readingAt.getTime())
@@ -151,8 +179,8 @@ export function evaluarPunto(
     superado(umbral)
       ? textoDeCruce(null, ahora, true)
       : umbral === null
-        ? { fecha: null, dias: null, texto: "Sin umbral definido" }
-        : { fecha: null, dias: null, texto: "Datos insuficientes para proyectar" };
+        ? { fecha: null, dias: null, texto: "Sin umbral definido", razon: "SIN_UMBRAL" }
+        : { fecha: null, dias: null, texto: `Datos insuficientes para proyectar (se necesitan ${MIN_LECTURAS_PROYECCION} lecturas en al menos ${MIN_DIAS_PROYECCION} día)`, razon: "DATOS_INSUFICIENTES" };
 
   if (n < MIN_LECTURAS_PROYECCION || abarca < MIN_DIAS_PROYECCION) {
     return {
@@ -160,6 +188,8 @@ export function evaluarPunto(
       tendencia: "SIN_DATOS",
       etiquetaTendencia: ETIQUETA_TENDENCIA.SIN_DATOS,
       pendientePorDia: 0,
+      tPendiente: null,
+      r2: null,
       confianza: "INSUFICIENTE",
       etiquetaConfianza: ETIQUETA_CONFIANZA.INSUFICIENTE,
       cruceAdvertencia: insuficiente(sensor.warningThreshold),
@@ -189,27 +219,52 @@ export function evaluarPunto(
   }
   const r2 = ssTot === 0 ? 0 : Math.max(0, Math.min(1, 1 - ssRes / ssTot));
 
-  // Hacia el umbral = positivo, sin importar la direccion del sensor.
+  // Hacia el umbral = positivo, sin importar la direccion del sensor. Es LA
+  // pendiente: la que se muestra y la que proyecta.
   const haciaUmbral = sube ? pendiente : -pendiente;
-  // Estable: en 30 dias se moveria menos del 5% de la escala del punto.
-  const escala = Math.abs(sensor.criticalThreshold ?? sensor.warningThreshold ?? my) || 1;
-  const tendencia: Tendencia =
-    Math.abs(haciaUmbral) * 30 < escala * 0.05 ? "ESTABLE" : haciaUmbral > 0 ? "EMPEORA" : "MEJORA";
+
+  /**
+   * Significancia estadistica de la pendiente, del mismo ajuste.
+   *
+   * Antes «Estable» era «en 30 dias se moveria menos del 5% del umbral»: una
+   * regla arbitraria que dependia de la escala. En CMP-301 (temperatura, umbral
+   * de 98 °C) una subida clara de +0.131 °C/dia con R² alto quedaba «Estable»
+   * porque 0.131 × 30 = 3.9 era menos que 4.9, y por eso decia «Sin cruce
+   * proyectado» mientras mostraba una pendiente positiva. Ahora estable quiere
+   * decir «no se distingue del ruido».
+   */
+  const errorEstandar = n > 2 && den > 0 ? Math.sqrt(ssRes / (n - 2)) / Math.sqrt(den) : 0;
+  const tPendiente = errorEstandar > 0 ? Math.abs(pendiente) / errorEstandar : pendiente === 0 ? 0 : Number.POSITIVE_INFINITY;
+  const significativa = tPendiente >= T_SIGNIFICATIVA;
+  const tendencia: Tendencia = !significativa ? "ESTABLE" : haciaUmbral > 0 ? "EMPEORA" : "MEJORA";
 
   const confianza: Confianza = r2 >= 0.8 && n >= 10 ? "ALTA" : r2 >= 0.5 ? "MEDIA" : "BAJA";
 
+  const unidad = sensor.unit ? ` ${sensor.unit}` : "";
+  const pendienteTexto = `${haciaUmbral >= 0 ? "+" : ""}${haciaUmbral.toFixed(3)}${unidad}/día`;
+
   const cruce = (umbral: number | null): Cruce => {
-    if (umbral === null) return { fecha: null, dias: null, texto: "Sin umbral definido" };
+    if (umbral === null) return { fecha: null, dias: null, texto: "Sin umbral definido", razon: "SIN_UMBRAL" };
     if (superado(umbral)) return textoDeCruce(null, ahora, true);
-    if (tendencia !== "EMPEORA") return { fecha: null, dias: null, texto: "Sin cruce proyectado con la tendencia actual" };
-    if (confianza === "BAJA") return { fecha: null, dias: null, texto: "Tendencia poco clara: no se proyecta" };
-    // Desde la ultima lectura real, no desde la recta: la recta puede quedar
-    // del otro lado del umbral y dar una fecha anterior a hoy.
-    const diasDesdeUltima = (umbral - ultima!.value) / pendiente;
-    if (!(diasDesdeUltima > 0) || diasDesdeUltima > HORIZONTE_DIAS) {
-      return { fecha: null, dias: null, texto: "Sin cruce proyectado en los próximos 10 años" };
+    if (tendencia === "ESTABLE") {
+      return { fecha: null, dias: null, razon: "PENDIENTE_NO_SIGNIFICATIVA",
+        texto: `Sin cruce: la pendiente (${pendienteTexto}) no se distingue del ruido de las lecturas` };
     }
-    return textoDeCruce(new Date(ultima!.readingAt.getTime() + diasDesdeUltima * DIA), ahora);
+    if (tendencia === "MEJORA") {
+      return { fecha: null, dias: null, razon: "DIRECCION_CONTRARIA",
+        texto: `Sin cruce: la tendencia se aleja del umbral (${pendienteTexto})` };
+    }
+    if (confianza === "BAJA") {
+      return { fecha: null, dias: null, razon: "CONFIANZA_INSUFICIENTE",
+        texto: `Sin fecha: la tendencia es hacia el umbral pero el ajuste es pobre (R² ${r2.toFixed(2)})` };
+    }
+    // Desde la ultima lectura real con la MISMA pendiente que se muestra.
+    const distancia = sube ? umbral - ultima!.value : ultima!.value - umbral;
+    const diasDesdeUltima = distancia / haciaUmbral;
+    if (!(diasDesdeUltima > 0) || diasDesdeUltima > HORIZONTE_DIAS) {
+      return { fecha: null, dias: null, texto: "Sin cruce en los próximos 10 años con esta pendiente", razon: "FUERA_DE_HORIZONTE" };
+    }
+    return textoDeCruce(new Date(ultima!.readingAt.getTime() + diasDesdeUltima * DIA), ahora, false, zona);
   };
 
   const cruceCritico = cruce(sensor.criticalThreshold);
@@ -218,6 +273,8 @@ export function evaluarPunto(
     tendencia,
     etiquetaTendencia: ETIQUETA_TENDENCIA[tendencia],
     pendientePorDia: haciaUmbral,
+    tPendiente: Number.isFinite(tPendiente) ? tPendiente : null,
+    r2,
     confianza,
     etiquetaConfianza: ETIQUETA_CONFIANZA[confianza],
     cruceAdvertencia: cruce(sensor.warningThreshold),
@@ -332,7 +389,8 @@ export async function ingestSensorReading(params: {
     data: { lastValue: masReciente.value, lastStatus: masReciente.status, lastReadingAt: masReciente.readingAt },
   });
 
-  const evaluacion = evaluarPunto(history, sensor, ahora);
+  const orgZona = await prisma.organization.findUnique({ where: { id: params.organizationId }, select: { timezone: true } });
+  const evaluacion = evaluarPunto(history, sensor, ahora, orgZona?.timezone || "America/Mexico_City");
   const condicion = condicionDeAlerta(evaluacion);
 
   let alertId: string | null = null;
@@ -536,6 +594,8 @@ export function healthScore(sensors: Array<{ lastStatus: string }>) {
 export async function evaluarPuntos(organizationId: string, sensorIds: string[], ahora = new Date()) {
   const ids = [...new Set(sensorIds)];
   if (!ids.length) return new Map<string, EvaluacionPunto>();
+  const org = await prisma.organization.findUnique({ where: { id: organizationId }, select: { timezone: true } });
+  const zona = org?.timezone || "America/Mexico_City";
   const sensores = await prisma.sensor.findMany({
     where: { organizationId, id: { in: ids } },
     select: { id: true, unit: true, warningThreshold: true, criticalThreshold: true, direction: true },
@@ -548,7 +608,7 @@ export async function evaluarPuntos(organizationId: string, sensorIds: string[],
         select: { value: true, readingAt: true },
         take: LECTURAS_PARA_TENDENCIA,
       });
-      return [s.id, evaluarPunto(lecturas, s, ahora)] as const;
+      return [s.id, evaluarPunto(lecturas, s, ahora, zona)] as const;
     }),
   );
   return new Map<string, EvaluacionPunto>(evaluaciones);

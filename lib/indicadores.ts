@@ -22,7 +22,7 @@
  * tarjeta.
  */
 import { prisma } from "./db";
-import { TIPOS_DE_FALLA, esFalla } from "./fallas";
+import { REGLA_DE_FALLA, clasificarFalla, solicitudesDeFalla } from "./fallas";
 import {
   periodoIndicadores, periodoAnterior, dentroDe, caeEn, claveDiaEnZona,
   ZONA_POR_OMISION, type Periodo,
@@ -65,6 +65,8 @@ export type Renglon = {
   aporte: number;
   /** Para indicadores de proporcion: si cuenta a favor. */
   aFavor?: boolean;
+  /** Por que este registro cuenta como falla (regla de `lib/fallas`). */
+  razon?: string | null;
 };
 
 export type Indicador = {
@@ -131,14 +133,6 @@ export async function periodoDeLaEmpresa(organizationId: string, dias: number, a
   return periodoIndicadores(dias, await zonaDeLaEmpresa(organizationId), ahora);
 }
 
-/**
- * Si una orden representa una falla: su tipo, o el de alguna de sus
- * actividades (un correctivo colado en una preventiva tambien fue una falla).
- * El criterio de tipo vive en `lib/fallas`.
- */
-function ordenEsFalla(o: { maintenanceType: string; tasks: Array<{ maintenanceType: string | null }> }) {
-  return esFalla(o.maintenanceType) || o.tasks.some((t) => esFalla(t.maintenanceType));
-}
 
 /** Los eventos de paro del periodo: fuente unica del paro. */
 export async function eventosDeParoDelPeriodo(
@@ -173,13 +167,13 @@ export async function calcularIndicadores(
   const seleccion = {
     id: true, number: true, title: true, status: true, maintenanceType: true, priority: true,
     createdAt: true, dueDate: true, startedAt: true, completedAt: true,
-    actualHours: true, estimatedHours: true,
+    actualHours: true, estimatedHours: true, failureCodeId: true,
     laborCost: true, partsCost: true, serviceCost: true, otherCost: true, totalCost: true,
     asset: { select: { code: true } },
-    tasks: { select: { maintenanceType: true } },
+    tasks: { select: { title: true, maintenanceType: true, failureCodeId: true, origenRequestId: true } },
   } as const;
 
-  const [creadas, terminadas, iniciadas, programadas, abiertas, eventos, activos] = await Promise.all([
+  const [creadas, terminadas, iniciadas, programadas, abiertas, eventos, activos, deFalla] = await Promise.all([
     prisma.workOrder.findMany({ where: { organizationId, createdAt: dentroDe(periodo) }, select: seleccion }),
     prisma.workOrder.findMany({
       where: { organizationId, status: { in: [...ESTADOS_TERMINADOS] }, completedAt: dentroDe(periodo) },
@@ -202,12 +196,17 @@ export async function calcularIndicadores(
       where: { organizationId, active: true, status: { not: "RETIRED" } },
       select: { id: true, status: true, criticality: true },
     }),
+    solicitudesDeFalla(organizationId),
   ]);
+  const falla = (o: { status: string; maintenanceType: string; failureCodeId: string | null; tasks: Array<{ title: string; maintenanceType: string | null; failureCodeId: string | null; origenRequestId: string | null }> }) =>
+    clasificarFalla(o, deFalla);
+  const ordenEsFalla = (o: Parameters<typeof falla>[0]) => falla(o).esFalla;
 
   type Orden = (typeof creadas)[number];
-  const renglonOrden = (o: Orden, aporte: number, fecha: Date | null, aFavor?: boolean): Renglon => ({
+  const renglonOrden = (o: Orden, aporte: number, fecha: Date | null, aFavor?: boolean, conRazon = false): Renglon => ({
     id: o.id, tipo: "ORDEN", folio: o.number, workOrderId: o.id, titulo: o.title,
     activo: o.asset?.code ?? null, fecha, aporte, aFavor,
+    ...(conRazon ? { razon: falla(o).razon } : {}),
   });
 
   const horasPeriodo = (periodo.hasta.getTime() - periodo.desde.getTime()) / HORA;
@@ -287,11 +286,11 @@ export async function calcularIndicadores(
     sinValor: !nActivos ? "No hay equipos en servicio." : fallas.length ? null : "Sin fallas en el periodo.",
     alcance: {
       estadosOT: "Todos menos Cancelada",
-      tiposTrabajo: `Falla: ${TIPOS_DE_FALLA.join(", ")} en la orden o en alguna actividad`,
+      tiposTrabajo: `Falla: ${REGLA_DE_FALLA}`,
       tiposParo: "Se resta solo el no planeado",
       fechaQueCuenta: "Fecha de creación de la orden (cuando se detectó la falla)",
     },
-    notas: [], detalle: fallas.map((o) => renglonOrden(o, 1, o.createdAt)), denominador: fallas.length,
+    notas: [], detalle: fallas.map((o) => renglonOrden(o, 1, o.createdAt, undefined, true)), denominador: fallas.length,
   };
 
   const reparaciones = terminadas.filter((o) => ordenEsFalla(o));
@@ -307,12 +306,12 @@ export async function calcularIndicadores(
     sinValor: conHoras.length ? null : reparaciones.length ? "Las reparaciones terminadas no tienen horas registradas." : "Sin reparaciones terminadas en el periodo.",
     alcance: {
       estadosOT: "Completada o Cerrada",
-      tiposTrabajo: `Falla: ${TIPOS_DE_FALLA.join(", ")} en la orden o en alguna actividad`,
+      tiposTrabajo: `Falla: ${REGLA_DE_FALLA}`,
       tiposParo: "No aplica",
       fechaQueCuenta: "Fecha de finalización operativa",
     },
     notas: sinHoras ? [`${sinHoras} reparación(es) terminada(s) sin horas registradas no entran al promedio.`] : [],
-    detalle: conHoras.map((o) => renglonOrden(o, o.actualHours, o.completedAt)), denominador: conHoras.length,
+    detalle: conHoras.map((o) => renglonOrden(o, o.actualHours, o.completedAt, undefined, true)), denominador: conHoras.length,
   };
 
   // ── Cumplimiento preventivo ─────────────────────────────────────────────
@@ -362,11 +361,11 @@ export async function calcularIndicadores(
     sinValor: atendidas.length ? null : "Ninguna orden de falla se inició en el periodo.",
     alcance: {
       estadosOT: "Todos menos Cancelada",
-      tiposTrabajo: `Falla: ${TIPOS_DE_FALLA.join(", ")} en la orden o en alguna actividad`,
+      tiposTrabajo: `Falla: ${REGLA_DE_FALLA}`,
       tiposParo: "No aplica",
       fechaQueCuenta: "Fecha de inicio dentro del periodo",
     },
-    notas: [], detalle: atendidas.map((o) => renglonOrden(o, horasRespuesta(o), o.startedAt)),
+    notas: [], detalle: atendidas.map((o) => renglonOrden(o, horasRespuesta(o), o.startedAt, undefined, true)),
     denominador: atendidas.length,
   };
 
@@ -385,12 +384,12 @@ export async function calcularIndicadores(
     sinValor: deMantenimiento.length ? null : "Sin órdenes terminadas en el periodo.",
     alcance: {
       estadosOT: "Completada o Cerrada",
-      tiposTrabajo: `Todos menos ${TIPOS_FUERA_DE_MANTENIMIENTO.join(", ")}; falla = ${TIPOS_DE_FALLA.join(", ")}`,
+      tiposTrabajo: `Todos menos ${TIPOS_FUERA_DE_MANTENIMIENTO.join(", ")}; falla = ${REGLA_DE_FALLA}`,
       tiposParo: "No aplica",
       fechaQueCuenta: "Fecha de finalización operativa",
     },
     notas: [],
-    detalle: deMantenimiento.map((o) => renglonOrden(o, ordenEsFalla(o) ? 0 : 1, o.completedAt, !ordenEsFalla(o))),
+    detalle: deMantenimiento.map((o) => renglonOrden(o, ordenEsFalla(o) ? 0 : 1, o.completedAt, !ordenEsFalla(o), ordenEsFalla(o))),
     denominador: deMantenimiento.length,
   };
 

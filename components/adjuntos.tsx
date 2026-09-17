@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FileText, Film, Image as ImgIcon, Loader2, Trash2, Upload } from "lucide-react";
@@ -53,6 +54,7 @@ export function Adjuntos({
   titulo?: string;
   ayuda?: string;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const archivo = useRef<HTMLInputElement>(null);
   const camara = useRef<HTMLInputElement>(null);
@@ -230,7 +232,7 @@ export function Adjuntos({
                   {a.name}
                 </a>
                 <p className="text-[0.625rem] text-slate-400">
-                  {pesoLegible(a.size)} · {formatDateTime(a.createdAt)}
+                  {pesoLegible(a.size)} · {formatDateTime(a.createdAt, zona)}
                   {a.subidoPor ? ` · ${a.subidoPor}` : ""}
                 </p>
               </div>

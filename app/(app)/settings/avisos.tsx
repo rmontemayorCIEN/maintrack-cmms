@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -61,10 +62,10 @@ function estaInstalada(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches || iosInstalada === true;
 }
 
-function fecha(iso: string | null) {
+function fecha(iso: string | null, zona: string) {
   if (!iso) return "todavía no recibe nada";
   return new Date(iso).toLocaleString("es-MX", {
-    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: zona,
   });
 }
 
@@ -75,6 +76,7 @@ export function PanelAvisos({
   encendidoInicial: boolean;
   puedeEditar: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [encendido, setEncendido] = useState(encendidoInicial);
   const [guardandoOrg, setGuardandoOrg] = useState(false);
@@ -464,7 +466,7 @@ export function PanelAvisos({
                             ) : null}
                           </p>
                           <p className="truncate text-[0.6875rem] text-slate-500">
-                            Último aviso: {fecha(d.ultimoEnvioAt)}
+                            Último aviso: {fecha(d.ultimoEnvioAt, zona)}
                             {d.fallos > 2 ? ` · ${d.fallos} intentos sin llegar` : ""}
                           </p>
                         </div>

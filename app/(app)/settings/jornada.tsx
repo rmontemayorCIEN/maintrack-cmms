@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -31,6 +32,7 @@ export function ConfiguracionJornada({
   personas: Persona[];
   editable: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [horas, setHoras] = useState(String(horasJornada));
   const [dias, setDias] = useState<number[]>(diasHabiles);
@@ -96,7 +98,7 @@ export function ConfiguracionJornada({
   const anioSiguiente = new Date().getFullYear() + 1;
   const fmt = (iso: string) =>
     new Intl.DateTimeFormat("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
-      .format(diaDeCalendario(iso));
+      .format(diaDeCalendario(iso, zona));
 
   return (
     <div className="grid gap-4">

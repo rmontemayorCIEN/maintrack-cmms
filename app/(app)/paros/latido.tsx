@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useMemo, useRef, useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -45,6 +46,7 @@ export function Latido({
   onLimpiar: () => void;
   ventana: { desde: number; hasta: number } | null;
 }) {
+  const zona = useZona();
   const pista = useRef<HTMLDivElement>(null);
   const [arrastre, setArrastre] = useState<{ a: number; b: number } | null>(null);
   const [tocado, setTocado] = useState<Evento | null>(null);
@@ -126,7 +128,7 @@ export function Latido({
       : null;
 
   const fecha = (t: number) =>
-    new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "2-digit" });
+    new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "2-digit", timeZone: zona });
 
   return (
     <div className="grid gap-2.5">
@@ -177,7 +179,9 @@ export function Latido({
                   {fecha(sel.a)} — {fecha(sel.b)}
                 </span>
               ) : null}
-              <span>{fecha(hasta)}</span>
+              {/* `hasta` es la medianoche que ABRE el dia siguiente (periodo
+                  semiabierto): se rotula el ultimo dia que si incluye. */}
+              <span>{fecha(hasta - 1)}</span>
             </div>
           </div>
         </div>

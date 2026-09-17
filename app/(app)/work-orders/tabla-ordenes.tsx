@@ -1,5 +1,7 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Avatar, Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
@@ -7,7 +9,7 @@ import {
   MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS,
   WO_STATUS_COLORS, WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDia, formatNumber } from "@/lib/utils";
 import type { EstadoDeVencimiento } from "@/lib/vencimiento";
 
 export type FilaOrden = {
@@ -27,7 +29,7 @@ export type FilaOrden = {
 };
 
 const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
-const fecha = (v: string | null) => (v ? formatDate(new Date(v)) : "—");
+const fecha = (v: string | null, zona: string) => (v ? formatDate(new Date(v), zona) : "—");
 
 const FIJAS: Columna<FilaOrden>[] = [
   {
@@ -48,7 +50,8 @@ const FIJAS: Columna<FilaOrden>[] = [
   },
 ];
 
-const COLUMNAS: Columna<FilaOrden>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaOrden>[] => [
   {
     id: "tipo", etiqueta: "Tipo", agrupable: true,
     texto: (w) => MAINTENANCE_TYPE_LABELS[w.maintenanceType] ?? w.maintenanceType,
@@ -96,11 +99,11 @@ const COLUMNAS: Columna<FilaOrden>[] = [
   { id: "costoServ", etiqueta: "Servicios externos", alineaDerecha: true, texto: (w) => formatCurrency(w.serviceCost, w.moneda) },
   { id: "costoOtros", etiqueta: "Otros costos", alineaDerecha: true, texto: (w) => formatCurrency(w.otherCost, w.moneda) },
   { id: "costo", etiqueta: "Costo total", alineaDerecha: true, texto: (w) => formatCurrency(w.totalCost, w.moneda) },
-  { id: "creada", etiqueta: "Creada", texto: (w) => fecha(w.createdAt) },
-  { id: "iniciada", etiqueta: "Iniciada", texto: (w) => fecha(w.startedAt) },
-  { id: "compromiso", etiqueta: "Fecha compromiso", texto: (w) => (w.dueDate ? formatDate(new Date(w.dueDate)) : "—") },
-  { id: "cerrada", etiqueta: "Terminada", texto: (w) => fecha(w.completedAt) },
-  { id: "cierreAdmin", etiqueta: "Cierre administrativo", texto: (w) => fecha(w.closedAt) },
+  { id: "creada", etiqueta: "Creada", texto: (w) => fecha(w.createdAt, zona) },
+  { id: "iniciada", etiqueta: "Iniciada", texto: (w) => fecha(w.startedAt, zona) },
+  { id: "compromiso", etiqueta: "Fecha compromiso", texto: (w) => (w.dueDate ? formatDia(w.dueDate, { zona }) : "—") },
+  { id: "cerrada", etiqueta: "Terminada", texto: (w) => fecha(w.completedAt, zona) },
+  { id: "cierreAdmin", etiqueta: "Cierre administrativo", texto: (w) => fecha(w.closedAt, zona) },
   { id: "paro", etiqueta: "Paro (min)", alineaDerecha: true, texto: (w) => (w.paroMinutos ? String(w.paroMinutos) : "—") },
 ];
 
@@ -108,11 +111,13 @@ const COLUMNAS: Columna<FilaOrden>[] = [
 const DE_FABRICA = ["tipo", "prioridad", "estado", "responsable", "vencimiento", "horas", "costo"];
 
 export function TablaOrdenes({ ordenes, vistaInicial }: { ordenes: FilaOrden[]; vistaInicial: Vista }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
   return (
     <TablaConfigurable
       filas={ordenes}
       fijas={FIJAS}
-      columnas={COLUMNAS}
+      columnas={columnas}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="ordenes"

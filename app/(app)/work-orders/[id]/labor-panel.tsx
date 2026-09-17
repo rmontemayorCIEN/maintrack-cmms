@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
@@ -25,6 +26,7 @@ export function LaborPanel({
   currency: string;
   editable: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [userId, setUserId] = useState(currentUserId);
   const [hours, setHours] = useState("1");
@@ -66,7 +68,7 @@ export function LaborPanel({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-slate-700">{entry.name}</p>
                 <p className="text-[0.6875rem] text-slate-400">
-                  {formatDate(entry.workedAt)}
+                  {formatDate(entry.workedAt, zona)}
                   {entry.notes ? ` · ${entry.notes}` : ""}
                 </p>
               </div>

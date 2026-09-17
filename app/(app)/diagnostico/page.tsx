@@ -59,6 +59,7 @@ export default async function DiagnosticoPage() {
         actions={
           puedeGenerar ? (
             <BotonDiagnostico
+              hayAnterior={Boolean(reporte)}
               disponible={entitlement.funciones.includes("DIAGNOSTICO") && iaConfigurada()}
               restantes={restantes}
             />
@@ -158,6 +159,25 @@ export default async function DiagnosticoPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700">
+            <p className="font-semibold">Este diagnóstico es una fotografía de la operación al momento de generarse.</p>
+            <p className="mt-0.5">
+              Generado el {formatDateTime(reporte.creadoEl, zona)} · periodo analizado{" "}
+              {describirPeriodo({ desde: reporte.desde, hasta: reporte.hasta, zonaHoraria: zona })} · zona {zona}.
+              Sus cifras no se recalculan.
+            </p>
+            {reporte.datosPosteriores ? (
+              <p className="mt-1 font-medium text-amber-800">
+                Los indicadores actuales pueden haber cambiado: hay órdenes, paros o lecturas registrados después.
+                Consulte Reportes para las cifras de hoy{puedeGenerar ? " o use «Generar diagnóstico actualizado» arriba" : ""}.
+                El diagnóstico nuevo se agrega; este se conserva.
+              </p>
+            ) : null}
+            {reporte.diagnosticosAnteriores > 0 ? (
+              <p className="mt-0.5 text-slate-500">Se conservan {reporte.diagnosticosAnteriores} diagnóstico(s) anterior(es).</p>
+            ) : null}
+          </div>
+
           <Card>
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">

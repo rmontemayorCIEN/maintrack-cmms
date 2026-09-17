@@ -4,7 +4,7 @@ import { claveDiaEnZona, dentroDe, describirPeriodo } from "../periodos";
 import { diaDelCompromiso, estadoDeVencimiento } from "../vencimiento";
 import { analizarAlmacen } from "../almacen-analisis";
 import { AYUDA, CONTROLES_TABLA } from "../ayuda";
-import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
+import { agruparPorCodigo, fallasCodificadas, filtroDeFalla } from "@/lib/fallas";
 
 /**
  * Herramientas de consulta para la IA.
@@ -289,7 +289,7 @@ export async function ejecutarHerramienta(
             select: {
               nextDueDate: true, nextDueMeter: true, lastCompletedAt: true,
               plan: { select: { name: true, triggerType: true, intervalDays: true, intervalMeter: true } },
-              meter: { select: { unit: true } },
+              meter: { select: { unit: true, proyeccionSuspendida: true, motivoSuspension: true } },
             },
           },
           workOrders: {
@@ -327,7 +327,9 @@ export async function ejecutarHerramienta(
           plan: p.plan.name,
           tipo: p.plan.triggerType,
           frecuencia: p.plan.triggerType === "METER" ? `cada ${p.plan.intervalMeter} ${p.meter?.unit ?? ""}` : `cada ${p.plan.intervalDays} días`,
-          proximaFecha: p.nextDueDate ? diaDelCompromiso(p.nextDueDate, zona) : null,
+          proximaFecha: p.meter?.proyeccionSuspendida
+            ? `Proyección suspendida: ${p.meter.motivoSuspension ?? "el medidor contiene una lectura inválida"}`
+            : p.nextDueDate ? diaDelCompromiso(p.nextDueDate, zona) : null,
           proximaMeta: p.nextDueMeter,
           ultimaVez: p.lastCompletedAt ? claveDiaEnZona(p.lastCompletedAt, zona) : null,
         })),
@@ -381,7 +383,8 @@ export async function ejecutarHerramienta(
         prisma.rootCause.findMany({ where: { id: { in: porCausa.map((x) => x.rootCauseId!) } }, select: { id: true, description: true } }),
       ]);
       const sinCausa = await prisma.workOrder.count({
-        where: { organizationId, status: { in: ["COMPLETED", "CLOSED"] }, rootCauseId: null, completedAt: dentroDe(r) },
+        // Solo fallas (regla unica de `lib/fallas`) sin causa en la orden ni en sus actividades.
+        where: { ...(await filtroDeFalla(organizationId)), organizationId, status: { in: ["COMPLETED", "CLOSED"] }, rootCauseId: null, tasks: { none: { rootCauseId: { not: null } } }, completedAt: dentroDe(r) },
       });
       return {
         periodoDias: r.dias,

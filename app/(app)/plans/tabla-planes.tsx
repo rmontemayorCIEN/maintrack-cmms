@@ -1,11 +1,13 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
 import {
   MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS,
 } from "@/lib/constants";
-import { dueLabel, formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { EnlacesPlan } from "./enlaces-plan";
 import { EquiposDelPlan } from "./equipos-del-plan";
 import { PlanDialog } from "./plan-dialog";
@@ -19,6 +21,7 @@ export type FilaPlan = {
   maintenanceType: string; triggerType: string; priority: string;
   frecuencia: string; medidorActual: string | null;
   nextDueDate: string | null; lastCompletedAt: string | null; lastGeneratedAt: string | null;
+  proyeccionSuspendida?: boolean;
   actividades: number; costoEstimado: number; horasEstimadas: number; otGeneradas: number;
   requiereParo: boolean; active: boolean;
   /** A cuantos equipos se aplica este plan. */
@@ -51,6 +54,7 @@ export function TablaPlanes({
   moneda: string;
   puedeCrearCatalogos: boolean;
 }) {
+  const zona = useZona();
   const FIJAS: Columna<FilaPlan>[] = [
     {
       id: "plan", etiqueta: "Plan",
@@ -132,11 +136,20 @@ export function TablaPlanes({
     },
     {
       id: "proximo", etiqueta: "Próximo",
-      texto: (p) => (p.nextDueDate ? dueLabel(new Date(p.nextDueDate)).text : "—"),
+      // Con la zona de la empresa y el mismo texto que las ordenes: igual en
+      // el servidor que en el navegador.
+      texto: (p) => (p.proyeccionSuspendida ? "Proyección suspendida" : p.nextDueDate ? estadoDeVencimiento({ status: "OPEN", dueDate: p.nextDueDate }, { zona }).texto : "—"),
       pinta: (p) => {
+        if (p.proyeccionSuspendida) {
+          return (
+            <a href="/meters" className="inline-block" title="El medidor contiene una lectura inválida: corríjala o anúlela en Medidores">
+              <Badge tone="warning">Proyección suspendida</Badge>
+            </a>
+          );
+        }
         if (!p.nextDueDate) return "—";
-        const d = dueLabel(new Date(p.nextDueDate));
-        return <Badge tone={d.tone === "muted" ? "muted" : d.tone}>{d.text}</Badge>;
+        const d = estadoDeVencimiento({ status: "OPEN", dueDate: p.nextDueDate }, { zona });
+        return <Badge tone={d.tono}>{d.texto}</Badge>;
       },
     },
     { id: "actividades", etiqueta: "Actividades", alineaDerecha: true, texto: (p) => String(p.actividades) },
@@ -161,8 +174,8 @@ export function TablaPlanes({
       id: "paro", etiqueta: "Requiere paro", agrupable: true,
       texto: (p) => (p.requiereParo ? "Si" : "No"),
     },
-    { id: "ultimoCierre", etiqueta: "Último cierre", texto: (p) => (p.lastCompletedAt ? new Date(p.lastCompletedAt).toLocaleDateString("es-MX") : "—") },
-    { id: "ultimaGeneracion", etiqueta: "Última generación", texto: (p) => (p.lastGeneratedAt ? new Date(p.lastGeneratedAt).toLocaleDateString("es-MX") : "—") },
+    { id: "ultimoCierre", etiqueta: "Último cierre", texto: (p) => (p.lastCompletedAt ? formatDate(p.lastCompletedAt, zona) : "—") },
+    { id: "ultimaGeneracion", etiqueta: "Última generación", texto: (p) => (p.lastGeneratedAt ? formatDate(p.lastGeneratedAt, zona) : "—") },
     { id: "tolerancia", etiqueta: "Tolerancia (días)", alineaDerecha: true, texto: (p) => String(p.toleranciaDias) },
     { id: "anticipacion", etiqueta: "Anticipacion (días)", alineaDerecha: true, texto: (p) => String(p.anticipacionDias) },
     { id: "enlaces", etiqueta: "Referencias", alineaDerecha: true, texto: (p) => String(p.enlaces.length) },

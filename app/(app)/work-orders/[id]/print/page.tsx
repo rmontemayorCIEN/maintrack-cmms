@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
-import { formatDate, formatDateTime, formatNumber } from "@/lib/utils";
+import { formatDate, formatDateTime, formatNumber, formatDia } from "@/lib/utils";
 import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export const metadata = { title: "Orden de trabajo (impresion)" };
 export default async function PrintWorkOrder({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
+  const zona = user.organization.timezone || "America/Mexico_City";
   const wo = await prisma.workOrder.findFirst({
     where: { id, organizationId: user.organizationId },
     include: {
@@ -37,7 +38,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold tabular-nums">{wo.number}</p>
-          <p className="text-xs">{formatDate(wo.createdAt)}</p>
+          <p className="text-xs">{formatDate(wo.createdAt, zona)}</p>
         </div>
       </header>
 
@@ -45,7 +46,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         <Field label="Tipo" value={MAINTENANCE_TYPE_LABELS[wo.maintenanceType]} />
         <Field label="Prioridad" value={PRIORITY_LABELS[wo.priority]} />
         <Field label="Estado" value={WO_STATUS_LABELS[wo.status]} />
-        <Field label="Fecha compromiso" value={formatDate(wo.dueDate)} />
+        <Field label="Fecha compromiso" value={formatDia(wo.dueDate, { zona })} />
         <Field label="Activo" value={wo.asset ? `${wo.asset.code} — ${wo.asset.name}` : "—"} />
         <Field label="Ubicacion" value={[wo.site?.name, wo.location?.name].filter(Boolean).join(" / ") || "—"} />
         <Field label="Responsable" value={wo.assignedTo?.name ?? "Sin asignar"} />
@@ -153,7 +154,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
       </section>
 
       <footer className="mt-8 border-t border-slate-300 pt-2 text-[0.625rem] text-slate-500">
-        Impreso {formatDateTime(new Date())} · MainTrack CMMS
+        Impreso {formatDateTime(new Date(), zona)} · MainTrack CMMS
       </footer>
     </div>
   );

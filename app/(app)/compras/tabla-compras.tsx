@@ -1,5 +1,7 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
@@ -46,7 +48,8 @@ const FIJAS: Columna<FilaCompra>[] = [
   },
 ];
 
-const COLUMNAS: Columna<FilaCompra>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaCompra>[] => [
   {
     id: "estado", etiqueta: "Estado", agrupable: true,
     texto: (c) => ESTADOS_COMPRA[c.estado as keyof typeof ESTADOS_COMPRA] ?? c.estado,
@@ -88,8 +91,8 @@ const COLUMNAS: Columna<FilaCompra>[] = [
       return falta ? <span className="font-medium text-amber-700">{falta}</span> : <span className="text-slate-300">—</span>;
     },
   },
-  { id: "creada", etiqueta: "Pedida", texto: (c) => formatDate(new Date(c.createdAt)) },
-  { id: "autorizadaEl", etiqueta: "Autorizada", texto: (c) => (c.autorizadaEl ? formatDate(new Date(c.autorizadaEl)) : "—") },
+  { id: "creada", etiqueta: "Pedida", texto: (c) => formatDate(new Date(c.createdAt), zona) },
+  { id: "autorizadaEl", etiqueta: "Autorizada", texto: (c) => (c.autorizadaEl ? formatDate(new Date(c.autorizadaEl), zona) : "—") },
   { id: "rechazo", etiqueta: "Motivo de rechazo", texto: (c) => guion(c.motivoRechazo) },
 ];
 
@@ -97,11 +100,13 @@ const COLUMNAS: Columna<FilaCompra>[] = [
 const DE_FABRICA = ["estado", "urgencia", "monto", "almacen", "solicitante", "porRecibir", "creada"];
 
 export function TablaCompras({ compras, vistaInicial }: { compras: FilaCompra[]; vistaInicial: Vista }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
   return (
     <TablaConfigurable
       filas={compras}
       fijas={FIJAS}
-      columnas={COLUMNAS}
+      columnas={columnas}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="compras"

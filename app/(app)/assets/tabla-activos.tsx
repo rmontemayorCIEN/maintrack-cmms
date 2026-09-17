@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useZona } from "@/components/zona-empresa";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
@@ -41,7 +42,8 @@ const FIJAS: Columna<FilaActivo>[] = [
   },
 ];
 
-const COLUMNAS: Columna<FilaActivo>[] = [
+/** Las columnas llevan la zona de la empresa: sin ella el servidor (UTC) y el navegador formatean distinto (#418). */
+const crearColumnas = (zona: string): Columna<FilaActivo>[] => [
   { id: "categoria", etiqueta: "Categoría", agrupable: true, texto: (a) => guion(a.categoria) },
   { id: "sitio", etiqueta: "Sitio", agrupable: true, texto: (a) => guion(a.sitio) },
   { id: "ubicacion", etiqueta: "Ubicación", agrupable: true, texto: (a) => guion(a.ubicacion) },
@@ -69,13 +71,13 @@ const COLUMNAS: Columna<FilaActivo>[] = [
     pinta: (a) =>
       a.warrantyExpiry
         ? new Date(a.warrantyExpiry) > new Date()
-          ? <Badge tone="success">Vigente {formatDia(a.warrantyExpiry)}</Badge>
+          ? <Badge tone="success">Vigente {formatDia(a.warrantyExpiry, { zona })}</Badge>
           : <span className="text-slate-400">Vencida</span>
         : "—",
   },
   { id: "costoReemplazo", etiqueta: "Costo de reemplazo", alineaDerecha: true, texto: (a) => (a.replacementCost ? formatCurrency(a.replacementCost) : "—") },
   { id: "costoCompra", etiqueta: "Costo de compra", alineaDerecha: true, texto: (a) => (a.purchaseCost ? formatCurrency(a.purchaseCost) : "—") },
-  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => formatDia(a.commissionedAt) },
+  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => formatDia(a.commissionedAt, { zona }) },
   { id: "vidaUtil", etiqueta: "Vida útil (años)", alineaDerecha: true, texto: (a) => (a.expectedLifeYears ? `${a.expectedLifeYears}` : "—") },
 ];
 
@@ -89,6 +91,8 @@ export function TablaActivos({
   vistaInicial: Vista;
   puedeEditar: boolean;
 }) {
+  const zona = useZona();
+  const columnas = useMemo(() => crearColumnas(zona), [zona]);
   const router = useRouter();
   const [borrando, setBorrando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +115,7 @@ export function TablaActivos({
       <TablaConfigurable
         filas={activos}
         fijas={FIJAS}
-        columnas={COLUMNAS}
+        columnas={columnas}
         deFabrica={DE_FABRICA}
         vistaInicial={vistaInicial}
         clave="activos"

@@ -5,12 +5,14 @@ import { Topbar } from "@/components/shell/topbar";
 import { BandaCliente } from "@/components/shell/banda-cliente";
 import { RegistrarSW } from "@/components/registrar-sw";
 import { terminoConjunto } from "@/lib/instalaciones";
+import { ZonaEmpresaProvider } from "@/components/zona-empresa";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   return (
+    <ZonaEmpresaProvider zona={user.organization.timezone || "America/Mexico_City"}>
     <div className="flex min-h-screen">
       <RegistrarSW />
       <Sidebar
@@ -30,5 +32,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="flex-1 px-4 py-6 lg:px-8">{children}</main>
       </div>
     </div>
+    </ZonaEmpresaProvider>
   );
 }

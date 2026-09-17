@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ export function Topbar({
 }: {
   user: { name: string; email: string; role: string; color: string };
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
@@ -118,7 +120,7 @@ export function Topbar({
                     >
                       <p className="text-xs font-medium text-slate-800">{n.title}</p>
                       {n.body ? <p className="mt-0.5 text-[0.6875rem] text-slate-500">{n.body}</p> : null}
-                      <p className="mt-1 text-[0.625rem] text-slate-400">{formatDateTime(n.createdAt)}</p>
+                      <p className="mt-1 text-[0.625rem] text-slate-400">{formatDateTime(n.createdAt, zona)}</p>
                     </Link>
                   ))
                 )}

@@ -1,4 +1,5 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { describirPeriodo } from "@/lib/periodos";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui";
@@ -43,7 +44,8 @@ export default async function ParosPage({
       ? { desde: new Date(d), hasta: new Date(hst) }
       : null;
 
-  const v = ventanas(periodo, new Date(), await zonaDeLaEmpresa(user.organizationId));
+  const zona = await zonaDeLaEmpresa(user.organizationId);
+  const v = ventanas(periodo, new Date(), zona);
   const [datos, eventos] = await Promise.all([
     costoComparado(user.organizationId, periodo, undefined, ventanaPropia),
     // El latido siempre muestra el periodo completo: la ventana es una
@@ -66,6 +68,9 @@ export default async function ParosPage({
         anterior={datos.anterior}
         horasQueDetienen={datos.horasQueDetienen}
         horasPlaneadas={datos.horasPlaneadas}
+        periodoTexto={ventanaPropia
+          ? `${describirPeriodo({ ...ventanaPropia, hasta: new Date(ventanaPropia.hasta.getTime() + 1), zonaHoraria: zona })} · ${zona}`
+          : `${describirPeriodo({ ...v.actual, zonaHoraria: zona })} · ${zona}`}
         cobertura={datos.cobertura}
         comoDecirlo={comoDecirlo(datos)}
         eventos={eventos}

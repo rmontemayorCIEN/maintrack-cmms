@@ -259,12 +259,18 @@ type LecturaDeCadena = { id: string; value: number; readingAt: Date; tipo: strin
  * Sirve para el ensayo de recalculo y para saber si anular o corregir un
  * reinicio romperia la continuidad.
  */
+export type ProblemaDeLectura = {
+  motivo: string;
+  /** Invalida (imposible o menor que la anterior): suspende la proyeccion. Si no, solo sospechosa. */
+  invalida: boolean;
+};
+
 export function problemasDeCadena(
   lecturas: LecturaDeCadena[],
   medidor: { tipo: string; unit: string; maxIncrementoDiario: number | null },
-): Map<string, string> {
+): Map<string, ProblemaDeLectura> {
   const orden = [...lecturas].sort((a, b) => a.readingAt.getTime() - b.readingAt.getTime() || a.id.localeCompare(b.id));
-  const problemas = new Map<string, string>();
+  const problemas = new Map<string, ProblemaDeLectura>();
   for (let i = 1; i < orden.length; i++) {
     const a = orden[i - 1];
     const b = orden[i];
@@ -272,11 +278,11 @@ export function problemasDeCadena(
     const horas = (b.readingAt.getTime() - a.readingAt.getTime()) / HORA;
     const inc = b.value - a.value;
     if (inc < 0) {
-      problemas.set(b.id, `${fmt(b.value)} ${medidor.unit} es menor que la anterior (${fmt(a.value)} ${medidor.unit})`);
+      problemas.set(b.id, { invalida: true, motivo: `${fmt(b.value)} ${medidor.unit} es menor que la anterior (${fmt(a.value)} ${medidor.unit})` });
     } else if (medidor.tipo === "HOROMETRO" && inc > Math.max(0, horas) + 1e-9) {
-      problemas.set(b.id, `+${fmt(inc)} h en ${tiempo(Math.max(0, horas))} de reloj: físicamente imposible`);
+      problemas.set(b.id, { invalida: true, motivo: `+${fmt(inc)} h en ${tiempo(Math.max(0, horas))} de reloj: físicamente imposible` });
     } else if (!b.atipica && medidor.maxIncrementoDiario && medidor.maxIncrementoDiario > 0 && inc > (Math.max(0, horas) / 24) * medidor.maxIncrementoDiario + 1e-9) {
-      problemas.set(b.id, `+${fmt(inc)} ${medidor.unit} supera el máximo diario sin justificación`);
+      problemas.set(b.id, { invalida: false, motivo: `+${fmt(inc)} ${medidor.unit} supera el máximo diario sin justificación` });
     }
   }
   return problemas;
@@ -448,7 +454,7 @@ async function nuevasRupturas(
   const lecturas = new Map(cadena.map((l) => [l.id, l]));
   return [...despues.entries()]
     .filter(([id]) => !antes.has(id))
-    .map(([id, motivo]) => `${lecturas.get(id)?.readingAt.toISOString().slice(0, 10) ?? ""}: ${motivo}`);
+    .map(([id, p]) => `${lecturas.get(id)?.readingAt.toISOString().slice(0, 10) ?? ""}: ${p.motivo}`);
 }
 
 /**
@@ -617,6 +623,8 @@ export type Recalculo = {
   dailyAverage: number;
   lastReadingAt: Date | null;
   lecturaVigente: boolean;
+  proyeccionSuspendida: boolean;
+  motivoSuspension: string | null;
   lecturasValidas: number;
   planesRecalculados: number;
 };
@@ -667,8 +675,8 @@ export type PlanDeRecalculo = {
   medidor: string;
   activo: string;
   unidad: string;
-  antes: { currentValue: number; dailyAverage: number; lastReadingAt: Date | null; lecturaVigente: boolean };
-  despues: { currentValue: number; dailyAverage: number; lastReadingAt: Date | null; lecturaVigente: boolean };
+  antes: EstadoMedidor;
+  despues: EstadoMedidor;
   incrementos: Array<{ id: string; antes: number; despues: number }>;
   planes: Array<{
     id: string;
@@ -680,16 +688,26 @@ export type PlanDeRecalculo = {
     estadoAntes: EstadoPlanPorUso;
     estadoDespues: EstadoPlanPorUso;
   }>;
-  lecturasSospechosas: Array<{ id: string; readingAt: Date; value: number; motivo: string }>;
+  lecturasSospechosas: Array<{ id: string; readingAt: Date; value: number; motivo: string; invalida: boolean }>;
   /** Registros que el recalculo escribiria (medidor + incrementos + planes). */
   registrosAModificar: number;
 };
 
-export type EstadoPlanPorUso = "VENCIDO" | "POR_VENCER" | "EN_TIEMPO" | "SIN_LECTURA" | "SIN_META";
+type EstadoMedidor = {
+  currentValue: number;
+  dailyAverage: number;
+  lastReadingAt: Date | null;
+  lecturaVigente: boolean;
+  proyeccionSuspendida: boolean;
+  motivoSuspension: string | null;
+};
 
-function estadoPlanPorUso(meta: number | null, actual: number, promedio: number, vigente: boolean): EstadoPlanPorUso {
+export type EstadoPlanPorUso = "VENCIDO" | "POR_VENCER" | "EN_TIEMPO" | "SIN_LECTURA" | "SIN_META" | "SUSPENDIDA";
+
+function estadoPlanPorUso(meta: number | null, actual: number, promedio: number, vigente: boolean, suspendida = false): EstadoPlanPorUso {
   if (meta === null) return "SIN_META";
   if (!vigente) return "SIN_LECTURA";
+  if (suspendida) return "SUSPENDIDA";
   const falta = meta - actual;
   if (falta <= 0) return "VENCIDO";
   return falta < (promedio > 0 ? promedio : 1) * DIAS_POR_VENCER ? "POR_VENCER" : "EN_TIEMPO";
@@ -737,6 +755,16 @@ export async function planearRecalculo(
   }
 
   const ultima = vigentes.at(-1) ?? null;
+  // Lecturas invalidas: suspenden toda proyeccion hasta corregirlas o anularlas.
+  const problemas = problemasDeCadena(vigentes, medidor);
+  const invalida = vigentes.find((l) => problemas.get(l.id)?.invalida);
+  const suspension = invalida
+    ? {
+        proyeccionSuspendida: true,
+        motivoSuspension: `Lectura inválida del ${invalida.readingAt.toISOString().slice(0, 10)} (${fmt(invalida.value)} ${medidor.unit}): ${problemas.get(invalida.id)!.motivo}`,
+      }
+    : { proyeccionSuspendida: false, motivoSuspension: null };
+
   let despues: PlanDeRecalculo["despues"];
   if (ultima) {
     despues = {
@@ -744,15 +772,16 @@ export async function planearRecalculo(
       lastReadingAt: ultima.readingAt,
       dailyAverage: promedioDiario(vigentes, medidor.tipo) ?? 0,
       lecturaVigente: true,
+      ...suspension,
     };
   } else if (total === 0) {
     // Nunca tuvo lecturas: vale lo que se capturo al darlo de alta.
-    despues = { currentValue: medidor.currentValue, lastReadingAt: null, dailyAverage: 0, lecturaVigente: true };
+    despues = { currentValue: medidor.currentValue, lastReadingAt: null, dailyAverage: 0, lecturaVigente: true, ...suspension };
   } else if (medidor.valorInicial !== null) {
-    despues = { currentValue: medidor.valorInicial, lastReadingAt: null, dailyAverage: 0, lecturaVigente: true };
+    despues = { currentValue: medidor.valorInicial, lastReadingAt: null, dailyAverage: 0, lecturaVigente: true, ...suspension };
   } else {
     // Todas anuladas y sin valor inicial formal: no se inventa un actual.
-    despues = { currentValue: 0, lastReadingAt: null, dailyAverage: 0, lecturaVigente: false };
+    despues = { currentValue: 0, lastReadingAt: null, dailyAverage: 0, lecturaVigente: false, ...suspension };
   }
 
   const zonaEmpresa = zona ?? (await cliente.organization.findUnique({ where: { id: organizationId }, select: { timezone: true } }))?.timezone ?? "America/Mexico_City";
@@ -764,7 +793,8 @@ export async function planearRecalculo(
     select: { id: true, nextDueMeter: true, nextDueDate: true, plan: { select: { name: true } } },
   });
   const planes: PlanDeRecalculo["planes"] = asignaciones.map((a) => {
-    const fechaDespues = !despues.lecturaVigente || a.nextDueMeter === null
+    // Sin lectura vigente o con proyeccion suspendida no hay fecha que prometer.
+    const fechaDespues = !despues.lecturaVigente || despues.proyeccionSuspendida || a.nextDueMeter === null
       ? null
       : fechaEstimadaPorUso(a.nextDueMeter, despues.currentValue, despues.dailyAverage, hoy);
     return {
@@ -774,27 +804,24 @@ export async function planearRecalculo(
       metaDespues: a.nextDueMeter,
       fechaAntes: a.nextDueDate,
       fechaDespues: a.nextDueMeter === null ? a.nextDueDate : fechaDespues,
-      estadoAntes: estadoPlanPorUso(a.nextDueMeter, medidor.currentValue, medidor.dailyAverage, medidor.lecturaVigente),
-      estadoDespues: estadoPlanPorUso(a.nextDueMeter, despues.currentValue, despues.dailyAverage, despues.lecturaVigente),
+      estadoAntes: estadoPlanPorUso(a.nextDueMeter, medidor.currentValue, medidor.dailyAverage, medidor.lecturaVigente, medidor.proyeccionSuspendida),
+      estadoDespues: estadoPlanPorUso(a.nextDueMeter, despues.currentValue, despues.dailyAverage, despues.lecturaVigente, despues.proyeccionSuspendida),
     };
   });
 
-  const problemas = problemasDeCadena(vigentes, medidor);
   const lecturasSospechosas = vigentes
     .filter((l) => problemas.has(l.id))
-    .map((l) => ({ id: l.id, readingAt: l.readingAt, value: l.value, motivo: problemas.get(l.id)! }));
+    .map((l) => ({ id: l.id, readingAt: l.readingAt, value: l.value, motivo: problemas.get(l.id)!.motivo, invalida: problemas.get(l.id)!.invalida }));
 
-  const antes = {
+  const antes: EstadoMedidor = {
     currentValue: medidor.currentValue,
     dailyAverage: medidor.dailyAverage,
     lastReadingAt: medidor.lastReadingAt,
     lecturaVigente: medidor.lecturaVigente,
+    proyeccionSuspendida: medidor.proyeccionSuspendida,
+    motivoSuspension: medidor.motivoSuspension,
   };
-  const cambiaMedidor =
-    Math.abs(antes.currentValue - despues.currentValue) > 1e-9 ||
-    Math.abs(antes.dailyAverage - despues.dailyAverage) > 1e-9 ||
-    !igualFecha(antes.lastReadingAt, despues.lastReadingAt) ||
-    antes.lecturaVigente !== despues.lecturaVigente;
+  const cambiaMedidor = medidorCambia(antes, despues);
 
   return {
     organizationId,
@@ -814,14 +841,20 @@ export async function planearRecalculo(
   };
 }
 
+function medidorCambia(a: EstadoMedidor, b: EstadoMedidor) {
+  return (
+    Math.abs(a.currentValue - b.currentValue) > 1e-9 ||
+    Math.abs(a.dailyAverage - b.dailyAverage) > 1e-9 ||
+    !igualFecha(a.lastReadingAt, b.lastReadingAt) ||
+    a.lecturaVigente !== b.lecturaVigente ||
+    a.proyeccionSuspendida !== b.proyeccionSuspendida ||
+    (a.motivoSuspension ?? null) !== (b.motivoSuspension ?? null)
+  );
+}
+
 /** Escribe un plan de recalculo. Solo lo que cambia: correrlo dos veces no hace nada. */
 export async function aplicarRecalculo(tx: Cliente, plan: PlanDeRecalculo) {
-  const cambiaMedidor =
-    Math.abs(plan.antes.currentValue - plan.despues.currentValue) > 1e-9 ||
-    Math.abs(plan.antes.dailyAverage - plan.despues.dailyAverage) > 1e-9 ||
-    !igualFecha(plan.antes.lastReadingAt, plan.despues.lastReadingAt) ||
-    plan.antes.lecturaVigente !== plan.despues.lecturaVigente;
-  if (cambiaMedidor) {
+  if (medidorCambia(plan.antes, plan.despues)) {
     await tx.meter.update({ where: { id: plan.meterId }, data: plan.despues });
   }
   for (const i of plan.incrementos) {

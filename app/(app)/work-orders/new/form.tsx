@@ -1,5 +1,6 @@
 "use client";
 
+import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -23,6 +24,7 @@ export function NewWorkOrderForm({
   teams: Option[];
   puedeGestionarCatalogos?: boolean;
 }) {
+  const zona = useZona();
   const router = useRouter();
   const [opcionesCuadrillas, setOpcionesCuadrillas] = useState<OpcionCatalogo[]>(
     teams.map((t) => ({ id: t.id, etiqueta: t.name })),
@@ -38,7 +40,7 @@ export function NewWorkOrderForm({
     assetId: "",
     assignedToId: "",
     teamId: "",
-    dueDate: claveDia(new Date(Date.now() + 3 * 86_400_000)),
+    dueDate: claveDia(new Date(Date.now() + 3 * 86_400_000), zona),
     scheduledStart: "",
     estimatedHours: "2",
     requiresShutdown: false,
