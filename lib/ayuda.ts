@@ -1069,7 +1069,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "«Generar diagnóstico actualizado» agrega uno nuevo; los anteriores se conservan.",
       "Los números se calculan en el sistema; la IA los interpreta pero no los inventa. Son los mismos indicadores, periodo y zona horaria que el Panel y Reportes.",
       "La calidad de la captura sale de las mismas reglas de calidad de datos: errores (datos imposibles), advertencias (datos sospechosos) y recomendaciones (datos que faltan). Cada una lleva a los registros exactos.",
-      "Las reglas del proceso de órdenes —terminadas sin horas, correctivas sin diagnóstico, paros sin duración, activas sin responsable, solicitudes convertidas sin OT y actividades sin resolver— son críticas: cada 1 % de incumplimiento resta 3 puntos a esa regla. Así una cuenta con esas carencias no aparece con calidad casi perfecta. Es aritmética, sin IA.",
+      "Las reglas del proceso de órdenes —terminadas sin horas, correctivas sin diagnóstico, paros sin duración, activas sin responsable, solicitudes convertidas sin OT y actividades sin resolver— son críticas: cada 1 % de incumplimiento resta 3 puntos a esa regla, y en el índice pesan el doble que las demás. Así una cuenta con esas carencias no aparece con calidad casi perfecta. Es aritmética, sin IA.",
       "Se genera solo cada semana, y puede pedirlo cuando quiera.",
     ],
   },

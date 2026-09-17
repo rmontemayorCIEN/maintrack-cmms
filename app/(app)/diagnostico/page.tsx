@@ -110,7 +110,7 @@ export default async function DiagnosticoPage() {
                   <div className="mt-1"><Progress value={h.calificacion} tone={h.calificacion >= 80 ? "good" : h.calificacion >= 50 ? "warn" : "bad"} /></div>
                   <p className="mt-1 text-[0.6875rem] text-slate-500">
                     {h.porque}
-                    {h.critica ? ` Regla del proceso de órdenes: cada 1 % de incumplimiento resta ${FACTOR_CRITICA} puntos (califica ${Math.round(h.calificacion)}).` : ""}
+                    {h.critica ? ` Regla del proceso de órdenes: cada 1 % de incumplimiento resta ${FACTOR_CRITICA} puntos (califica ${Math.round(h.calificacion)}) y pesa el doble en el índice.` : ""}
                   </p>
                   {h.hallazgos.length ? (
                     <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.6875rem]">

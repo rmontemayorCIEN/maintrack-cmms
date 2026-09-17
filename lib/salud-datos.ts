@@ -33,8 +33,10 @@ import { revisarCalidad, type Hallazgo, type NivelRegla } from "./calidad-datos"
  *
  *   calificacion = max(0, 100 − 3 × % de incumplimiento)
  *
- * 15 % de ordenes sin horas califica 55, no 85. Sigue siendo aritmetica
- * auditable, sin IA.
+ * 15 % de ordenes sin horas califica 55, no 85. Y en el promedio pesan el
+ * doble que las demas (PESO_CRITICA): con solo la penalizacion la Demo —24
+ * registros por corregir— quedaba en 86, rotulada «Solida». Sigue siendo
+ * aritmetica auditable, sin IA.
  */
 
 export type Revision = {
@@ -57,6 +59,8 @@ export type Revision = {
 
 /** Cuantos puntos resta cada punto porcentual de incumplimiento en una regla critica. */
 export const FACTOR_CRITICA = 3;
+/** Cuanto pesa una regla critica en el promedio, respecto a su peso normal. */
+export const PESO_CRITICA = 2;
 
 export type SaludDatos = {
   indice: number;
@@ -89,10 +93,11 @@ export async function saludDeDatos(organizationId: string, ahora = new Date()): 
 
   // Lo que no existe no se juzga: una planta sin medidores no esta mal por eso.
   const aplicables = revisiones.filter((r) => r.total > 0);
-  const pesoTotal = aplicables.reduce((s, r) => s + r.peso, 0);
+  const pesoEnIndice = (r: Revision) => r.peso * (r.critica ? PESO_CRITICA : 1);
+  const pesoTotal = aplicables.reduce((s, r) => s + pesoEnIndice(r), 0);
   const indice = pesoTotal === 0
     ? 0
-    : Math.round(aplicables.reduce((s, r) => s + r.calificacion * r.peso, 0) / pesoTotal);
+    : Math.round(aplicables.reduce((s, r) => s + r.calificacion * pesoEnIndice(r), 0) / pesoTotal);
 
   const orden: Record<NivelRegla, number> = { ERROR: 0, ADVERTENCIA: 1, RECOMENDACION: 2 };
   return {
