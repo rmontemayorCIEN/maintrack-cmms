@@ -28,7 +28,11 @@ export async function POST(request: Request) {
     const asset = await prisma.asset.findFirst({ where: { id: input.assetId, organizationId: orgId } });
     if (!asset) return fail("Activo no encontrado", 404);
     // El tipo sale de la unidad: decide que lecturas son imposibles.
-    const meter = await prisma.meter.create({ data: { ...input, tipo: tipoPorUnidad(input.unit), organizationId: orgId } });
+    // El valor de alta queda como valor inicial FORMAL: si algun dia se anulan
+    // todas las lecturas, es lo unico que puede valer como actual.
+    const meter = await prisma.meter.create({
+      data: { ...input, tipo: tipoPorUnidad(input.unit), organizationId: orgId, valorInicial: input.currentValue, valorInicialEl: new Date() },
+    });
     return ok({ meter }, 201);
   });
 }

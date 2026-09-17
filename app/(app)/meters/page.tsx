@@ -85,18 +85,25 @@ export default async function MetersPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-semibold tabular-nums text-slate-900">
-                      {formatNumber(meter.currentValue, 0)}
-                      <span className="ml-1 text-xs text-slate-400">{meter.unit}</span>
-                    </p>
-                    <p className="text-[0.625rem] text-slate-400" title="Uso de los últimos 90 días entre los días que abarcan las lecturas">
-                      {meter.dailyAverage > 0 ? `${formatNumber(meter.dailyAverage, 1)} ${meter.unit}/día` : "Promedio sin datos suficientes"}
-                    </p>
-                  </div>
+                  {meter.lecturaVigente ? (
+                    <div className="text-right">
+                      <p className="text-xl font-semibold tabular-nums text-slate-900">
+                        {formatNumber(meter.currentValue, 0)}
+                        <span className="ml-1 text-xs text-slate-400">{meter.unit}</span>
+                      </p>
+                      <p className="text-[0.625rem] text-slate-400" title="Uso de los últimos 90 días entre los días que abarcan las lecturas">
+                        {meter.dailyAverage > 0 ? `${formatNumber(meter.dailyAverage, 1)} ${meter.unit}/día` : "Promedio sin datos suficientes"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-amber-700">Sin lectura vigente</p>
+                      <p className="text-[0.625rem] text-slate-500">Requiere una lectura nueva</p>
+                    </div>
+                  )}
                 </div>
 
-                {pending.length ? (
+                {pending.length && meter.lecturaVigente ? (
                   <ul className="mt-3 grid gap-1.5 rounded-lg bg-slate-50 p-2.5">
                     {pending.map((plan) => (
                       <li key={plan.id} className="flex items-center justify-between gap-2 text-[0.6875rem]">
@@ -120,7 +127,7 @@ export default async function MetersPage() {
                 ) : null}
 
                 <div className="mt-3">
-                  <MeterReadingForm meterId={meter.id} unit={meter.unit} current={meter.currentValue} />
+                  <MeterReadingForm meterId={meter.id} unit={meter.unit} current={meter.lecturaVigente ? meter.currentValue : null} />
                 </div>
 
                 <Lecturas
@@ -137,6 +144,8 @@ export default async function MetersPage() {
                     atipica: r.atipica,
                     justificacion: r.justificacion,
                     valorOriginal: r.valorOriginal,
+                    tipoOriginal: r.tipoOriginal,
+                    valorAnterior: r.valorAnterior,
                     correccionMotivo: r.correccionMotivo,
                     correccionPor: correctores.find((c) => c.id === r.correccionPorId)?.name ?? null,
                     correccionEl: r.correccionEl?.toISOString() ?? null,

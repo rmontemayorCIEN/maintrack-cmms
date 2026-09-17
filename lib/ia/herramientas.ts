@@ -1,7 +1,7 @@
 import { prisma } from "../db";
-import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa } from "../indicadores";
-import { dentroDe, describirPeriodo } from "../periodos";
-import { estadoDeVencimiento } from "../vencimiento";
+import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa, zonaDeLaEmpresa } from "../indicadores";
+import { claveDiaEnZona, dentroDe, describirPeriodo } from "../periodos";
+import { diaDelCompromiso, estadoDeVencimiento } from "../vencimiento";
 import { analizarAlmacen } from "../almacen-analisis";
 import { AYUDA, CONTROLES_TABLA } from "../ayuda";
 import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
@@ -240,7 +240,7 @@ export async function ejecutarHerramienta(
           numero: w.number, titulo: w.title, activo: w.asset?.code ?? null,
           tipo: w.maintenanceType, estado: w.status, prioridad: w.priority,
           vencimiento: estadoDeVencimiento(w, { zona: periodo.zonaHoraria }).texto,
-          costo: Math.round(w.totalCost), fecha: w.createdAt.toISOString().slice(0, 10),
+          costo: Math.round(w.totalCost), fecha: claveDiaEnZona(w.createdAt, periodo.zonaHoraria),
         })),
       };
     }
@@ -272,6 +272,7 @@ export async function ejecutarHerramienta(
     }
 
     case "consultar_activo": {
+      const zona = await zonaDeLaEmpresa(organizationId);
       const a = await prisma.asset.findFirst({
         where: { organizationId, code: String(entrada.codigo ?? "") },
         select: {
@@ -280,7 +281,17 @@ export async function ejecutarHerramienta(
           site: { select: { name: true } }, location: { select: { name: true } },
           category: { select: { name: true } },
           meters: { select: { name: true, unit: true, currentValue: true } },
-          plans: { where: { active: true }, select: { name: true, intervalDays: true, nextDueDate: true } },
+          // Por la ASIGNACION del equipo, no por el encabezado viejo del plan:
+          // un equipo de un plan de varios no aparece en el encabezado, y las
+          // fechas y metas viven en la asignacion.
+          planesAsignados: {
+            where: { active: true, plan: { active: true } },
+            select: {
+              nextDueDate: true, nextDueMeter: true, lastCompletedAt: true,
+              plan: { select: { name: true, triggerType: true, intervalDays: true, intervalMeter: true } },
+              meter: { select: { unit: true } },
+            },
+          },
           workOrders: {
             select: {
               number: true, title: true, maintenanceType: true, status: true, totalCost: true,
@@ -310,9 +321,17 @@ export async function ejecutarHerramienta(
       const minutosParo = (planeado: boolean) => paro.find((p) => p.planned === planeado)?._sum.minutes ?? 0;
       return {
         ...a,
-        purchaseDate: a.purchaseDate?.toISOString().slice(0, 10) ?? null,
-        plans: a.plans.map((p) => ({ ...p, nextDueDate: p.nextDueDate?.toISOString().slice(0, 10) ?? null })),
-        workOrders: a.workOrders.map((w) => ({ ...w, createdAt: w.createdAt.toISOString().slice(0, 10) })),
+        purchaseDate: a.purchaseDate ? diaDelCompromiso(a.purchaseDate, zona) : null,
+        planesAsignados: undefined,
+        planes: a.planesAsignados.map((p) => ({
+          plan: p.plan.name,
+          tipo: p.plan.triggerType,
+          frecuencia: p.plan.triggerType === "METER" ? `cada ${p.plan.intervalMeter} ${p.meter?.unit ?? ""}` : `cada ${p.plan.intervalDays} días`,
+          proximaFecha: p.nextDueDate ? diaDelCompromiso(p.nextDueDate, zona) : null,
+          proximaMeta: p.nextDueMeter,
+          ultimaVez: p.lastCompletedAt ? claveDiaEnZona(p.lastCompletedAt, zona) : null,
+        })),
+        workOrders: a.workOrders.map((w) => ({ ...w, createdAt: claveDiaEnZona(w.createdAt, zona) })),
         acumulado: {
           ordenes: totales._count._all,
           costo: Math.round(totales._sum.totalCost ?? 0),

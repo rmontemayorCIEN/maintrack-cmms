@@ -36,6 +36,11 @@ export const esquemaTarea = z.object({
   cadaCuanto: z.coerce.number().int().min(1).optional().nullable(),
   /** DIAS | SEMANAS | MESES. */
   unidadFrecuencia: z.enum([UNIDADES.DIAS, UNIDADES.SEMANAS, UNIDADES.MESES]).optional().nullable(),
+  /**
+   * Confirmacion explicita de que la actividad SI es diaria. Sin ella, una
+   * frecuencia diaria no se guarda desde la pantalla (ver `diariasSinConfirmar`).
+   */
+  confirmarDiaria: z.boolean().optional(),
   labor: z.array(z.object({
     specialtyId: z.string().min(1),
     personas: z.coerce.number().int().min(1).max(99).default(1),
@@ -116,10 +121,45 @@ export function frecuenciaDe(t: {
   return { cadaCuanto: null, unidadFrecuencia: "DIAS" };
 }
 
+/**
+ * Si una actividad es diaria: cada 1 dia, o sin frecuencia propia en un plan
+ * por calendario que va cada dia.
+ */
+export function esFrecuenciaDiaria(
+  t: { cadaCuanto?: number | null; unidadFrecuencia?: string | null; cadaDias?: number | null },
+  intervalDelPlan?: number | null,
+): boolean {
+  const f = frecuenciaDe(t);
+  if (f.cadaCuanto === null) return intervalDelPlan != null && intervalDelPlan <= 1;
+  return f.unidadFrecuencia === "DIAS" && f.cadaCuanto <= 1;
+}
+
+/**
+ * Las actividades diarias que llegan sin confirmar. Una rutina diaria es
+ * valida (la revision de arranque de turno), pero tambien es el error de
+ * captura mas caro: 365 visitas al ano en el calendario y en el backlog. Por
+ * eso se pide confirmarla en vez de adivinar.
+ */
+export function diariasSinConfirmar(tareas: TareaDePlan[], intervalDelPlan?: number | null, triggerType = "CALENDAR") {
+  if (triggerType !== "CALENDAR") return [];
+  return tareas.filter((t) => t.title.trim() && esFrecuenciaDiaria(t, intervalDelPlan) && !t.confirmarDiaria).map((t) => t.title);
+}
+
+type Confirmador = { userId: string | null; ahora?: Date; intervalDelPlan?: number | null; triggerType?: string };
+
+/** Los campos de confirmacion de una actividad nueva. */
+function confirmacionNueva(t: TareaDePlan, quien?: Confirmador) {
+  const diaria = (quien?.triggerType ?? "CALENDAR") === "CALENDAR" && esFrecuenciaDiaria(t, quien?.intervalDelPlan);
+  return diaria && t.confirmarDiaria && quien?.userId
+    ? { diariaConfirmadaPorId: quien.userId, diariaConfirmadaEl: quien.ahora ?? new Date() }
+    : { diariaConfirmadaPorId: null, diariaConfirmadaEl: null };
+}
+
 /** Traduce las tareas del formulario a un `create` anidado de Prisma. */
-export function crearTareas(tareas: TareaDePlan[], multiplos?: number[]) {
+export function crearTareas(tareas: TareaDePlan[], multiplos?: number[], quien?: Confirmador) {
   return tareas.map((t, index) => ({
     ...frecuenciaDe(t),
+    ...confirmacionNueva(t, quien),
     // El multiplo lo calcula resolverCadenciaDelPlan a partir de los dias; si
     // no viene, es 1 y la actividad sale en cada ejecucion —lo de siempre—.
     cadaCuantas: multiplos?.[index] ?? 1,
@@ -164,17 +204,21 @@ export async function reemplazarTareas(
   planId: string,
   tareas: TareaDePlan[],
   intervalBase?: number | null,
+  quien?: Confirmador & { organizationId: string },
 ) {
   // La cadencia se recalcula al editar: cambiar la frecuencia de una actividad
   // puede mover la del plan entero, y guardar los multiplos contra una base
   // vieja daria un calendario que nadie puede cumplir.
   const cadencia = resolverCadenciaDelPlan(intervalBase, tareas);
-  const nuevas = crearTareas(tareas, cadencia.multiplos);
+  const ahora = quien?.ahora ?? new Date();
+  const nuevas = crearTareas(tareas, cadencia.multiplos, { ...quien, userId: quien?.userId ?? null, ahora, intervalDelPlan: intervalBase });
 
   const existentes = await prisma.planTask.findMany({
     where: { planId },
-    select: { id: true, title: true },
+    select: { id: true, title: true, diariaConfirmadaPorId: true, diariaConfirmadaEl: true },
   });
+  const retiradas: Array<{ id: string; title: string; porque: string }> = [];
+  const confirmadas: string[] = [];
   const porTitulo = new Map<string, string>();
   for (const t of existentes) {
     const k = claveDeTitulo(t.title);
@@ -192,11 +236,22 @@ export async function reemplazarTareas(
 
     if (previa && !conservados.has(previa)) {
       conservados.add(previa);
+      const antes = existentes.find((e) => e.id === previa)!;
+      const sigueConfirmada = Boolean(campos.diariaConfirmadaEl);
+      // Ya confirmada y sigue confirmada: se conserva quien y cuando.
+      const confirmacion = antes.diariaConfirmadaEl && sigueConfirmada
+        ? { diariaConfirmadaPorId: antes.diariaConfirmadaPorId, diariaConfirmadaEl: antes.diariaConfirmadaEl }
+        : { diariaConfirmadaPorId: campos.diariaConfirmadaPorId, diariaConfirmadaEl: campos.diariaConfirmadaEl };
+      if (!antes.diariaConfirmadaEl && sigueConfirmada) confirmadas.push(campos.title);
+      if (antes.diariaConfirmadaEl && !sigueConfirmada) {
+        retiradas.push({ id: previa, title: campos.title, porque: "la actividad dejó de ser diaria o se desmarcó la confirmación" });
+      }
       operaciones.push(
         prisma.planTask.update({
           where: { id: previa },
           data: {
             ...campos,
+            ...confirmacion,
             // Los recursos si se reemplazan enteros: son una plantilla y no
             // llevan historia propia.
             labor: { deleteMany: {}, ...labor },
@@ -206,6 +261,7 @@ export async function reemplazarTareas(
         }),
       );
     } else {
+      if (campos.diariaConfirmadaEl) confirmadas.push(campos.title);
       operaciones.push(prisma.planTask.create({ data: { ...data, planId } }));
     }
   }
@@ -221,7 +277,19 @@ export async function reemplazarTareas(
   }
 
   await prisma.$transaction(operaciones);
-  return { ...cadencia, conservadas: conservados.size, creadas: nuevas.length - conservados.size, borradas: sobran.length };
+  return {
+    ...cadencia,
+    conservadas: conservados.size,
+    creadas: nuevas.length - conservados.size,
+    borradas: sobran.length,
+    // Para la bitacora (la escribe `lib/tareas-con-rastro.ts`, solo servidor:
+    // este archivo tambien lo importan pantallas del navegador).
+    confirmacionesNuevas: confirmadas,
+    confirmacionesRetiradas: retiradas.map((r) => {
+      const antes = existentes.find((e) => e.id === r.id)!;
+      return { ...r, confirmadaPorId: antes.diariaConfirmadaPorId, confirmadaEl: antes.diariaConfirmadaEl };
+    }),
+  };
 }
 
 type TareaConRecursos = {

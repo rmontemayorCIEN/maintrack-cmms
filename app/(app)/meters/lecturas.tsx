@@ -7,6 +7,12 @@ import { Dialogo } from "@/components/ui/dialogo";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { DetalleValidacion } from "./reading-form";
 
+const ETIQUETA_TIPO: Record<string, string> = {
+  LECTURA: "Lectura",
+  REINICIO: "Reinicio",
+  SUSTITUCION: "Sustitución",
+};
+
 export type LecturaVista = {
   id: string;
   value: number;
@@ -18,6 +24,8 @@ export type LecturaVista = {
   atipica: boolean;
   justificacion: string | null;
   valorOriginal: number | null;
+  tipoOriginal: string | null;
+  valorAnterior: number | null;
   correccionMotivo: string | null;
   correccionPor: string | null;
   correccionEl: string | null;
@@ -48,12 +56,13 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
                 </span>
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                {l.tipo === "REINICIO" ? <Badge tone="info">Reinicio</Badge> : null}
-                {l.tipo === "SUSTITUCION" ? <Badge tone="info">Sustitución</Badge> : null}
+                {l.tipo === "REINICIO" ? <Badge tone="info">Reinicio{l.valorAnterior !== null ? ` · antes ${formatNumber(l.valorAnterior, 1)} ${unit}` : ""}</Badge> : null}
+                {l.tipo === "SUSTITUCION" ? <Badge tone="info">Sustitución{l.valorAnterior !== null ? ` · antes ${formatNumber(l.valorAnterior, 1)} ${unit}` : ""}</Badge> : null}
+                {l.tipoOriginal ? <Badge tone="muted">Capturado como {ETIQUETA_TIPO[l.tipoOriginal] ?? l.tipoOriginal}</Badge> : null}
                 {l.atipica ? <Badge tone="warning">Atípica</Badge> : null}
                 {l.estado === "CORREGIDA" ? <Badge tone="muted">Corregida · original {formatNumber(l.valorOriginal ?? 0, 1)} {unit}</Badge> : null}
                 {anulada ? <Badge tone="danger">Anulada</Badge> : null}
-                {puedeCorregir && !anulada && l.tipo === "LECTURA" ? (
+                {puedeCorregir && !anulada ? (
                   <span className="ml-auto flex gap-2">
                     <button type="button" className="text-brand-600 hover:underline" onClick={() => setAccion({ lectura: l, tipo: "corregir" })}>
                       Corregir
@@ -82,6 +91,8 @@ export function Lecturas({ lecturas, unit, puedeCorregir }: { lecturas: LecturaV
 function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo: "corregir" | "anular"; unit: string; onCerrar: () => void }) {
   const router = useRouter();
   const [valor, setValor] = useState(String(lectura.value));
+  const esEvento = lectura.tipo !== "LECTURA";
+  const [tipoEvento, setTipoEvento] = useState(lectura.tipo);
   const [motivo, setMotivo] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +104,11 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
     const res = await fetch(`/api/readings/${lectura.id}`, {
       method: tipo === "corregir" ? "PATCH" : "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(tipo === "corregir" ? { value: Number(valor), motivo, confirmar } : { motivo }),
+      body: JSON.stringify(
+        tipo === "corregir"
+          ? { value: Number(valor), motivo, confirmar, ...(esEvento ? { tipo: tipoEvento } : {}) }
+          : { motivo },
+      ),
     });
     const data = await res.json();
     setCargando(false);
@@ -111,7 +126,7 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
 
   return (
     <Dialogo
-      titulo={tipo === "corregir" ? "Corregir lectura" : "Anular lectura"}
+      titulo={`${tipo === "corregir" ? "Corregir" : "Anular"} ${esEvento ? (ETIQUETA_TIPO[lectura.tipo] ?? "evento").toLowerCase() : "lectura"}`}
       descripcion={`${formatNumber(lectura.value, 1)} ${unit} del ${formatDateTime(lectura.readingAt)} — se conserva el valor original y queda en la bitácora; el promedio y los planes por uso se recalculan.`}
       onCerrar={onCerrar}
       ancho="sm"
@@ -121,9 +136,23 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
       }}
     >
       <div className="grid gap-3">
+        {tipo === "corregir" && esEvento ? (
+          <div>
+            <label className="label">Tipo de evento</label>
+            <select className="field" value={tipoEvento} onChange={(e) => setTipoEvento(e.target.value)}>
+              <option value="REINICIO">Reinicio del medidor</option>
+              <option value="SUSTITUCION">Sustitución del medidor</option>
+            </select>
+          </div>
+        ) : null}
+        {tipo === "anular" && esEvento ? (
+          <p className="rounded-lg bg-slate-50 p-2 text-[0.6875rem] text-slate-600">
+            Los planes por uso regresan al punto de partida anterior{lectura.valorAnterior !== null ? ` (${formatNumber(lectura.valorAnterior, 1)} ${unit})` : ""}. Si hay lecturas posteriores que dependen de este evento, el sistema no lo anulará y dirá cuáles son.
+          </p>
+        ) : null}
         {tipo === "corregir" ? (
           <div>
-            <label className="label">Valor correcto ({unit})</label>
+            <label className="label">{esEvento ? "Valor de arranque correcto" : "Valor correcto"} ({unit})</label>
             <input type="number" step="any" min={0} className="field" value={valor} onChange={(e) => { setValor(e.target.value); setAviso(null); }} />
           </div>
         ) : null}
@@ -146,7 +175,7 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
             </Button>
           ) : (
             <Button type="submit" size="sm" variant={tipo === "anular" ? "danger" : "primary"} disabled={cargando || motivo.trim().length < 3}>
-              {tipo === "corregir" ? "Guardar corrección" : "Anular lectura"}
+              {tipo === "corregir" ? "Guardar corrección" : esEvento ? "Anular evento" : "Anular lectura"}
             </Button>
           )}
         </div>

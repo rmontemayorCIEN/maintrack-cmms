@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { costoYParoPorActivo, indicadoresConComparacion, type Indicadores } from "../indicadores";
 import { describirPeriodo } from "../periodos";
+import { diaDelCompromiso } from "../vencimiento";
 import { evaluarPuntos } from "../predictive";
 import { saludDeDatos } from "../salud-datos";
 import { contextoDeLaEmpresa } from "../contexto-negocio";
@@ -269,7 +270,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       planesVencidos: planesVencidos.map((p) => ({
         plan: p.plan.name,
         activo: p.asset.code,
-        vencioEl: p.nextDueDate?.toISOString().slice(0, 10) ?? null,
+        vencioEl: p.nextDueDate ? diaDelCompromiso(p.nextDueDate, actual.periodo.zonaHoraria) : null,
         diasDeAtraso: p.nextDueDate
           ? Math.floor((hasta.getTime() - p.nextDueDate.getTime()) / DIA)
           : null,

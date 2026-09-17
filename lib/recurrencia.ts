@@ -1,4 +1,7 @@
 import { prisma } from "./db";
+import { TIPOS_DE_FALLA } from "./fallas";
+import { periodoDeLaEmpresa } from "./indicadores";
+import { claveDiaEnZona, dentroDe } from "./periodos";
 
 /**
  * El expediente de fallas de un equipo, calculado en codigo.
@@ -17,9 +20,12 @@ const DIA = 86_400_000;
 export type Expediente = Awaited<ReturnType<typeof expedienteDeFallas>>;
 
 export async function expedienteDeFallas(organizationId: string, assetId: string, dias = 365) {
-  const desde = new Date(Date.now() - dias * DIA);
+  // El mismo periodo que los indicadores: dias completos en la zona de la
+  // empresa. Antes eran 365 dias al milisegundo desde este instante.
+  const periodo = await periodoDeLaEmpresa(organizationId, dias);
+  const zona = periodo.zonaHoraria;
 
-  const [activo, ordenes] = await Promise.all([
+  const [activo, ordenes, paros] = await Promise.all([
     prisma.asset.findFirst({
       where: { id: assetId, organizationId },
       select: {
@@ -33,8 +39,14 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
     prisma.workOrder.findMany({
       where: {
         organizationId, assetId,
-        maintenanceType: { in: ["CORRECTIVE", "SAFETY"] },
-        createdAt: { gte: desde },
+        // El criterio de falla de `lib/fallas`, en la orden o en una actividad,
+        // y sin canceladas: una falla que no ocurrio no es recurrencia.
+        status: { not: "CANCELLED" },
+        OR: [
+          { maintenanceType: { in: [...TIPOS_DE_FALLA] } },
+          { tasks: { some: { maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
+        ],
+        createdAt: dentroDe(periodo),
       },
       orderBy: { createdAt: "asc" },
       select: {
@@ -45,6 +57,11 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
         rootCause: { select: { code: true, description: true } },
         partsUsed: { select: { quantity: true, cost: true, part: { select: { code: true, name: true } } } },
       },
+    }),
+    // El paro sale de los eventos de paro no planeados, como en los indicadores.
+    prisma.downtimeEvent.findMany({
+      where: { assetId, asset: { organizationId }, planned: false, startedAt: dentroDe(periodo) },
+      select: { minutes: true },
     }),
   ]);
   if (!activo) return null;
@@ -92,7 +109,7 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
   }
 
   const costo = ordenes.reduce((s, o) => s + o.totalCost, 0);
-  const paroHoras = Math.round(ordenes.reduce((s, o) => s + o.downtimeMinutes, 0) / 60);
+  const paroHoras = Math.round(paros.reduce((s, e) => s + e.minutes, 0) / 60);
 
   return {
     activo,
@@ -116,7 +133,7 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
     refaccionesMasUsadas: [...refacciones.values()].sort((a, b) => b.veces - a.veces).slice(0, 8),
     ordenes: ordenes.map((o) => ({
       folio: o.number,
-      cuando: o.createdAt.toISOString().slice(0, 10),
+      cuando: claveDiaEnZona(o.createdAt, zona),
       titulo: o.title,
       descripcion: o.description,
       resolucion: o.resolution,

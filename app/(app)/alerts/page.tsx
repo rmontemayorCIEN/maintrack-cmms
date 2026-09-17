@@ -63,7 +63,12 @@ export default async function AlertsPage() {
                       {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}
                     </Badge>
                     <Badge tone="muted">{STATUS_LABELS[alert.status]}</Badge>
-                    {alert.normalizadaEl ? <Badge tone="success">Normalizada: por validar</Badge> : null}
+                    {alert.normalizadaEl ? (
+                      <Badge tone="success">
+                        Normalizada: por validar
+                        {alert.normalizacionValor != null ? ` · lectura ${formatNumber(alert.normalizacionValor, 2)} ${alert.sensor?.unit ?? ""} del ${formatDateTime(alert.normalizacionLecturaEl)}` : ""}
+                      </Badge>
+                    ) : null}
                     {alert.sensor ? (
                       <Badge tone="info">{SENSOR_TYPE_LABELS[alert.sensor.sensorType]}</Badge>
                     ) : null}
@@ -143,7 +148,10 @@ export default async function AlertsPage() {
                   {history.map((alert) => (
                     <tr key={alert.id}>
                       <td className="text-xs text-slate-600">{alert.asset.code} · {alert.asset.name}</td>
-                      <td className="max-w-80 truncate text-xs text-slate-700">{alert.message}</td>
+                      <td className="max-w-80 text-xs text-slate-700">
+                        <p className="truncate">{alert.message}</p>
+                        {alert.resolucion ? <p className="truncate text-slate-400">Cierre: {alert.resolucion}</p> : null}
+                      </td>
                       <td>
                         <Badge tone={alert.severity === "CRITICAL" ? "danger" : "warning"}>
                           {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}

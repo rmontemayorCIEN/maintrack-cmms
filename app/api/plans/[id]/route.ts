@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { esquemaTarea, reemplazarTareas, validarRecursos } from "@/lib/plan-tasks";
+import { diariasSinConfirmar, esquemaTarea, validarRecursos } from "@/lib/plan-tasks";
+import { reemplazarTareasConRastro } from "@/lib/tareas-con-rastro";
 import { sembrarCalendarioDelPlan } from "@/lib/calendario-actividad";
 import { logAudit } from "@/lib/audit";
 
@@ -58,6 +59,14 @@ export async function PATCH(request: Request, { params }: Params) {
     if (tasks) {
       const problema = await validarRecursos(orgId, tasks);
       if (problema) return fail(problema, 422);
+      const sinConfirmar = diariasSinConfirmar(tasks, dias, trigger);
+      if (sinConfirmar.length) {
+        return fail(
+          `Confirme que estas actividades son diarias: ${sinConfirmar.join(", ")}. Una frecuencia diaria genera una visita cada día.`,
+          409,
+          { requiereConfirmacionDiaria: sinConfirmar },
+        );
+      }
     }
 
     const data: Record<string, unknown> = { ...input };
@@ -72,7 +81,9 @@ export async function PATCH(request: Request, { params }: Params) {
     // reemplazarTareas la puede bajar si alguna actividad no encaja, y de ahi
     // salen los multiplos que se persisten.
     if (tasks) {
-      await reemplazarTareas(id, tasks, plan.intervalDays);
+      await reemplazarTareasConRastro(id, tasks, plan.intervalDays, {
+        organizationId: orgId, userId: user.id, triggerType: plan.triggerType,
+      });
       // Una actividad recien agregada no tiene reloj en ninguno de los equipos
       // del plan. Sin esto no generaria nunca, y se veria igual que una que
       // todavia no toca.

@@ -1,4 +1,3 @@
-import { evaluarPuntos } from "./predictive";
 import { prisma } from "./db";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "./almacen";
 import { STATUS_TRANSITIONS } from "./constants";
@@ -364,28 +363,13 @@ export async function transitionWorkOrder(params: {
     });
 
     /**
-     * La OT predictiva terminada cierra su alerta SOLO si el punto ya esta en
-     * normal. Si la ultima lectura sigue sobre el umbral, el trabajo no lo
-     * corrigio (o falta medir despues de la intervencion): cerrarla esconderia
-     * un punto critico. Se queda abierta y visible.
+     * Completar la OT predictiva NO toca su alerta.
+     *
+     * Terminar el trabajo no prueba que la condicion se corrigio: eso lo dice
+     * la siguiente lectura. Mientras el punto siga fuera de rango la alerta
+     * queda activa; cuando una lectura lo muestre normal, la ingesta la marca
+     * como normalizada con esa lectura como evidencia, y alguien la valida.
      */
-    const alertasDeLaOrden = await prisma.predictiveAlert.findMany({
-      where: { organizationId: params.organizationId, workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
-      select: { id: true, sensorId: true },
-    });
-    if (alertasDeLaOrden.length) {
-      const vivas = await evaluarPuntos(params.organizationId, alertasDeLaOrden.map((a) => a.sensorId).filter(Boolean) as string[]);
-      const normales = alertasDeLaOrden.filter((a) => {
-        const e = a.sensorId ? vivas.get(a.sensorId) : undefined;
-        return !e || e.estado === "NORMAL";
-      });
-      if (normales.length) {
-        await prisma.predictiveAlert.updateMany({
-          where: { id: { in: normales.map((a) => a.id) } },
-          data: { status: "RESOLVED" },
-        });
-      }
-    }
 
     if (wo.createdById && wo.createdById !== params.userId) {
       await notify({

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
-import { esquemaTarea } from "@/lib/plan-tasks";
+import { diariasSinConfirmar, esquemaTarea } from "@/lib/plan-tasks";
 import { altaDePlan } from "@/lib/alta-de-plan";
 
 const schema = z.object({
@@ -59,6 +59,15 @@ export async function GET() {
 export async function POST(request: Request) {
   return withAuth("plan:write", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
+
+    const sinConfirmar = diariasSinConfirmar(input.tasks, input.intervalDays, input.triggerType);
+    if (sinConfirmar.length) {
+      return fail(
+        `Confirme que estas actividades son diarias: ${sinConfirmar.join(", ")}. Una frecuencia diaria genera una visita cada día.`,
+        409,
+        { requiereConfirmacionDiaria: sinConfirmar },
+      );
+    }
 
     const r = await altaDePlan(orgId, user.id, input);
     if ("error" in r) return ok({ error: r.error }, 422);

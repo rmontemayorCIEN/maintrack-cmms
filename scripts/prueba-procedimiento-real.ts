@@ -33,9 +33,27 @@ const revisar = (e: string, ok: boolean, nota = "") => {
   console.log(`  ${ok ? "ok   " : "FALLA"} ${e.padEnd(50)} ${nota}`);
 };
 
+/**
+ * La cuenta contra la que se prueba, SIEMPRE explicita.
+ *
+ * Antes tomaba las tres ordenes mas recientes de TODA la base. En desarrollo
+ * esas son las que dejo la ultima prueba que corrio sin limpiar (hay cientos de
+ * empresas de prueba huerfanas), asi que el resultado dependia del orden de la
+ * suite: sola pasaba —le tocaban ordenes sin activo y se negaba con motivo— y
+ * dentro de la suite fallaba —le tocaban las de «Ciclo», con activo, y llegaba
+ * a la IA sin llave—. No era intermitencia: era contaminacion entre pruebas.
+ */
+const SLUG = process.env.PRUEBA_ORG_SLUG ?? "acero-industrial";
+
 async function main() {
+  const org = await prisma.organization.findFirst({ where: { slug: SLUG }, select: { id: true } });
+  if (!org) {
+    console.error(`\n  No existe la cuenta «${SLUG}». Indique otra con PRUEBA_ORG_SLUG.\n`);
+    process.exitCode = 1;
+    return;
+  }
   const ordenes = await prisma.workOrder.findMany({
-    where: { status: { notIn: ["CANCELLED"] } },
+    where: { organizationId: org.id, status: { notIn: ["CANCELLED"] }, assetId: { not: null } },
     orderBy: { createdAt: "desc" },
     take: 3,
     select: {

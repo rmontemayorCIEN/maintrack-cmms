@@ -1,3 +1,4 @@
+import { periodoDeLaEmpresa } from "../indicadores";
 import { z } from "zod";
 import { prisma } from "../db";
 import { saludDeDatos } from "../salud-datos";
@@ -97,12 +98,14 @@ export async function generarDiagnostico(
     esfuerzo: "high",
   });
 
-  const hasta = new Date();
+  // El periodo guardado es el mismo que analizo el expediente: dias completos
+  // en la zona de la empresa (el `hasta` es exclusivo).
+  const periodo = await periodoDeLaEmpresa(org.id, dias);
   const guardado = await prisma.aiReport.create({
     data: {
       organizationId: org.id,
-      desde: new Date(hasta.getTime() - dias * 86_400_000),
-      hasta,
+      desde: periodo.desde,
+      hasta: periodo.hasta,
       resumen: datos.resumen,
       contenido: JSON.stringify(datos),
       saludDatos: salud.indice,

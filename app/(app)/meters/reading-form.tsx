@@ -16,6 +16,7 @@ type Contexto = {
   promedioDiario: number;
   maximoPermitido: number | null;
   unidad: string;
+  alternativas?: string[];
 };
 
 /** Lo que el servidor dice de una lectura que no paso limpia. */
@@ -27,17 +28,28 @@ export function DetalleValidacion({ contexto }: { contexto: Contexto }) {
     ["Incremento", contexto.incremento === null ? "—" : `${formatNumber(contexto.incremento, 1)} ${u}`],
     ["Tiempo transcurrido", contexto.horasTranscurridas === null ? "—" : contexto.horasTranscurridas < 48 ? `${formatNumber(contexto.horasTranscurridas, 1)} h` : `${formatNumber(contexto.horasTranscurridas / 24, 1)} días`],
     ["Uso por día de esta lectura", contexto.usoPorDia === null ? "—" : `${formatNumber(contexto.usoPorDia, 1)} ${u}/día`],
+    ["Máximo permitido", contexto.maximoPermitido === null ? "—" : `${formatNumber(contexto.maximoPermitido, 1)} ${u}`],
     ["Promedio actual", `${formatNumber(contexto.promedioDiario, 1)} ${u}/día`],
   ];
   return (
-    <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 text-[0.6875rem]">
-      {filas.map(([k, v]) => (
-        <div key={k} className="contents">
-          <dt className="text-slate-500">{k}</dt>
-          <dd className="text-right tabular-nums text-slate-800">{v}</dd>
+    <>
+      <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 text-[0.6875rem]">
+        {filas.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-slate-500">{k}</dt>
+            <dd className="text-right tabular-nums text-slate-800">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {contexto.alternativas?.length ? (
+        <div className="mt-1.5 text-[0.6875rem]">
+          <p className="font-semibold">Qué puede hacer:</p>
+          <ul className="list-disc pl-4">
+            {contexto.alternativas.map((a) => <li key={a}>{a}</li>)}
+          </ul>
         </div>
-      ))}
-    </dl>
+      ) : null}
+    </>
   );
 }
 
@@ -48,7 +60,8 @@ export function MeterReadingForm({
 }: {
   meterId: string;
   unit: string;
-  current: number;
+  /** Nulo: el medidor no tiene lectura vigente. */
+  current: number | null;
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -106,7 +119,7 @@ export function MeterReadingForm({
           step="any"
           min={0}
           className="field"
-          placeholder={tipo === "LECTURA" ? `Lectura (actual ${formatNumber(current, 0)} ${unit})` : `Valor inicial del medidor (${unit})`}
+          placeholder={tipo !== "LECTURA" ? `Valor inicial del medidor (${unit})` : current === null ? `Nueva lectura (${unit})` : `Lectura (actual ${formatNumber(current, 0)} ${unit})`}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);

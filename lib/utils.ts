@@ -17,18 +17,25 @@ export function formatNumber(value: number, digits = 1) {
   }).format(value || 0);
 }
 
-export function formatDate(value?: Date | string | null) {
+/**
+ * Un momento como fecha. En una pantalla que se dibuja en el SERVIDOR hay que
+ * pasar la zona de la empresa: produccion corre en UTC y, sin zona, una orden
+ * terminada a las 11 pm de Monterrey sale con la fecha del dia siguiente. En
+ * el navegador se puede omitir: usa la zona de quien mira.
+ */
+export function formatDate(value?: Date | string | null, zona?: string) {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", ...(zona ? { timeZone: zona } : {}) }).format(date);
 }
 
-export function formatDateTime(value?: Date | string | null) {
+export function formatDateTime(value?: Date | string | null, zona?: string) {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat("es-MX", {
     dateStyle: "medium",
     timeStyle: "short",
+    ...(zona ? { timeZone: zona } : {}),
   }).format(date);
 }
 

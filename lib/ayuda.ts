@@ -470,6 +470,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 ],
     tablaConfigurable: true,
     campos: [
+      { nombre: "Confirmo que esta actividad es diaria", explica: "Aparece cuando una actividad va cada día. Una rutina diaria es válida —la revisión de arranque de turno— pero también es el error de captura más caro: 365 visitas al año. No se guarda sin confirmarla; se registra quién la confirmó y cuándo. Si después deja de ser diaria, la confirmación se retira sola y queda en la bitácora. Las diarias sin confirmar (por ejemplo, importadas) aparecen como advertencia en el índice de captura." },
       { nombre: "Equipos", explica: "A cuántos equipos se aplica este plan. Cuando es uno solo se muestra cuál; cuando son varios, lo que importa es cuántos." },
       { nombre: "Plan", explica: "El nombre con el que lo va a reconocer el tecnico. Debajo van sus referencias y manuales." },
       { nombre: "Activo", explica: "A que equipo se le aplica. Un plan sin activo NO genera ordenes: es el motivo mas comun de que el programador no haga nada." },
@@ -960,6 +961,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Un plan por medidor no dispara por calendario sino cuando la lectura alcanza el intervalo.",
+      "Un horómetro que suma más horas que las transcurridas en el reloj es físicamente imposible: se bloquea y no se acepta con justificación. El mensaje dice la lectura anterior, la nueva, el incremento, las horas naturales y el máximo, y qué hacer: corregir, registrar sustitución o registrar reinicio.",
+      "Un reinicio o una sustitución también se corrige o se anula, con motivo, conservando el valor, el tipo, el usuario y la fecha originales.",
       "Cada lectura, corrección o anulación recalcula el valor actual, el promedio diario y la fecha estimada de los planes por uso.",
       "El promedio diario es el uso de los últimos 90 días entre los días que abarcan las lecturas, sin mezclar un medidor sustituido con el nuevo.",
       "Sin lecturas al día, esos planes no generan nunca.",
@@ -972,7 +975,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     noPuedo: [
       { sintoma: "Dice que la lectura es menor que la anterior", porque: "Un medidor no retrocede. Si se reinició o se cambió, regístrelo como tal; si la lectura anterior está mal, corríjala." },
       { sintoma: "Dice que un horómetro no puede sumar tantas horas", porque: "Entre las dos lecturas pasaron menos horas de reloj que las que marca. Es imposible, no atípico: revise la captura o la lectura anterior." },
-      { sintoma: "No puedo corregir un reinicio", porque: "Deshacerlo obligaría a recorrer a mano la meta de los planes. Registre un nuevo reinicio o sustitución con el valor correcto." },
+      { sintoma: "No me deja anular un reinicio o una sustitución", porque: "Hay lecturas posteriores que se midieron contra ese punto de partida y quedarían sin continuidad; el mensaje dice cuáles. Corrija el valor o el tipo del evento, o anule primero esas lecturas. Al anularlo o corregirlo, la meta de los planes por uso se recorre sola." },
+      { sintoma: "El medidor dice «Sin lectura vigente»", porque: "Todas sus lecturas están anuladas y no tiene un valor inicial registrado. No se muestra una lectura anulada como actual ni se proyecta nada con ella: registre una lectura nueva." },
     ],
   },
 
@@ -1001,7 +1005,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Vienen del predictivo y de las revisiones automáticas. No se capturan a mano.",
       "Cada alerta muestra el estado de HOY del punto, su tendencia y las fechas estimadas de cruce, recalculadas con las lecturas actuales; «Al detectar» es el mensaje original.",
       "Una alerta no se cierra sola cuando el valor regresa a normal: aparece «Normalizada: por validar» para que alguien confirme que no fue un sensor desconectado o una lectura suelta.",
-      "Completar la orden predictiva cierra la alerta solo si el punto ya está en normal; si sigue crítico, la alerta queda visible.",
+      "Completar o cerrar la orden predictiva NO cierra la alerta: terminar el trabajo no prueba que la condición se corrigió. La alerta sigue activa mientras el punto esté fuera de rango.",
+      "«Resolver» y «Validar normalización» solo proceden cuando una lectura mostró el punto en normal; la alerta guarda esa lectura como evidencia, y quién la cerró y cuándo.",
+      "«Descartar» es para falsas alarmas y pide el motivo.",
     ],
   },
 

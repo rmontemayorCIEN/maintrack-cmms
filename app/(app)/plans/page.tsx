@@ -148,6 +148,7 @@ export default async function PlansPage() {
          */
         cadaCuanto: t.cadaCuanto ? String(t.cadaCuanto) : undefined,
         unidadFrecuencia: t.unidadFrecuencia ?? "DIAS",
+        confirmarDiaria: Boolean(t.diariaConfirmadaEl),
         labor: t.labor.map((l) => ({
           specialtyId: l.specialtyId, personas: String(l.personas), hours: String(l.hours),
         })),

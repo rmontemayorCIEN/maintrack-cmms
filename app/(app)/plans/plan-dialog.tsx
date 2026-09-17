@@ -43,6 +43,8 @@ export type Task = {
   cadaCuanto?: string;
   /** DIAS | SEMANAS | MESES. */
   unidadFrecuencia?: string;
+  /** Confirmacion explicita de que una frecuencia diaria es intencional. */
+  confirmarDiaria?: boolean;
 };
 
 /** Un plan ya guardado, tal como lo manda la pagina para editarlo. */
@@ -300,6 +302,7 @@ export function PlanDialog({
           cadaDias: Number(t.cadaDias) || null,
           cadaCuanto: Number(t.cadaCuanto) || null,
           unidadFrecuencia: t.unidadFrecuencia || "DIAS",
+          confirmarDiaria: Boolean(t.confirmarDiaria),
           labor: t.labor.filter((l) => l.specialtyId).map((l) => ({
             specialtyId: l.specialtyId,
             personas: Number(l.personas || 1),
@@ -759,6 +762,28 @@ export function PlanDialog({
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+
+                    {form.triggerType === "CALENDAR" &&
+                    task.title.trim() &&
+                    ((Number(task.cadaCuanto) === 1 && (task.unidadFrecuencia ?? "DIAS") === "DIAS") ||
+                      (!Number(task.cadaCuanto) && Number(form.intervalDays) === 1)) ? (
+                      <label
+                        className={`mt-1.5 flex items-start gap-2 rounded-md px-2 py-1.5 text-[0.6875rem] ${
+                          task.confirmarDiaria ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={Boolean(task.confirmarDiaria)}
+                          onChange={(e) => cambiarTarea(index, { confirmarDiaria: e.target.checked })}
+                        />
+                        <span>
+                          Confirmo que esta actividad es <strong>diaria</strong>: genera una visita cada día (unas 365 al año).
+                          Se guarda quién lo confirmó y cuándo.
+                        </span>
+                      </label>
+                    ) : null}
 
                     <button
                       type="button"

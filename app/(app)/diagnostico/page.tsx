@@ -1,3 +1,5 @@
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { describirPeriodo } from "@/lib/periodos";
 import { NIVELES } from "@/lib/calidad-datos";
 import { AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -44,6 +46,7 @@ export default async function DiagnosticoPage() {
   ]);
 
   const entitlement = iaDeLaOrganizacion(user.organization);
+  const zona = await zonaDeLaEmpresa(user.organizationId);
   const nivel = nivelSalud(salud.indice);
   const puedeGenerar = can(user.role, "settings:write");
   const restantes = Math.max(0, entitlement.operaciones - consumo.operaciones);
@@ -164,7 +167,7 @@ export default async function DiagnosticoPage() {
                       : reporte.contenido.semaforo === "ATENCION" ? "Requiere atención" : "En riesgo"}
                   </Badge>
                   <span className="text-[0.6875rem] text-slate-400">
-                    {formatDateTime(reporte.creadoEl)} · periodo {reporte.desde.toISOString().slice(0, 10)} al {reporte.hasta.toISOString().slice(0, 10)}
+                    {formatDateTime(reporte.creadoEl, zona)} · periodo {describirPeriodo({ desde: reporte.desde, hasta: reporte.hasta, zonaHoraria: zona })}
                   </span>
                 </div>
                 <p className="text-sm leading-relaxed text-slate-800">{reporte.contenido.resumen}</p>

@@ -5,6 +5,8 @@ import { LecturaRechazada, anularLectura, corregirLectura } from "@/lib/medidore
 const corregir = z.object({
   value: z.coerce.number().min(0),
   readingAt: z.string().optional(),
+  /** Solo reinicios y sustituciones: cambiar uno por el otro. */
+  tipo: z.enum(["LECTURA", "REINICIO", "SUSTITUCION"]).optional(),
   motivo: z.string().trim().min(3, "Indique el motivo de la corrección"),
   confirmar: z.boolean().optional(),
 });
@@ -15,7 +17,7 @@ const anular = z.object({
 
 function traducir(error: unknown) {
   if (error instanceof LecturaRechazada) return fail(error.message, 422, { validacion: error.validacion });
-  if (error instanceof Error && /no encontrada|anulada|reinicio o sustitución/.test(error.message)) {
+  if (error instanceof Error && /no encontrada|anulada|no se convierte/.test(error.message)) {
     return fail(error.message, error.message.includes("no encontrada") ? 404 : 422);
   }
   throw error;
@@ -33,6 +35,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         userId: user.id,
         value: input.value,
         readingAt: input.readingAt ? new Date(input.readingAt) : undefined,
+        tipo: input.tipo,
         motivo: input.motivo,
         confirmar: input.confirmar,
       });

@@ -324,7 +324,7 @@ export async function ingestSensorReading(params: {
     where: { sensorId: sensor.id, organizationId: params.organizationId },
     orderBy: { readingAt: "desc" },
     take: LECTURAS_PARA_TENDENCIA,
-    select: { value: true, readingAt: true, status: true },
+    select: { id: true, value: true, readingAt: true, status: true },
   });
   const masReciente = history[0];
   await prisma.sensor.update({
@@ -395,8 +395,19 @@ export async function ingestSensorReading(params: {
       where: { id: existing.id },
       data: {
         ...camposDeEvaluacion(evaluacion, ahora),
-        // Normalizada: se marca, pero la alerta sigue abierta hasta validarla.
-        normalizadaEl: condicion === null ? (existing.normalizadaEl ?? ahora) : null,
+        // Normalizada: se marca con la lectura que lo mostro —la evidencia—,
+        // pero la alerta sigue abierta hasta que alguien la valide. Si vuelve
+        // a salirse de rango, la normalizacion y su evidencia se limpian.
+        ...(condicion === null
+          ? existing.normalizadaEl
+            ? {}
+            : {
+                normalizadaEl: ahora,
+                normalizacionLecturaId: masReciente.id,
+                normalizacionValor: masReciente.value,
+                normalizacionLecturaEl: masReciente.readingAt,
+              }
+          : { normalizadaEl: null, normalizacionLecturaId: null, normalizacionValor: null, normalizacionLecturaEl: null }),
         ...(escala
           ? {
               condicion,
@@ -453,6 +464,57 @@ export async function ingestSensorReading(params: {
   }
 
   return { status, evaluacion, condicion, alertId, workOrderNumber };
+}
+
+/**
+ * Cierra una alerta validando su normalizacion.
+ *
+ * «Resolver» y «validar normalizacion» son lo mismo: una alerta no se cierra
+ * mientras el punto siga fuera de rango. Exige que la ingesta haya registrado
+ * la lectura que mostro la normalizacion (la evidencia) y que el punto siga
+ * normal HOY. Guarda quien cerro, cuando, con que nota y con que lectura.
+ */
+export async function validarNormalizacion(params: {
+  organizationId: string;
+  alertId: string;
+  userId: string;
+  nota?: string | null;
+  ahora?: Date;
+}): Promise<{ alerta: Awaited<ReturnType<typeof prisma.predictiveAlert.update>> } | { error: string }> {
+  const alerta = await prisma.predictiveAlert.findFirst({
+    where: { id: params.alertId, organizationId: params.organizationId },
+  });
+  if (!alerta) return { error: "Alerta no encontrada" };
+  if (!["OPEN", "ACKNOWLEDGED"].includes(alerta.status)) return { error: "La alerta ya está cerrada" };
+  if (!alerta.normalizadaEl || !alerta.normalizacionLecturaId) {
+    return { error: "El punto sigue fuera de rango: la alerta se resuelve cuando una lectura muestre la normalización." };
+  }
+  const ahora = params.ahora ?? new Date();
+  const hoy = alerta.sensorId ? (await evaluarPuntos(params.organizationId, [alerta.sensorId], ahora)).get(alerta.sensorId) : undefined;
+  if (hoy && hoy.estado !== "NORMAL") {
+    return { error: `El punto volvió a ${hoy.etiquetaEstado.toLowerCase()}: no se puede validar la normalización.` };
+  }
+  const resolucion = params.nota?.trim() ||
+    `Normalización validada con la lectura ${alerta.normalizacionValor} del ${alerta.normalizacionLecturaEl?.toISOString()}`;
+  const actualizada = await prisma.predictiveAlert.update({
+    where: { id: alerta.id },
+    data: { status: "RESOLVED", resueltaPorId: params.userId, resueltaEl: ahora, resolucion },
+  });
+  await logAudit({
+    organizationId: params.organizationId,
+    userId: params.userId,
+    entity: "PredictiveAlert",
+    entityId: alerta.id,
+    action: "NORMALIZACION_VALIDADA",
+    summary: `${alerta.title}: normalización validada (normal desde ${alerta.normalizadaEl.toISOString()})`,
+    changes: {
+      lecturaId: alerta.normalizacionLecturaId,
+      valor: alerta.normalizacionValor,
+      lecturaEl: alerta.normalizacionLecturaEl?.toISOString() ?? null,
+      nota: params.nota ?? null,
+    },
+  });
+  return { alerta: actualizada };
 }
 
 /** Indice de salud 0-100 del activo a partir del estado de sus sensores. */

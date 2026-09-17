@@ -20,6 +20,11 @@ import {
 import { evaluarPunto, ingestSensorReading, textoDeCruce } from "../lib/predictive";
 import { revisarCalidad, validarFechasDeActivo } from "../lib/calidad-datos";
 import { saludDeDatos } from "../lib/salud-datos";
+import { planearRecalculo, recalcularMedidor } from "../lib/medidores";
+import { validarNormalizacion } from "../lib/predictive";
+import { diariasSinConfirmar, esquemaTarea } from "../lib/plan-tasks";
+import { reemplazarTareasConRastro as reemplazarTareas } from "../lib/tareas-con-rastro";
+import { formatDate, formatDateTime } from "../lib/utils";
 
 let fallas = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -191,7 +196,11 @@ async function main() {
       validarLectura({ medidor, anterior: anterior && { ...anterior, tipo: "LECTURA" }, siguiente: null, nueva: { value, readingAt, tipo, motivo }, ahora });
     revisar("lectura normal", val({ value: 100, readingAt: t(2) }, 120, t(1)).nivel === "OK");
     revisar("menor que la anterior: bloqueada", val({ value: 100, readingAt: t(2) }, 90, t(1)).codigo === "MENOR_QUE_ANTERIOR");
-    revisar("horómetro con más horas que el reloj: bloqueado (el caso CMP-301)", val({ value: 18420, readingAt: t(4) }, 20500, t(0)).codigo === "HORAS_IMPOSIBLES");
+    const imposible = val({ value: 18420, readingAt: t(4) }, 20500, t(0));
+    revisar("horómetro con más horas que el reloj: bloqueado (el caso CMP-301)", imposible.codigo === "HORAS_IMPOSIBLES" && imposible.nivel === "ERROR");
+    revisar("el mensaje dice anterior, nueva, incremento, horas naturales, máximo y alternativas",
+      ["18,420", "20,500", "2,080", "Horas naturales transcurridas", "Máximo permitido: 96 h", "corregir la lectura", "sustitución", "reinicio"].every((x) => imposible.mensaje.includes(x)) &&
+      imposible.contexto.maximoPermitido === 96 && imposible.contexto.alternativas.length === 3, imposible.mensaje);
     revisar("reinicio sin motivo: bloqueado", val({ value: 100, readingAt: t(2) }, 0, t(1), hor, "REINICIO").codigo === "FALTA_MOTIVO");
     revisar("reinicio con motivo: puede bajar", val({ value: 100, readingAt: t(2) }, 0, t(1), hor, "REINICIO", "cambio").nivel === "OK");
     const odo = { tipo: "ODOMETRO", unit: "km", maxIncrementoDiario: 500, dailyAverage: 200 };
@@ -211,6 +220,8 @@ async function main() {
     await reg(1100, t(15));
     revisar("menor que la anterior: rechazada", (await lanza(() => reg(1050, t(14)))) === "MENOR_QUE_ANTERIOR");
     revisar("200 h en 24 h de reloj: rechazada", (await lanza(() => reg(1300, t(14)))) === "HORAS_IMPOSIBLES");
+    revisar("y ni confirmando con justificación se acepta",
+      (await lanza(() => reg(1300, t(14), { confirmar: true, justificacion: "Lo vi yo" }))) === "HORAS_IMPOSIBLES");
     await reg(1115, t(14));
     let m = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id } });
     revisar("promedio desde el historial: 115 h en 6 días", cerca(m.dailyAverage, 115 / 6), m.dailyAverage);
@@ -226,7 +237,9 @@ async function main() {
     revisar("y en la bitácora", Boolean(await prisma.auditLog.findFirst({ where: { organizationId: orgA.id, entityId: lectura6?.id, action: "LECTURA_ATIPICA" } })));
     let a = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig.id } });
     m = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id } });
-    const esperada = (actual: number, prom: number) => ahora.getTime() + Math.ceil((1500 - actual) / prom) * DIA;
+    // Desde la medianoche de hoy en la zona de la empresa: asi el recalculo es idempotente.
+    const hoyEnZona = medianocheEnZona(...(claveDiaEnZona(ahora, ZONA).split("-").map(Number) as [number, number, number]), ZONA);
+    const esperada = (actual: number, prom: number) => hoyEnZona.getTime() + Math.ceil((1500 - actual) / prom) * DIA;
     revisar("el plan por uso recalcula su fecha estimada", Math.abs((a.nextDueDate?.getTime() ?? 0) - esperada(1138, m.dailyAverage)) < 1000, a.nextDueDate?.toISOString());
 
     const corr = await corregirLectura({ organizationId: orgA.id, readingId: lectura6!.id, userId: userA.id, value: 1130, motivo: "Se leyó mal un dígito", ahora });
@@ -255,8 +268,68 @@ async function main() {
     m = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id } });
     revisar("el promedio no mezcla medidor viejo y nuevo (1 día de tramo nuevo)", cerca(m.dailyAverage, 10), m.dailyAverage);
     const sust = await prisma.meterReading.findFirstOrThrow({ where: { meterId: medidor.id, tipo: "SUSTITUCION" } });
-    revisar("una sustitución no se corrige: se registra otra",
-      (await lanza(() => corregirLectura({ organizationId: orgA.id, readingId: sust.id, userId: userA.id, value: 5, motivo: "x", ahora }))) !== null);
+    revisar("la sustitución guarda el valor de antes para poder deshacerse", sust.valorAnterior === 1115, sust.valorAnterior);
+
+    console.log("\nMedidores: corregir y anular reinicios o sustituciones");
+    revisar("anularla dejaría la lectura posterior sin continuidad: se niega y dice por qué",
+      (await lanza(() => anularLectura({ organizationId: orgA.id, readingId: sust.id, userId: userA.id, motivo: "Capturada por error", ahora }))) === "ROMPE_CONTINUIDAD");
+    revisar("corregirla a un arranque mayor que la lectura siguiente: se niega",
+      (await lanza(() => corregirLectura({ organizationId: orgA.id, readingId: sust.id, userId: userA.id, value: 20, motivo: "x", ahora }))) === "ROMPE_CONTINUIDAD");
+    await corregirLectura({ organizationId: orgA.id, readingId: sust.id, userId: userA.id, value: 5, tipo: "REINICIO", motivo: "Fue reinicio, arrancó en 5", ahora });
+    const sustCorr = await prisma.meterReading.findUniqueOrThrow({ where: { id: sust.id } });
+    a = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig.id } });
+    revisar("corregida: conserva valor, tipo, usuario y fecha originales, y quién corrigió",
+      sustCorr.valorOriginal === 0 && sustCorr.tipoOriginal === "SUSTITUCION" && sustCorr.tipo === "REINICIO" && sustCorr.value === 5 &&
+      sustCorr.userId === userA.id && Boolean(sustCorr.fechaOriginal) && sustCorr.correccionPorId === userA.id && Boolean(sustCorr.correccionEl));
+    revisar("y la meta del plan se recorre por la diferencia (385 → 390)", a.nextDueMeter === 390, a.nextDueMeter);
+    const lectura10 = await prisma.meterReading.findFirstOrThrow({ where: { meterId: medidor.id, value: 10, estado: { not: "ANULADA" } } });
+    await anularLectura({ organizationId: orgA.id, readingId: lectura10.id, userId: userA.id, motivo: "Del medidor equivocado", ahora });
+    await anularLectura({ organizationId: orgA.id, readingId: sust.id, userId: userA.id, motivo: "El reinicio nunca ocurrió", ahora });
+    a = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig.id } });
+    m = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id } });
+    revisar("anulado el reinicio: la meta regresa a 1,500 y el medidor a 1,115", a.nextDueMeter === 1500 && m.currentValue === 1115, { meta: a.nextDueMeter, actual: m.currentValue });
+    revisar("el evento sigue ahí, anulado, con motivo", (await prisma.meterReading.findUniqueOrThrow({ where: { id: sust.id } })).estado === "ANULADA");
+    revisar("queda en la bitácora", (await prisma.auditLog.count({ where: { organizationId: orgA.id, entityId: sust.id, action: { in: ["CORREGIDA", "ANULADA"] } } })) === 2);
+
+    console.log("\nMedidores: sin lectura vigente");
+    const m2 = await prisma.meter.create({ data: { organizationId: orgA.id, assetId: a2.id, name: "Horómetro B", unit: "h", tipo: "HOROMETRO" } });
+    const plan2 = await prisma.maintenancePlan.create({ data: { organizationId: orgA.id, name: "Servicio B", triggerType: "METER", intervalMeter: 100 } });
+    const asig2 = await prisma.planAsset.create({ data: { organizationId: orgA.id, planId: plan2.id, assetId: a2.id, meterId: m2.id, nextDueMeter: 300 } });
+    const l1 = await registrarLectura({ organizationId: orgA.id, meterId: m2.id, userId: userA.id, value: 100, readingAt: t(5), ahora });
+    const l2 = await registrarLectura({ organizationId: orgA.id, meterId: m2.id, userId: userA.id, value: 110, readingAt: t(4), ahora });
+    if (l1.ok && l2.ok) {
+      await anularLectura({ organizationId: orgA.id, readingId: l2.lecturaId, userId: userA.id, motivo: "error", ahora });
+      await anularLectura({ organizationId: orgA.id, readingId: l1.lecturaId, userId: userA.id, motivo: "error", ahora });
+    }
+    const m2d = await prisma.meter.findUniqueOrThrow({ where: { id: m2.id } });
+    const a2d = await prisma.planAsset.findUniqueOrThrow({ where: { id: asig2.id } });
+    revisar("todas anuladas y sin valor inicial: «sin lectura vigente», sin actual ni promedio",
+      m2d.lecturaVigente === false && m2d.currentValue === 0 && m2d.dailyAverage === 0 && m2d.lastReadingAt === null, m2d);
+    revisar("y no se proyecta el plan con una lectura anulada", a2d.nextDueDate === null);
+    const m3 = await prisma.meter.create({ data: { organizationId: orgA.id, assetId: a2.id, name: "Contador C", unit: "ciclos", tipo: "CICLOS", currentValue: 50, valorInicial: 50, valorInicialEl: t(30) } });
+    const l3 = await registrarLectura({ organizationId: orgA.id, meterId: m3.id, userId: userA.id, value: 60, readingAt: t(3), ahora });
+    if (l3.ok) await anularLectura({ organizationId: orgA.id, readingId: l3.lecturaId, userId: userA.id, motivo: "error", ahora });
+    const m3d = await prisma.meter.findUniqueOrThrow({ where: { id: m3.id } });
+    revisar("con valor inicial formal: vuelve al valor inicial", m3d.lecturaVigente && m3d.currentValue === 50);
+    revisar("una lectura nueva devuelve la vigencia", (await registrarLectura({ organizationId: orgA.id, meterId: m2.id, userId: userA.id, value: 120, readingAt: t(1), ahora })).ok &&
+      (await prisma.meter.findUniqueOrThrow({ where: { id: m2.id } })).lecturaVigente === true);
+
+    console.log("\nRecálculo: ensayo e idempotencia");
+    await prisma.meter.update({ where: { id: medidor.id }, data: { dailyAverage: 99 } });
+    const ensayo = await planearRecalculo(prisma, orgA.id, medidor.id, ahora, ZONA);
+    revisar("el ensayo detecta el promedio desviado", ensayo.registrosAModificar > 0 && cerca(ensayo.antes.dailyAverage, 99) && !cerca(ensayo.despues.dailyAverage, 99));
+    revisar("y no escribe nada", (await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id } })).dailyAverage === 99);
+    await recalcularMedidor(orgA.id, medidor.id, ahora);
+    const segunda = await planearRecalculo(prisma, orgA.id, medidor.id, ahora, ZONA);
+    revisar("aplicado una vez, la segunda corrida no cambia nada", segunda.registrosAModificar === 0, segunda.registrosAModificar);
+    const conLegado = await prisma.meter.create({ data: { organizationId: orgA.id, assetId: a2.id, name: "Horómetro legado", unit: "h", tipo: "HOROMETRO" } });
+    await prisma.meterReading.createMany({ data: [
+      { organizationId: orgA.id, meterId: conLegado.id, value: 18420, readingAt: t(6) },
+      { organizationId: orgA.id, meterId: conLegado.id, value: 20500, readingAt: t(2) },
+    ] });
+    const planLegado = await planearRecalculo(prisma, orgA.id, conLegado.id, ahora, ZONA);
+    revisar("la lectura imposible se reporta y NO se corrige", planLegado.lecturasSospechosas.length === 1 && planLegado.despues.currentValue === 20500, planLegado.lecturasSospechosas);
+    revisar("otra empresa no puede planear sobre este medidor", (await lanza(() => planearRecalculo(prisma, orgB.id, conLegado.id, ahora))) === "Medidor no encontrado");
     revisar("otra empresa no puede registrar en este medidor",
       (await lanza(() => registrarLectura({ organizationId: orgB.id, meterId: medidor.id, userId: userB.id, value: 20, ahora }))) === "Medidor no encontrado");
     revisar("ni corregir sus lecturas",
@@ -301,12 +374,73 @@ async function main() {
       (await prisma.workOrder.count({ where: { organizationId: orgA.id, maintenanceType: "PREDICTIVE" } })) === 1);
     revisar("ninguna alerta activa guarda un cruce anterior a su detección",
       al.every((x) => !x.fechaCruceCritico || x.fechaCruceCritico >= x.createdAt) && al[0].estadoActual === "CRITICO");
-    await ingesta(2.0, 2);
+
+    console.log("\nPredictivo: completar o cerrar la OT no toca la alerta");
+    const otPred = await prisma.workOrder.findFirstOrThrow({ where: { organizationId: orgA.id, maintenanceType: "PREDICTIVE" } });
+    await transitionWorkOrder({ workOrderId: otPred.id, to: "IN_PROGRESS", userId: userA.id, organizationId: orgA.id });
+    await transitionWorkOrder({ workOrderId: otPred.id, to: "COMPLETED", userId: userA.id, organizationId: orgA.id });
     al = await alertas();
-    revisar("al normalizar no se resuelve sola: queda por validar", al.length === 1 && al[0].status === "OPEN" && Boolean(al[0].normalizadaEl));
-    await ingesta(7.6, 1);
+    revisar("completada la OT con el punto crítico: la alerta sigue abierta y crítica",
+      al.length === 1 && al[0].status === "OPEN" && al[0].severity === "CRITICAL" && al[0].normalizadaEl === null, al.map((x) => x.status));
+    await transitionWorkOrder({ workOrderId: otPred.id, to: "CLOSED", userId: userA.id, organizationId: orgA.id });
     al = await alertas();
-    revisar("si vuelve a subir, se limpia la normalización", al[0].normalizadaEl === null && al.length === 1);
+    revisar("cerrada la OT: la alerta sigue igual", al[0].status === "OPEN" && al[0].normalizadaEl === null);
+    revisar("no se puede resolver mientras siga fuera de rango",
+      "error" in (await validarNormalizacion({ organizationId: orgA.id, alertId: al[0].id, userId: userA.id, ahora })));
+
+    const r2 = await ingesta(2.0, 3);
+    al = await alertas();
+    const evidencia = await prisma.sensorReading.findFirst({ where: { id: al[0].normalizacionLecturaId ?? "" } });
+    revisar("al normalizar no se resuelve sola: queda por validar", al.length === 1 && al[0].status === "OPEN" && Boolean(al[0].normalizadaEl) && r2.condicion === null);
+    revisar("y guarda la lectura que lo mostró como evidencia", evidencia?.value === 2 && al[0].normalizacionValor === 2);
+    await ingesta(7.6, 2);
+    al = await alertas();
+    revisar("si vuelve a subir, se limpia la normalización y su evidencia", al[0].normalizadaEl === null && al[0].normalizacionLecturaId === null && al.length === 1);
+    await ingesta(2.1, 1);
+    al = await alertas();
+    revisar("la validación de otra empresa no alcanza esta alerta",
+      "error" in (await validarNormalizacion({ organizationId: orgB.id, alertId: al[0].id, userId: userB.id, ahora })));
+    const val2 = await validarNormalizacion({ organizationId: orgA.id, alertId: al[0].id, userId: userA.id, ahora });
+    al = await alertas();
+    revisar("validada: resuelta con quién, cuándo y la lectura de evidencia",
+      "alerta" in val2 && al[0].status === "RESOLVED" && al[0].resueltaPorId === userA.id && Boolean(al[0].resueltaEl) &&
+      al[0].normalizacionValor === 2.1 && Boolean(al[0].resolucion));
+    revisar("la validación queda en la bitácora", Boolean(await prisma.auditLog.findFirst({ where: { organizationId: orgA.id, entityId: al[0].id, action: "NORMALIZACION_VALIDADA" } })));
+
+    // ─────────────────────────────────────────── Rutinas diarias ───
+    console.log("\nRutinas diarias: confirmación explícita");
+    const tarea = (title: string, cadaCuanto: number, unidadFrecuencia: "DIAS" | "SEMANAS" | "MESES", confirmarDiaria?: boolean) =>
+      esquemaTarea.parse({ title, cadaCuanto, unidadFrecuencia, confirmarDiaria });
+    revisar("una diaria sin confirmar se detecta", JSON.stringify(diariasSinConfirmar([tarea("Purga", 1, "DIAS"), tarea("Aceite", 1, "MESES")], 7)) === JSON.stringify(["Purga"]));
+    revisar("confirmada ya no se pide", diariasSinConfirmar([tarea("Purga", 1, "DIAS", true)], 7).length === 0);
+    revisar("en planes por medidor no aplica", diariasSinConfirmar([tarea("Purga", 1, "DIAS")], 7, "METER").length === 0);
+    const planDiario = await prisma.maintenancePlan.create({ data: { organizationId: orgA.id, name: "Rutina de turno", triggerType: "CALENDAR", intervalDays: 7 } });
+    await reemplazarTareas(planDiario.id, [tarea("Purga de condensados", 1, "DIAS", true), tarea("Revisión semanal", 1, "SEMANAS")], 7, { organizationId: orgA.id, userId: userA.id, ahora });
+    let purga = await prisma.planTask.findFirstOrThrow({ where: { planId: planDiario.id, title: "Purga de condensados" } });
+    revisar("confirmada: guarda quién y cuándo", purga.diariaConfirmadaPorId === userA.id && Boolean(purga.diariaConfirmadaEl));
+    const primeraConfirmacion = purga.diariaConfirmadaEl;
+    await reemplazarTareas(planDiario.id, [tarea("Purga de condensados", 1, "DIAS", true), tarea("Revisión semanal", 1, "SEMANAS")], 7, { organizationId: orgA.id, userId: userB.id, ahora: new Date(ahora.getTime() + 60_000) });
+    purga = await prisma.planTask.findFirstOrThrow({ where: { planId: planDiario.id, title: "Purga de condensados" } });
+    revisar("editar el plan conserva la confirmación original", purga.diariaConfirmadaPorId === userA.id && purga.diariaConfirmadaEl?.getTime() === primeraConfirmacion?.getTime());
+    let reglasDiarias = await revisarCalidad(orgA.id, ahora);
+    revisar("una diaria confirmada no es problema de calidad", !reglasDiarias.find((x) => x.clave === "frecuencia-atipica")!.hallazgos.some((h) => h.id === purga.id));
+    await reemplazarTareas(planDiario.id, [tarea("Purga de condensados", 2, "DIAS"), tarea("Revisión semanal", 1, "SEMANAS")], 7, { organizationId: orgA.id, userId: userA.id, ahora });
+    purga = await prisma.planTask.findFirstOrThrow({ where: { planId: planDiario.id, title: "Purga de condensados" } });
+    revisar("deja de ser diaria: la confirmación se retira", purga.diariaConfirmadaEl === null && purga.id === purga.id);
+    revisar("con rastro en la bitácora", Boolean(await prisma.auditLog.findFirst({ where: { organizationId: orgA.id, entityId: purga.id, action: "CONFIRMACION_DIARIA_RETIRADA" } })));
+    const sinConfirmar = await prisma.planTask.create({ data: { planId: planDiario.id, title: "Diaria importada", cadaCuanto: 1, unidadFrecuencia: "DIAS", position: 9 } });
+    reglasDiarias = await revisarCalidad(orgA.id, ahora);
+    revisar("una diaria sin confirmar (importada) aparece como advertencia",
+      reglasDiarias.find((x) => x.clave === "frecuencia-atipica")!.hallazgos.some((h) => h.id === sinConfirmar.id) &&
+      reglasDiarias.find((x) => x.clave === "frecuencia-atipica")!.nivel === "ADVERTENCIA");
+
+    // ───────────────────────────────────────── IA y zona horaria ───
+    console.log("\nIA: ficha de activo y zona horaria");
+    const ficha = (await ejecutarHerramienta(orgA.id, "consultar_activo", { codigo: "A1" })) as { planes?: Array<{ plan: string }>; plans?: unknown };
+    revisar("la ficha de activo de la IA lee las asignaciones, no el encabezado del plan",
+      Boolean(ficha.planes?.some((p) => p.plan === "Servicio 500 h")) && ficha.plans === undefined, ficha.planes);
+    const once = new Date("2026-09-17T04:30:00Z"); // 11:30 pm del 16 en Monterrey
+    revisar("una fecha con zona de empresa no se recorre al día siguiente", formatDate(once, ZONA).includes("16") && formatDateTime(once, ZONA).includes("16"), formatDateTime(once, ZONA));
 
     // ─────────────────────────────────────────────── Calidad de datos ───
     console.log("\nCalidad de datos: reglas");

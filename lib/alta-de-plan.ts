@@ -91,7 +91,7 @@ export async function altaDePlan(
       nextDueDate:
         diaLocal(rest.nextDueDate) ??
         new Date(Date.now() + (cadencia.base ?? 30) * 86_400_000),
-      tasks: { create: crearTareas(tasks, cadencia.multiplos) },
+      tasks: { create: crearTareas(tasks, cadencia.multiplos, { userId, intervalDelPlan: cadencia.base, triggerType: rest.triggerType }) },
     },
     select: { id: true, name: true },
   });

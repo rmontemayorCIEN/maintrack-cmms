@@ -3,9 +3,11 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
+import { validarNormalizacion } from "@/lib/predictive";
 
 const schema = z.object({
   action: z.enum(["ACKNOWLEDGE", "DISMISS", "RESOLVE", "CREATE_WORK_ORDER", "VALIDATE_NORMALIZATION"]),
+  nota: z.string().trim().optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -56,36 +58,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
      * que es real (no un sensor desconectado ni una lectura suelta). Solo
      * procede si el sistema detecto la normalizacion.
      */
-    if (input.action === "VALIDATE_NORMALIZATION") {
-      if (!alert.normalizadaEl) return fail("El punto no ha regresado a valores normales", 409);
+    /**
+     * «Resolver» es lo mismo que validar la normalizacion: una alerta no se
+     * cierra mientras el punto siga fuera de rango. Para una falsa alarma esta
+     * «Descartar», que pide nota.
+     */
+    if (input.action === "VALIDATE_NORMALIZATION" || input.action === "RESOLVE") {
+      const r = await validarNormalizacion({ organizationId: orgId, alertId: id, userId: user.id, nota: input.nota });
+      if ("error" in r) return fail(r.error, 409);
+      return ok({ alert: r.alerta });
+    }
+
+    if (input.action === "DISMISS") {
+      if (!input.nota || input.nota.length < 3) return fail("Indique por qué se descarta la alerta", 422);
       const updated = await prisma.predictiveAlert.update({
         where: { id },
-        data: { status: "RESOLVED", acknowledgedById: user.id, acknowledgedAt: new Date() },
+        data: { status: "DISMISSED", resueltaPorId: user.id, resueltaEl: new Date(), resolucion: input.nota },
       });
       await logAudit({
-        organizationId: orgId,
-        userId: user.id,
-        entity: "PredictiveAlert",
-        entityId: id,
-        action: "NORMALIZACION_VALIDADA",
-        summary: `${alert.title}: normalización validada (normal desde ${alert.normalizadaEl.toISOString()})`,
+        organizationId: orgId, userId: user.id, entity: "PredictiveAlert", entityId: id,
+        action: "DESCARTADA", summary: `${alert.title}: descartada. ${input.nota}`,
       });
       return ok({ alert: updated });
     }
 
-    const statusMap = {
-      ACKNOWLEDGE: "ACKNOWLEDGED",
-      DISMISS: "DISMISSED",
-      RESOLVE: "RESOLVED",
-    } as const;
-
     const updated = await prisma.predictiveAlert.update({
       where: { id },
-      data: {
-        status: statusMap[input.action as keyof typeof statusMap],
-        acknowledgedById: user.id,
-        acknowledgedAt: new Date(),
-      },
+      data: { status: "ACKNOWLEDGED", acknowledgedById: user.id, acknowledgedAt: new Date() },
     });
     return ok({ alert: updated });
   });

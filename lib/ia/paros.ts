@@ -1,4 +1,5 @@
 import { zonaDeLaEmpresa } from "../indicadores";
+import { claveDiaEnZona } from "../periodos";
 import { z } from "zod";
 import { prisma } from "../db";
 import { analizarConIa, textoIa } from "./cliente";
@@ -144,7 +145,9 @@ export async function explicarParos(
     };
   }
 
-  const dia = (d: Date) => d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+  // En la zona de la empresa: el servidor corre en UTC.
+  const zona = await zonaDeLaEmpresa(org.id);
+  const dia = (d: Date) => d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: zona });
   const rotulo = params.rango
     ? `el tramo del ${dia(rango.desde)} al ${dia(rango.hasta)}`
     : PERIODOS[params.periodo].etiqueta.toLowerCase();
@@ -208,7 +211,7 @@ export async function explicarParos(
         causaRaiz: o.rootCause ? `${o.rootCause.code} — ${o.rootCause.description}` : null,
         minutosDeParo: o.downtimeMinutes,
         costo: o.totalCost,
-        cerrada: o.completedAt?.toISOString().slice(0, 10) ?? null,
+        cerrada: o.completedAt ? claveDiaEnZona(o.completedAt, zona) : null,
       })),
     },
   });

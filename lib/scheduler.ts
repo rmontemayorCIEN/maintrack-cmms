@@ -296,7 +296,7 @@ function resolveDueDate(plan: {
   nextDueMeter: number | null;
   lastCompletedAt: Date | null;
   createdAt: Date;
-  meter?: { currentValue: number; dailyAverage: number } | null;
+  meter?: { currentValue: number; dailyAverage: number; lecturaVigente?: boolean } | null;
 }): Date | null {
   if (plan.triggerType === "CALENDAR") {
     if (plan.nextDueDate) return plan.nextDueDate;
@@ -307,7 +307,9 @@ function resolveDueDate(plan: {
 
   if (plan.triggerType === "METER") {
     const meter = plan.meter;
-    if (!meter || !plan.intervalMeter) return null;
+    // Sin lectura vigente (todas anuladas) no hay de donde proyectar: no se
+    // genera ni se estima nada hasta que llegue una lectura nueva.
+    if (!meter || !plan.intervalMeter || meter.lecturaVigente === false) return null;
     const target = plan.nextDueMeter ?? meter.currentValue + plan.intervalMeter;
     const remaining = target - meter.currentValue;
     if (remaining <= 0) return new Date();
@@ -577,14 +579,14 @@ function avanzar(
     triggerType: string;
     intervalDays: number | null;
     intervalMeter: number | null;
-    meter?: { dailyAverage: number } | null;
+    meter?: { dailyAverage: number; lecturaVigente?: boolean } | null;
   },
   desde: Date,
 ): Date | null {
   if (plan.triggerType === "CALENDAR" && plan.intervalDays) {
     return addDays(desde, plan.intervalDays);
   }
-  if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter) {
+  if (plan.triggerType === "METER" && plan.intervalMeter && plan.meter && plan.meter.lecturaVigente !== false) {
     const rate = plan.meter.dailyAverage > 0 ? plan.meter.dailyAverage : 1;
     return addDays(desde, Math.ceil(plan.intervalMeter / rate));
   }

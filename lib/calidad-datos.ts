@@ -183,6 +183,8 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     prisma.planTask.findMany({
       where: {
         plan: { organizationId, active: true, triggerType: "CALENDAR" },
+        // Confirmada explicitamente = rutina valida, no problema de calidad.
+        diariaConfirmadaEl: null,
         OR: [
           { cadaCuanto: { lte: 1 }, unidadFrecuencia: "DIAS" },
           { cadaCuanto: null, plan: { intervalDays: { lte: 1 } } },
@@ -338,7 +340,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       porque: "Un plan sin actividades genera órdenes vacías.",
       enlace: "/plans", peso: 2, total: nPlanes },
     planesSinActividades.map((p) => ({ id: p.id, etiqueta: p.name, enlace: "/plans" }))),
-    regla({ clave: "frecuencia-atipica", titulo: "Actividades con frecuencia diaria por confirmar", nivel: "ADVERTENCIA",
+    regla({ clave: "frecuencia-atipica", titulo: "Rutinas diarias sin confirmar", nivel: "ADVERTENCIA",
       porque: "Una rutina diaria genera 365 visitas al año. Si fue un error de captura, satura el calendario y el backlog.",
       enlace: "/plans", peso: 1, total: nPlanes },
     actividadesDiarias.map((t) => ({ id: t.id, etiqueta: `${t.plan.name} · ${t.title}`, detalle: "cada día", enlace: "/plans" }))),

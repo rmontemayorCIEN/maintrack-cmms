@@ -68,7 +68,7 @@ export async function trabajoDisponible(
       where: { organizationId, assetId, active: true, plan: { active: true, tasks: { some: {} } } },
       select: {
         id: true, nextDueDate: true, nextDueMeter: true,
-        meter: { select: { currentValue: true, unit: true } },
+        meter: { select: { currentValue: true, unit: true, lecturaVigente: true } },
         plan: {
           select: {
             id: true, name: true, maintenanceType: true, estimatedHours: true, triggerType: true,
@@ -132,7 +132,7 @@ export async function trabajoDisponible(
      */
     const esMedidor = a.plan.triggerType === "METER";
     const medidorAlcanzado =
-      esMedidor && a.nextDueMeter != null && (a.meter?.currentValue ?? 0) >= a.nextDueMeter;
+      esMedidor && a.nextDueMeter != null && a.meter?.lecturaVigente !== false && (a.meter?.currentValue ?? 0) >= a.nextDueMeter;
     const medidorEnVentana =
       esMedidor && (medidorAlcanzado || (a.nextDueDate != null && a.nextDueDate <= hasta));
 

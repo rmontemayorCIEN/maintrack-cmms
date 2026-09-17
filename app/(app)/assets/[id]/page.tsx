@@ -30,7 +30,7 @@ import {
   WO_STATUS_COLORS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { dueLabel, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDia, formatNumber } from "@/lib/utils";
 import { can } from "@/lib/rbac";
 import { AssetDialog } from "../asset-dialog";
 import { Adjuntos } from "@/components/adjuntos";
@@ -65,7 +65,16 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       children: { select: { id: true, code: true, name: true, status: true } },
       meters: true,
       sensors: { include: { readings: { orderBy: { readingAt: "desc" }, take: 30 } } },
-      plans: { select: { id: true, name: true, nextDueDate: true, active: true, intervalDays: true, triggerType: true } },
+      // Los planes del equipo por su ASIGNACION: el encabezado del plan solo
+      // guarda el equipo con que nacio y su fecha dejo de moverse.
+      planesAsignados: {
+        select: {
+          id: true, active: true, nextDueDate: true, nextDueMeter: true,
+          plan: { select: { id: true, name: true, active: true, triggerType: true } },
+          meter: { select: { unit: true, currentValue: true, lecturaVigente: true } },
+        },
+        orderBy: { nextDueDate: "asc" },
+      },
     },
   });
   if (!asset) notFound();
@@ -325,14 +334,14 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             <Row label="Fabricante">{asset.manufacturer ?? "—"}</Row>
             <Row label="Modelo">{asset.model ?? "—"}</Row>
             <Row label="Número de serie">{asset.serialNumber ?? "—"}</Row>
-            <Row label="Fecha de compra">{formatDate(asset.purchaseDate)}</Row>
+            <Row label="Fecha de compra">{formatDia(asset.purchaseDate)}</Row>
             <Row label="Costo de adquisición">{formatCurrency(asset.purchaseCost, currency)}</Row>
             <Row label="Costo de reposición">{formatCurrency(asset.replacementCost, currency)}</Row>
             <Row label="Garantia">
               {asset.warrantyExpiry
                 ? asset.warrantyExpiry > new Date()
-                  ? `Vigente hasta ${formatDate(asset.warrantyExpiry)}`
-                  : `Vencida el ${formatDate(asset.warrantyExpiry)}`
+                  ? `Vigente hasta ${formatDia(asset.warrantyExpiry)}`
+                  : `Vencida el ${formatDia(asset.warrantyExpiry)}`
                 : "—"}
             </Row>
             <Row label="Paro acumulado">
@@ -359,12 +368,18 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 <li key={meter.id} className="rounded-lg border border-slate-200 p-3">
                   <div className="flex items-baseline justify-between">
                     <p className="text-xs font-medium text-slate-700">{meter.name}</p>
-                    <p className="text-sm font-semibold tabular-nums text-slate-900">
-                      {formatNumber(meter.currentValue, 0)} <span className="text-[0.6875rem] text-slate-400">{meter.unit}</span>
-                    </p>
+                    {meter.lecturaVigente ? (
+                      <p className="text-sm font-semibold tabular-nums text-slate-900">
+                        {formatNumber(meter.currentValue, 0)} <span className="text-[0.6875rem] text-slate-400">{meter.unit}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs font-semibold text-amber-700">Sin lectura vigente</p>
+                    )}
                   </div>
                   <p className="mt-0.5 text-[0.6875rem] text-slate-400">
-                    Promedio {formatNumber(meter.dailyAverage, 1)} {meter.unit}/dia · ultima lectura {formatDate(meter.lastReadingAt)}
+                    {meter.lecturaVigente
+                      ? `Promedio ${formatNumber(meter.dailyAverage, 1)} ${meter.unit}/día · última lectura ${formatDate(meter.lastReadingAt, zona)}`
+                      : "Todas sus lecturas están anuladas: requiere una lectura nueva."}
                   </p>
                 </li>
               ))}
@@ -373,16 +388,24 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
           <div className="mt-4 border-t border-slate-100 pt-4">
             <p className="mb-2 text-xs font-semibold text-slate-700">Planes asociados</p>
-            {asset.plans.length === 0 ? (
+            {asset.planesAsignados.length === 0 ? (
               <p className="text-xs text-slate-400">Sin planes preventivos</p>
             ) : (
               <ul className="grid gap-1.5">
-                {asset.plans.map((plan) => {
-                  const due = dueLabel(plan.nextDueDate);
+                {asset.planesAsignados.map((a) => {
+                  const activo = a.active && a.plan.active;
+                  const porUso = a.plan.triggerType === "METER" && a.nextDueMeter != null && a.meter;
+                  const due = porUso && a.meter!.lecturaVigente
+                    ? a.nextDueMeter! - a.meter!.currentValue <= 0
+                      ? { texto: "Meta de uso alcanzada", tono: "danger" as const }
+                      : { texto: `Faltan ${formatNumber(a.nextDueMeter! - a.meter!.currentValue, 0)} ${a.meter!.unit}`, tono: "muted" as const }
+                    : porUso
+                      ? { texto: "Sin lectura vigente", tono: "warning" as const }
+                      : estadoDeVencimiento({ status: "OPEN", dueDate: a.nextDueDate }, { zona });
                   return (
-                    <li key={plan.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className={plan.active ? "text-slate-700" : "text-slate-400 line-through"}>{plan.name}</span>
-                      <Badge tone={due.tone === "muted" ? "muted" : due.tone}>{due.text}</Badge>
+                    <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className={activo ? "text-slate-700" : "text-slate-400 line-through"}>{a.plan.name}</span>
+                      <Badge tone={due.tono}>{due.texto}</Badge>
                     </li>
                   );
                 })}
@@ -513,7 +536,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                     </td>
                     <td><Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge></td>
                     <td className="text-xs text-slate-600">{wo.assignedTo?.name ?? "—"}</td>
-                    <td className="text-xs text-slate-500">{formatDate(wo.completedAt ?? wo.createdAt)}</td>
+                    <td className="text-xs text-slate-500">{formatDate(wo.completedAt ?? wo.createdAt, zona)}</td>
                     <td>
                       {(() => {
                         const v = estadoDeVencimiento(wo, { zona });

@@ -592,6 +592,15 @@ model Meter {
   /// Nulo: sin limite configurado. En horometros solo puede bajar de 24.
   maxIncrementoDiario Float?
 
+  /// Valor inicial registrado formalmente al dar de alta el medidor. Es lo
+  /// unico que vale como "actual" cuando no queda ninguna lectura vigente.
+  valorInicial   Float?
+  valorInicialEl DateTime?
+
+  /// Falso cuando todas las lecturas estan anuladas y no hay valor inicial:
+  /// el medidor se muestra "Sin lectura vigente" y no se proyecta nada.
+  lecturaVigente Boolean @default(true)
+
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   readings     MeterReading[]
@@ -630,6 +639,12 @@ model MeterReading {
   /// El valor tal como se capturo la primera vez, si luego se corrigio.
   valorOriginal     Float?
   fechaOriginal     DateTime?
+  /// El tipo con que se capturo, si una correccion lo cambio (p. ej. un
+  /// reinicio que era sustitucion).
+  tipoOriginal      String?
+  /// En un REINICIO o SUSTITUCION: el valor del medidor justo antes. Con el se
+  /// recorren los planes al registrarlo y se deshace al anularlo o corregirlo.
+  valorAnterior     Float?
   correccionPorId   String?
   correccionEl      DateTime?
   correccionMotivo  String?
@@ -756,6 +771,12 @@ model PlanTask {
   /// "Cada lunes" no necesita un tipo propio: es una semana anclada en lunes,
   /// y el ancla la pone `PlanTaskAsset`.
   unidadFrecuencia String  @default("DIAS")
+
+  /// Una frecuencia diaria es valida en rutinas de turno, pero tambien es el
+  /// error de captura mas caro (365 visitas al ano). Se confirma explicitamente
+  /// y se guarda quien y cuando; nulo en una diaria = advertencia de calidad.
+  diariaConfirmadaPorId String?
+  diariaConfirmadaEl    DateTime?
   unit             String?
   minValue         Float?
   maxValue         Float?
@@ -1944,6 +1965,17 @@ model PredictiveAlert {
   /// Cuando el valor regreso a normal. La alerta NO se cierra sola: alguien
   /// valida que la normalizacion es real (no un sensor desconectado).
   normalizadaEl DateTime?
+
+  /// La lectura que mostro la normalizacion: la evidencia con que se valido.
+  normalizacionLecturaId String?
+  normalizacionValor     Float?
+  normalizacionLecturaEl DateTime?
+
+  /// Quien cerro la alerta, cuando y con que nota. Aparte de `acknowledgedBy`
+  /// para no perder quien la reconocio.
+  resueltaPorId String?
+  resueltaEl    DateTime?
+  resolucion    String?
   acknowledgedById   String?
   acknowledgedAt     DateTime?
   createdAt          DateTime  @default(now())
