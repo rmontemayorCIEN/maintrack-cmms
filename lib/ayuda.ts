@@ -720,11 +720,13 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Movimiento", explica: "Entrada de compra, salida a mantenimiento, devolución, ajuste de conteo o las dos mitades de un traspaso." },
       { nombre: "Entra / Sale", explica: "Columnas separadas a proposito: es como se lee un kardex y evita confundir el signo." },
       { nombre: "Saldo", explica: "Lo que quedo en ESE almacen despues del movimiento. Es contra lo que se cuadra un conteo fisico." },
-      { nombre: "Documento", explica: "El vale, el traspaso o la orden que lo origino. Es liga: lleva al documento completo." },
-      { nombre: "Recibio", explica: "A quien se le entrego fisicamente. Puede no ser quien pidio." },
+      { nombre: "Documento", explica: "El vale, la recepcion de compra, el traspaso o la orden que lo origino. Es liga: lleva al documento completo. En una entrada de compra se lee «RE-000002 · RC-000001» y lleva a la compra, con su proveedor, su remision y quien firmo." },
+      { nombre: "Recibio", explica: "Quien recibio el material fisicamente: a quien se le entrego en una salida, o quien firmo la recepcion en una entrada de compra." },
+      { nombre: "Registro", explica: "La persona que capturo el movimiento en el sistema. No siempre es la misma que lo recibio." },
     ],
     preguntas: [
-      { pregunta: "¿Quién movió esta refacción?", respuesta: "Filtre por esa refacción. Cada renglón trae quién lo registró, a quién se le entregó y el documento —vale, traspaso u orden— que lo originó." },
+      { pregunta: "¿Quién movió esta refacción?", respuesta: "Filtre por esa refacción. Cada renglón trae quién lo registró, quién lo recibió y el documento —vale, recepción de compra, traspaso u orden— que lo originó." },
+      { pregunta: "¿Por qué una entrada vieja no trae documento?", respuesta: "Los movimientos anteriores a esta versión solo guardaban la referencia en texto. Se pueden volver a ligar con su recepción: el folio ya está en la referencia y el enlace se reconstruye sin adivinar nada. Pídalo y se hace." },
     ],
   },
 
