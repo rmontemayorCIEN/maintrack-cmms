@@ -19,6 +19,7 @@ import {
   ErrorDeCompra, autorizar, crearRequisicionDeCompra, cubiertoPorCompras, enCompra, recibir,
 } from "../lib/compras";
 import { can } from "../lib/rbac";
+import { consumePart } from "../lib/workorders";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -399,6 +400,24 @@ async function main() {
       grupoCorr.tipo === "CORRECTIVE" && grupoCorr.costoNeto === 75 && grupoCorr.devuelto === 0, grupoCorr.costoNeto);
     revisar("el consumo general de la orden queda sin tipo, sin inventarle uno",
       grupoGeneral.tipo === null && grupoGeneral.costoNeto === 5);
+
+    // Una refaccion cargada a mano en la orden, sin vale: tambien tiene que verse.
+    const otSoloCargo = await prisma.workOrder.create({
+      data: {
+        organizationId: org.id, number: "OT-M3", title: "Carga directa sin vale", assetId: activo.id,
+        maintenanceType: "CORRECTIVE", status: "IN_PROGRESS", startedAt: new Date(), assignedToId: almacenista.id,
+      },
+    });
+    const banda = await parte("BAN-9", 4, 60);
+    await consumePart({
+      organizationId: org.id, workOrderId: otSoloCargo.id, partId: banda.id,
+      quantity: 2, userId: almacenista.id, warehouseId: almacen.id,
+    });
+    const soloCargo = await materialPorActividad(org.id, otSoloCargo.id);
+    revisar("una refacción cargada directo a la orden, sin vale, se ve como consumo general con su costo",
+      soloCargo.length === 1 && soloCargo[0].taskId === null && soloCargo[0].renglones.length === 0 &&
+      soloCargo[0].costoNeto === 120,
+      soloCargo.map((g) => [g.taskId, g.costoNeto]));
 
     await prisma.workOrder.update({ where: { id: otMixta.id }, data: { status: "COMPLETED", completedAt: new Date(), resolution: "Hecho" } });
     const porTipo = await costoDeMaterialPorTipo(org.id, new Date(Date.now() - 86_400_000), new Date(Date.now() + 86_400_000));

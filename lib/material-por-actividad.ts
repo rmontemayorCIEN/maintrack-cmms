@@ -95,16 +95,21 @@ export async function materialPorActividad(organizationId: string, workOrderId: 
     grupos.set(t.id, nuevo(t.id, t.title, tipoDeActividad(t.maintenanceType, orden.maintenanceType), false));
   }
 
+  /**
+   * El grupo sin actividad: material de la orden completa, refaccion cargada a
+   * mano en la orden, o un vale anterior a que se guardara la actividad. En
+   * ninguno de los tres casos se le inventa un tipo.
+   */
+  const general = () => {
+    const previo = grupos.get("__general");
+    if (previo) return previo;
+    const g = nuevo(null, "Consumo general de la OT / actividad no especificada", null, true);
+    grupos.set("__general", g);
+    return g;
+  };
+
   for (const r of renglones) {
-    const suyo = r.taskId ? grupos.get(r.taskId) : undefined;
-    const grupo = suyo ?? grupos.get("__general") ?? (() => {
-      // Sin actividad: el material es de la orden completa, o el vale es
-      // anterior a que se guardara la actividad. En ninguno de los dos casos se
-      // le inventa un tipo.
-      const g = nuevo(null, "Consumo general de la OT / actividad no especificada", null, true);
-      grupos.set("__general", g);
-      return g;
-    })();
+    const grupo = (r.taskId ? grupos.get(r.taskId) : undefined) ?? general();
 
     const comprada = r.compras
       .filter((c) => ESTADOS_COMPRA_ABIERTA.includes(c.request.estado) || ["RECIBIDA", "CERRADA"].includes(c.request.estado))
@@ -135,8 +140,9 @@ export async function materialPorActividad(organizationId: string, workOrderId: 
   // El costo neto sale de los cargos de la orden, que es donde vive el dinero:
   // ahi entran tambien las refacciones cargadas a mano, sin pasar por un vale.
   for (const c of cargos) {
-    const grupo = c.taskId ? grupos.get(c.taskId) : grupos.get("__general");
-    if (!grupo) continue;
+    // Un cargo sin actividad tambien cuenta: es la refaccion que se puso
+    // directo en la orden, y antes no aparecia por ningun lado.
+    const grupo = (c.taskId ? grupos.get(c.taskId) : undefined) ?? general();
     grupo.costoNeto += c.cost;
   }
 
