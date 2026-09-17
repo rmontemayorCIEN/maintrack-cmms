@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { revisarSemana } from "@/lib/ia/agenda";
 
+/** El modelo tarda de 15 a 60 s; sin esto la plataforma podria cortar antes. */
+export const maxDuration = 120;
+
 const schema = z.object({
   desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use el formato AAAA-MM-DD").optional(),
 });

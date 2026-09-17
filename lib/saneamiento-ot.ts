@@ -13,6 +13,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { filtroDeFalla } from "./fallas";
+import { motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "./reglas-ot";
 
 export const ESTADOS_ACTIVOS_OT = ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"];
 /** Dias que puede esperar una orden completada su cierre administrativo antes de contarse como pendiente. */
@@ -70,7 +71,7 @@ export async function filtrosDelProceso(organizationId: string, ahora = new Date
     } satisfies Prisma.WorkOrderWhereInput,
 
     convertidas: { organizationId, status: "CONVERTED" } satisfies Prisma.WorkRequestWhereInput,
-    /** Marcadas como convertidas sin orden, o ligadas a una orden cancelada. */
+    /** Convertidas sin OT activa: sin orden ligada, o con su orden cancelada. */
     solicitudesHuerfanas: {
       organizationId, status: "CONVERTED",
       OR: [{ workOrderId: null }, { workOrder: { status: "CANCELLED" } }],
@@ -100,7 +101,7 @@ export const TITULOS_SANEAMIENTO: Record<keyof ListaSaneamiento, string> = {
   parosSinDuracion: "Requirieron paro sin duración registrada",
   completadasSinCerrar: `Completadas pendientes de cierre administrativo (más de ${DIAS_PARA_CERRAR} días)`,
   activasSinResponsable: "Órdenes activas sin responsable",
-  solicitudesHuerfanas: "Solicitudes convertidas sin OT, o ligadas a una OT cancelada",
+  solicitudesHuerfanas: TITULO_SOLICITUDES_SIN_OT,
   actividadesSinResolver: "Actividades de órdenes terminadas sin resolver ni enviar al backlog",
 };
 
@@ -146,7 +147,7 @@ export async function listaDeSaneamientoOt(organizationId: string, ahora = new D
     activasSinResponsable: sinResp.map((o) => ot(o, `${o.status}${o.startedAt ? `, iniciada el ${fecha(o.startedAt)}` : ""}`)),
     solicitudesHuerfanas: huerfanas.map((r) => ({
       folio: r.number, titulo: r.title,
-      detalle: r.workOrder ? `ligada a ${r.workOrder.number}, que está cancelada` : `convertida el ${fecha(r.reviewedAt)} sin orden registrada`,
+      detalle: `${motivoSinOtActiva("CONVERTED", r.workOrder)?.largo ?? ""} Convertida el ${fecha(r.reviewedAt)}.`,
       enlace: `/requests/${r.id}`,
     })),
     actividadesSinResolver: actividades.map((t) => ({

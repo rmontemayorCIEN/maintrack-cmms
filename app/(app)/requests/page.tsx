@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { Paperclip } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -28,7 +29,7 @@ export default async function RequestsPage() {
         asset: { select: { code: true, name: true } },
         requestedBy: { select: { name: true, color: true } },
         reviewedBy: { select: { name: true } },
-        workOrder: { select: { id: true, number: true } },
+        workOrder: { select: { id: true, number: true, status: true } },
         _count: { select: { attachments: true } },
       },
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -136,11 +137,15 @@ export default async function RequestsPage() {
                         <Link href={`/work-orders/${request.workOrder.id}`} className="text-brand-600 hover:underline">
                           {request.workOrder.number}
                         </Link>
-                      ) : request.status === "CONVERTED" ? (
-                        <span className="text-amber-700" title="Marcada como convertida sin orden registrada: aparece en la calidad de captura para revisarla">
-                          Sin OT registrada
-                        </span>
-                      ) : "—"}
+                      ) : null}
+                      {(() => {
+                        const sinOt = motivoSinOtActiva(request.status, request.workOrder);
+                        return sinOt ? (
+                          <span className="block text-amber-700" title={`${sinOt.largo} Aparece en la calidad de captura para revisarla.`}>
+                            {sinOt.corto}
+                          </span>
+                        ) : request.workOrder ? null : "—";
+                      })()}
                     </td>
                     {canReview ? (
                       <td className="text-right">

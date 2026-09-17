@@ -19,6 +19,7 @@
  */
 import { prisma } from "./db";
 import { filtrosDelProceso, DIAS_PARA_CERRAR } from "./saneamiento-ot";
+import { motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "./reglas-ot";
 
 const DIA = 86_400_000;
 const HORA = 3_600_000;
@@ -132,7 +133,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     prisma.workRequest.count({ where: f.convertidas }),
     prisma.workRequest.findMany({
       where: f.solicitudesHuerfanas,
-      select: { id: true, number: true, title: true, workOrder: { select: { number: true } } },
+      select: { id: true, number: true, title: true, workOrder: { select: { number: true, status: true } } },
     }),
     prisma.workOrderTask.count({ where: f.actividadesDeTerminadas }),
     prisma.workOrderTask.findMany({
@@ -344,12 +345,12 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     regla({ clave: "activas-sin-responsable", titulo: "Órdenes activas sin responsable", nivel: "ADVERTENCIA", critica: true,
       porque: "Trabajo que nadie tiene en su carga: no aparece en la programación de ninguna persona y se queda sin atender.",
       enlace: "/backlog", peso: 2, total: nActivas }, activasSinResponsable.map((o) => ot(o))),
-    regla({ clave: "solicitudes-sin-ot", titulo: "Solicitudes convertidas sin orden de trabajo", nivel: "ADVERTENCIA", critica: true,
+    regla({ clave: "solicitudes-sin-ot", titulo: TITULO_SOLICITUDES_SIN_OT, nivel: "ADVERTENCIA", critica: true,
       porque: "Quien reportó cree que ya se atiende, pero no hay orden viva que lo haga.",
       enlace: "/requests", peso: 2, total: nConvertidas },
     solicitudesHuerfanas.map((r) => ({
       id: r.id, etiqueta: `${r.number} · ${r.title}`,
-      detalle: r.workOrder ? `ligada a ${r.workOrder.number}, cancelada` : "sin orden registrada",
+      detalle: motivoSinOtActiva("CONVERTED", r.workOrder)?.largo,
       enlace: `/requests/${r.id}`,
     }))),
     regla({ clave: "actividades-sin-resolver", titulo: "Actividades sin resolver en órdenes terminadas", nivel: "ADVERTENCIA", critica: true,

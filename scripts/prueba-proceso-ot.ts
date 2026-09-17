@@ -10,12 +10,12 @@
  */
 import { prisma } from "../lib/db";
 import { asegurarEditable, consumePart, ErrorDeOrden, recalcWorkOrder, transitionWorkOrder } from "../lib/workorders";
-import { accionesDisponibles, faltantesDeCierre } from "../lib/reglas-ot";
+import { accionesDisponibles, faltantesDeCierre, motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "../lib/reglas-ot";
 import { aprobarSolicitud, rechazarSolicitud } from "../lib/solicitudes";
 import { trabajoPendiente } from "../lib/backlog";
 import { esReprogramacion, revisarProgramacion, validarDatosDeProgramacion } from "../lib/programacion";
 import { saludDeDatos } from "../lib/salud-datos";
-import { listaDeSaneamientoOt } from "../lib/saneamiento-ot";
+import { listaDeSaneamientoOt, TITULOS_SANEAMIENTO } from "../lib/saneamiento-ot";
 import { can } from "../lib/rbac";
 
 let fallos = 0;
@@ -155,6 +155,30 @@ async function main() {
     const log3b = await prisma.auditLog.findFirst({ where: { entityId: o3b.id, action: "STATUS_CHANGED" } });
     revisar("supervisor inicia sin responsable solo con motivo, y queda en auditoría",
       JSON.parse(log3b!.changes).iniciadaSinResponsable === true && JSON.parse(log3b!.changes).motivo === "Emergencia en turno nocturno");
+
+    // Prohibicion y excepcion controlada, rol por rol.
+    const sinResp = async () => nuevaOt();
+    const oS1 = await sinResp();
+    await rechaza("supervisor sin tomarla y sin motivo: prohibido", () => t(oS1.id, "IN_PROGRESS", "SUPERVISOR", sup.id), 422, "no tiene responsable");
+    await rechaza("supervisor con motivo demasiado corto: prohibido", () => t(oS1.id, "IN_PROGRESS", "SUPERVISOR", sup.id, { motivo: "ya" }), 422);
+    revisar("y la orden sigue abierta, sin inicio registrado",
+      await prisma.workOrder.findUniqueOrThrow({ where: { id: oS1.id } }).then((o) => o.status === "OPEN" && o.startedAt === null && o.assignedToId === null));
+    await rechaza("solicitante no puede iniciar ni tomándola", () => t(oS1.id, "IN_PROGRESS", "REQUESTER", solicitante.id, { tomarla: true }), 403);
+    await rechaza("consulta no puede iniciar ni tomándola", () => t(oS1.id, "IN_PROGRESS", "VIEWER", consulta.id, { tomarla: true }), 403);
+    const oS2 = await sinResp();
+    await t(oS2.id, "IN_PROGRESS", "ADMIN", admin.id, { motivo: "Arranque urgente por paro de línea" });
+    const oS2d = await prisma.workOrder.findUniqueOrThrow({ where: { id: oS2.id }, include: { comments: true } });
+    revisar("administración: excepción con motivo — inicia, queda SIN responsable (no se inventa uno)",
+      oS2d.status === "IN_PROGRESS" && oS2d.assignedToId === null && !!oS2d.startedAt);
+    revisar("la excepción queda visible en la bitácora de la orden",
+      oS2d.comments.some((c) => c.body === "Iniciada sin responsable: Arranque urgente por paro de línea"), oS2d.comments.map((c) => c.body));
+    const oS3 = await sinResp();
+    await t(oS3.id, "IN_PROGRESS", "SUPERVISOR", sup.id, { tomarla: true });
+    revisar("supervisor que la toma queda como responsable (sin excepción)",
+      (await prisma.workOrder.findUniqueOrThrow({ where: { id: oS3.id } })).assignedToId === sup.id &&
+      JSON.parse((await prisma.auditLog.findFirstOrThrow({ where: { entityId: oS3.id, action: "STATUS_CHANGED" } })).changes).iniciadaSinResponsable === undefined);
+    revisar("la excepción queda contada: la orden aparece en «activas sin responsable»",
+      (await listaDeSaneamientoOt(orgA.id)).activasSinResponsable.some((r) => r.folio === oS2.number));
 
     // ───────────────────────────────────────── 4. Pausa y reprogramación ───
     console.log("\n4. Pausa y reprogramación");
@@ -334,6 +358,19 @@ async function main() {
     revisar("y no se creó ningún cargo en la orden", (await prisma.workOrderPart.count({ where: { workOrderId: o3.id } })) === 0);
     revisar("el backlog de otra empresa no ve estas órdenes", (await trabajoPendiente(orgB.id, { zona: ZONA })).length === 0);
 
+    // ───────────────────────────────────────── 10b. Textos de solicitudes sin OT activa ───
+    console.log("\n10b. Texto de solicitudes sin OT activa");
+    const sinOrden = motivoSinOtActiva("CONVERTED", null);
+    const cancelada = motivoSinOtActiva("CONVERTED", { number: "OT-000110", status: "CANCELLED" });
+    revisar("sin orden ligada: «Sin OT activa» y explica que nunca quedó ligada",
+      sinOrden?.corto === "Sin OT activa" && /no quedó ligada/.test(sinOrden.largo), sinOrden);
+    revisar("con orden cancelada: nombra la orden y dice que está cancelada",
+      cancelada?.corto === "Sin OT activa (cancelada)" && cancelada.largo.includes("OT-000110 está cancelada"), cancelada);
+    revisar("con orden viva, pendiente o rechazada: no aplica",
+      motivoSinOtActiva("CONVERTED", { number: "OT-1", status: "IN_PROGRESS" }) === null &&
+      motivoSinOtActiva("CONVERTED", { number: "OT-1", status: "CLOSED" }) === null &&
+      motivoSinOtActiva("PENDING", null) === null && motivoSinOtActiva("REJECTED", null) === null);
+
     // ───────────────────────────────────────── 11. Calidad de captura ───
     console.log("\n11. Calidad de captura");
     // 20 preventivas cerradas; 3 sin horas (15 %) y una sin horas pero justificada.
@@ -355,6 +392,8 @@ async function main() {
     // Solicitud marcada como convertida sin orden (dato historico).
     await prisma.workRequest.create({ data: { organizationId: orgA.id, number: "SS-HUERF", title: "Huérfana", status: "CONVERTED" } });
     const lista = await listaDeSaneamientoOt(orgA.id);
+    revisar("calidad y lista usan el mismo título «sin OT activa»",
+      salud.revisiones.some((r) => r.titulo === TITULO_SOLICITUDES_SIN_OT) && TITULOS_SANEAMIENTO.solicitudesHuerfanas === TITULO_SOLICITUDES_SIN_OT);
     revisar("la lista de saneamiento reporta la solicitud huérfana sin inventarle OT",
       lista.solicitudesHuerfanas.some((r) => r.folio === "SS-HUERF") &&
       (await prisma.workRequest.findFirstOrThrow({ where: { organizationId: orgA.id, number: "SS-HUERF" } })).workOrderId === null);

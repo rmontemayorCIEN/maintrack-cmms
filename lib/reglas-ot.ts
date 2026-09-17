@@ -186,3 +186,35 @@ export function faltantesDeCierre(d: DatosDeCierre): string[] {
   }
   return faltan;
 }
+
+// ─────────────────────────────────────────── Solicitudes sin OT activa ───
+
+export const TITULO_SOLICITUDES_SIN_OT = "Solicitudes convertidas sin OT activa";
+
+/**
+ * Por que una solicitud convertida no tiene una orden viva que la atienda, en
+ * las palabras que ven la lista, el detalle, la calidad de captura y la lista
+ * de saneamiento. Nulo si no aplica.
+ *
+ * Son dos casos distintos y el texto no debe decir lo mismo: una nunca quedo
+ * ligada a una orden; la otra si tiene orden, pero esta cancelada.
+ */
+export function motivoSinOtActiva(
+  status: string,
+  orden: { number: string; status: string } | null | undefined,
+): { corto: string; largo: string } | null {
+  if (status !== "CONVERTED") return null;
+  if (!orden) {
+    return {
+      corto: "Sin OT activa",
+      largo: "Se marcó como convertida, pero no quedó ligada a ninguna orden de trabajo.",
+    };
+  }
+  if (orden.status === "CANCELLED") {
+    return {
+      corto: "Sin OT activa (cancelada)",
+      largo: `Su orden ${orden.number} está cancelada: nadie la está atendiendo.`,
+    };
+  }
+  return null;
+}

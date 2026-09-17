@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2, Sparkles, Layers, ShieldAlert, X } from "lucide-react";
 import { Badge, Button, Card } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { pedirJson } from "@/lib/pedir";
+import { rangoDeSemana } from "@/lib/semana";
 
 type Revision = {
   resumen: string;
@@ -33,54 +35,64 @@ export function RevisarSemana({ semana }: { semana: string }) {
   // Por indice del movimiento: "aplicando", "aplicado" o el error que dio.
   const [estado, setEstado] = useState<Record<number, string>>({});
   const [aplicandoTodo, setAplicandoTodo] = useState(false);
+  const rango = rangoDeSemana(semana);
 
   async function aplicar(indice: number) {
     const m = revision?.movimientos[indice];
-    if (!m || estado[indice] === "aplicado") return;
+    if (!m || estado[indice] === "aplicado" || estado[indice] === "aplicando") return;
     setEstado((e) => ({ ...e, [indice]: "aplicando" }));
 
-    const res = await fetch("/api/ia/agenda/aplicar", {
+    const r = await pedirJson<{ aviso?: string | null }>("/api/ia/agenda/aplicar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orden: m.orden, aFecha: m.aFecha, aResponsable: m.aResponsable }),
+      limiteMs: 30_000,
     });
-    const cuerpo = await res.json().catch(() => null);
-
-    if (!res.ok) {
-      setEstado((e) => ({ ...e, [indice]: cuerpo?.error ?? "No se pudo aplicar" }));
+    if (!r.ok) {
+      setEstado((e) => ({ ...e, [indice]: r.error || "No se pudo aplicar" }));
       return;
     }
-    setEstado((e) => ({ ...e, [indice]: cuerpo?.aviso ? `aplicado — ${cuerpo.aviso}` : "aplicado" }));
+    setEstado((e) => ({ ...e, [indice]: r.cuerpo?.aviso ? `aplicado — ${r.cuerpo.aviso}` : "aplicado" }));
     startTransition(() => router.refresh());
   }
 
   async function aplicarTodo() {
-    if (!revision) return;
+    if (!revision || aplicandoTodo) return;
     setAplicandoTodo(true);
-    // En serie y no en paralelo: cada movimiento cambia la carga del dia, y en
-    // paralelo el ultimo podria aterrizar sobre un dia que los anteriores ya
-    // llenaron.
-    for (let i = 0; i < revision.movimientos.length; i++) {
-      if (estado[i] === "aplicado") continue;
-      await aplicar(i);
+    try {
+      // En serie y no en paralelo: cada movimiento cambia la carga del dia, y en
+      // paralelo el ultimo podria aterrizar sobre un dia que los anteriores ya
+      // llenaron.
+      for (let i = 0; i < revision.movimientos.length; i++) {
+        if (estado[i] === "aplicado") continue;
+        await aplicar(i);
+      }
+    } finally {
+      setAplicandoTodo(false);
     }
-    setAplicandoTodo(false);
   }
 
+  /**
+   * El boton siempre se destraba: `pedirJson` no lanza y tiene tiempo limite.
+   * Antes, si la red fallaba a media peticion, «Revisando…» se quedaba para
+   * siempre porque la linea que lo quitaba nunca corria.
+   */
   async function revisar() {
+    if (cargando) return;
     setCargando(true); setError(null); setRevision(null);
-    const res = await fetch("/api/ia/agenda", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ desde: semana }),
-    });
-    setCargando(false);
-    const cuerpo = await res.json().catch(() => null);
-    if (!res.ok) {
-      setError(cuerpo?.error ?? "No fue posible revisar la semana.");
-      return;
+    try {
+      const r = await pedirJson<{ revision: Revision }>("/api/ia/agenda", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ desde: semana }),
+        limiteMs: 120_000,
+      });
+      if (!r.ok) { setError(r.error || "No fue posible revisar la semana."); return; }
+      if (!r.cuerpo?.revision) { setError("La revisión llegó vacía. Intente de nuevo."); return; }
+      setRevision(r.cuerpo.revision);
+    } finally {
+      setCargando(false);
     }
-    setRevision(cuerpo.revision);
   }
 
   const fmt = (iso: string) =>
@@ -89,9 +101,9 @@ export function RevisarSemana({ semana }: { semana: string }) {
 
   return (
     <>
-      <Button variant="ghost" onClick={revisar} disabled={cargando}>
+      <Button variant="ghost" onClick={revisar} disabled={cargando} title={`Revisa la semana ${rango.texto}`}>
         {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-        {cargando ? "Revisando…" : "Revisar la semana"}
+        {cargando ? "Revisando… (puede tardar hasta un minuto)" : "Revisar la semana"}
       </Button>
 
       {error ? (
@@ -108,7 +120,10 @@ export function RevisarSemana({ semana }: { semana: string }) {
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-              <p className="text-sm text-slate-700">{revision.resumen}</p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Semana {rango.texto}</p>
+                <p className="text-sm text-slate-700">{revision.resumen}</p>
+              </div>
             </div>
             <button
               type="button"

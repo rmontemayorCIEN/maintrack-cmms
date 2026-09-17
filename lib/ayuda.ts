@@ -883,7 +883,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Al aprobarla nace una orden de trabajo con su folio propio, o se suma como actividad a una orden abierta del mismo equipo. La solicitud muestra siempre la OT ligada.",
       "Convertir es a prueba de doble clic: aunque se presione dos veces, sale una sola orden. Queda registrado quién la aprobó y convirtió, o quién la rechazó.",
       "Rechazar exige motivo, y quien reportó lo recibe.",
-      "Una solicitud marcada como convertida sin orden registrada se muestra «Sin OT registrada» y aparece en la calidad de captura; el sistema no le inventa una orden.",
+      "Una solicitud convertida que no tiene una OT activa —porque nunca quedó ligada a una orden, o porque su orden está cancelada— se muestra «Sin OT activa» y aparece en la calidad de captura. El sistema no le inventa ni le reasigna una orden: alguien decide si se vuelve a atender.",
     ],
     campos: [
       { nombre: "Posible condición de riesgo", explica: "Aparece en rojo cuando lo reportado menciona algo peligroso. Se detecta al recibir, en el acto y sin IA, porque un «huele a gas» no puede esperar a que alguien abra la bandeja." },
@@ -929,7 +929,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "La vista de semana pone a cada persona en su renglón: ahí se ve si alguien trae tres días saturados mientras otro está libre. En el mes eso queda escondido porque todo se mezcla por día.",
       "La vista de día muestra una sola jornada completa: la carga de cada quien y todas sus órdenes con sus horas. Es la vista para arrancar la mañana.",
       "El botón «Ejecutar programador» crea las órdenes de los planes que ya vencieron, y dice por qué saltó las que no generó.",
-      "«Revisar la semana» le pide a la IA que lea la carga real y proponga qué mover, qué juntar en una sola visita y qué no tocar. Es una propuesta: no cambia nada, usted decide qué aplicar.",
+      "«Revisar la semana» le pide a la IA que lea la carga real y proponga qué mover, qué juntar en una sola visita y qué no tocar. Es una propuesta: no cambia nada, usted decide qué aplicar. Revisa la semana que está viendo: en la vista de mes, la semana de hoy (o la primera del mes si ve otro mes); el resultado dice qué semana revisó. Tarda de 15 segundos a un minuto; si no hay respuesta en dos minutos o se cae la conexión, se cancela y lo dice.",
     ],
     campos: [
       { nombre: "Las horas de la esquina del día", explica: "La suma de horas estimadas de lo asignado ese día. En ámbar cuando alguien pasa de su jornada." },
@@ -1069,7 +1069,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "«Generar diagnóstico actualizado» agrega uno nuevo; los anteriores se conservan.",
       "Los números se calculan en el sistema; la IA los interpreta pero no los inventa. Son los mismos indicadores, periodo y zona horaria que el Panel y Reportes.",
       "La calidad de la captura sale de las mismas reglas de calidad de datos: errores (datos imposibles), advertencias (datos sospechosos) y recomendaciones (datos que faltan). Cada una lleva a los registros exactos.",
-      "Las reglas del proceso de órdenes —terminadas sin horas, correctivas sin diagnóstico, paros sin duración, activas sin responsable, solicitudes convertidas sin OT y actividades sin resolver— son críticas: cada 1 % de incumplimiento resta 3 puntos a esa regla, y en el índice pesan el doble que las demás. Así una cuenta con esas carencias no aparece con calidad casi perfecta. Es aritmética, sin IA.",
+      "Las reglas del proceso de órdenes —terminadas sin horas, correctivas sin diagnóstico, paros sin duración, activas sin responsable, solicitudes convertidas sin OT activa y actividades sin resolver— son críticas: cada 1 % de incumplimiento resta 3 puntos a esa regla, y en el índice pesan el doble que las demás. Así una cuenta con esas carencias no aparece con calidad casi perfecta. Es aritmética, sin IA.",
       "Se genera solo cada semana, y puede pedirlo cuando quiera.",
     ],
   },

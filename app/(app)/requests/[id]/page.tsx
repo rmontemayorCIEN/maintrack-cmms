@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -217,11 +218,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                   {MAINTENANCE_TYPE_LABELS[solicitud.workOrder.maintenanceType]}
                 </Badge>
               </Fila>
-            ) : solicitud.status === "CONVERTED" ? (
-              <Fila label="Orden generada">
+            ) : null}
+            {motivoSinOtActiva(solicitud.status, solicitud.workOrder) ? (
+              <Fila label="Sin OT activa">
                 <span className="text-amber-700">
-                  Sin orden registrada. La solicitud figura como convertida pero no quedó ligada a ninguna OT;
-                  se reporta en la calidad de captura para que alguien la revise.
+                  {motivoSinOtActiva(solicitud.status, solicitud.workOrder)!.largo} Se reporta en la calidad de captura
+                  para que alguien decida si se vuelve a atender.
                 </span>
               </Fila>
             ) : null}

@@ -116,6 +116,16 @@ npx tsx scripts/prueba-asignaciones.ts >/dev/null 2>&1 \
   && echo "     Planes aplicados a varios equipos correctos." \
   || { echo "     ERROR: la prueba de asignaciones fallo."; npx tsx scripts/prueba-asignaciones.ts; exit 1; }
 
+# El proceso de ordenes: estados, permisos por rol, cierre, backlog, doble clic
+# y aislamiento. Y que «Revisar la semana» nunca se quede trabado.
+npx tsx scripts/prueba-proceso-ot.ts >/dev/null 2>&1 \
+  && echo "     Proceso de ordenes: roles, transiciones y aislamiento correctos." \
+  || { echo "     ERROR: la prueba del proceso de ordenes fallo."; npx tsx scripts/prueba-proceso-ot.ts; exit 1; }
+
+npx tsx scripts/prueba-revisar-semana.ts >/dev/null 2>&1 \
+  && echo "     Revisar la semana termina siempre y revisa la semana correcta." \
+  || { echo "     ERROR: la prueba de revisar la semana fallo."; npx tsx scripts/prueba-revisar-semana.ts; exit 1; }
+
 npx tsx scripts/prueba-ciclo-completo.ts >/dev/null 2>&1 \
   && echo "     Ciclo completo plan-orden-refaccion-cierre correcto." \
   || { echo "     ERROR: el ciclo completo fallo."; npx tsx scripts/prueba-ciclo-completo.ts; exit 1; }

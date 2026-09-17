@@ -9,6 +9,8 @@ import { RevisarSemana } from "./revisar-semana";
 import { Calendario } from "./calendario";
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { semanaARevisar } from "@/lib/semana";
+import { claveDiaEnZona } from "@/lib/periodos";
 
 export const metadata = { title: "Calendario" };
 export const dynamic = "force-dynamic";
@@ -134,7 +136,14 @@ export default async function CalendarPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <RevisarSemana semana={first.toISOString().slice(0, 10)} />
+          <RevisarSemana
+            semana={semanaARevisar({
+              vista,
+              desde: first.toISOString().slice(0, 10),
+              hasta: last.toISOString().slice(0, 10),
+              hoy: claveDiaEnZona(new Date(), zona),
+            })}
+          />
           <RunSchedulerButton />
         </div>
       </div>

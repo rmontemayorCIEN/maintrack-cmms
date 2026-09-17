@@ -623,15 +623,22 @@ export async function transitionWorkOrder(params: {
 
   // El motivo tambien queda a la vista en la orden, donde lo lee quien la retome.
   if (motivo) {
-    const PASO: Record<string, string> = {
-      ON_HOLD: "En espera", CANCELLED: "Cancelada", IN_PROGRESS: "Devuelta a proceso",
-      COMPLETED: "Reabierta", OPEN: "Reactivada", ASSIGNED: wo.status === "CANCELLED" ? "Reactivada" : "Reanudada",
-    };
+    // El nombre del paso depende de donde venia: pasar a «en proceso» es
+    // iniciar, reanudar o devolver segun el estado anterior.
+    const paso =
+      params.to === "ON_HOLD" ? "En espera"
+        : params.to === "CANCELLED" ? "Cancelada"
+        : wo.status === "CANCELLED" ? "Reactivada"
+        : wo.status === "CLOSED" ? "Reabierta"
+        : wo.status === "COMPLETED" ? "Devuelta a proceso"
+        : wo.status === "ON_HOLD" ? "Reanudada"
+        : params.to === "IN_PROGRESS" ? "Iniciada"
+        : etiqueta(params.to);
     await prisma.workOrderComment.create({
       data: {
         workOrderId: wo.id,
         userId: params.userId,
-        body: `${PASO[params.to] ?? etiqueta(params.to)}${excepcionSinResponsable ? " sin responsable" : ""}: ${motivo}`,
+        body: `${paso}${excepcionSinResponsable ? " sin responsable" : ""}: ${motivo}`,
       },
     });
   }
