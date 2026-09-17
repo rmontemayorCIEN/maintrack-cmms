@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
-import { URGENCIAS } from "@/lib/requisiciones";
+import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type RefaccionCompra = { id: string; code: string; name: string; unit: string; costo: number };
-type Renglon = { partId: string; descripcion: string; cantidad: string; costo: string };
+type Renglon = { partId: string; descripcion: string; cantidad: string; costo: string; materialRequestLineId?: string | null };
 
 /**
  * Alta de requisicion de compra.
@@ -23,7 +23,7 @@ export function CompraDialog({
   refacciones: RefaccionCompra[];
   proveedores: { id: string; name: string }[];
   materialRequestId?: string;
-  precargados?: Array<{ partId: string | null; descripcion: string; cantidad: number }>;
+  precargados?: Array<{ partId: string | null; descripcion: string; cantidad: number; materialRequestLineId?: string }>;
   etiqueta?: string;
 }) {
   const router = useRouter();
@@ -64,6 +64,9 @@ export function CompraDialog({
           descripcion: p.descripcion,
           cantidad: String(p.cantidad),
           costo: String(p.partId ? porId.get(p.partId)?.costo ?? 0 : 0),
+          // De que renglon del vale viene: asi la compra queda ligada al
+          // faltante y el sistema puede impedir que se compre dos veces.
+          materialRequestLineId: p.materialRequestLineId ?? null,
         }))
       : [{ partId: "", descripcion: "", cantidad: "", costo: "" }],
   );
@@ -85,6 +88,7 @@ export function CompraDialog({
         descripcion: r.partId ? `${porId.get(r.partId)?.code} — ${porId.get(r.partId)?.name}` : r.descripcion.trim(),
         cantidadSolicitada: Number(r.cantidad),
         costoEstimado: Number(r.costo) || 0,
+        materialRequestLineId: r.materialRequestLineId ?? null,
       }));
     if (!validos.length) { setError("Agregue al menos un renglón con cantidad"); return; }
 

@@ -1,3 +1,4 @@
+import { cubiertoPorCompras } from "@/lib/compras";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -5,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { ESTADOS, MOTIVOS, URGENCIAS } from "@/lib/requisiciones";
+import { ESTADOS, MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesRequisicion, type RenglonVale } from "./acciones";
 import { CompraDialog } from "../../compras/compra-dialog";
@@ -27,7 +28,7 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
       solicitante: { select: { name: true } },
       workOrder: { select: { id: true, number: true, title: true } },
       asset: { select: { id: true, code: true, name: true } },
-      renglones: { include: { part: { select: { id: true, code: true, unit: true } } } },
+      renglones: { include: { part: { select: { id: true, code: true, unit: true, unitCost: true } } } },
       movements: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -78,21 +79,30 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
     surtida: r.cantidadSurtida,
     devuelta: r.cantidadDevuelta,
     disponible: r.partId ? existencias.get(r.partId) ?? 0 : null,
+    // Una refaccion sin costo entra a la orden en cero y el costo por equipo
+    // sale corto. Se avisa aqui, que es donde alguien puede capturarlo.
+    sinCosto: !!r.partId && (r.part?.unitCost ?? 0) <= 0,
   }));
+  const sinCosto = renglones.filter((r) => r.sinCosto);
 
   // Lo que el almacen no puede cubrir: o no esta en catalogo, o no alcanza la
   // existencia. Es exactamente lo que tiene que ir a compras.
+  // Lo que ya esta en una compra viva no se vuelve a mandar: se descuenta del
+  // faltante y se dice en que folio va.
+  const yaEnCompra = await cubiertoPorCompras(user.organizationId, req.id);
   const faltantes = renglones
     .map((r) => {
       const pendiente = r.solicitada - r.surtida;
       if (pendiente <= 0.0001) return null;
       const cubre = r.disponible === null ? 0 : Math.min(pendiente, r.disponible);
-      const falta = pendiente - cubre;
+      const comprado = yaEnCompra.get(r.id)?.cantidad ?? 0;
+      const falta = pendiente - cubre - comprado;
       if (falta <= 0.0001) return null;
       const original = req.renglones.find((x) => x.id === r.id);
-      return { partId: original?.partId ?? null, descripcion: r.descripcion, cantidad: falta };
+      return { partId: original?.partId ?? null, descripcion: r.descripcion, cantidad: falta, materialRequestLineId: r.id };
     })
-    .filter(Boolean) as Array<{ partId: string | null; descripcion: string; cantidad: number }>;
+    .filter(Boolean) as Array<{ partId: string | null; descripcion: string; cantidad: number; materialRequestLineId: string }>;
+  const enCompraTexto = [...yaEnCompra.values()].flatMap((v) => v.folios);
 
   const destino = req.workOrder
     ? { texto: `${req.workOrder.number} · ${req.workOrder.title}`, href: `/work-orders/${req.workOrder.id}` }
@@ -176,6 +186,12 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
                 No hay existencia suficiente en {req.warehouse.name}, o la refacción todavía no está
                 en el catálogo. Lo que falta se puede mandar a compras sin volver a capturarlo.
               </p>
+              {enCompraTexto.length ? (
+                <p className="mt-0.5 text-[0.6875rem] text-amber-800">
+                  Ya hay compra abierta para parte de este vale ({[...new Set(enCompraTexto)].join(", ")}): esa
+                  cantidad ya no aparece aquí para no comprarla dos veces.
+                </p>
+              ) : null}
               <div className="mt-2">
                 <CompraDialog
                   almacenes={almacenes}
@@ -186,6 +202,14 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
                   etiqueta="Solicitar a compras"
                 />
               </div>
+            </div>
+          ) : null}
+
+          {sinCosto.length ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[0.6875rem] text-slate-600">
+              <span className="font-semibold text-slate-700">Costo pendiente: </span>
+              {sinCosto.map((r) => r.descripcion).join(", ")} no tiene costo capturado. Se puede surtir,
+              pero el consumo entra en $0 y el costo del equipo sale corto. Captúrelo en Almacén.
             </div>
           ) : null}
 

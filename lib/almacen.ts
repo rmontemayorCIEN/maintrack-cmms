@@ -102,7 +102,24 @@ export async function aplicarMovimiento(m: Movimiento, tx?: Cliente): Promise<nu
       : part.unitCost;
 
   if (existencia) {
-    await db.partStock.update({ where: { id: existencia.id }, data: { quantity: saldo } });
+    /**
+     * El saldo se escribe SOLO si sigue siendo el que se leyo.
+     *
+     * Dos salidas al mismo tiempo —doble clic, dos personas surtiendo, un
+     * reintento del navegador— leian el mismo saldo previo y las dos escribian
+     * el suyo: una de las dos se perdia y el almacen quedaba con existencia
+     * que ya no estaba. Quien pierde la carrera no descuenta de mas: se le
+     * dice que vuelva a intentar.
+     */
+    const escrito = await db.partStock.updateMany({
+      where: { id: existencia.id, quantity: saldoPrevio },
+      data: { quantity: saldo },
+    });
+    if (escrito.count === 0) {
+      throw new ErrorDeAlmacen(
+        "La existencia cambió mientras se registraba el movimiento. Vuelva a intentarlo para no descontar dos veces.",
+      );
+    }
   } else {
     await db.partStock.create({
       data: {

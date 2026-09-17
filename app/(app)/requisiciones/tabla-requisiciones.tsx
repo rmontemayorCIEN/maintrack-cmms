@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
-import { ESTADOS, MOTIVOS, URGENCIAS } from "@/lib/requisiciones";
+import { ESTADOS, MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatDate } from "@/lib/utils";
 
 export type FilaRequisicion = {

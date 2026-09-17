@@ -19,6 +19,8 @@ export type FilaRefaccion = {
   description: string | null; category: string | null;
   unit: string; unitCost: number;
   quantityOnHand: number; minQuantity: number; maxQuantity: number;
+  /** Folios de compras abiertas que ya traen esta refaccion en camino. */
+  enCompra?: string[];
   bin: string | null; supplierId: string | null; proveedor: string | null;
   moneda: string;
   adjuntos: Adjunto[]; enlaces: Enlace[];
@@ -131,7 +133,14 @@ export function TablaRefacciones({
             {formatNumber(p.quantityOnHand, 2)}
           </span>
           <span className="ml-1 text-[0.6875rem] text-slate-400">{p.unit}</span>
-          {bajoMinimo(p) ? <div className="mt-0.5"><Badge tone="danger">Reordenar</Badge></div> : null}
+          {bajoMinimo(p) ? (
+            <div className="mt-0.5">
+              {/* Ya viene en camino: reordenarla otra vez duplica la compra. */}
+              {p.enCompra?.length
+                ? <Badge tone="info">Ya pedida · {p.enCompra.join(", ")}</Badge>
+                : <Badge tone="danger">Reordenar</Badge>}
+            </div>
+          ) : null}
         </>
       ),
     },

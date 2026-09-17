@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { filtroDeActividadesDeLaOrden } from "./plan-tasks";
 import { prisma } from "./db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
+import { recalcWorkOrder } from "./workorders";
+import { ESTADOS, estadoSegunRenglones, type Estado } from "./requisiciones-datos";
 
 /**
  * Requisicion de material: el circuito entre mantenimiento y almacen.
@@ -13,47 +15,14 @@ import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
  * mueve la misma funcion.
  */
 
-export const MOTIVOS = {
-  PREVENTIVO: "Mantenimiento preventivo",
-  CORRECTIVO: "Mantenimiento correctivo",
-  MINIMO: "Reposición de mínimo",
-  PROYECTO: "Proyecto especial",
-} as const;
-
-export const URGENCIAS = {
-  NORMAL: "Normal",
-  ALTA: "Alta",
-  PARO: "Equipo parado",
-} as const;
-
-export const ESTADOS = {
-  SOLICITADA: "Solicitada",
-  PARCIAL: "Surtida en parte",
-  SURTIDA: "Surtida",
-  CERRADA: "Cerrada",
-  CANCELADA: "Cancelada",
-} as const;
-
-export type Motivo = keyof typeof MOTIVOS;
-export type Urgencia = keyof typeof URGENCIAS;
-export type Estado = keyof typeof ESTADOS;
+// El catalogo y las reglas puras viven en `requisiciones-datos.ts` para que las
+// pantallas del navegador no arrastren Prisma ni los avisos al celular.
+export {
+  MOTIVOS, URGENCIAS, ESTADOS, motivoDeLaOrden, estadoSegunRenglones,
+  type Motivo, type Urgencia, type Estado,
+} from "./requisiciones-datos";
 
 export class ErrorDeRequisicion extends Error {}
-
-/**
- * El estado que le corresponde a la requisicion segun sus renglones.
- *
- * Se calcula, no se captura: un estado escrito a mano se desincroniza del
- * primer surtido parcial que alguien registre sin acordarse de moverlo.
- */
-export function estadoSegunRenglones(
-  renglones: Array<{ cantidadSolicitada: number; cantidadSurtida: number }>,
-): Estado {
-  const surtido = renglones.reduce((s, r) => s + r.cantidadSurtida, 0);
-  if (surtido === 0) return "SOLICITADA";
-  const completo = renglones.every((r) => r.cantidadSurtida >= r.cantidadSolicitada);
-  return completo ? "SURTIDA" : "PARCIAL";
-}
 
 type Cliente = Prisma.TransactionClient;
 
@@ -135,10 +104,22 @@ export async function surtir(params: {
         tx,
       );
 
-      await tx.materialRequestLine.update({
-        where: { id: renglon.id },
+      /**
+       * El renglon se actualiza SOLO si sigue como se leyo.
+       *
+       * Dos entregas simultaneas —doble clic, dos personas en el almacen—
+       * leian el mismo pendiente y las dos lo daban por bueno: se entregaba de
+       * mas y el vale terminaba con mas surtido que solicitado.
+       */
+      const avance = await tx.materialRequestLine.updateMany({
+        where: { id: renglon.id, cantidadSurtida: renglon.cantidadSurtida },
         data: { cantidadSurtida: { increment: entrega.cantidad } },
       });
+      if (avance.count === 0) {
+        throw new ErrorDeRequisicion(
+          `Alguien más surtió «${renglon.descripcion}» mientras tanto. Vuelva a abrir el vale para ver lo que falta.`,
+        );
+      }
 
       // Lo surtido contra una OT se asienta tambien como consumo de esa orden:
       // es lo que despues permite decir cuanto costo mantener cada equipo.
@@ -157,7 +138,18 @@ export async function surtir(params: {
     }
 
     await sincronizarEstado(tx, req.id);
-    return cargar(tx, req.id, params.organizationId);
+    const actualizada = await cargar(tx, req.id, params.organizationId);
+    return { req: actualizada, workOrderId: req.workOrderId };
+  }).then(async ({ req, workOrderId }) => {
+    /**
+     * El costo de la orden se recalcula despues de entregar.
+     *
+     * Antes se creaba el cargo y ahi quedaba: la orden seguia diciendo que las
+     * refacciones costaron lo de antes —cero, en OT-000001 de produccion—
+     * hasta que algo mas la recalculara. El costo por equipo salia corto.
+     */
+    if (workOrderId) await recalcWorkOrder(workOrderId);
+    return req;
   });
 }
 
@@ -208,13 +200,50 @@ export async function devolver(params: {
         tx,
       );
 
-      await tx.materialRequestLine.update({
-        where: { id: renglon.id },
+      const avance = await tx.materialRequestLine.updateMany({
+        where: { id: renglon.id, cantidadDevuelta: renglon.cantidadDevuelta },
         data: { cantidadDevuelta: { increment: dev.cantidad } },
       });
+      if (avance.count === 0) {
+        throw new ErrorDeRequisicion(
+          `Alguien más registró una devolución de «${renglon.descripcion}» mientras tanto. Vuelva a abrir el vale.`,
+        );
+      }
+
+      /**
+       * Lo devuelto deja de ser consumo de la orden.
+       *
+       * El cargo original NO se borra —es lo que de verdad salio del almacen
+       * ese dia— pero se le anota lo regresado y el costo de la orden baja a
+       * lo que se uso. Sin esto la orden pagaba material que volvio al estante:
+       * en produccion, RM-000001 dejo 2 piezas cargadas a OT-000001 habiendo
+       * devuelto una.
+       */
+      if (req.workOrderId) {
+        let porRepartir = dev.cantidad;
+        const cargos = await tx.workOrderPart.findMany({
+          where: { workOrderId: req.workOrderId, partId: renglon.partId },
+          orderBy: { id: "asc" },
+        });
+        for (const cargo of cargos) {
+          if (porRepartir <= 0) break;
+          const disponible = cargo.quantity - cargo.devuelto;
+          if (disponible <= 0) continue;
+          const baja = Math.min(disponible, porRepartir);
+          await tx.workOrderPart.update({
+            where: { id: cargo.id },
+            data: { devuelto: cargo.devuelto + baja, cost: (cargo.quantity - cargo.devuelto - baja) * cargo.unitCost },
+          });
+          porRepartir -= baja;
+        }
+      }
     }
 
-    return cargar(tx, req.id, params.organizationId);
+    const actualizada = await cargar(tx, req.id, params.organizationId);
+    return { req: actualizada, workOrderId: req.workOrderId };
+  }).then(async ({ req, workOrderId }) => {
+    if (workOrderId) await recalcWorkOrder(workOrderId);
+    return req;
   });
 }
 

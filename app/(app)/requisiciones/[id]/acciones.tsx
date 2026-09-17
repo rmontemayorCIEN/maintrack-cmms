@@ -10,6 +10,8 @@ export type RenglonVale = {
   solicitada: number; surtida: number; devuelta: number;
   /** Existencia en el almacen de la requisicion. Null si no esta en catalogo. */
   disponible: number | null;
+  /** La refaccion no tiene costo capturado: lo que se entregue entraria en $0. */
+  sinCosto?: boolean;
 };
 
 export function AccionesRequisicion({

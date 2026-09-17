@@ -18,6 +18,8 @@ const schema = z.object({
       cantidadSolicitada: z.coerce.number().positive(),
       costoEstimado: z.coerce.number().min(0).default(0),
       nota: z.string().trim().max(200).optional().nullable(),
+      /** El renglon del vale que quedo faltante, para no comprarlo dos veces. */
+      materialRequestLineId: z.string().optional().nullable(),
     }),
   ).min(1).max(80),
 });
@@ -35,6 +37,11 @@ export async function POST(request: Request) {
     });
     if (!almacen) return fail("Almacén no encontrado", 404);
 
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { montoAutorizacion: true },
+    });
+
     try {
       const req = await crearRequisicionDeCompra({
         organizationId: orgId,
@@ -44,16 +51,18 @@ export async function POST(request: Request) {
         proveedorSugeridoId: input.proveedorSugeridoId,
         urgencia: input.urgencia,
         justificacion: input.justificacion,
+        montoAutorizacion: org?.montoAutorizacion ?? 0,
         renglones: input.renglones,
       });
 
       await logAudit({
         organizationId: orgId, userId: user.id,
         entity: "PurchaseRequest", entityId: req.id, action: "CREATED",
-        summary: `Requisicion de compra ${req.folio}: ${input.renglones.length} renglones`,
+        summary: `Requisicion de compra ${req.folio}: ${input.renglones.length} renglones, $${req.montoEstimado.toFixed(2)}` +
+          (req.estado === "AUTORIZADA" ? " (autorizada automáticamente: bajo el umbral)" : ""),
       });
 
-      return ok({ id: req.id, folio: req.folio }, 201);
+      return ok({ id: req.id, folio: req.folio, estado: req.estado }, 201);
     } catch (error) {
       if (error instanceof ErrorDeCompra) return fail(error.message, 422);
       throw error;

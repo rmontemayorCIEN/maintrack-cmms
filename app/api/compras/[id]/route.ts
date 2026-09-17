@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAlmacen, ErrorDeCompra, autorizar, enCompra, recibir } from "@/lib/compras";
 import { logAudit } from "@/lib/audit";
+import { ESTADOS_COMPRA, type EstadoCompra } from "@/lib/estados-compra";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,6 +14,8 @@ const schema = z.discriminatedUnion("accion", [
   z.object({ accion: z.literal("COLOCAR"), ordenCompra: z.string().trim().min(1).max(60) }),
   z.object({
     accion: z.literal("RECIBIR"),
+    /** Clave del envio: el mismo recibo repetido no entra dos veces. */
+    clave: z.string().trim().max(64).optional().nullable(),
     remision: z.string().trim().max(60).optional().nullable(),
     supplierId: z.string().optional().nullable(),
     nota: z.string().trim().max(300).optional().nullable(),
@@ -82,7 +85,7 @@ export async function POST(request: Request, { params }: Params) {
           organizationId: orgId, userId: user.id,
           purchaseRequestId: id, warehouseId: compra.warehouseId,
           supplierId: input.supplierId, remision: input.remision,
-          ordenCompra: compra.ordenCompra, nota: input.nota,
+          ordenCompra: compra.ordenCompra, nota: input.nota, clave: input.clave,
           renglones: input.renglones,
         });
         await logAudit({
@@ -93,6 +96,12 @@ export async function POST(request: Request, { params }: Params) {
         return ok({ recepcion: rec.folio });
       }
 
+      // Cerrar es dar por terminada la compra: no se cierra lo que ya estaba
+      // cerrado, rechazado o cancelado.
+      const actual = await prisma.purchaseRequest.findFirstOrThrow({ where: { id }, select: { estado: true } });
+      if (["CERRADA", "CANCELADA", "RECHAZADA"].includes(actual.estado)) {
+        return fail(`La requisición ya está ${ESTADOS_COMPRA[actual.estado as EstadoCompra].toLowerCase()}`, 409);
+      }
       const cerrada = await prisma.purchaseRequest.update({
         where: { id }, data: { estado: "CERRADA" }, select: { estado: true },
       });

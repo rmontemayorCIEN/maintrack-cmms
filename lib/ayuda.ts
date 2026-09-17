@@ -772,8 +772,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Pedir no descuenta existencia. El almacén baja hasta que se surte.",
-      "Lo surtido contra una orden de trabajo se carga solo como consumo de esa orden.",
-      "Lo que el almacén no puede cubrir se manda a compras sin volver a capturarlo.",
+      "El motivo lo pone el tipo de la orden: una requisición de un preventivo entra como preventiva, no como correctiva.",
+      "Lo surtido contra una orden de trabajo se carga como consumo de esa orden y actualiza su costo en el momento.",
+      "Lo devuelto baja ese consumo: el cargo original no se borra, se le anota lo que regresó y el costo de la orden queda en lo que de verdad se usó.",
+      "Lo que el almacén no puede cubrir se manda a compras sin volver a capturarlo. Lo que ya está en una compra abierta deja de aparecer como faltante, para no comprarlo dos veces.",
+      "Si la refacción no tiene costo capturado, se puede surtir, pero se avisa: el consumo entraría en $0 y el costo del equipo saldría corto.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -782,7 +785,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Estado", explica: "Se calcula de los renglones, no se captura: solicitada, surtida en parte, surtida." },
       { nombre: "Urgencia", explica: "Normal, alta o equipo parado. Las de paro salen resaltadas y se cuentan aparte arriba." },
       { nombre: "Por surtir", explica: "Lo que falta entregar. Es la columna que le dice al almacenista que tiene pendiente." },
-      { nombre: "Devuelto", explica: "Lo que regreso sin usarse. Mucha devolución significa que se esta pidiendo de mas por si acaso." },
+      { nombre: "Devuelto", explica: "Lo que regreso sin usarse. Mucha devolución significa que se esta pidiendo de mas por si acaso. Al devolver, el costo de la orden baja solo." },
     ],
     botones: [
       { nombre: "Nueva requisición", explica: "Pedir material. Ofrece solo lo que existe en el almacen elegido, con su cantidad disponible. Al elegir orden de trabajo, el activo se toma de ella: no hay que capturarlo dos veces." },
@@ -814,7 +817,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción.",
       "Si está encendido, entre autorizar y recibir van las cotizaciones, el comparativo y la orden de compra.",
-      "Al recibir, la existencia sube y el costo promedio de la refacción se recalcula.",
+      "Al recibir, la existencia sube solo por lo que de verdad llegó y el costo promedio de la refacción se recalcula.",
+      "Debajo del monto de autorización que tenga configurado su empresa, la requisición nace autorizada y lo dice; de ahí para arriba necesita firma, y sin firma no se puede colocar.",
+      "La recepción admite parciales y no se puede recibir más de lo pedido. Si el mismo recibo se envía dos veces —doble clic, reintento— el material entra una sola vez.",
+      "Mientras una compra siga viva, el almacén marca esa refacción como «Ya pedida» para que no se vuelva a comprar por mínimo.",
     ],
     tablaConfigurable: true,
     campos: [

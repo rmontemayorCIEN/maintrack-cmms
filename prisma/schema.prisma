@@ -1039,6 +1039,12 @@ model WorkOrderPart {
   unitCost    Float  @default(0)
   cost        Float  @default(0)
 
+  /// Lo que se regreso al almacen de este cargo. El renglon NO se borra: la
+  /// cantidad original se conserva y el costo de la orden se calcula sobre lo
+  /// que de verdad se consumio (quantity - devuelto). Sin esto, devolver
+  /// material dejaba a la orden pagando lo que nunca uso.
+  devuelto Float @default(0)
+
   /// A que actividad se le carga este gasto.
   ///
   /// Opcional a proposito: hay gastos que son de la orden entera —el viaje, la
@@ -1431,19 +1437,25 @@ model PurchaseRequest {
 }
 
 model PurchaseRequestLine {
-  id                 String  @id @default(cuid())
-  requestId          String
-  partId             String?
-  descripcion        String
-  cantidadSolicitada Float
-  cantidadRecibida   Float   @default(0)
-  costoEstimado      Float   @default(0)
-  nota               String?
+  id                    String  @id @default(cuid())
+  requestId             String
+  /// El renglon de la requisicion de material que quedo faltante y origino
+  /// esta compra. Es lo que permite seguir la pista completa —OT, activo,
+  /// requisicion, renglon, parte— y no volver a comprar lo mismo dos veces.
+  materialRequestLineId String?
+  partId                String?
+  descripcion           String
+  cantidadSolicitada    Float
+  cantidadRecibida      Float   @default(0)
+  costoEstimado         Float   @default(0)
+  nota                  String?
 
-  request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  part    Part?           @relation(fields: [partId], references: [id])
+  request             PurchaseRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  part                Part?                @relation(fields: [partId], references: [id])
+  materialRequestLine MaterialRequestLine? @relation(fields: [materialRequestLineId], references: [id])
 
   @@index([requestId])
+  @@index([materialRequestLineId])
 }
 
 /// Recepcion: lo que llego contra lo que se pidio, con la revision fisica.
@@ -1455,6 +1467,11 @@ model GoodsReceipt {
   id                String   @id @default(cuid())
   organizationId    String
   folio             String
+  /// Clave que manda la pantalla al recibir. Si el mismo envio llega dos veces
+  /// —doble clic, reintento, recargar— la segunda encuentra esta clave y
+  /// devuelve la recepcion que ya existe en vez de entrar el material dos
+  /// veces al inventario.
+  clave             String?
   purchaseRequestId String?
   warehouseId       String
   supplierId        String?
@@ -1473,6 +1490,7 @@ model GoodsReceipt {
   renglones       GoodsReceiptLine[]
 
   @@unique([organizationId, folio])
+  @@unique([organizationId, clave])
   @@index([organizationId])
 }
 
@@ -1748,8 +1766,10 @@ model MaterialRequestLine {
   cantidadDevuelta   Float   @default(0)
   nota               String?
 
-  request MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  part    Part?           @relation(fields: [partId], references: [id])
+  request MaterialRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  part    Part?                 @relation(fields: [partId], references: [id])
+  /// Las compras que se generaron por lo que falto de este renglon.
+  compras PurchaseRequestLine[]
 
   @@index([requestId])
 }

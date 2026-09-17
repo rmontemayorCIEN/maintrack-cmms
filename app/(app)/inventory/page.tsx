@@ -1,3 +1,4 @@
+import { ESTADOS_COMPRA_ABIERTA } from "@/lib/compras";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -115,6 +116,28 @@ export default async function InventoryPage({
   // Los indicadores describen lo que se esta viendo. Con un almacen elegido,
   // "bajo mínimo" significa bajo minimo AHI, que es la pregunta que se hace
   // quien esta parado en ese almacen.
+  /**
+   * Lo que ya viene en camino, por refaccion.
+   *
+   * Sin esto, la lista de «bajo minimo» vuelve a proponer comprar algo que ya
+   * se pidio la semana pasada y llegan dos veces.
+   */
+  const enCamino = await prisma.purchaseRequestLine.findMany({
+    where: {
+      partId: { not: null },
+      request: { organizationId: user.organizationId, estado: { in: ESTADOS_COMPRA_ABIERTA } },
+    },
+    select: { partId: true, request: { select: { folio: true } } },
+  });
+  const foliosPorParte = new Map<string, string[]>();
+  for (const l of enCamino) {
+    const previos = foliosPorParte.get(l.partId!) ?? [];
+    if (!previos.includes(l.request.folio)) previos.push(l.request.folio);
+    foliosPorParte.set(l.partId!, previos);
+  }
+  for (const f of filas) f.enCompra = foliosPorParte.get(f.id) ?? [];
+
+  const bajoMinimoSinPedir = filas.filter((f) => f.quantityOnHand <= f.minQuantity && !f.enCompra?.length).length;
   const lowCount = filas.filter((f) => f.quantityOnHand <= f.minQuantity).length;
   const outOfStock = filas.filter((f) => f.quantityOnHand === 0).length;
   const inventoryValue = filas.reduce((sum, f) => sum + f.quantityOnHand * f.unitCost, 0);
@@ -210,7 +233,12 @@ export default async function InventoryPage({
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="SKU activos" value={parts.length} />
-        <Stat label="Bajo mínimo" value={lowCount} tone={lowCount ? "warn" : "good"} />
+        <Stat
+          label="Bajo mínimo"
+          value={lowCount}
+          tone={bajoMinimoSinPedir ? "warn" : "good"}
+          hint={lowCount && lowCount !== bajoMinimoSinPedir ? `${lowCount - bajoMinimoSinPedir} ya vienen en camino` : undefined}
+        />
         <Stat label="Sin existencia" value={outOfStock} tone={outOfStock ? "bad" : "good"} />
         <Stat label="Valor del inventario" value={formatCurrency(inventoryValue, currency)} />
       </div>

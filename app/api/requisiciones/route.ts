@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { almacenPorOmision } from "@/lib/almacen";
 import { siguienteFolio } from "@/lib/numbering";
+import { motivoDeLaOrden } from "@/lib/requisiciones-datos";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -46,13 +47,17 @@ export async function POST(request: Request) {
     // guardar dos copias solo abre la puerta a que se contradigan. Ademas se
     // valida que la orden sea de esta organizacion.
     let assetId = input.assetId || null;
+    // Con orden, el motivo SALE del tipo de trabajo: dejarlo al formulario
+    // clasifico como correctivas las requisiciones de preventivos.
+    let motivo: string = input.motivo;
     if (input.workOrderId) {
       const orden = await prisma.workOrder.findFirst({
         where: { id: input.workOrderId, organizationId: orgId },
-        select: { assetId: true },
+        select: { assetId: true, maintenanceType: true },
       });
       if (!orden) return fail("Orden de trabajo no encontrada", 404);
       assetId = orden.assetId;
+      motivo = motivoDeLaOrden(orden.maintenanceType);
     } else if (assetId) {
       const activo = await prisma.asset.findFirst({
         where: { id: assetId, organizationId: orgId },
@@ -70,7 +75,7 @@ export async function POST(request: Request) {
         workOrderId: input.workOrderId || null,
         assetId,
         solicitanteId: user.id,
-        motivo: input.motivo,
+        motivo,
         urgencia: input.urgencia,
         nota: input.nota || null,
         renglones: {

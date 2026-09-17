@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
-import { MOTIVOS, URGENCIAS } from "@/lib/requisiciones";
+import { MOTIVOS, URGENCIAS } from "@/lib/requisiciones-datos";
 import { SelectorBuscable } from "@/components/selector-buscable";
 
 export type Opcion = { id: string; etiqueta: string };

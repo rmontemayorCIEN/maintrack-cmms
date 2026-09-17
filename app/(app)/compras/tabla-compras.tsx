@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { TablaConfigurable, type Columna, type Vista } from "@/components/tabla-configurable";
 import { ESTADOS_COMPRA } from "@/lib/estados-compra";
-import { URGENCIAS } from "@/lib/requisiciones";
+import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export type FilaCompra = {

@@ -36,6 +36,12 @@ export function AccionesCompra({
   const [nota, setNota] = useState("");
   const [recepcion, setRecepcion] = useState<Record<string, { cantidad: string; costo: string; conforme: boolean; obs: string }>>({});
   const [ocupado, setOcupado] = useState(false);
+  /**
+   * Clave del recibo que se esta capturando. Viaja con el envio: si el boton
+   * se presiona dos veces o el navegador reintenta, el servidor reconoce la
+   * clave y devuelve la recepcion que ya hizo, sin volver a entrar material.
+   */
+  const [claveRecepcion, setClaveRecepcion] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const porRecibir = renglones.filter((r) => r.partId && r.solicitada - r.recibida > 0.0001);
@@ -49,10 +55,13 @@ export function AccionesCompra({
         conforme: true, obs: "",
       };
     }
-    setRecepcion(previas); setError(null); setModo("RECIBIR");
+    setRecepcion(previas); setError(null);
+    setClaveRecepcion(crypto.randomUUID());
+    setModo("RECIBIR");
   }
 
   async function enviar(cuerpo: Record<string, unknown>) {
+    if (ocupado) return;
     setOcupado(true); setError(null);
     const res = await fetch(`/api/compras/${compraId}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo),
@@ -78,20 +87,29 @@ export function AccionesCompra({
           </>
         ) : null}
 
+        {estado === "AUTORIZADA" && !puedeColocar ? (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Autorizada. Falta que compras la coloque con el proveedor.
+          </p>
+        ) : null}
+
         {estado === "SOLICITADA" && puedeAutorizar && esPropia ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             Usted la solicitó: la autorización la firma otra persona.
           </p>
         ) : null}
 
-        {["SOLICITADA", "AUTORIZADA"].includes(estado) && puedeColocar ? (
+        {/* Colocar es sobre una compra ya firmada: ofrecerlo antes solo lleva al
+            rechazo del servidor («Falta autorizar la requisición»). */}
+        {estado === "AUTORIZADA" && puedeColocar ? (
           <Button type="button" variant="secondary" onClick={() => setModo("COLOCAR")}>
             <ShoppingCart className="h-3.5 w-3.5" />
             {comprasInternas ? "Registrar orden de compra" : "Anotar orden del ERP"}
           </Button>
         ) : null}
 
-        {porRecibir.length && puedeRecibir && !["RECHAZADA", "CANCELADA"].includes(estado) ? (
+        {/* Y se recibe lo que ya se colocó: antes de eso no hay nada en camino. */}
+        {porRecibir.length && puedeRecibir && ["EN_COMPRA", "RECIBIDA_PARCIAL"].includes(estado) ? (
           <Button type="button" onClick={abrirRecepcion}>
             <PackagePlus className="h-3.5 w-3.5" /> Recibir material
           </Button>
@@ -235,7 +253,7 @@ export function AccionesCompra({
             <Button
               type="button" disabled={ocupado}
               onClick={() => enviar({
-                accion: "RECIBIR", remision: remision || null,
+                accion: "RECIBIR", clave: claveRecepcion, remision: remision || null,
                 supplierId: supplierId || null, nota: nota || null,
                 renglones: porRecibir
                   .map((r) => {
