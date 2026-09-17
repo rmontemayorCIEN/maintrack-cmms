@@ -15,6 +15,8 @@ type Orden = {
   id: string; number: string; title: string;
   maintenanceType: string; status: string; estimatedHours: number;
   dueDate: string | null;
+  /** Texto de vencimiento calculado en el servidor con el estado de la orden («Cumplida en fecha», «Vencida hace 3 días»…). */
+  vencimiento: string;
   asset: { id: string; code: string; name: string; categoryId?: string | null } | null;
   assignedTo: { id: string; name: string; color: string | null } | null;
 };
@@ -166,7 +168,7 @@ export function Calendario({
                 key={o.id}
                 href={`/work-orders/${o.id}`}
                 className="rounded border border-rose-200 bg-white px-1.5 py-0.5 text-[0.6875rem] text-rose-800 hover:bg-rose-100"
-                title={`${o.title} · vencia ${o.dueDate?.slice(0, 10)}`}
+                title={`${o.title} · ${o.vencimiento}`}
               >
                 {o.number} · {o.asset?.code ?? "sin activo"}
               </Link>
@@ -395,7 +397,7 @@ export function Calendario({
                         MAINTENANCE_TYPE_COLORS[o.maintenanceType],
                         !OPEN_STATUSES.includes(o.status) && "opacity-50 line-through",
                       )}
-                      title={`${o.number} — ${o.title}`}
+                      title={`${o.number} — ${o.title} · ${o.vencimiento}`}
                     >
                       {o.assignedTo?.color ? (
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: o.assignedTo.color }} />
@@ -676,7 +678,7 @@ function RejillaSemana({
                           MAINTENANCE_TYPE_COLORS[o.maintenanceType],
                           !OPEN_STATUSES.includes(o.status) && "opacity-50 line-through",
                         )}
-                        title={`${o.number} — ${o.title} · ${o.estimatedHours}h · ${o.asset?.code ?? "sin activo"}`}
+                        title={`${o.number} — ${o.title} · ${o.estimatedHours}h · ${o.asset?.code ?? "sin activo"} · ${o.vencimiento}`}
                       >
                         {o.title}
                       </Link>

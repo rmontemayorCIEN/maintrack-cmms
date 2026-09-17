@@ -2,19 +2,43 @@ import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
 import { logAudit, notify } from "./audit";
 
-export type SensorEvaluation = {
-  status: "NORMAL" | "WARNING" | "CRITICAL";
-  slope: number;
-  projectedFailureAt: Date | null;
-  daysToThreshold: number | null;
-  confidence: number;
-};
+/**
+ * El estado predictivo de un punto de monitoreo: la UNICA evaluacion que leen
+ * Predictivo, Alertas, la ficha del activo, el Panel y el Diagnostico IA.
+ *
+ * Lo que estaba mal y por que:
+ *
+ *  - Una sola fecha (`projectedFailureAt`) mezclaba el cruce del umbral de
+ *    advertencia con el del critico, y se mostraba como «Falla proyectada».
+ *    No hay modelo de falla: lo que se proyecta es cuando la tendencia cruza un
+ *    umbral. Ahora son dos fechas separadas, y la palabra «falla» no aparece.
+ *  - La fecha se guardaba al detectar y nunca se actualizaba. CNC-201 tenia
+ *    una alerta detectada el 29 de agosto con «falla» el 22 de julio: una
+ *    fecha anterior a su propia deteccion, presentada como futura.
+ *  - Un valor ya sobre el umbral critico podia verse «estable»: la pendiente
+ *    describe la tendencia, no el estado. Ahora el estado manda: sobre el
+ *    critico es CRITICO, con la tendencia que tenga.
+ *  - El R² de cuatro lecturas se mostraba como «confianza 87%». Un porcentaje
+ *    con tan pocos datos es precision falsa. Ahora es alta/media/baja, y con
+ *    menos de 5 lecturas no se proyecta.
+ */
+
+/** Minimo de lecturas para proyectar, y el tramo minimo que deben abarcar. */
+export const MIN_LECTURAS_PROYECCION = 5;
+export const MIN_DIAS_PROYECCION = 1;
+/** Cuantas lecturas recientes entran a la regresion. */
+export const LECTURAS_PARA_TENDENCIA = 30;
+/** Cruce proyectado mas lejano que se reporta como fecha. */
+const HORIZONTE_DIAS = 3650;
+/** Una tendencia que abre alerta sin haber cruzado: critico en 30 dias o menos. */
+export const DIAS_ALERTA_POR_TENDENCIA = 30;
+
+const DIA = 86_400_000;
+
+type Umbrales = { warningThreshold: number | null; criticalThreshold: number | null; direction: string };
 
 /** Clasifica una lectura contra los umbrales del sensor. */
-export function classify(
-  value: number,
-  sensor: { warningThreshold: number | null; criticalThreshold: number | null; direction: string },
-): "NORMAL" | "WARNING" | "CRITICAL" {
+export function classify(value: number, sensor: Umbrales): "NORMAL" | "WARNING" | "CRITICAL" {
   const above = sensor.direction !== "BELOW";
   const { warningThreshold: warn, criticalThreshold: crit } = sensor;
   if (above) {
@@ -27,69 +51,241 @@ export function classify(
   return "NORMAL";
 }
 
+export type EstadoPunto = "NORMAL" | "ADVERTENCIA" | "CRITICO" | "SIN_DATOS";
+export type Tendencia = "EMPEORA" | "MEJORA" | "ESTABLE" | "SIN_DATOS";
+export type Confianza = "ALTA" | "MEDIA" | "BAJA" | "INSUFICIENTE";
+
+export const ETIQUETA_ESTADO: Record<EstadoPunto, string> = {
+  NORMAL: "Normal",
+  ADVERTENCIA: "Advertencia",
+  CRITICO: "Crítico",
+  SIN_DATOS: "Sin datos suficientes",
+};
+export const ETIQUETA_TENDENCIA: Record<Tendencia, string> = {
+  EMPEORA: "Empeorando",
+  MEJORA: "Mejorando",
+  ESTABLE: "Estable",
+  SIN_DATOS: "Sin tendencia",
+};
+export const ETIQUETA_CONFIANZA: Record<Confianza, string> = {
+  ALTA: "Confianza alta",
+  MEDIA: "Confianza media",
+  BAJA: "Confianza baja",
+  INSUFICIENTE: "Datos insuficientes",
+};
+
+export type Cruce = {
+  /** Solo cuando hay proyeccion futura valida. */
+  fecha: Date | null;
+  dias: number | null;
+  texto: string;
+};
+
+export type EvaluacionPunto = {
+  estado: EstadoPunto;
+  etiquetaEstado: string;
+  valorActual: number | null;
+  lecturaEl: Date | null;
+  tendencia: Tendencia;
+  etiquetaTendencia: string;
+  /** Unidades por dia, en la direccion del umbral (positivo = hacia el umbral). */
+  pendientePorDia: number;
+  confianza: Confianza;
+  etiquetaConfianza: string;
+  lecturasUsadas: number;
+  cruceAdvertencia: Cruce;
+  cruceCritico: Cruce;
+  /** Una frase para listas y para la IA. Siempre coherente con el estado. */
+  resumen: string;
+};
+
+const fmtFecha = (d: Date) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(d);
+
 /**
- * Regresion lineal simple sobre las ultimas lecturas para estimar la tendencia
- * y proyectar cuando se alcanzara el umbral critico (vida util remanente).
- * Devuelve un R^2 como medida de confianza de la proyeccion.
+ * El texto de una fecha de cruce vista HOY. Sirve igual para una evaluacion
+ * nueva que para una fecha guardada: una fecha ya pasada nunca se presenta
+ * como futura.
  */
-export function analyzeTrend(
-  readings: Array<{ value: number; readingAt: Date }>,
-  sensor: { criticalThreshold: number | null; warningThreshold: number | null; direction: string },
-): SensorEvaluation {
-  const points = [...readings].sort((a, b) => a.readingAt.getTime() - b.readingAt.getTime());
-  const latest = points.at(-1);
-  const status = latest ? classify(latest.value, sensor) : "NORMAL";
-
-  if (points.length < 4) {
-    return { status, slope: 0, projectedFailureAt: null, daysToThreshold: null, confidence: 0 };
-  }
-
-  const t0 = points[0].readingAt.getTime();
-  const xs = points.map((p) => (p.readingAt.getTime() - t0) / 86_400_000); // dias
-  const ys = points.map((p) => p.value);
-  const n = xs.length;
-  const meanX = xs.reduce((a, b) => a + b, 0) / n;
-  const meanY = ys.reduce((a, b) => a + b, 0) / n;
-
-  let num = 0;
-  let den = 0;
-  for (let i = 0; i < n; i++) {
-    num += (xs[i] - meanX) * (ys[i] - meanY);
-    den += (xs[i] - meanX) ** 2;
-  }
-  const slope = den === 0 ? 0 : num / den; // unidades por dia
-  const intercept = meanY - slope * meanX;
-
-  let ssRes = 0;
-  let ssTot = 0;
-  for (let i = 0; i < n; i++) {
-    const predicted = intercept + slope * xs[i];
-    ssRes += (ys[i] - predicted) ** 2;
-    ssTot += (ys[i] - meanY) ** 2;
-  }
-  const confidence = ssTot === 0 ? 0 : Math.max(0, Math.min(1, 1 - ssRes / ssTot));
-
-  const target = sensor.criticalThreshold ?? sensor.warningThreshold;
-  let daysToThreshold: number | null = null;
-  let projectedFailureAt: Date | null = null;
-
-  if (target !== null && slope !== 0) {
-    const currentX = xs[n - 1];
-    const targetX = (target - intercept) / slope;
-    const delta = targetX - currentX;
-    const heading = sensor.direction === "BELOW" ? slope < 0 : slope > 0;
-    if (heading && delta > 0 && delta < 3650) {
-      daysToThreshold = Math.round(delta);
-      projectedFailureAt = new Date(Date.now() + delta * 86_400_000);
-    }
-  }
-
-  return { status, slope, projectedFailureAt, daysToThreshold, confidence };
+export function textoDeCruce(fecha: Date | null, ahora = new Date(), yaSuperado = false): Cruce {
+  if (yaSuperado) return { fecha: null, dias: null, texto: "Umbral ya superado" };
+  if (!fecha) return { fecha: null, dias: null, texto: "Sin cruce proyectado" };
+  const dias = Math.ceil((fecha.getTime() - ahora.getTime()) / DIA);
+  if (dias < 0) return { fecha: null, dias: null, texto: `Proyección vencida (era ${fmtFecha(fecha)})` };
+  return { fecha, dias, texto: dias === 0 ? `Estimado hoy` : `Estimado el ${fmtFecha(fecha)} (en ${dias} ${dias === 1 ? "día" : "días"})` };
 }
 
 /**
- * Ingesta de lectura de condicion: guarda el dato, reevalua la tendencia y,
- * si procede, abre una alerta y una OT predictiva.
+ * Evalua un punto con sus lecturas. Pura: no toca la base.
+ *
+ * Estado: la ultima lectura contra los umbrales. Tendencia y cruces: regresion
+ * lineal sobre las ultimas 30 lecturas, solo con 5 o mas que abarquen al
+ * menos un dia y un ajuste razonable (R² ≥ 0.5).
+ */
+export function evaluarPunto(
+  lecturas: Array<{ value: number; readingAt: Date }>,
+  sensor: Umbrales & { unit?: string },
+  ahora = new Date(),
+): EvaluacionPunto {
+  const puntos = [...lecturas]
+    .sort((a, b) => a.readingAt.getTime() - b.readingAt.getTime())
+    .slice(-LECTURAS_PARA_TENDENCIA);
+  const ultima = puntos.at(-1) ?? null;
+  const sube = sensor.direction !== "BELOW";
+
+  const clasif = ultima ? classify(ultima.value, sensor) : null;
+  const estado: EstadoPunto = !clasif ? "SIN_DATOS" : clasif === "CRITICAL" ? "CRITICO" : clasif === "WARNING" ? "ADVERTENCIA" : "NORMAL";
+  const superado = (umbral: number | null) =>
+    umbral !== null && ultima !== null && (sube ? ultima.value >= umbral : ultima.value <= umbral);
+
+  const base = {
+    estado,
+    etiquetaEstado: ETIQUETA_ESTADO[estado],
+    valorActual: ultima?.value ?? null,
+    lecturaEl: ultima?.readingAt ?? null,
+    lecturasUsadas: puntos.length,
+  };
+
+  const n = puntos.length;
+  const abarca = n ? (puntos[n - 1].readingAt.getTime() - puntos[0].readingAt.getTime()) / DIA : 0;
+  const insuficiente = (umbral: number | null): Cruce =>
+    superado(umbral)
+      ? textoDeCruce(null, ahora, true)
+      : umbral === null
+        ? { fecha: null, dias: null, texto: "Sin umbral definido" }
+        : { fecha: null, dias: null, texto: "Datos insuficientes para proyectar" };
+
+  if (n < MIN_LECTURAS_PROYECCION || abarca < MIN_DIAS_PROYECCION) {
+    return {
+      ...base,
+      tendencia: "SIN_DATOS",
+      etiquetaTendencia: ETIQUETA_TENDENCIA.SIN_DATOS,
+      pendientePorDia: 0,
+      confianza: "INSUFICIENTE",
+      etiquetaConfianza: ETIQUETA_CONFIANZA.INSUFICIENTE,
+      cruceAdvertencia: insuficiente(sensor.warningThreshold),
+      cruceCritico: insuficiente(sensor.criticalThreshold),
+      resumen: resumir(estado, "SIN_DATOS", "INSUFICIENTE", insuficiente(sensor.criticalThreshold)),
+    };
+  }
+
+  const t0 = puntos[0].readingAt.getTime();
+  const xs = puntos.map((p) => (p.readingAt.getTime() - t0) / DIA);
+  const ys = puntos.map((p) => p.value);
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - mx) * (ys[i] - my);
+    den += (xs[i] - mx) ** 2;
+  }
+  const pendiente = den === 0 ? 0 : num / den;
+  const intercepto = my - pendiente * mx;
+  let ssRes = 0;
+  let ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    ssRes += (ys[i] - (intercepto + pendiente * xs[i])) ** 2;
+    ssTot += (ys[i] - my) ** 2;
+  }
+  const r2 = ssTot === 0 ? 0 : Math.max(0, Math.min(1, 1 - ssRes / ssTot));
+
+  // Hacia el umbral = positivo, sin importar la direccion del sensor.
+  const haciaUmbral = sube ? pendiente : -pendiente;
+  // Estable: en 30 dias se moveria menos del 5% de la escala del punto.
+  const escala = Math.abs(sensor.criticalThreshold ?? sensor.warningThreshold ?? my) || 1;
+  const tendencia: Tendencia =
+    Math.abs(haciaUmbral) * 30 < escala * 0.05 ? "ESTABLE" : haciaUmbral > 0 ? "EMPEORA" : "MEJORA";
+
+  const confianza: Confianza = r2 >= 0.8 && n >= 10 ? "ALTA" : r2 >= 0.5 ? "MEDIA" : "BAJA";
+
+  const cruce = (umbral: number | null): Cruce => {
+    if (umbral === null) return { fecha: null, dias: null, texto: "Sin umbral definido" };
+    if (superado(umbral)) return textoDeCruce(null, ahora, true);
+    if (tendencia !== "EMPEORA") return { fecha: null, dias: null, texto: "Sin cruce proyectado con la tendencia actual" };
+    if (confianza === "BAJA") return { fecha: null, dias: null, texto: "Tendencia poco clara: no se proyecta" };
+    // Desde la ultima lectura real, no desde la recta: la recta puede quedar
+    // del otro lado del umbral y dar una fecha anterior a hoy.
+    const diasDesdeUltima = (umbral - ultima!.value) / pendiente;
+    if (!(diasDesdeUltima > 0) || diasDesdeUltima > HORIZONTE_DIAS) {
+      return { fecha: null, dias: null, texto: "Sin cruce proyectado en los próximos 10 años" };
+    }
+    return textoDeCruce(new Date(ultima!.readingAt.getTime() + diasDesdeUltima * DIA), ahora);
+  };
+
+  const cruceCritico = cruce(sensor.criticalThreshold);
+  return {
+    ...base,
+    tendencia,
+    etiquetaTendencia: ETIQUETA_TENDENCIA[tendencia],
+    pendientePorDia: haciaUmbral,
+    confianza,
+    etiquetaConfianza: ETIQUETA_CONFIANZA[confianza],
+    cruceAdvertencia: cruce(sensor.warningThreshold),
+    cruceCritico,
+    resumen: resumir(estado, tendencia, confianza, cruceCritico),
+  };
+}
+
+function resumir(estado: EstadoPunto, tendencia: Tendencia, confianza: Confianza, critico: Cruce): string {
+  if (estado === "SIN_DATOS") return "Sin lecturas registradas.";
+  if (estado === "CRITICO") {
+    // «Estable» sobre el critico no es buena noticia: sigue critico.
+    const t = tendencia === "SIN_DATOS" ? "" : tendencia === "MEJORA" ? " · tendencia a la baja, aún sin normalizar" : tendencia === "ESTABLE" ? " · tendencia estable, sin mejora" : " · sigue empeorando";
+    return `Umbral crítico superado${t}.`;
+  }
+  const est = estado === "ADVERTENCIA" ? "En advertencia" : "Normal";
+  if (confianza === "INSUFICIENTE") return `${est}. Datos insuficientes para proyectar.`;
+  return `${est} · ${ETIQUETA_TENDENCIA[tendencia].toLowerCase()} · crítico: ${critico.texto.charAt(0).toLowerCase()}${critico.texto.slice(1)}.`;
+}
+
+/** Que condicion abriria (o mantiene) una alerta con esta evaluacion. */
+export function condicionDeAlerta(e: EvaluacionPunto): "CRITICO" | "ADVERTENCIA" | "TENDENCIA" | null {
+  if (e.estado === "CRITICO") return "CRITICO";
+  if (e.estado === "ADVERTENCIA") return "ADVERTENCIA";
+  if (
+    e.cruceCritico.dias !== null && e.cruceCritico.dias <= DIAS_ALERTA_POR_TENDENCIA &&
+    (e.confianza === "ALTA" || e.confianza === "MEDIA")
+  ) {
+    return "TENDENCIA";
+  }
+  return null;
+}
+
+const GRAVEDAD = { TENDENCIA: 1, ADVERTENCIA: 2, CRITICO: 3 } as const;
+
+/** Los campos de evaluacion que se guardan en la alerta. */
+function camposDeEvaluacion(e: EvaluacionPunto, ahora: Date) {
+  return {
+    estadoActual: e.estado,
+    tendencia: e.tendencia,
+    confianza: e.confianza,
+    lecturasUsadas: e.lecturasUsadas,
+    fechaCruceAdvertencia: e.cruceAdvertencia.fecha,
+    fechaCruceCritico: e.cruceCritico.fecha,
+    evaluadaEl: ahora,
+    value: e.valorActual,
+    trendSlope: e.pendientePorDia,
+    // Legado: solo el cruce critico futuro. Nunca una fecha pasada.
+    projectedFailureAt: e.cruceCritico.fecha,
+  };
+}
+
+function mensajeDeAlerta(e: EvaluacionPunto, sensor: { unit: string; warningThreshold: number | null; criticalThreshold: number | null }) {
+  const v = e.valorActual === null ? "—" : `${e.valorActual} ${sensor.unit}`;
+  if (e.estado === "CRITICO") return `Lectura ${v} sobre el umbral crítico (${sensor.criticalThreshold} ${sensor.unit}). ${e.resumen}`;
+  if (e.estado === "ADVERTENCIA") return `Lectura ${v} sobre el umbral de advertencia (${sensor.warningThreshold} ${sensor.unit}). Crítico: ${e.cruceCritico.texto}.`;
+  return `Tendencia hacia el umbral crítico: ${e.cruceCritico.texto} (${e.etiquetaConfianza.toLowerCase()}).`;
+}
+
+/**
+ * Ingesta de lectura de condicion: guarda el dato, reevalua el punto y
+ * mantiene UNA alerta abierta por punto.
+ *
+ *  - Sin alerta y con condicion: se crea (critica abre OT predictiva).
+ *  - Con alerta: se actualiza su evaluacion. Si la condicion empeoro, se
+ *    escala la misma alerta; no se crea otra.
+ *  - Si el valor se normaliza, la alerta NO se cierra sola: se marca
+ *    `normalizadaEl` y alguien valida la normalizacion desde Alertas.
  */
 export async function ingestSensorReading(params: {
   organizationId: string;
@@ -99,6 +295,7 @@ export async function ingestSensorReading(params: {
   source?: string;
   userId?: string | null;
   autoWorkOrder?: boolean;
+  ahora?: Date;
 }) {
   const sensor = await prisma.sensor.findFirst({
     where: { id: params.sensorId, organizationId: params.organizationId },
@@ -106,7 +303,8 @@ export async function ingestSensorReading(params: {
   });
   if (!sensor) throw new Error("Sensor no encontrado");
 
-  const readingAt = params.readingAt ?? new Date();
+  const ahora = params.ahora ?? new Date();
+  const readingAt = params.readingAt ?? ahora;
   const status = classify(params.value, sensor);
 
   await prisma.sensorReading.create({
@@ -120,25 +318,25 @@ export async function ingestSensorReading(params: {
     },
   });
 
+  // El ultimo valor es el de la lectura mas reciente, no el de la que llego al
+  // final: una lectura capturada con fecha pasada no pisa el estado actual.
+  const history = await prisma.sensorReading.findMany({
+    where: { sensorId: sensor.id, organizationId: params.organizationId },
+    orderBy: { readingAt: "desc" },
+    take: LECTURAS_PARA_TENDENCIA,
+    select: { value: true, readingAt: true, status: true },
+  });
+  const masReciente = history[0];
   await prisma.sensor.update({
     where: { id: sensor.id },
-    data: { lastValue: params.value, lastStatus: status, lastReadingAt: readingAt },
+    data: { lastValue: masReciente.value, lastStatus: masReciente.status, lastReadingAt: masReciente.readingAt },
   });
 
-  const history = await prisma.sensorReading.findMany({
-    where: { sensorId: sensor.id },
-    orderBy: { readingAt: "desc" },
-    take: 40,
-    select: { value: true, readingAt: true },
-  });
-  const trend = analyzeTrend(history, sensor);
+  const evaluacion = evaluarPunto(history, sensor, ahora);
+  const condicion = condicionDeAlerta(evaluacion);
 
   let alertId: string | null = null;
   let workOrderNumber: string | null = null;
-
-  const needsAlert =
-    status !== "NORMAL" ||
-    (trend.daysToThreshold !== null && trend.daysToThreshold <= 30 && trend.confidence >= 0.6);
 
   /** Abre la OT predictiva y avisa a los supervisores. */
   async function openPredictiveWorkOrder(alertDbId: string, message: string) {
@@ -155,22 +353,16 @@ export async function ingestSensorReading(params: {
         assetId: sensor!.assetId,
         siteId: sensor!.asset.siteId,
         locationId: sensor!.asset.locationId,
-        dueDate: trend.projectedFailureAt ?? new Date(Date.now() + 3 * 86_400_000),
+        // Ya critico: se atiende pronto. La fecha de cruce no aplica, ya cruzo.
+        dueDate: new Date(ahora.getTime() + 3 * DIA),
         estimatedHours: 3,
         createdById: params.userId ?? null,
       },
     });
-    await prisma.predictiveAlert.update({
-      where: { id: alertDbId },
-      data: { workOrderId: wo.id },
-    });
+    await prisma.predictiveAlert.update({ where: { id: alertDbId }, data: { workOrderId: wo.id } });
 
     const supervisors = await prisma.user.findMany({
-      where: {
-        organizationId: params.organizationId,
-        role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] },
-        active: true,
-      },
+      where: { organizationId: params.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] }, active: true },
       select: { id: true },
     });
     await Promise.all(
@@ -188,80 +380,79 @@ export async function ingestSensorReading(params: {
     return number;
   }
 
-  if (needsAlert) {
-    const existing = await prisma.predictiveAlert.findFirst({
-      where: { sensorId: sensor.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+  const existing = await prisma.predictiveAlert.findFirst({
+    where: { organizationId: params.organizationId, sensorId: sensor.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (existing) {
+    alertId = existing.id;
+    const anterior = (existing.condicion ?? (existing.severity === "CRITICAL" ? "CRITICO" : "ADVERTENCIA")) as keyof typeof GRAVEDAD;
+    const escala = condicion !== null && GRAVEDAD[condicion] > (GRAVEDAD[anterior] ?? 0);
+    const message = condicion ? mensajeDeAlerta(evaluacion, sensor) : existing.message;
+
+    await prisma.predictiveAlert.update({
+      where: { id: existing.id },
+      data: {
+        ...camposDeEvaluacion(evaluacion, ahora),
+        // Normalizada: se marca, pero la alerta sigue abierta hasta validarla.
+        normalizadaEl: condicion === null ? (existing.normalizadaEl ?? ahora) : null,
+        ...(escala
+          ? {
+              condicion,
+              severity: condicion === "CRITICO" ? "CRITICAL" : "WARNING",
+              message,
+              threshold: condicion === "CRITICO" ? sensor.criticalThreshold : sensor.warningThreshold,
+            }
+          : condicion && GRAVEDAD[condicion] === (GRAVEDAD[anterior] ?? 0)
+            ? { message }
+            : {}),
+      },
     });
 
-    const severity = status === "CRITICAL" ? "CRITICAL" : "WARNING";
-    const message =
-      status === "NORMAL"
-        ? `Tendencia ascendente: se estima alcanzar el umbral en ${trend.daysToThreshold} dias (R2 ${(trend.confidence * 100).toFixed(0)}%).`
-        : `Lectura ${params.value} ${sensor.unit} fuera de umbral (${severity === "CRITICAL" ? sensor.criticalThreshold : sensor.warningThreshold} ${sensor.unit}).`;
-
-    if (existing) {
-      await prisma.predictiveAlert.update({
-        where: { id: existing.id },
-        data: {
-          severity,
-          value: params.value,
-          message,
-          trendSlope: trend.slope,
-          projectedFailureAt: trend.projectedFailureAt,
-        },
-      });
-      alertId = existing.id;
-
-      // Escalamiento: la alerta ya existia pero acaba de volverse critica.
-      if (
-        params.autoWorkOrder !== false &&
-        severity === "CRITICAL" &&
-        !existing.workOrderId
-      ) {
-        workOrderNumber = await openPredictiveWorkOrder(existing.id, message);
-        await logAudit({
-          organizationId: params.organizationId,
-          userId: params.userId,
-          entity: "PredictiveAlert",
-          entityId: existing.id,
-          action: "ESCALATED",
-          summary: message,
-        });
-      }
-    } else {
-      const alert = await prisma.predictiveAlert.create({
-        data: {
-          organizationId: params.organizationId,
-          sensorId: sensor.id,
-          assetId: sensor.assetId,
-          severity,
-          title: `${sensor.name} — ${sensor.asset.name}`,
-          message,
-          value: params.value,
-          threshold: severity === "CRITICAL" ? sensor.criticalThreshold : sensor.warningThreshold,
-          trendSlope: trend.slope,
-          projectedFailureAt: trend.projectedFailureAt,
-        },
-      });
-      alertId = alert.id;
-
-      // Una alerta critica abre automaticamente una OT predictiva.
-      if (params.autoWorkOrder !== false && severity === "CRITICAL") {
-        workOrderNumber = await openPredictiveWorkOrder(alert.id, message);
-      }
-
+    if (escala) {
       await logAudit({
         organizationId: params.organizationId,
         userId: params.userId,
         entity: "PredictiveAlert",
-        entityId: alert.id,
-        action: "CREATED",
+        entityId: existing.id,
+        action: "ESCALATED",
         summary: message,
       });
+      if (params.autoWorkOrder !== false && condicion === "CRITICO" && !existing.workOrderId) {
+        workOrderNumber = await openPredictiveWorkOrder(existing.id, message);
+      }
     }
+  } else if (condicion) {
+    const message = mensajeDeAlerta(evaluacion, sensor);
+    const alert = await prisma.predictiveAlert.create({
+      data: {
+        organizationId: params.organizationId,
+        sensorId: sensor.id,
+        assetId: sensor.assetId,
+        condicion,
+        severity: condicion === "CRITICO" ? "CRITICAL" : "WARNING",
+        title: `${sensor.name} — ${sensor.asset.name}`,
+        message,
+        threshold: condicion === "CRITICO" ? sensor.criticalThreshold : sensor.warningThreshold,
+        ...camposDeEvaluacion(evaluacion, ahora),
+      },
+    });
+    alertId = alert.id;
+    if (params.autoWorkOrder !== false && condicion === "CRITICO") {
+      workOrderNumber = await openPredictiveWorkOrder(alert.id, message);
+    }
+    await logAudit({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      entity: "PredictiveAlert",
+      entityId: alert.id,
+      action: "CREATED",
+      summary: message,
+    });
   }
 
-  return { status, trend, alertId, workOrderNumber };
+  return { status, evaluacion, condicion, alertId, workOrderNumber };
 }
 
 /** Indice de salud 0-100 del activo a partir del estado de sus sensores. */
@@ -273,4 +464,30 @@ export function healthScore(sensors: Array<{ lastStatus: string }>) {
     return sum;
   }, 0);
   return Math.max(0, Math.round(100 - penalty / sensors.length));
+}
+
+/**
+ * La evaluacion viva de varios puntos, para pantallas que listan alertas: la
+ * fecha y el estado salen de las lecturas de hoy, no de lo que se guardo al
+ * detectar.
+ */
+export async function evaluarPuntos(organizationId: string, sensorIds: string[], ahora = new Date()) {
+  const ids = [...new Set(sensorIds)];
+  if (!ids.length) return new Map<string, EvaluacionPunto>();
+  const sensores = await prisma.sensor.findMany({
+    where: { organizationId, id: { in: ids } },
+    select: { id: true, unit: true, warningThreshold: true, criticalThreshold: true, direction: true },
+  });
+  const evaluaciones = await Promise.all(
+    sensores.map(async (s) => {
+      const lecturas = await prisma.sensorReading.findMany({
+        where: { organizationId, sensorId: s.id },
+        orderBy: { readingAt: "desc" },
+        select: { value: true, readingAt: true },
+        take: LECTURAS_PARA_TENDENCIA,
+      });
+      return [s.id, evaluarPunto(lecturas, s, ahora)] as const;
+    }),
+  );
+  return new Map<string, EvaluacionPunto>(evaluaciones);
 }

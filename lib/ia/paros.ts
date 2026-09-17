@@ -1,3 +1,4 @@
+import { zonaDeLaEmpresa } from "../indicadores";
 import { z } from "zod";
 import { prisma } from "../db";
 import { analizarConIa, textoIa } from "./cliente";
@@ -95,7 +96,7 @@ export async function explicarParos(
    * "esas tres semanas de julio en las que algo paso". Lo segundo es lo que
    * ningun tablero deja hacer, y es donde esta el valor.
    */
-  const v = ventanas(params.periodo);
+  const v = ventanas(params.periodo, new Date(), await zonaDeLaEmpresa(org.id));
   const rango = params.rango ?? v.actual;
   const resumen = await costoDeParar(org.id, rango);
   const area = resumen.areas.find((a) => a.locationId === params.locationId);
@@ -120,8 +121,8 @@ export async function explicarParos(
       organizationId: org.id,
       assetId: { in: equiposDelArea },
       OR: [
-        { startedAt: { gte: rango.desde, lte: rango.hasta } },
-        { completedAt: { gte: rango.desde, lte: rango.hasta } },
+        { startedAt: { gte: rango.desde, lt: rango.hasta } },
+        { completedAt: { gte: rango.desde, lt: rango.hasta } },
       ],
     },
     orderBy: { completedAt: "desc" },

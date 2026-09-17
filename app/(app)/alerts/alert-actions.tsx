@@ -9,10 +9,13 @@ export function AlertActions({
   alertId,
   hasWorkOrder,
   status,
+  normalizada,
 }: {
   alertId: string;
   hasWorkOrder: boolean;
   status: string;
+  /** El punto regreso a normal: se ofrece validar en vez de dejarla cerrarse sola. */
+  normalizada: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
@@ -44,6 +47,11 @@ export function AlertActions({
       {status === "OPEN" ? (
         <Button size="sm" variant="secondary" onClick={() => act("ACKNOWLEDGE")} disabled={loading !== null}>
           Reconocer
+        </Button>
+      ) : null}
+      {normalizada ? (
+        <Button size="sm" variant="success" onClick={() => act("VALIDATE_NORMALIZATION")} disabled={loading !== null}>
+          Validar normalización
         </Button>
       ) : null}
       <Button size="sm" variant="secondary" onClick={() => act("RESOLVE")} disabled={loading !== null}>

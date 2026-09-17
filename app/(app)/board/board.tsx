@@ -13,7 +13,8 @@ import {
   STATUS_TRANSITIONS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { cn, dueLabel, formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
 
 type Item = {
   id: string;
@@ -23,13 +24,14 @@ type Item = {
   priority: string;
   maintenanceType: string;
   dueDate: string | null;
+  completedAt: string | null;
   asset: string | null;
   assignee: string | null;
   assigneeColor: string | null;
   estimatedHours: number;
 };
 
-export function KanbanBoard({ workOrders }: { workOrders: Item[] }) {
+export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: string }) {
   const router = useRouter();
   const [items, setItems] = useState(workOrders);
   const [dragging, setDragging] = useState<Item | null>(null);
@@ -43,7 +45,10 @@ export function KanbanBoard({ workOrders }: { workOrders: Item[] }) {
     }
     setError(null);
     const previous = items;
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status } : i)));
+    // Al completar, la fecha de finalizacion es ahora; al reabrir se borra,
+    // igual que en el servidor. Asi la etiqueta no dice «Vencida» de algo hecho.
+    const completedAt = status === "COMPLETED" ? new Date().toISOString() : status === "CLOSED" ? item.completedAt : null;
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status, completedAt } : i)));
 
     const res = await fetch(`/api/work-orders/${item.id}/status`, {
       method: "POST",
@@ -84,7 +89,7 @@ export function KanbanBoard({ workOrders }: { workOrders: Item[] }) {
               </div>
               <div className="grid gap-2">
                 {column.map((item) => {
-                  const due = dueLabel(item.dueDate);
+                  const due = estadoDeVencimiento(item, { zona });
                   return (
                     <div
                       key={item.id}
@@ -110,8 +115,8 @@ export function KanbanBoard({ workOrders }: { workOrders: Item[] }) {
                         </Badge>
                         {item.assignee ? <Avatar name={item.assignee} color={item.assigneeColor ?? undefined} /> : null}
                       </div>
-                      <p className={cn("mt-1.5 text-[0.625rem]", due.tone === "danger" ? "text-red-600" : "text-slate-400")}>
-                        {due.text}
+                      <p className={cn("mt-1.5 text-[0.625rem]", due.tono === "danger" ? "text-red-600" : due.tono === "warning" ? "text-amber-600" : due.tono === "success" ? "text-emerald-600" : "text-slate-400")}>
+                        {due.texto}
                       </p>
                     </div>
                   );

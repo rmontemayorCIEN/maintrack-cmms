@@ -7,7 +7,8 @@ import {
   MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS,
   WO_STATUS_COLORS, WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { dueLabel, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import type { EstadoDeVencimiento } from "@/lib/vencimiento";
 
 export type FilaOrden = {
   id: string; number: string; title: string;
@@ -17,7 +18,9 @@ export type FilaOrden = {
   responsable: string | null; responsableColor: string | null;
   creadaPor: string | null; cuadrilla: string | null; plan: string | null;
   modoFalla: string | null; causaRaiz: string | null; paroMinutos: number;
-  dueDate: string | null; startedAt: string | null; completedAt: string | null; createdAt: string;
+  dueDate: string | null; startedAt: string | null; completedAt: string | null; closedAt: string | null; createdAt: string;
+  /** Calculado en el servidor con la zona de la empresa y el ESTADO de la orden. */
+  vencimiento: EstadoDeVencimiento;
   estimatedHours: number; actualHours: number;
   laborCost: number; partsCost: number; serviceCost: number; otherCost: number; totalCost: number;
   moneda: string;
@@ -73,12 +76,8 @@ const COLUMNAS: Columna<FilaOrden>[] = [
   },
   {
     id: "vencimiento", etiqueta: "Vencimiento",
-    texto: (w) => (w.dueDate ? dueLabel(new Date(w.dueDate)).text : "—"),
-    pinta: (w) => {
-      if (!w.dueDate) return "—";
-      const d = dueLabel(new Date(w.dueDate));
-      return <Badge tone={d.tone === "muted" ? "muted" : d.tone}>{d.text}</Badge>;
-    },
+    texto: (w) => w.vencimiento.texto,
+    pinta: (w) => <Badge tone={w.vencimiento.tono}>{w.vencimiento.texto}</Badge>,
   },
   { id: "activo", etiqueta: "Activo", agrupable: true, texto: (w) => guion(w.activo) },
   { id: "sitio", etiqueta: "Sitio", agrupable: true, texto: (w) => guion(w.sitio) },
@@ -99,7 +98,9 @@ const COLUMNAS: Columna<FilaOrden>[] = [
   { id: "costo", etiqueta: "Costo total", alineaDerecha: true, texto: (w) => formatCurrency(w.totalCost, w.moneda) },
   { id: "creada", etiqueta: "Creada", texto: (w) => fecha(w.createdAt) },
   { id: "iniciada", etiqueta: "Iniciada", texto: (w) => fecha(w.startedAt) },
-  { id: "cerrada", etiqueta: "Cerrada", texto: (w) => fecha(w.completedAt) },
+  { id: "compromiso", etiqueta: "Fecha compromiso", texto: (w) => (w.dueDate ? formatDate(new Date(w.dueDate)) : "—") },
+  { id: "cerrada", etiqueta: "Terminada", texto: (w) => fecha(w.completedAt) },
+  { id: "cierreAdmin", etiqueta: "Cierre administrativo", texto: (w) => fecha(w.closedAt) },
   { id: "paro", etiqueta: "Paro (min)", alineaDerecha: true, texto: (w) => (w.paroMinutos ? String(w.paroMinutos) : "—") },
 ];
 

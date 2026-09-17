@@ -1,3 +1,4 @@
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
@@ -50,7 +51,7 @@ export default async function ConjuntoPage({ params, searchParams }: Params) {
   const vivos = conjunto.equipos.filter((e) => e.asset.active);
   const ids = vivos.map((e) => e.asset.id);
   const ahora = new Date();
-  const v = ventanas(periodo, ahora);
+  const v = ventanas(periodo, ahora, await zonaDeLaEmpresa(orgId));
 
   const [ordenes, costo, planes] = await Promise.all([
     ids.length

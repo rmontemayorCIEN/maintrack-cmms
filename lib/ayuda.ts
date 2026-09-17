@@ -206,7 +206,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Los números salen de las órdenes de trabajo cerradas y del kardex del almacén; no se capturan en ningún lado.",
-      "Si un número se ve raro, ábralo: cada tarjeta lleva a la lista que lo produjo.",
+      "Si un número se ve raro, ábralo: cada tarjeta de indicador abre su fórmula y los registros exactos que lo forman.",
+      "«Paro no planeado» es la pérdida por fallas; «paro acumulado» suma también el planeado. La disponibilidad solo descuenta el no planeado.",
+      "El vencimiento de cada orden depende de su estado: «Vencida hace X días», «Vence hoy», «Cumplida en fecha», «Terminada con X días de atraso». Una cancelada nunca aparece vencida.",
     ],
   },
 
@@ -950,10 +952,27 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/meters": {
     titulo: "Medidores",
     que: "Las lecturas de horas, kilómetros o ciclos que disparan mantenimiento por uso.",
-    hacer: ["Capturar lecturas", "Ver la tendencia de consumo"],
+    hacer: [
+      "Capturar lecturas, con fecha pasada si hace falta",
+      "Registrar el reinicio o la sustitución de un medidor",
+      "Corregir o anular una lectura mal capturada (supervisor en adelante)",
+      "Configurar el tipo de medidor y su uso máximo por día",
+    ],
     flujo: [
       "Un plan por medidor no dispara por calendario sino cuando la lectura alcanza el intervalo.",
+      "Cada lectura, corrección o anulación recalcula el valor actual, el promedio diario y la fecha estimada de los planes por uso.",
+      "El promedio diario es el uso de los últimos 90 días entre los días que abarcan las lecturas, sin mezclar un medidor sustituido con el nuevo.",
       "Sin lecturas al día, esos planes no generan nunca.",
+    ],
+    campos: [
+      { nombre: "Tipo de registro", explica: "«Lectura normal» no puede bajar. «Reinicio» o «Sustitución» es lo único que permite un valor menor, pide motivo y recorre la meta de los planes: lo que les faltaba contra el medidor viejo es lo que les falta contra el nuevo." },
+      { nombre: "Uso máximo por día", explica: "Arriba de este uso la lectura es atípica: el sistema muestra lectura anterior, nueva, incremento, tiempo transcurrido y promedio, y solo la guarda si confirma con una justificación. Un horómetro nunca acepta más horas que las del reloj, tenga o no máximo." },
+      { nombre: "Corregida · original", explica: "La lectura se corrigió: se muestra el valor que se capturó primero, quién corrigió, cuándo y por qué. Nada se borra." },
+    ],
+    noPuedo: [
+      { sintoma: "Dice que la lectura es menor que la anterior", porque: "Un medidor no retrocede. Si se reinició o se cambió, regístrelo como tal; si la lectura anterior está mal, corríjala." },
+      { sintoma: "Dice que un horómetro no puede sumar tantas horas", porque: "Entre las dos lecturas pasaron menos horas de reloj que las que marca. Es imposible, no atípico: revise la captura o la lectura anterior." },
+      { sintoma: "No puedo corregir un reinicio", porque: "Deshacerlo obligaría a recorrer a mano la meta de los planes. Registre un nuevo reinicio o sustitución con el valor correcto." },
     ],
   },
 
@@ -962,14 +981,28 @@ export const AYUDA: Record<string, FichaAyuda> = {
     camposBuscables: true,
     que: "Sensores y tendencias que avisan antes de que algo falle.",
     hacer: ["Registrar sensores y sus lecturas", "Ver qué variables se están saliendo de rango"],
-    flujo: ["Cuando una tendencia cruza el umbral, se genera una alerta; de la alerta puede nacer una orden."],
+    flujo: [
+      "El estado (Normal, Advertencia, Crítico, Sin datos suficientes) sale de la última lectura contra los umbrales. Sobre el crítico es Crítico aunque la tendencia sea estable.",
+      "La tendencia y las fechas estimadas de cruce salen de una regresión lineal con al menos 5 lecturas que abarquen un día. Con menos, dice «Datos insuficientes para proyectar».",
+      "Se estiman dos fechas: cuándo cruzaría el umbral de advertencia y cuándo el crítico. No es una fecha de falla: no hay modelo de falla.",
+      "Cuando el punto entra en advertencia, en crítico, o su tendencia cruzaría el crítico en 30 días o menos, se abre UNA alerta por punto; si empeora, se escala la misma.",
+    ],
+    campos: [
+      { nombre: "Confianza", explica: "Alta, media o baja según qué tan bien se ajustan las lecturas a una recta. Con confianza baja no se proyecta fecha. No se muestra como porcentaje: con pocas lecturas un número así aparenta una precisión que no existe." },
+      { nombre: "Proyección vencida", explica: "La fecha estimada ya pasó y el umbral no se cruzó. No se presenta como fecha futura." },
+    ],
   },
 
   "/alerts": {
     titulo: "Alertas",
     que: "Lo que el sistema detectó y necesita que alguien decida.",
-    hacer: ["Revisar la alerta", "Convertirla en orden de trabajo o darla por atendida"],
-    flujo: ["Vienen del predictivo y de las revisiones automáticas. No se capturan a mano."],
+    hacer: ["Revisar la alerta", "Convertirla en orden de trabajo o darla por atendida", "Validar la normalización de un punto que regresó a normal"],
+    flujo: [
+      "Vienen del predictivo y de las revisiones automáticas. No se capturan a mano.",
+      "Cada alerta muestra el estado de HOY del punto, su tendencia y las fechas estimadas de cruce, recalculadas con las lecturas actuales; «Al detectar» es el mensaje original.",
+      "Una alerta no se cierra sola cuando el valor regresa a normal: aparece «Normalizada: por validar» para que alguien confirme que no fue un sensor desconectado o una lectura suelta.",
+      "Completar la orden predictiva cierra la alerta solo si el punto ya está en normal; si sigue crítico, la alerta queda visible.",
+    ],
   },
 
   "/consulta": {
@@ -989,7 +1022,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Un análisis del estado de la operación, con fortalezas, riesgos y qué atender primero.",
     hacer: ["Generar el diagnóstico del periodo", "Revisar las áreas de oportunidad"],
     flujo: [
-      "Los números se calculan en el sistema; la IA los interpreta pero no los inventa.",
+      "Los números se calculan en el sistema; la IA los interpreta pero no los inventa. Son los mismos indicadores, periodo y zona horaria que el Panel y Reportes.",
+      "La calidad de la captura sale de las mismas reglas de calidad de datos: errores (datos imposibles), advertencias (datos sospechosos) y recomendaciones (datos que faltan). Cada una lleva a los registros exactos.",
       "Se genera solo cada semana, y puede pedirlo cuando quiera.",
     ],
   },
@@ -1103,8 +1137,28 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/reports": {
     titulo: "Reportes",
     que: "Los cortes de información para llevar a una junta o a un cierre de mes.",
-    hacer: ["Elegir periodo y exportar"],
-    flujo: ["Todo sale de las órdenes cerradas y del kardex. Si un número no cuadra, el kardex lo explica."],
+    hacer: ["Elegir periodo (30 días, 90 días, 6 meses, 12 meses) y exportar", "Abrir cualquier indicador para ver su fórmula y los registros que lo forman"],
+    flujo: [
+      "Los indicadores son los mismos del Panel de control y del Diagnóstico IA: una sola fuente de cálculo.",
+      "El periodo son días completos en la zona horaria de la empresa, hoy incluido.",
+      "El costo cuenta órdenes TERMINADAS en el periodo; las canceladas no suman. El paro sale de los eventos de paro, y el planeado se reporta aparte: no resta disponibilidad.",
+    ],
+  },
+
+  "/indicadores": {
+    titulo: "Cómo se calculan los indicadores",
+    que: "Todos los indicadores con su definición y fórmula, y el detalle de cada uno: qué órdenes y paros cuentan, y los registros exactos que forman la cifra.",
+    hacer: ["Cambiar el periodo", "Abrir un indicador y cada orden que aporta a su cifra"],
+    flujo: [
+      "La suma del detalle es exactamente la cifra de la tarjeta (o su numerador, en porcentajes y promedios).",
+      "«Con los datos de hoy» muestra la fórmula con los números reales del periodo.",
+      "Completada es la fecha de finalización operativa; el cierre administrativo es aparte y no cambia el cumplimiento.",
+    ],
+    campos: [
+      { nombre: "Estados de OT", explica: "Qué órdenes entran. Las canceladas nunca cuentan; una orden reabierta deja de contar como terminada hasta que se vuelva a completar." },
+      { nombre: "Fecha que cuenta", explica: "Qué fecha decide si un registro cae en el periodo: creación, inicio, finalización o día compromiso." },
+      { nombre: "A favor / En contra", explica: "En porcentajes, si ese registro suma al numerador (en fecha, planificado) o solo al denominador." },
+    ],
   },
 
   "/catalogs": {

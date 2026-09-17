@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
-import { analyzeTrend } from "@/lib/predictive";
+import { evaluarPunto, MIN_LECTURAS_PROYECCION, type EstadoPunto } from "@/lib/predictive";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Progress, Stat } from "@/components/ui";
-import { SENSOR_STATUS_COLORS, SENSOR_TYPE_LABELS } from "@/lib/constants";
+import { SENSOR_TYPE_LABELS } from "@/lib/constants";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { SensorSparkline } from "@/components/charts/dashboard-charts";
 import { SensorDialog } from "./sensor-dialog";
@@ -35,34 +35,35 @@ export default async function PredictivePage() {
 
   const evaluations = sensors.map((sensor) => ({
     sensor,
-    trend: analyzeTrend(
+    trend: evaluarPunto(
       sensor.readings.map((r) => ({ value: r.value, readingAt: r.readingAt })),
       sensor,
     ),
   }));
 
-  const critical = evaluations.filter((e) => e.sensor.lastStatus === "CRITICAL").length;
-  const warning = evaluations.filter((e) => e.sensor.lastStatus === "WARNING").length;
-  const projected = evaluations.filter((e) => e.trend.daysToThreshold !== null);
-  const nearest = projected.sort((a, b) => (a.trend.daysToThreshold ?? 0) - (b.trend.daysToThreshold ?? 0))[0];
+  const critical = evaluations.filter((e) => e.trend.estado === "CRITICO").length;
+  const warning = evaluations.filter((e) => e.trend.estado === "ADVERTENCIA").length;
+  // Solo los que aun no cruzan el critico y tienen proyeccion valida.
+  const projected = evaluations.filter((e) => e.trend.cruceCritico.dias !== null);
+  const nearest = projected.sort((a, b) => (a.trend.cruceCritico.dias ?? 0) - (b.trend.cruceCritico.dias ?? 0))[0];
 
   return (
     <>
       <PageHeader
         title="Mantenimiento predictivo"
-        description="Monitoreo de condición por sensor. Cada lectura se compara contra umbrales y se proyecta la tendencia por regresión lineal para estimar la vida útil remanente."
+        description={`Monitoreo de condición por punto. El estado sale de la última lectura contra sus umbrales; la tendencia y la fecha estimada de cruce, de una regresión lineal con al menos ${MIN_LECTURAS_PROYECCION} lecturas.`}
         actions={editable ? <SensorDialog assets={assets} /> : null}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Puntos monitoreados" value={sensors.length} hint="Sensores activos" />
-        <Stat label="En alerta" value={warning} tone={warning ? "warn" : "good"} hint="Sobre umbral de advertencia" />
-        <Stat label="En estado crítico" value={critical} tone={critical ? "bad" : "good"} hint="Requieren intervención" />
+        <Stat label="En advertencia" value={warning} tone={warning ? "warn" : "good"} hint="Sobre umbral de advertencia" />
+        <Stat label="Umbral crítico superado" value={critical} tone={critical ? "bad" : "good"} hint="Requieren intervención" />
         <Stat
-          label="Falla mas próxima"
-          value={nearest?.trend.daysToThreshold != null ? `${nearest.trend.daysToThreshold} d` : "—"}
-          hint={nearest ? `${nearest.sensor.asset.code} · ${nearest.sensor.name}` : "Sin tendencias adversas"}
-          tone={nearest && (nearest.trend.daysToThreshold ?? 99) < 15 ? "bad" : "default"}
+          label="Cruce crítico más próximo"
+          value={nearest?.trend.cruceCritico.dias != null ? `${nearest.trend.cruceCritico.dias} d` : "—"}
+          hint={nearest ? `${nearest.sensor.asset.code} · ${nearest.sensor.name}` : "Sin cruces proyectados"}
+          tone={nearest && (nearest.trend.cruceCritico.dias ?? 99) < 15 ? "bad" : "default"}
         />
       </div>
 
@@ -91,9 +92,7 @@ export default async function PredictivePage() {
                   title={
                     <span className="flex items-center gap-2">
                       {sensor.name}
-                      <Badge className={SENSOR_STATUS_COLORS[sensor.lastStatus]}>
-                        {sensor.lastStatus === "NORMAL" ? "Normal" : sensor.lastStatus === "WARNING" ? "Alerta" : "Critico"}
-                      </Badge>
+                      <Badge tone={TONO_ESTADO[trend.estado]}>{trend.etiquetaEstado}</Badge>
                     </span>
                   }
                   subtitle={
@@ -125,22 +124,17 @@ export default async function PredictivePage() {
                   <Progress value={usage} tone={usage >= 100 ? "bad" : usage >= 75 ? "warn" : "good"} />
                 </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-2.5 text-center">
+                <p className={`mt-3 text-xs font-medium ${trend.estado === "CRITICO" ? "text-red-700" : trend.estado === "ADVERTENCIA" ? "text-amber-700" : "text-slate-600"}`}>
+                  {trend.resumen}
+                </p>
+                <div className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-2.5 sm:grid-cols-2">
                   <Metric
                     label="Tendencia"
-                    value={`${trend.slope >= 0 ? "+" : ""}${formatNumber(trend.slope, 3)}`}
-                    hint={`${sensor.unit}/dia`}
+                    value={trend.etiquetaTendencia}
+                    hint={trend.tendencia === "SIN_DATOS" ? trend.etiquetaConfianza : `${trend.pendientePorDia >= 0 ? "+" : ""}${formatNumber(trend.pendientePorDia, 3)} ${sensor.unit}/día hacia el umbral · ${trend.etiquetaConfianza.toLowerCase()} · ${trend.lecturasUsadas} lecturas`}
                   />
-                  <Metric
-                    label="Vida remanente"
-                    value={trend.daysToThreshold != null ? `${trend.daysToThreshold} d` : "—"}
-                    hint={trend.projectedFailureAt ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(trend.projectedFailureAt) : "estable"}
-                  />
-                  <Metric
-                    label="Confianza"
-                    value={`${formatNumber(trend.confidence * 100, 0)}%`}
-                    hint="R² del ajuste"
-                  />
+                  <Metric label="Cruce de advertencia" value={trend.cruceAdvertencia.texto} hint={sensor.warningThreshold != null ? `Umbral ${formatNumber(sensor.warningThreshold, 2)} ${sensor.unit}` : ""} />
+                  <Metric label="Cruce crítico" value={trend.cruceCritico.texto} hint={sensor.criticalThreshold != null ? `Umbral ${formatNumber(sensor.criticalThreshold, 2)} ${sensor.unit}` : ""} />
                 </div>
 
                 <div className="mt-3">
@@ -155,11 +149,18 @@ export default async function PredictivePage() {
   );
 }
 
+const TONO_ESTADO: Record<EstadoPunto, "success" | "warning" | "danger" | "muted"> = {
+  NORMAL: "success",
+  ADVERTENCIA: "warning",
+  CRITICO: "danger",
+  SIN_DATOS: "muted",
+};
+
 function Metric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <div>
       <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-sm font-semibold tabular-nums text-slate-800">{value}</p>
+      <p className="text-xs font-semibold text-slate-800">{value}</p>
       <p className="text-[0.625rem] text-slate-400">{hint}</p>
     </div>
   );

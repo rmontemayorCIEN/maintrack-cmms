@@ -1,3 +1,4 @@
+import { evaluarPuntos } from "./predictive";
 import { prisma } from "./db";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "./almacen";
 import { STATUS_TRANSITIONS } from "./constants";
@@ -176,6 +177,16 @@ export async function transitionWorkOrder(params: {
     }
   }
   if (params.to === "CLOSED") data.closedAt = now;
+  /**
+   * Reabrir una orden terminada borra su fecha de finalizacion.
+   *
+   * Los indicadores cuentan como terminada lo que tiene `completedAt`: una
+   * orden reabierta que la conservaba seguia sumando al MTTR, al costo y al
+   * cumplimiento mientras volvia a estar en proceso. Al completarla otra vez
+   * recibe la fecha nueva, que es cuando de verdad quedo hecha. La fecha
+   * anterior queda en la bitacora de auditoria de la transicion.
+   */
+  if (wo.status === "COMPLETED" && params.to !== "CLOSED") data.completedAt = null;
 
   /**
    * Cancelar una orden LIBERA las solicitudes que atendia.
@@ -253,9 +264,27 @@ export async function transitionWorkOrder(params: {
       const minutes = params.fallas
         ? sumaDeActividades + (params.fallas.find((f) => f.taskId === null)?.downtimeMinutes ?? 0)
         : params.downtimeMinutes ?? wo.downtimeMinutes;
-      if (minutes > 0) {
-        await prisma.downtimeEvent.create({
-          data: {
+      /**
+       * Un paro por orden. Completar, reabrir y volver a completar creaba un
+       * segundo evento con los mismos minutos y el paro de la planta salia al
+       * doble. Ahora el cierre nuevo corrige el evento que ya existia.
+       */
+      const previo = await prisma.downtimeEvent.findFirst({
+        where: { workOrderId: wo.id, assetId: wo.assetId },
+        select: { id: true },
+        orderBy: { startedAt: "asc" },
+      });
+      if (minutes > 0 || previo) {
+        await prisma.downtimeEvent.upsert({
+          where: { id: previo?.id ?? "" },
+          update: {
+            endedAt: now,
+            minutes,
+            planned:
+              sumaDeActividades === 0 &&
+              (wo.maintenanceType === "PREVENTIVE" || wo.maintenanceType === "INSPECTION"),
+          },
+          create: {
             assetId: wo.assetId,
             workOrderId: wo.id,
             startedAt: wo.startedAt ?? wo.createdAt,
@@ -334,10 +363,29 @@ export async function transitionWorkOrder(params: {
       completadaEl: now,
     });
 
-    await prisma.predictiveAlert.updateMany({
-      where: { workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
-      data: { status: "RESOLVED" },
+    /**
+     * La OT predictiva terminada cierra su alerta SOLO si el punto ya esta en
+     * normal. Si la ultima lectura sigue sobre el umbral, el trabajo no lo
+     * corrigio (o falta medir despues de la intervencion): cerrarla esconderia
+     * un punto critico. Se queda abierta y visible.
+     */
+    const alertasDeLaOrden = await prisma.predictiveAlert.findMany({
+      where: { organizationId: params.organizationId, workOrderId: wo.id, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+      select: { id: true, sensorId: true },
     });
+    if (alertasDeLaOrden.length) {
+      const vivas = await evaluarPuntos(params.organizationId, alertasDeLaOrden.map((a) => a.sensorId).filter(Boolean) as string[]);
+      const normales = alertasDeLaOrden.filter((a) => {
+        const e = a.sensorId ? vivas.get(a.sensorId) : undefined;
+        return !e || e.estado === "NORMAL";
+      });
+      if (normales.length) {
+        await prisma.predictiveAlert.updateMany({
+          where: { id: { in: normales.map((a) => a.id) } },
+          data: { status: "RESOLVED" },
+        });
+      }
+    }
 
     if (wo.createdById && wo.createdById !== params.userId) {
       await notify({
@@ -363,7 +411,13 @@ export async function transitionWorkOrder(params: {
     entityId: wo.id,
     action: "STATUS_CHANGED",
     summary: `${wo.number}: ${wo.status} → ${params.to}`,
-    changes: { from: wo.status, to: params.to },
+    changes: {
+      from: wo.status,
+      to: params.to,
+      // Lo que se borra al reabrir se guarda aqui, para no perder cuando se
+      // habia dado por terminada la primera vez.
+      ...(data.completedAt === null && wo.completedAt ? { completedAtAnterior: wo.completedAt.toISOString() } : {}),
+    },
   });
 
   return updated;

@@ -1,3 +1,4 @@
+import { NIVELES } from "@/lib/calidad-datos";
 import { AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
@@ -89,20 +90,31 @@ export default async function DiagnosticoPage() {
             </p>
           ) : (
             <ul className="grid gap-2.5">
-              {salud.huecos.slice(0, 5).map((h) => (
-                <li key={h.clave}>
-                  <Link href={h.enlace} className="group block rounded-lg px-2 py-1.5 hover:bg-slate-50">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-xs font-medium text-slate-700 group-hover:text-brand-700">
-                        {h.titulo}
-                      </p>
-                      <p className="shrink-0 text-[0.6875rem] tabular-nums text-slate-500">
-                        {h.cumplidos}/{h.total} · faltan {h.total - h.cumplidos}
-                      </p>
-                    </div>
-                    <div className="mt-1"><Progress value={h.porcentaje} tone={h.porcentaje >= 80 ? "good" : h.porcentaje >= 50 ? "warn" : "bad"} /></div>
-                    <p className="mt-1 text-[0.6875rem] text-slate-500">{h.porque}</p>
-                  </Link>
+              {salud.huecos.slice(0, 8).map((h) => (
+                <li key={h.clave} className="rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <Link href={h.enlace} className="text-xs font-medium text-slate-700 hover:text-brand-700">
+                      {h.titulo}
+                    </Link>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <Badge tone={NIVELES[h.nivel].tono}>{NIVELES[h.nivel].etiqueta}</Badge>
+                      <span className="text-[0.6875rem] tabular-nums text-slate-500">
+                        {h.total - h.cumplidos} de {h.total}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="mt-1"><Progress value={h.porcentaje} tone={h.porcentaje >= 80 ? "good" : h.porcentaje >= 50 ? "warn" : "bad"} /></div>
+                  <p className="mt-1 text-[0.6875rem] text-slate-500">{h.porque}</p>
+                  {h.hallazgos.length ? (
+                    <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.6875rem]">
+                      {h.hallazgos.slice(0, 4).map((x) => (
+                        <Link key={x.id} href={x.enlace} className="text-brand-600 hover:underline" title={x.detalle}>
+                          {x.etiqueta}{x.detalle ? ` (${x.detalle})` : ""}
+                        </Link>
+                      ))}
+                      {h.total - h.cumplidos > 4 ? <span className="text-slate-400">y {h.total - h.cumplidos - 4} más</span> : null}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

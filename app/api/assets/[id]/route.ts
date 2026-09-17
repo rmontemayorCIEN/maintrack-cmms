@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
+import { validarFechasDeActivo } from "@/lib/calidad-datos";
 
 const schema = z.object({
   name: z.string().min(2).optional(),
@@ -35,6 +36,13 @@ export async function PATCH(request: Request, { params }: Params) {
     const data: Record<string, unknown> = { ...input };
     if (input.purchaseDate !== undefined) data.purchaseDate = parseDate(input.purchaseDate);
     if (input.warrantyExpiry !== undefined) data.warrantyExpiry = parseDate(input.warrantyExpiry);
+    // Las fechas se validan con lo que quedaria guardado, no solo con lo que llega.
+    const errorDeFechas = validarFechasDeActivo({
+      purchaseDate: input.purchaseDate !== undefined ? (data.purchaseDate as Date | null) : existing.purchaseDate,
+      warrantyExpiry: input.warrantyExpiry !== undefined ? (data.warrantyExpiry as Date | null) : existing.warrantyExpiry,
+      commissionedAt: existing.commissionedAt,
+    });
+    if (errorDeFechas) return fail(errorDeFechas, 422);
     const asset = await prisma.asset.update({ where: { id }, data });
     await logAudit({
       organizationId: orgId,

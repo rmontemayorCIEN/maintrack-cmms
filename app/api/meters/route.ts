@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
+import { tipoPorUnidad } from "@/lib/medidores";
 
 const createSchema = z.object({
   assetId: z.string(),
   name: z.string().min(1),
   unit: z.string().default("h"),
   currentValue: z.coerce.number().min(0).default(0),
+  maxIncrementoDiario: z.coerce.number().positive().nullable().optional(),
 });
 
 export async function GET() {
@@ -25,7 +27,8 @@ export async function POST(request: Request) {
     const input = createSchema.parse(await request.json());
     const asset = await prisma.asset.findFirst({ where: { id: input.assetId, organizationId: orgId } });
     if (!asset) return fail("Activo no encontrado", 404);
-    const meter = await prisma.meter.create({ data: { ...input, organizationId: orgId } });
+    // El tipo sale de la unidad: decide que lecturas son imposibles.
+    const meter = await prisma.meter.create({ data: { ...input, tipo: tipoPorUnidad(input.unit), organizationId: orgId } });
     return ok({ meter }, 201);
   });
 }

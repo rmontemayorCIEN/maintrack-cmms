@@ -182,12 +182,15 @@ export function Stat({
   hint,
   tone = "default",
   icon,
+  href,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: "default" | "good" | "warn" | "bad";
   icon?: ReactNode;
+  /** Si la tarjeta abre su detalle (p. ej. la formula y los registros de un indicador). */
+  href?: string;
 }) {
   const tones = {
     default: "text-slate-900",
@@ -195,8 +198,8 @@ export function Stat({
     warn: "text-amber-600",
     bad: "text-red-600",
   };
-  return (
-    <div className="card p-4">
+  const contenido = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">
           <Glosa>{label}</Glosa>
@@ -205,7 +208,14 @@ export function Stat({
       </div>
       <p className={cn("mt-2 text-2xl font-semibold tabular-nums", tones[tone])}>{value}</p>
       {hint ? <p className="mt-1 text-xs text-slate-500"><Glosa>{hint}</Glosa></p> : null}
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="card block p-4 transition-colors hover:border-brand-300 focus-visible:border-brand-400">
+      {contenido}
+    </Link>
+  ) : (
+    <div className="card p-4">{contenido}</div>
   );
 }
 

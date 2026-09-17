@@ -1,3 +1,6 @@
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { TIPOS_DE_FALLA } from "@/lib/fallas";
 import Link from "next/link";
 import { LectorPlaca } from "./lector-placa";
 import { iaConfigurada } from "@/lib/ia/cliente";
@@ -12,7 +15,7 @@ import { puntoDeActivo } from "@/lib/portal";
 import { expedienteDeFallas } from "@/lib/recurrencia";
 import { Recurrencia, type Analisis } from "./recurrencia";
 import { prisma } from "@/lib/db";
-import { analyzeTrend, healthScore } from "@/lib/predictive";
+import { evaluarPunto, healthScore } from "@/lib/predictive";
 import { Badge, Card, CardHeader, PageHeader, Progress, Stat } from "@/components/ui";
 import {
   ASSET_STATUS_COLORS,
@@ -123,15 +126,17 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       },
   });
 
-  const [workOrders, costs, downtime] = await Promise.all([
+  const zona = await zonaDeLaEmpresa(user.organizationId);
+  const [workOrders, costs, downtime, reparaciones] = await Promise.all([
     prisma.workOrder.findMany({
       where: { assetId: asset.id },
       include: { assignedTo: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 25,
     }),
+    // Las canceladas no suman costo: se listan, pero no se gasto en ellas.
     prisma.workOrder.aggregate({
-      where: { assetId: asset.id },
+      where: { assetId: asset.id, status: { not: "CANCELLED" } },
       _sum: { totalCost: true, actualHours: true, downtimeMinutes: true },
       _count: { _all: true },
     }),
@@ -140,13 +145,28 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       _sum: { minutes: true },
       _count: { _all: true },
     }),
+    // MTTR del equipo con la regla de los indicadores: reparaciones de falla
+    // (en la orden o en una actividad) terminadas y con horas registradas, de
+    // toda su historia —no solo de las ultimas 25 que se listan abajo.
+    prisma.workOrder.findMany({
+      where: {
+        assetId: asset.id,
+        status: { in: ["COMPLETED", "CLOSED"] },
+        completedAt: { not: null },
+        OR: [
+          { maintenanceType: { in: [...TIPOS_DE_FALLA] } },
+          { tasks: { some: { maintenanceType: { in: [...TIPOS_DE_FALLA] } } } },
+        ],
+      },
+      select: { actualHours: true },
+    }),
   ]);
 
   const open = workOrders.filter((wo) => OPEN_STATUSES.includes(wo.status));
-  const corrective = workOrders.filter((wo) => wo.maintenanceType === "CORRECTIVE" && wo.completedAt);
-  const mttr = corrective.length
-    ? corrective.reduce((s, wo) => s + wo.actualHours, 0) / corrective.length
-    : 0;
+  const conHoras = reparaciones.filter((r) => r.actualHours > 0);
+  const mttr = conHoras.length
+    ? conHoras.reduce((s, r) => s + r.actualHours, 0) / conHoras.length
+    : null;
   const health = healthScore(asset.sensors);
   const totalCost = costs._sum.totalCost ?? 0;
   const ratio = asset.replacementCost ? (totalCost / asset.replacementCost) * 100 : 0;
@@ -219,7 +239,15 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           hint={`${asset.sensors.length} puntos monitoreados`}
         />
         <Stat label="OT historicas" value={costs._count._all} hint={`${open.length} abiertas`} />
-        <Stat label="MTTR del activo" value={`${formatNumber(mttr, 1)} h`} hint={`${corrective.length} correctivos cerrados`} />
+        <Stat
+          label="MTTR del activo"
+          value={mttr === null ? "—" : `${formatNumber(mttr, 1)} h`}
+          hint={
+            mttr === null
+              ? reparaciones.length ? "Reparaciones sin horas registradas" : "Sin reparaciones terminadas"
+              : `${conHoras.length} reparaciones con horas${reparaciones.length > conHoras.length ? ` · ${reparaciones.length - conHoras.length} sin horas` : ""}`
+          }
+        />
         <Stat
           label="Costo acumulado"
           value={formatCurrency(totalCost, currency)}
@@ -370,7 +398,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           ) : (
             <ul className="grid gap-3">
               {asset.sensors.map((sensor) => {
-                const trend = analyzeTrend(
+                const trend = evaluarPunto(
                   sensor.readings.map((r) => ({ value: r.value, readingAt: r.readingAt })),
                   sensor,
                 );
@@ -390,9 +418,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                     <div className="mt-2">
                       <Progress value={usage} tone={usage >= 100 ? "bad" : usage >= 75 ? "warn" : "good"} />
                     </div>
-                    {trend.daysToThreshold != null ? (
-                      <p className="mt-1.5 text-[0.6875rem] font-medium text-amber-700">
-                        Umbral estimado en {trend.daysToThreshold} dias (confianza {formatNumber(trend.confidence * 100, 0)}%)
+                    <p className={`mt-1.5 text-[0.6875rem] font-medium ${trend.estado === "CRITICO" ? "text-red-700" : trend.estado === "ADVERTENCIA" ? "text-amber-700" : "text-slate-500"}`}>
+                      {trend.etiquetaEstado} · {trend.resumen}
+                    </p>
+                    {trend.estado !== "CRITICO" ? (
+                      <p className="text-[0.6875rem] text-slate-500">
+                        Cruce crítico: {trend.cruceCritico.texto}
                       </p>
                     ) : null}
                   </li>
@@ -461,6 +492,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   <th>Estado</th>
                   <th>Responsable</th>
                   <th>Fecha</th>
+                  <th>Vencimiento</th>
                   <th className="text-right">Horas</th>
                   <th className="text-right">Costo</th>
                 </tr>
@@ -482,6 +514,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                     <td><Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge></td>
                     <td className="text-xs text-slate-600">{wo.assignedTo?.name ?? "—"}</td>
                     <td className="text-xs text-slate-500">{formatDate(wo.completedAt ?? wo.createdAt)}</td>
+                    <td>
+                      {(() => {
+                        const v = estadoDeVencimiento(wo, { zona });
+                        return <Badge tone={v.tono}>{v.texto}</Badge>;
+                      })()}
+                    </td>
                     <td className="text-right tabular-nums text-xs">{formatNumber(wo.actualHours, 1)}</td>
                     <td className="text-right tabular-nums text-xs">{formatCurrency(wo.totalCost, currency)}</td>
                   </tr>

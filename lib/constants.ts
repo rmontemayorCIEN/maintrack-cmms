@@ -195,3 +195,17 @@ export const REQUEST_STATUS_COLORS: Record<string, string> = {
 // El catalogo comercial vive en lib/planes.ts: limites, precios y funciones
 // de cada plan, junto con su verificacion.
 
+
+/** Tipos de medidor. Deciden que lectura es imposible o atipica (`lib/medidores`). */
+export const TIPOS_MEDIDOR = {
+  HOROMETRO: "Horómetro",
+  ODOMETRO: "Odómetro",
+  CICLOS: "Contador de ciclos",
+  OTRO: "Otro",
+} as const;
+
+export const TIPOS_LECTURA = {
+  LECTURA: "Lectura",
+  REINICIO: "Reinicio del medidor",
+  SUSTITUCION: "Sustitución del medidor",
+} as const;

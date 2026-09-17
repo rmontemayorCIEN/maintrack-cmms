@@ -64,13 +64,16 @@ export async function fallasCodificadas(
   desde: Date,
   hasta?: Date,
 ): Promise<FallaContada[]> {
-  const rango = { gte: desde, ...(hasta ? { lte: hasta } : {}) };
+  // Semiabierto `[desde, hasta)`, como todos los periodos (`lib/periodos`), y
+  // solo ordenes terminadas: una reabierta conserva su fecha vieja de termino.
+  const rango = { gte: desde, ...(hasta ? { lt: hasta } : {}) };
+  const terminada = { in: ["COMPLETED", "CLOSED"] };
 
   const [actividades, encabezados] = await Promise.all([
     prisma.workOrderTask.findMany({
       where: {
         failureCodeId: { not: null },
-        workOrder: { organizationId, completedAt: rango },
+        workOrder: { organizationId, status: terminada, completedAt: rango },
       },
       select: {
         failureCodeId: true, rootCauseId: true, downtimeMinutes: true,
@@ -83,6 +86,7 @@ export async function fallasCodificadas(
         organizationId,
         failureCodeId: { not: null },
         maintenanceType: { in: [...TIPOS_DE_FALLA] },
+        status: terminada,
         completedAt: rango,
       },
       select: {

@@ -582,6 +582,16 @@ model Meter {
   lastReadingAt  DateTime?
   createdAt      DateTime  @default(now())
 
+  /// HOROMETRO | ODOMETRO | CICLOS | OTRO. Decide que lectura es imposible:
+  /// un horometro no puede sumar mas horas que las que pasaron en el reloj.
+  /// Los existentes se derivaron de la unidad en la migracion.
+  tipo String @default("HOROMETRO")
+
+  /// Uso maximo razonable por dia (km/dia, ciclos/dia...). Arriba de esto la
+  /// lectura se trata como atipica y pide confirmacion con justificacion.
+  /// Nulo: sin limite configurado. En horometros solo puede bajar de 24.
+  maxIncrementoDiario Float?
+
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   readings     MeterReading[]
@@ -602,6 +612,27 @@ model MeterReading {
   readingAt      DateTime @default(now())
   source         String   @default("MANUAL") // MANUAL | IOT | IMPORT
   note           String?
+
+  /// LECTURA | REINICIO | SUSTITUCION. Un reinicio o un medidor nuevo es el
+  /// unico caso en que el valor puede bajar, y corta el calculo de uso: el
+  /// incremento no se mide contra el medidor anterior.
+  tipo String @default("LECTURA")
+
+  /// VALIDA | CORREGIDA | ANULADA. Nunca se borra una lectura: se corrige
+  /// conservando el valor original o se anula con motivo, y el promedio y los
+  /// planes se recalculan sin ella.
+  estado String @default("VALIDA")
+
+  /// Se aceptó fuera de lo razonable, con confirmacion y justificacion.
+  atipica       Boolean @default(false)
+  justificacion String?
+
+  /// El valor tal como se capturo la primera vez, si luego se corrigio.
+  valorOriginal     Float?
+  fechaOriginal     DateTime?
+  correccionPorId   String?
+  correccionEl      DateTime?
+  correccionMotivo  String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meter        Meter        @relation(fields: [meterId], references: [id], onDelete: Cascade)
@@ -1892,8 +1923,27 @@ model PredictiveAlert {
   value              Float?
   threshold          Float?
   trendSlope         Float?
+  /// Legado: una sola fecha que mezclaba cruce de advertencia y critico y se
+  /// mostraba como «falla». Se conserva; ya no se presenta como falla.
   projectedFailureAt DateTime?
   status             String    @default("OPEN") // OPEN | ACKNOWLEDGED | RESOLVED | DISMISSED
+
+  /// ADVERTENCIA | CRITICO | TENDENCIA: la condicion que abrio la alerta. Una
+  /// alerta abierta por punto; si la condicion empeora se escala la misma.
+  condicion String?
+
+  /// Ultima evaluacion del punto (`lib/predictive.ts` evaluarPunto).
+  estadoActual          String?   // NORMAL | ADVERTENCIA | CRITICO | SIN_DATOS
+  tendencia             String?   // EMPEORA | MEJORA | ESTABLE | SIN_DATOS
+  confianza             String?   // ALTA | MEDIA | BAJA | INSUFICIENTE
+  lecturasUsadas        Int?
+  fechaCruceAdvertencia DateTime?
+  fechaCruceCritico     DateTime?
+  evaluadaEl            DateTime?
+
+  /// Cuando el valor regreso a normal. La alerta NO se cierra sola: alguien
+  /// valida que la normalizacion es real (no un sensor desconectado).
+  normalizadaEl DateTime?
   acknowledgedById   String?
   acknowledgedAt     DateTime?
   createdAt          DateTime  @default(now())

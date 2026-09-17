@@ -1,5 +1,7 @@
 import { prisma } from "../db";
-import { computeKpis } from "../kpi";
+import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa } from "../indicadores";
+import { dentroDe, describirPeriodo } from "../periodos";
+import { estadoDeVencimiento } from "../vencimiento";
 import { analizarAlmacen } from "../almacen-analisis";
 import { AYUDA, CONTROLES_TABLA } from "../ayuda";
 import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
@@ -16,12 +18,13 @@ import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
  * deliberada: una consulta se responde, no ejecuta cambios.
  */
 
-const DIA = 86_400_000;
-
-function rango(dias?: number) {
-  const to = new Date();
-  const from = new Date(to.getTime() - (dias ?? 90) * DIA);
-  return { from, to };
+/**
+ * El periodo de una consulta: los mismos dias completos, en la zona horaria de
+ * la empresa, que usan el Panel y Reportes (`lib/periodos`). Antes era "ahora
+ * menos N dias" al milisegundo y la IA respondia cifras de otra ventana.
+ */
+function rango(organizationId: string, dias: number) {
+  return periodoDeLaEmpresa(organizationId, dias);
 }
 
 export const HERRAMIENTAS = [
@@ -168,23 +171,30 @@ export async function ejecutarHerramienta(
     }
 
     case "indicadores": {
-      const k = await computeKpis(organizationId, rango(dias ?? 90));
+      // La misma fuente que el Panel y Reportes: una cifra, un lugar.
+      const periodo = await rango(organizationId, dias ?? 90);
+      const k = await calcularIndicadores(organizationId, periodo);
       return {
-        periodoDias: dias ?? 90,
-        mttrHoras: Math.round(k.reliability.mttr * 10) / 10,
-        mtbfHoras: Math.round(k.reliability.mtbf),
-        disponibilidad: Math.round(k.reliability.availability * 100) / 100,
-        cumplimientoPreventivo: Math.round(k.reliability.pmCompliance),
-        trabajoPlanificado: Math.round(k.reliability.plannedRatio),
-        horasParoNoPlaneado: Math.round(k.reliability.unplannedDowntimeMinutes / 60),
-        ordenes: k.totals,
-        costos: k.costs,
-        porTipo: k.byType,
+        periodoDias: periodo.dias,
+        periodo: describirPeriodo(periodo),
+        zonaHoraria: periodo.zonaHoraria,
+        indicadores: Object.values(k.indicadores).map((i) => ({
+          indicador: i.nombre,
+          valor: i.valor === null ? null : Math.round(i.valor * 100) / 100,
+          unidad: i.unidad,
+          sinDato: i.sinValor,
+          formula: i.formula,
+          calculo: i.calculo,
+          notas: i.notas,
+        })),
+        ordenes: k.totales,
+        costos: k.costos,
+        porTipo: k.porTipo,
       };
     }
 
     case "buscar_ordenes": {
-      const r = rango(dias ?? 90);
+      const periodo = await rango(organizationId, dias ?? 90);
       const activo = typeof entrada.codigoActivo === "string" && entrada.codigoActivo
         ? await prisma.asset.findFirst({ where: { organizationId, code: entrada.codigoActivo }, select: { id: true, code: true, name: true } })
         : null;
@@ -192,72 +202,70 @@ export async function ejecutarHerramienta(
 
       const where = {
         organizationId,
-        createdAt: { gte: r.from, lte: r.to },
+        createdAt: dentroDe(periodo),
         ...(activo ? { assetId: activo.id } : {}),
         ...(typeof entrada.tipo === "string" ? { maintenanceType: entrada.tipo } : {}),
         ...(typeof entrada.estado === "string" ? { status: entrada.estado } : {}),
-        ...(entrada.soloVencidas
-          ? { dueDate: { lt: new Date() }, status: { notIn: ["COMPLETED", "CLOSED", "CANCELLED"] } }
-          : {}),
       };
 
-      const [agregado, muestra] = await Promise.all([
-        prisma.workOrder.aggregate({
-          where, _count: { _all: true },
-          _sum: { totalCost: true, actualHours: true, downtimeMinutes: true },
-        }),
-        prisma.workOrder.findMany({
-          where,
-          select: {
-            number: true, title: true, status: true, maintenanceType: true, priority: true,
-            totalCost: true, createdAt: true, asset: { select: { code: true } },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 12,
-        }),
-      ]);
+      const todas = await prisma.workOrder.findMany({
+        where,
+        select: {
+          id: true, number: true, title: true, status: true, maintenanceType: true, priority: true,
+          totalCost: true, actualHours: true, createdAt: true, dueDate: true, completedAt: true,
+          asset: { select: { code: true } },
+          downtimes: { select: { minutes: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      // «Vencida» con la misma regla que las pantallas: abierta y con el dia
+      // compromiso ya pasado en la zona de la empresa.
+      const ordenes = entrada.soloVencidas
+        ? todas.filter((w) => estadoDeVencimiento(w, { zona: periodo.zonaHoraria }).clave === "VENCIDA")
+        : todas;
+      // Las canceladas se listan pero no suman costo, horas ni paro.
+      const vivas = ordenes.filter((w) => w.status !== "CANCELLED");
 
       return {
-        filtro: { dias: dias ?? 90, activo: activo ? `${activo.code} ${activo.name}` : "toda la planta", tipo: entrada.tipo ?? null, estado: entrada.estado ?? null },
-        total: agregado._count._all,
-        costoSumado: Math.round(agregado._sum.totalCost ?? 0),
-        horasSumadas: Math.round((agregado._sum.actualHours ?? 0) * 10) / 10,
-        horasDeParo: Math.round((agregado._sum.downtimeMinutes ?? 0) / 60),
-        muestra: muestra.map((w) => ({
+        filtro: {
+          dias: periodo.dias, periodo: describirPeriodo(periodo), fechaQueCuenta: "creación",
+          activo: activo ? `${activo.code} ${activo.name}` : "toda la planta", tipo: entrada.tipo ?? null, estado: entrada.estado ?? null,
+        },
+        total: ordenes.length,
+        canceladas: ordenes.length - vivas.length,
+        costoSumado: Math.round(vivas.reduce((t, w) => t + w.totalCost, 0)),
+        horasSumadas: Math.round(vivas.reduce((t, w) => t + w.actualHours, 0) * 10) / 10,
+        horasDeParo: Math.round(vivas.reduce((t, w) => t + w.downtimes.reduce((m, d) => m + d.minutes, 0), 0) / 6) / 10,
+        muestra: ordenes.slice(0, 12).map((w) => ({
           numero: w.number, titulo: w.title, activo: w.asset?.code ?? null,
           tipo: w.maintenanceType, estado: w.status, prioridad: w.priority,
+          vencimiento: estadoDeVencimiento(w, { zona: periodo.zonaHoraria }).texto,
           costo: Math.round(w.totalCost), fecha: w.createdAt.toISOString().slice(0, 10),
         })),
       };
     }
 
     case "costo_por_activo": {
-      const r = rango(dias ?? 365);
+      const periodo = await rango(organizationId, dias ?? 365);
       const limite = typeof entrada.limite === "number" ? Math.min(25, Math.max(1, entrada.limite)) : 10;
-      const filas = await prisma.workOrder.groupBy({
-        by: ["assetId"],
-        where: { organizationId, assetId: { not: null }, createdAt: { gte: r.from, lte: r.to } },
-        _sum: { totalCost: true, downtimeMinutes: true },
-        _count: { _all: true },
-      });
-      const top = filas.sort((a, b) => (b._sum.totalCost ?? 0) - (a._sum.totalCost ?? 0)).slice(0, limite);
+      const top = await costoYParoPorActivo(organizationId, periodo, limite);
       const activos = await prisma.asset.findMany({
-        where: { id: { in: top.map((t) => t.assetId!) } },
-        select: { id: true, code: true, name: true, criticality: true, replacementCost: true },
+        where: { organizationId, id: { in: top.map((t) => t.assetId) } },
+        select: { id: true, replacementCost: true },
       });
       return {
-        periodoDias: dias ?? 365,
+        periodoDias: periodo.dias,
+        criterio: "Costo de órdenes terminadas en el periodo; paro no planeado de los eventos de paro.",
         activos: top.map((t) => {
-          const a = activos.find((x) => x.id === t.assetId);
-          const costo = Math.round(t._sum.totalCost ?? 0);
+          const reemplazo = activos.find((x) => x.id === t.assetId)?.replacementCost ?? null;
           return {
-            activo: a ? `${a.code} ${a.name}` : "sin activo",
-            criticidad: a?.criticality ?? null,
-            costo,
-            ordenes: t._count._all,
-            horasDeParo: Math.round((t._sum.downtimeMinutes ?? 0) / 60),
-            costoDeReemplazo: a?.replacementCost ?? null,
-            proporcionDelReemplazo: a?.replacementCost ? Math.round((costo / a.replacementCost) * 100) : null,
+            activo: `${t.code} ${t.name}`,
+            criticidad: t.criticality,
+            costo: t.costo,
+            ordenesTerminadas: t.ordenes,
+            horasDeParoNoPlaneado: t.paroHoras,
+            costoDeReemplazo: reemplazo,
+            proporcionDelReemplazo: reemplazo ? Math.round((t.costo / reemplazo) * 100) : null,
           };
         }),
       };
@@ -286,10 +294,20 @@ export async function ejecutarHerramienta(
         },
       });
       if (!a) return { error: `No existe el activo ${entrada.codigo}` };
-      const totales = await prisma.workOrder.aggregate({
-        where: { organizationId, asset: { code: String(entrada.codigo) } },
-        _sum: { totalCost: true, downtimeMinutes: true }, _count: { _all: true },
-      });
+      // Acumulado con las reglas de los indicadores: sin canceladas, y el paro
+      // desde los eventos de paro (no el encabezado de la orden).
+      const [totales, paro] = await Promise.all([
+        prisma.workOrder.aggregate({
+          where: { organizationId, asset: { code: String(entrada.codigo) }, status: { not: "CANCELLED" } },
+          _sum: { totalCost: true }, _count: { _all: true },
+        }),
+        prisma.downtimeEvent.groupBy({
+          by: ["planned"],
+          where: { asset: { organizationId, code: String(entrada.codigo) } },
+          _sum: { minutes: true },
+        }),
+      ]);
+      const minutosParo = (planeado: boolean) => paro.find((p) => p.planned === planeado)?._sum.minutes ?? 0;
       return {
         ...a,
         purchaseDate: a.purchaseDate?.toISOString().slice(0, 10) ?? null,
@@ -298,7 +316,8 @@ export async function ejecutarHerramienta(
         acumulado: {
           ordenes: totales._count._all,
           costo: Math.round(totales._sum.totalCost ?? 0),
-          horasDeParo: Math.round((totales._sum.downtimeMinutes ?? 0) / 60),
+          horasDeParoNoPlaneado: Math.round(minutosParo(false) / 6) / 10,
+          horasDeParoPlaneado: Math.round(minutosParo(true) / 6) / 10,
         },
       };
     }
@@ -329,12 +348,12 @@ export async function ejecutarHerramienta(
     }
 
     case "fallas_frecuentes": {
-      const r = rango(dias ?? 180);
+      const r = await rango(organizationId, dias ?? 180);
       const [porCodigo, porCausa] = await Promise.all([
-        fallasCodificadas(organizationId, r.from).then(agruparPorCodigo),
+        fallasCodificadas(organizationId, r.desde, r.hasta).then(agruparPorCodigo),
         prisma.workOrder.groupBy({
           by: ["rootCauseId"],
-          where: { organizationId, rootCauseId: { not: null }, createdAt: { gte: r.from } },
+          where: { organizationId, rootCauseId: { not: null }, status: { in: ["COMPLETED", "CLOSED"] }, completedAt: dentroDe(r) },
           _count: { _all: true },
         }),
       ]);
@@ -343,10 +362,10 @@ export async function ejecutarHerramienta(
         prisma.rootCause.findMany({ where: { id: { in: porCausa.map((x) => x.rootCauseId!) } }, select: { id: true, description: true } }),
       ]);
       const sinCausa = await prisma.workOrder.count({
-        where: { organizationId, status: { in: ["COMPLETED", "CLOSED"] }, rootCauseId: null, createdAt: { gte: r.from } },
+        where: { organizationId, status: { in: ["COMPLETED", "CLOSED"] }, rootCauseId: null, completedAt: dentroDe(r) },
       });
       return {
-        periodoDias: dias ?? 180,
+        periodoDias: r.dias,
         fallas: porCodigo
           .map((f) => {
             const c = codigos.find((x) => x.id === f.failureCodeId);

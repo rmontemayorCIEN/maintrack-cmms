@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { SENSOR_TYPE_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/utils";
 import { AlertActions } from "./alert-actions";
+import { evaluarPuntos } from "@/lib/predictive";
 
 export const metadata = { title: "Alertas predictivas" };
 export const dynamic = "force-dynamic";
@@ -34,6 +35,9 @@ export default async function AlertsPage() {
   });
 
   const open = alerts.filter((a) => ["OPEN", "ACKNOWLEDGED"].includes(a.status));
+  // Estado y fechas VIVOS del punto: lo guardado al detectar puede haber
+  // quedado atras (una fecha proyectada que ya paso no se muestra como futura).
+  const vivas = await evaluarPuntos(user.organizationId, open.map((a) => a.sensorId).filter(Boolean) as string[]);
   const history = alerts.filter((a) => !["OPEN", "ACKNOWLEDGED"].includes(a.status));
 
   return (
@@ -56,9 +60,10 @@ export default async function AlertsPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={alert.severity === "CRITICAL" ? "danger" : "warning"}>
-                      {alert.severity === "CRITICAL" ? "Critico" : "Alerta"}
+                      {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}
                     </Badge>
                     <Badge tone="muted">{STATUS_LABELS[alert.status]}</Badge>
+                    {alert.normalizadaEl ? <Badge tone="success">Normalizada: por validar</Badge> : null}
                     {alert.sensor ? (
                       <Badge tone="info">{SENSOR_TYPE_LABELS[alert.sensor.sensorType]}</Badge>
                     ) : null}
@@ -67,7 +72,9 @@ export default async function AlertsPage() {
                     </Link>
                   </div>
                   <p className="mt-2 text-sm font-medium text-slate-800">{alert.title}</p>
-                  <p className="mt-0.5 text-sm text-slate-600">{alert.message}</p>
+                  <p className="mt-0.5 text-sm text-slate-600">
+                    <span className="text-slate-400">Al detectar:</span> {alert.message}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-4 text-[0.6875rem] text-slate-500">
                     <span>Detectada {formatDateTime(alert.createdAt)}</span>
                     {alert.value != null ? (
@@ -76,11 +83,20 @@ export default async function AlertsPage() {
                         {alert.threshold != null ? ` · umbral ${formatNumber(alert.threshold, 2)}` : ""}
                       </span>
                     ) : null}
-                    {alert.projectedFailureAt ? (
-                      <span className="font-medium text-amber-700">
-                        Falla proyectada: {formatDate(alert.projectedFailureAt)}
-                      </span>
-                    ) : null}
+                    {(() => {
+                      const e = alert.sensorId ? vivas.get(alert.sensorId) : undefined;
+                      if (!e) return null;
+                      return (
+                        <>
+                          <span className={`font-medium ${e.estado === "CRITICO" ? "text-red-700" : e.estado === "ADVERTENCIA" ? "text-amber-700" : "text-emerald-700"}`}>
+                            Hoy: {e.etiquetaEstado} · {e.etiquetaTendencia}
+                          </span>
+                          <span>Cruce de advertencia: {e.cruceAdvertencia.texto}</span>
+                          <span>Cruce crítico: {e.cruceCritico.texto}</span>
+                          <span>{e.etiquetaConfianza} · {e.lecturasUsadas} lecturas</span>
+                        </>
+                      );
+                    })()}
                     {alert.acknowledgedBy ? <span>Reconocida por {alert.acknowledgedBy.name}</span> : null}
                   </div>
                   {alert.workOrder ? (
@@ -94,7 +110,12 @@ export default async function AlertsPage() {
                 </div>
 
                 {editable ? (
-                  <AlertActions alertId={alert.id} hasWorkOrder={Boolean(alert.workOrderId)} status={alert.status} />
+                  <AlertActions
+                    alertId={alert.id}
+                    hasWorkOrder={Boolean(alert.workOrderId)}
+                    status={alert.status}
+                    normalizada={Boolean(alert.normalizadaEl)}
+                  />
                 ) : null}
               </div>
             </Card>
@@ -125,7 +146,7 @@ export default async function AlertsPage() {
                       <td className="max-w-80 truncate text-xs text-slate-700">{alert.message}</td>
                       <td>
                         <Badge tone={alert.severity === "CRITICAL" ? "danger" : "warning"}>
-                          {alert.severity === "CRITICAL" ? "Critico" : "Alerta"}
+                          {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}
                         </Badge>
                       </td>
                       <td><Badge tone="muted">{STATUS_LABELS[alert.status]}</Badge></td>

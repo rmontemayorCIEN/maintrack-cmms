@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { assetCostRanking, computeKpis, monthlyTrend } from "@/lib/kpi";
+import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa, tendenciaMensual } from "@/lib/indicadores";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { TarjetaIndicador } from "@/components/tarjeta-indicador";
 import { Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, Progress, Stat } from "@/components/ui";
 import { CostRankingChart, DonutChart, MixChart, TrendChart } from "@/components/charts/dashboard-charts";
 import {
@@ -24,9 +26,10 @@ import {
   WO_STATUS_COLORS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { dueLabel, formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { ArrowRight, ListChecks } from "lucide-react";
 import { puestaEnMarcha } from "@/lib/puesta-en-marcha";
+import { evaluarPuntos } from "@/lib/predictive";
 
 export const metadata = { title: "Panel de control" };
 export const dynamic = "force-dynamic";
@@ -35,12 +38,14 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const orgId = user.organizationId;
   const currency = user.organization.currency;
+  const DIAS = 90;
+  const periodo = await periodoDeLaEmpresa(orgId, DIAS);
 
   const [kpis, trend, ranking, upcoming, criticalOpen, alerts, stockParts, pendingRequests] =
     await Promise.all([
-      computeKpis(orgId),
-      monthlyTrend(orgId, 6),
-      assetCostRanking(orgId, 8),
+      calcularIndicadores(orgId, periodo),
+      tendenciaMensual(orgId, 6),
+      costoYParoPorActivo(orgId, periodo, 8),
       prisma.workOrder.findMany({
         where: { organizationId: orgId, status: { in: OPEN_STATUSES } },
         include: {
@@ -82,13 +87,16 @@ export default async function DashboardPage() {
     .sort((a, b) => a.quantityOnHand - a.minQuantity - (b.quantityOnHand - b.minQuantity))
     .slice(0, 5);
 
-  const typeData = Object.entries(kpis.byType).map(([key, value]) => ({
+  const typeData = Object.entries(kpis.porTipo).map(([key, value]) => ({
     name: MAINTENANCE_TYPE_LABELS[key] ?? key,
     value,
   }));
 
-  const complianceTone = kpis.reliability.pmCompliance >= 90 ? "good" : kpis.reliability.pmCompliance >= 75 ? "warn" : "bad";
-  const availabilityTone = kpis.reliability.availability >= 95 ? "good" : kpis.reliability.availability >= 90 ? "warn" : "bad";
+  const ind = kpis.indicadores;
+  // El estado de hoy de cada punto con alerta, no el texto guardado al detectar.
+  const vivas = await evaluarPuntos(orgId, alerts.map((a) => a.sensorId).filter(Boolean) as string[]);
+  const tonoMinimo = (v: number | null, bueno: number, regular: number) =>
+    v === null ? "default" : v >= bueno ? "good" : v >= regular ? "warn" : "bad";
 
   // Mientras la cuenta no este lista, el panel abre con lo que falta: los
   // indicadores de una cuenta a medio configurar no significan nada todavia.
@@ -98,7 +106,7 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title={`Hola, ${user.name.split(" ")[0]}`}
-        description={`Resumen operativo de ${user.organization.name} — ultimos 90 dias`}
+        description={`Resumen operativo de ${user.organization.name} — últimos ${DIAS} días`}
         actions={
           <>
             <LinkButton href="/reports" variant="secondary" size="sm">
@@ -169,57 +177,67 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat
-          label="Disponibilidad"
-          value={`${formatNumber(kpis.reliability.availability, 1)}%`}
-          hint={`${formatNumber(kpis.reliability.totalDowntimeMinutes / 60, 1)} h de paro acumulado`}
-          tone={availabilityTone}
-          icon={<Gauge className="h-4 w-4" />}
+        <TarjetaIndicador
+          indicador={ind.disponibilidad}
+          dias={DIAS}
+          pista={`${formatNumber(ind.paroNoPlaneado.valor ?? 0, 1)} h de paro no planeado · ${formatNumber(ind.paroTotal.valor ?? 0, 1)} h de paro acumulado`}
+          tono={tonoMinimo(ind.disponibilidad.valor, 95, 90)}
+          icono={<Gauge className="h-4 w-4" />}
         />
-        <Stat
-          label="Cumplimiento PM"
-          value={`${formatNumber(kpis.reliability.pmCompliance, 0)}%`}
-          hint="Preventivos cerrados en fecha"
-          tone={complianceTone}
-          icon={<Wrench className="h-4 w-4" />}
+        <TarjetaIndicador
+          indicador={ind.cumplimientoPreventivo}
+          dias={DIAS}
+          etiqueta="Cumplimiento PM"
+          decimales={0}
+          pista="Programadas terminadas a más tardar el día compromiso"
+          tono={tonoMinimo(ind.cumplimientoPreventivo.valor, 90, 75)}
+          icono={<Wrench className="h-4 w-4" />}
         />
-        <Stat
-          label="MTTR"
-          value={`${formatNumber(kpis.reliability.mttr, 1)} h`}
-          hint="Tiempo medio de reparación"
-          icon={<Timer className="h-4 w-4" />}
+        <TarjetaIndicador
+          indicador={ind.mttr}
+          dias={DIAS}
+          etiqueta="MTTR"
+          pista="Tiempo medio de reparación"
+          icono={<Timer className="h-4 w-4" />}
         />
-        <Stat
-          label="MTBF"
-          value={`${formatNumber(kpis.reliability.mtbf, 0)} h`}
-          hint="Tiempo medio entre fallas"
-          icon={<Clock className="h-4 w-4" />}
+        <TarjetaIndicador
+          indicador={ind.mtbf}
+          dias={DIAS}
+          etiqueta="MTBF"
+          decimales={0}
+          pista="Tiempo medio entre fallas"
+          icono={<Clock className="h-4 w-4" />}
         />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat
-          label="Backlog abierto"
-          value={kpis.totals.backlog}
-          hint={`${formatNumber(kpis.totals.backlogHours, 0)} h estimadas`}
+        <TarjetaIndicador
+          indicador={ind.backlog}
+          dias={DIAS}
+          etiqueta="Backlog abierto"
+          pista={`${formatNumber(kpis.totales.backlogHoras, 0)} h estimadas`}
         />
         <Stat
           label="OT vencidas"
-          value={kpis.totals.overdue}
-          tone={kpis.totals.overdue > 0 ? "bad" : "good"}
-          hint="Fuera de la fecha compromiso"
+          value={kpis.totales.backlogVencido}
+          tone={kpis.totales.backlogVencido > 0 ? "bad" : "good"}
+          hint="Abiertas con la fecha compromiso ya pasada"
+          href="/work-orders?vencidas=1"
         />
-        <Stat
-          label="Trabajo planificado"
-          value={`${formatNumber(kpis.reliability.plannedRatio, 0)}%`}
-          hint="Meta de clase mundial: 80%"
-          tone={kpis.reliability.plannedRatio >= 80 ? "good" : "warn"}
+        <TarjetaIndicador
+          indicador={ind.trabajoPlanificado}
+          dias={DIAS}
+          decimales={0}
+          pista="Meta de clase mundial: 80%"
+          tono={ind.trabajoPlanificado.valor === null ? "default" : ind.trabajoPlanificado.valor >= 80 ? "good" : "warn"}
         />
-        <Stat
-          label="Costo del periodo"
-          value={formatCurrency(kpis.costs.totalCost, currency)}
-          hint={`MO ${formatCurrency(kpis.costs.laborCost, currency)} · Refacciones ${formatCurrency(kpis.costs.partsCost, currency)}`}
-          icon={<CircleDollarSign className="h-4 w-4" />}
+        <TarjetaIndicador
+          indicador={ind.costoMantenimiento}
+          dias={DIAS}
+          moneda={currency}
+          etiqueta="Costo del periodo"
+          pista={`MO ${formatCurrency(kpis.costos.mano, currency)} · Refacciones ${formatCurrency(kpis.costos.refacciones, currency)}`}
+          icono={<CircleDollarSign className="h-4 w-4" />}
         />
       </div>
 
@@ -232,7 +250,7 @@ export default async function DashboardPage() {
           <TrendChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Distribución por tipo" subtitle="Órdenes del periodo" />
+          <CardHeader title="Distribución por tipo" subtitle="Órdenes creadas en el periodo, sin canceladas" />
           <DonutChart data={typeData} />
         </Card>
       </div>
@@ -246,7 +264,7 @@ export default async function DashboardPage() {
           <MixChart data={trend} />
         </Card>
         <Card>
-          <CardHeader title="Activos con mayor costo" subtitle="Concentración del gasto" />
+          <CardHeader title="Activos con mayor costo" subtitle={`Órdenes terminadas en los últimos ${DIAS} días`} />
           <CostRankingChart data={ranking} />
         </Card>
       </div>
@@ -285,7 +303,7 @@ export default async function DashboardPage() {
                 </thead>
                 <tbody>
                   {upcoming.map((wo) => {
-                    const due = dueLabel(wo.dueDate);
+                    const due = estadoDeVencimiento(wo, { zona: periodo.zonaHoraria });
                     return (
                       <tr key={wo.id}>
                         <td>
@@ -311,7 +329,7 @@ export default async function DashboardPage() {
                           <Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge>
                         </td>
                         <td>
-                          <Badge tone={due.tone === "muted" ? "muted" : due.tone}>{due.text}</Badge>
+                          <Badge tone={due.tono}>{due.texto}</Badge>
                         </td>
                       </tr>
                     );
@@ -342,10 +360,13 @@ export default async function DashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs font-medium text-slate-800">{alert.asset.name}</p>
                       <Badge tone={alert.severity === "CRITICAL" ? "danger" : "warning"}>
-                        {alert.severity === "CRITICAL" ? "Critico" : "Alerta"}
+                        {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-[0.6875rem] leading-snug text-slate-500">{alert.message}</p>
+                    <p className="mt-1 text-[0.6875rem] leading-snug text-slate-500">
+                      {(alert.sensorId && vivas.get(alert.sensorId)?.resumen) || alert.message}
+                      {alert.normalizadaEl ? " Normalizada: falta validar." : ""}
+                    </p>
                   </li>
                 ))}
               </ul>

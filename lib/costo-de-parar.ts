@@ -1,4 +1,6 @@
 import { prisma } from "./db";
+import { ZONA_POR_OMISION, periodoAnterior, periodoIndicadores } from "./periodos";
+import { zonaDeLaEmpresa } from "./indicadores";
 
 /**
  * Cuanto costo que la planta se detuviera.
@@ -85,7 +87,7 @@ export async function costoDeParar(
     where: {
       asset: { organizationId },
       ...(opciones?.desde || opciones?.hasta
-        ? { startedAt: { ...(opciones.desde ? { gte: opciones.desde } : {}), ...(opciones.hasta ? { lte: opciones.hasta } : {}) } }
+        ? { startedAt: { ...(opciones.desde ? { gte: opciones.desde } : {}), ...(opciones.hasta ? { lt: opciones.hasta } : {}) } }
         : {}),
     },
     select: {
@@ -239,16 +241,20 @@ export function esPeriodo(v: string | undefined): v is ClavePeriodo {
   return Boolean(v && v in PERIODOS);
 }
 
-/** La ventana actual y la inmediata anterior, del mismo largo. */
-export function ventanas(periodo: ClavePeriodo, ahora = new Date()) {
-  const dias = PERIODOS[periodo].dias;
-  const ms = dias * 86_400_000;
-  const hasta = ahora;
-  const desde = new Date(ahora.getTime() - ms);
+/**
+ * La ventana actual y la inmediata anterior, del mismo largo.
+ *
+ * Dias completos en la zona de la empresa y semiabiertas `[desde, hasta)`, con
+ * la misma regla que los indicadores (`lib/periodos`): el paro de "90 dias"
+ * aqui es el mismo que el del Panel y Reportes.
+ */
+export function ventanas(periodo: ClavePeriodo, ahora = new Date(), zona: string = ZONA_POR_OMISION) {
+  const actual = periodoIndicadores(PERIODOS[periodo].dias, zona, ahora);
+  const anterior = periodoAnterior(actual);
   return {
-    dias,
-    actual: { desde, hasta },
-    anterior: { desde: new Date(desde.getTime() - ms), hasta: desde },
+    dias: actual.dias,
+    actual: { desde: actual.desde, hasta: actual.hasta },
+    anterior: { desde: anterior.desde, hasta: anterior.hasta },
   };
 }
 
@@ -273,7 +279,7 @@ export async function costoComparado(
    */
   propia?: { desde: Date; hasta: Date } | null,
 ): Promise<Comparado> {
-  const v = ventanas(periodo, ahora);
+  const v = ventanas(periodo, ahora, await zonaDeLaEmpresa(organizationId));
   const actualRango = propia ?? v.actual;
   const largo = actualRango.hasta.getTime() - actualRango.desde.getTime();
   const anteriorRango = propia
@@ -333,7 +339,7 @@ export async function eventosDeParo(
   rango: { desde: Date; hasta: Date },
 ): Promise<EventoDeParo[]> {
   const eventos = await prisma.downtimeEvent.findMany({
-    where: { asset: { organizationId }, startedAt: { gte: rango.desde, lte: rango.hasta } },
+    where: { asset: { organizationId }, startedAt: { gte: rango.desde, lt: rango.hasta } },
     orderBy: { startedAt: "asc" },
     select: {
       id: true, startedAt: true, minutes: true, planned: true,

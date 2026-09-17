@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { verificarCupo } from "@/lib/planes";
+import { validarFechasDeActivo } from "@/lib/calidad-datos";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -56,6 +57,11 @@ export async function POST(request: Request) {
     if (!cupo.permitido) return fail(cupo.mensaje, 402);
 
     const input = schema.parse(await request.json());
+    const errorDeFechas = validarFechasDeActivo({
+      purchaseDate: parseDate(input.purchaseDate),
+      warrantyExpiry: parseDate(input.warrantyExpiry),
+    });
+    if (errorDeFechas) return fail(errorDeFechas, 422);
     const asset = await prisma.asset.create({
       data: {
         ...input,

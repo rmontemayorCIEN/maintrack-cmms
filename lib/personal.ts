@@ -15,6 +15,8 @@ import { prisma } from "./db";
 import { OPEN_STATUSES } from "./constants";
 import { MOTIVOS_LIBERACION } from "./backlog";
 import { cargaPorDia, jornada } from "./agenda";
+import { estadoDeVencimiento } from "./vencimiento";
+import { zonaDeLaEmpresa } from "./indicadores";
 
 export type RangoPersonal = { desde: Date; hasta: Date };
 
@@ -47,6 +49,9 @@ export async function cargaDelEquipo(
   finHorizonte.setDate(hoy.getDate() + horizonte);
 
   const dondeUsuario = opciones?.soloUserId ? { id: opciones.soloUserId } : {};
+  // Vencida y puntual con la regla de todas las pantallas (`lib/vencimiento`):
+  // por dia de calendario en la zona de la empresa, no por hora exacta.
+  const zona = await zonaDeLaEmpresa(organizationId);
 
   const [personas, abiertas, cerradas, labor, actividades, j] = await Promise.all([
     prisma.user.findMany({
@@ -81,7 +86,7 @@ export async function cargaDelEquipo(
       where: {
         organizationId,
         status: { in: ["COMPLETED", "CLOSED"] },
-        completedAt: { gte: rango.desde, lte: rango.hasta },
+        completedAt: { gte: rango.desde, lt: rango.hasta },
       },
       select: {
         id: true, number: true, estimatedHours: true, maintenanceType: true,
@@ -135,7 +140,7 @@ export async function cargaDelEquipo(
 
   const resultado = personas.map((p) => {
     const suyas = abiertas.filter((o) => o.assignedToId === p.id);
-    const vencidas = suyas.filter((o) => o.dueDate && o.dueDate < hoy);
+    const vencidas = suyas.filter((o) => estadoDeVencimiento({ ...o, status: "OPEN" }, { zona }).clave === "VENCIDA");
     const capacidad = p.horasDisponibles ?? j.horasJornada;
 
     // --- Horas aplicadas en el periodo ---
@@ -166,7 +171,9 @@ export async function cargaDelEquipo(
 
     // --- Puntualidad ---
     const conFecha = cerradas.filter((o) => o.assignedToId === p.id && o.dueDate && o.completedAt);
-    const aTiempo = conFecha.filter((o) => o.completedAt! <= o.dueDate!).length;
+    const aTiempo = conFecha.filter(
+      (o) => estadoDeVencimiento({ ...o, status: "COMPLETED" }, { zona }).clave === "CUMPLIDA_EN_FECHA",
+    ).length;
 
     // --- Actividades ---
     const completadas = actividades.filter((t) => t.completedById === p.id && t.completedAt).length;

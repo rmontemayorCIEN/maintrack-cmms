@@ -11,7 +11,9 @@ import {
   WO_STATUS_COLORS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
-import { dueLabel, formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { WorkOrderFilters } from "./filters";
 import { TablaOrdenes, type FilaOrden } from "./tabla-ordenes";
 import { vistaGuardada } from "@/lib/vistas";
@@ -25,11 +27,17 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
   const user = await requireUser();
   const params = await searchParams;
   const orgId = user.organizationId;
+  const zona = await zonaDeLaEmpresa(orgId);
+  // «Vencidas» (desde el Panel): abiertas con el dia compromiso ya pasado en la
+  // zona de la empresa. Se acota en la base a compromisos anteriores a manana y
+  // se decide el dia exacto con la misma regla que pinta la etiqueta.
+  const soloVencidas = params.vencidas === "1";
 
   const where = {
     organizationId: orgId,
     ...(params.status ? { status: params.status } : {}),
-    ...(params.scope === "open" ? { status: { in: OPEN_STATUSES } } : {}),
+    ...(params.scope === "open" || soloVencidas ? { status: { in: OPEN_STATUSES } } : {}),
+    ...(soloVencidas ? { dueDate: { lt: new Date(Date.now() + 86_400_000) } } : {}),
     ...(params.type ? { maintenanceType: params.type } : {}),
     ...(params.priority ? { priority: params.priority } : {}),
     ...(params.assignedToId ? { assignedToId: params.assignedToId } : {}),
@@ -38,7 +46,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
       : {}),
   };
 
-  const [workOrders, technicians, counts] = await Promise.all([
+  const [encontradas, technicians, counts] = await Promise.all([
     prisma.workOrder.findMany({
       where,
       include: {
@@ -66,6 +74,10 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
       _count: { _all: true },
     }),
   ]);
+
+  const workOrders = soloVencidas
+    ? encontradas.filter((w) => estadoDeVencimiento(w, { zona }).clave === "VENCIDA")
+    : encontradas;
 
   const openCount = counts
     .filter((c) => OPEN_STATUSES.includes(c.status))
@@ -97,6 +109,8 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
     dueDate: w.dueDate?.toISOString() ?? null,
     startedAt: w.startedAt?.toISOString() ?? null,
     completedAt: w.completedAt?.toISOString() ?? null,
+    closedAt: w.closedAt?.toISOString() ?? null,
+    vencimiento: estadoDeVencimiento(w, { zona }),
     createdAt: w.createdAt.toISOString(),
     estimatedHours: w.estimatedHours,
     actualHours: w.actualHours,
@@ -112,7 +126,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
     <>
       <PageHeader
         title="Órdenes de trabajo"
-        description={`${workOrders.length} resultados · ${openCount} abiertas en total · costo listado ${formatCurrency(totalCost, user.organization.currency)}`}
+        description={`${soloVencidas ? "Vencidas: " : ""}${workOrders.length} resultados · ${openCount} abiertas en total · costo listado ${formatCurrency(totalCost, user.organization.currency)}`}
         actions={
           <div className="flex gap-2">
             {/* Armar junta trabajo de varios origenes en una sola orden; Nueva

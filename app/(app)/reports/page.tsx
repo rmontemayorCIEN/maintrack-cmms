@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { assetCostRanking, computeKpis, defaultRange, monthlyTrend } from "@/lib/kpi";
+import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa, tendenciaMensual } from "@/lib/indicadores";
+import { PERIODOS_INDICADORES, describirPeriodo, diasDeParametro, fechaHoraEnZona } from "@/lib/periodos";
+import { TarjetaIndicador } from "@/components/tarjeta-indicador";
 import { Badge, Card, CardHeader, PageHeader, Progress, Stat } from "@/components/ui";
 import { CostRankingChart, DonutChart, MixChart, TrendChart } from "@/components/charts/dashboard-charts";
 import {
@@ -16,12 +18,6 @@ import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 export const metadata = { title: "Reportes" };
 export const dynamic = "force-dynamic";
 
-const PERIODS = [
-  { days: 30, label: "30 días" },
-  { days: 90, label: "90 días" },
-  { days: 180, label: "6 meses" },
-  { days: 365, label: "12 meses" },
-];
 
 export default async function ReportsPage({
   searchParams,
@@ -30,25 +26,25 @@ export default async function ReportsPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const days = Number(params.days ?? 90);
-  const range = defaultRange(days);
+  const days = diasDeParametro(params.days);
   const currency = user.organization.currency;
   const orgId = user.organizationId;
+  const periodo = await periodoDeLaEmpresa(orgId, days);
 
   const [kpis, trend, ranking, byTechnician, failureCodes, backlogAging] = await Promise.all([
-    computeKpis(orgId, range),
-    monthlyTrend(orgId, 12),
-    assetCostRanking(orgId, 10),
+    calcularIndicadores(orgId, periodo),
+    tendenciaMensual(orgId, 12),
+    costoYParoPorActivo(orgId, periodo, 10),
     prisma.workOrderLabor.groupBy({
       by: ["userId"],
-      where: { workOrder: { organizationId: orgId, createdAt: { gte: range.from } } },
+      where: { workOrder: { organizationId: orgId, status: { not: "CANCELLED" } }, workedAt: { gte: periodo.desde, lt: periodo.hasta } },
       _sum: { hours: true, cost: true },
       _count: { _all: true },
     }),
     // Pasa por fallasCodificadas y no por un groupBy directo: ese contaba
     // cualquier OT con codigo, incluidos preventivos codificados por error, y
     // el Pareto no coincidia con el analisis de recurrencia.
-    fallasCodificadas(orgId, range.from).then(agruparPorCodigo),
+    fallasCodificadas(orgId, periodo.desde, periodo.hasta).then(agruparPorCodigo),
     prisma.workOrder.findMany({
       where: { organizationId: orgId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } },
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
@@ -65,11 +61,12 @@ export default async function ReportsPage({
     }),
   ]);
 
-  const typeData = Object.entries(kpis.byType).map(([key, value]) => ({
+  const ind = kpis.indicadores;
+  const typeData = Object.entries(kpis.porTipo).map(([key, value]) => ({
     name: MAINTENANCE_TYPE_LABELS[key] ?? key,
     value,
   }));
-  const priorityData = Object.entries(kpis.byPriority).map(([key, value]) => ({
+  const priorityData = Object.entries(kpis.porPrioridad).map(([key, value]) => ({
     name: PRIORITY_LABELS[key] ?? key,
     value,
   }));
@@ -101,10 +98,10 @@ export default async function ReportsPage({
     <>
       <PageHeader
         title="Reportes e indicadores"
-        description={`Analisis de confiabilidad y costos — ${new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(range.from)} al ${new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(range.to)}`}
+        description={`Análisis de confiabilidad y costos — ${describirPeriodo(periodo)} · ${periodo.zonaHoraria} · actualizado ${fechaHoraEnZona(kpis.actualizadoEl, periodo.zonaHoraria)}`}
         actions={
           <div className="flex gap-1">
-            {PERIODS.map((period) => (
+            {Object.entries(PERIODOS_INDICADORES).map(([d, label]) => ({ days: Number(d), label })).map((period) => (
               <Link
                 key={period.days}
                 href={`/reports?days=${period.days}`}
@@ -121,44 +118,49 @@ export default async function ReportsPage({
         }
       />
 
+      <p className="mb-4 text-xs text-slate-500">
+        Cada tarjeta abre su fórmula y los registros que la forman. Las mismas cifras salen en el Panel de control y en el Diagnóstico IA.{" "}
+        <Link href={`/indicadores?dias=${days}`} className="font-medium text-brand-600 hover:underline">Ver cómo se calcula cada indicador</Link>
+      </p>
+
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Confiabilidad</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="MTTR" value={`${formatNumber(kpis.reliability.mttr, 2)} h`} hint="Tiempo medio de reparacion" />
-          <Stat label="MTBF" value={`${formatNumber(kpis.reliability.mtbf, 0)} h`} hint="Tiempo medio entre fallas" />
-          <Stat
-            label="Disponibilidad"
-            value={`${formatNumber(kpis.reliability.availability, 2)}%`}
-            tone={kpis.reliability.availability >= 95 ? "good" : "warn"}
+          <TarjetaIndicador indicador={ind.mttr} dias={days} etiqueta="MTTR" decimales={2} pista="Tiempo medio de reparación" />
+          <TarjetaIndicador indicador={ind.mtbf} dias={days} etiqueta="MTBF" decimales={0} pista="Tiempo medio entre fallas" />
+          <TarjetaIndicador
+            indicador={ind.disponibilidad}
+            dias={days}
+            decimales={2}
+            pista="Descuenta solo el paro no planeado"
+            tono={ind.disponibilidad.valor !== null && ind.disponibilidad.valor >= 95 ? "good" : "warn"}
           />
-          <Stat
-            label="Cumplimiento PM"
-            value={`${formatNumber(kpis.reliability.pmCompliance, 1)}%`}
-            tone={kpis.reliability.pmCompliance >= 90 ? "good" : "warn"}
-            hint="Meta: 90%"
+          <TarjetaIndicador
+            indicador={ind.cumplimientoPreventivo}
+            dias={days}
+            etiqueta="Cumplimiento PM"
+            tono={ind.cumplimientoPreventivo.valor !== null && ind.cumplimientoPreventivo.valor >= 90 ? "good" : "warn"}
+            pista="Meta: 90%"
           />
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat
-            label="Tiempo de respuesta"
-            value={`${formatNumber(kpis.reliability.avgResponseHours, 1)} h`}
-            hint="De creación a inicio"
-          />
+          <TarjetaIndicador indicador={ind.tiempoRespuesta} dias={days} pista="De creación a inicio, órdenes de falla" />
           <Stat
             label="Precisión de estimación"
-            value={`${formatNumber(kpis.reliability.estimateAccuracy, 0)}%`}
-            hint="Horas estimadas vs reales"
+            value={kpis.precisionEstimacion === null ? "—" : `${formatNumber(kpis.precisionEstimacion, 0)}%`}
+            hint="Horas estimadas vs reales, órdenes terminadas"
           />
-          <Stat
-            label="Paro no planeado"
-            value={`${formatNumber(kpis.reliability.unplannedDowntimeMinutes / 60, 1)} h`}
-            tone={kpis.reliability.unplannedDowntimeMinutes > 0 ? "warn" : "good"}
+          <TarjetaIndicador
+            indicador={ind.paroNoPlaneado}
+            dias={days}
+            pista={`Además ${formatNumber(ind.paroPlaneado.valor ?? 0, 1)} h de paro planeado`}
+            tono={(ind.paroNoPlaneado.valor ?? 0) > 0 ? "warn" : "good"}
           />
-          <Stat
-            label="Trabajo planificado"
-            value={`${formatNumber(kpis.reliability.plannedRatio, 1)}%`}
-            tone={kpis.reliability.plannedRatio >= 80 ? "good" : "warn"}
-            hint="Meta clase mundial: 80%"
+          <TarjetaIndicador
+            indicador={ind.trabajoPlanificado}
+            dias={days}
+            tono={ind.trabajoPlanificado.valor !== null && ind.trabajoPlanificado.valor >= 80 ? "good" : "warn"}
+            pista="Meta clase mundial: 80%"
           />
         </div>
       </section>
@@ -166,14 +168,14 @@ export default async function ReportsPage({
       <section className="mb-6">
         <h2 className="mb-3 text-sm font-semibold text-slate-700">Costos</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Costo total" value={formatCurrency(kpis.costs.totalCost, currency)} />
-          <Stat label="Mano de obra" value={formatCurrency(kpis.costs.laborCost, currency)} />
-          <Stat label="Refacciones" value={formatCurrency(kpis.costs.partsCost, currency)} />
-          <Stat label="Servicios externos" value={formatCurrency(kpis.costs.serviceCost, currency)} />
+          <TarjetaIndicador indicador={ind.costoMantenimiento} dias={days} moneda={currency} etiqueta="Costo total" pista="Órdenes terminadas en el periodo" />
+          <Stat label="Mano de obra" value={formatCurrency(kpis.costos.mano, currency)} />
+          <Stat label="Refacciones" value={formatCurrency(kpis.costos.refacciones, currency)} />
+          <Stat label="Servicios externos" value={formatCurrency(kpis.costos.servicios, currency)} />
           <Stat
             label="Costo por OT"
-            value={formatCurrency(kpis.totals.workOrders ? kpis.costs.totalCost / kpis.totals.workOrders : 0, currency)}
-            hint={`${kpis.totals.workOrders} ordenes`}
+            value={formatCurrency(kpis.totales.ordenesTerminadas ? kpis.costos.total / kpis.totales.ordenesTerminadas : 0, currency)}
+            hint={`${kpis.totales.ordenesTerminadas} órdenes terminadas`}
           />
         </div>
       </section>

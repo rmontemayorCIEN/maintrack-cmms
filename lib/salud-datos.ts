@@ -1,7 +1,7 @@
-import { prisma } from "./db";
+import { revisarCalidad, type Hallazgo, type NivelRegla } from "./calidad-datos";
 
 /**
- * Indice de salud de datos.
+ * Indice de calidad de la captura.
  *
  * Un CMMS no falla por falta de funciones, falla porque la captura queda a
  * medias: ordenes cerradas sin causa raiz, activos sin plan, refacciones sin
@@ -12,13 +12,24 @@ import { prisma } from "./db";
  * semanal —si la captura esta en 30%, la IA lo primero que debe decir es que
  * arreglar la captura, no interpretar indicadores que no se sostienen.
  *
- * Cada revision pesa distinto: que una orden correctiva no tenga causa raiz
- * duele mas que que un activo no tenga costo de reemplazo.
+ * Las reglas viven en `lib/calidad-datos.ts`, que es tambien lo que lee la IA:
+ * una sola definicion de «orden sin causa raiz». Cada regla pesa distinto: que
+ * una reparacion no tenga causa raiz duele mas que que un activo no tenga costo
+ * de reemplazo.
+ *
+ * Impacto del cambio (Bloque 1): antes «activos con plan» contaba el
+ * encabezado viejo del plan (un equipo agregado a un plan de varios quedaba
+ * como «sin plan»), «causa raiz» se exigia a TODA orden cerrada —incluidos
+ * preventivos bien hechos— y solo en el encabezado. Ahora se exige a las
+ * reparaciones de falla, en la orden o en cualquiera de sus actividades, y se
+ * agregaron las reglas de datos imposibles. El indice de una misma cuenta
+ * puede moverse respecto al anterior sin que su captura haya cambiado.
  */
 
 export type Revision = {
   clave: string;
   titulo: string;
+  nivel: NivelRegla;
   /** Por que importa, en una frase, para mostrarlo junto al numero. */
   porque: string;
   total: number;
@@ -26,6 +37,7 @@ export type Revision = {
   porcentaje: number;
   peso: number;
   enlace: string;
+  hallazgos: Hallazgo[];
 };
 
 export type SaludDatos = {
@@ -35,101 +47,23 @@ export type SaludDatos = {
   huecos: Revision[];
 };
 
-function revision(
-  clave: string, titulo: string, porque: string, enlace: string,
-  peso: number, total: number, cumplidos: number,
-): Revision {
-  return {
-    clave, titulo, porque, enlace, peso, total, cumplidos,
-    porcentaje: total === 0 ? 100 : Math.round((cumplidos / total) * 100),
-  };
-}
-
-export async function saludDeDatos(organizationId: string): Promise<SaludDatos> {
-  const cerradas = { organizationId, status: { in: ["COMPLETED", "CLOSED"] } };
-  const correctivasCerradas = { ...cerradas, maintenanceType: "CORRECTIVE" };
-
-  const [
-    activos, activosConPlan, activosUbicados, activosConValor, activosClasificados,
-    otCerradas, otConCausa, otConHoras,
-    correctivas, correctivasConFalla,
-    refacciones, refaccionesConMinimo, refaccionesConCosto,
-    planes, planesConRecursos,
-    medidores, medidoresAlDia,
-  ] = await Promise.all([
-    prisma.asset.count({ where: { organizationId, active: true } }),
-    prisma.asset.count({ where: { organizationId, active: true, plans: { some: {} } } }),
-    prisma.asset.count({ where: { organizationId, active: true, locationId: { not: null } } }),
-    prisma.asset.count({ where: { organizationId, active: true, replacementCost: { gt: 0 } } }),
-    prisma.asset.count({ where: { organizationId, active: true, categoryId: { not: null } } }),
-
-    prisma.workOrder.count({ where: cerradas }),
-    prisma.workOrder.count({ where: { ...cerradas, rootCauseId: { not: null } } }),
-    prisma.workOrder.count({ where: { ...cerradas, labor: { some: {} } } }),
-
-    prisma.workOrder.count({ where: correctivasCerradas }),
-    prisma.workOrder.count({ where: { ...correctivasCerradas, failureCodeId: { not: null } } }),
-
-    prisma.part.count({ where: { organizationId, active: true } }),
-    prisma.part.count({ where: { organizationId, active: true, minQuantity: { gt: 0 } } }),
-    prisma.part.count({ where: { organizationId, active: true, unitCost: { gt: 0 } } }),
-
-    prisma.maintenancePlan.count({ where: { organizationId, active: true } }),
-    prisma.maintenancePlan.count({
-      where: { organizationId, active: true, tasks: { some: { labor: { some: {} } } } },
-    }),
-
-    prisma.meter.count({ where: { organizationId } }),
-    prisma.meter.count({
-      where: { organizationId, readings: { some: { readingAt: { gte: new Date(Date.now() - 45 * 86_400_000) } } } },
-    }),
-  ]);
-
-  const revisiones: Revision[] = [
-    revision("activos-con-plan", "Activos con plan de mantenimiento",
-      "Un activo sin plan solo genera trabajo correctivo: nunca se adelanta a la falla.",
-      "/plans", 3, activos, activosConPlan),
-
-    revision("ot-con-causa", "Órdenes cerradas con causa raiz",
-      "Sin causa raiz no hay analisis de fallas: se repara lo mismo una y otra vez.",
-      "/work-orders", 3, otCerradas, otConCausa),
-
-    revision("ot-con-horas", "Órdenes cerradas con horas registradas",
-      "Sin horas no hay costo de mano de obra ni productividad medible.",
-      "/work-orders", 2, otCerradas, otConHoras),
-
-    revision("correctivas-con-falla", "Correctivas con código de falla",
-      "Es lo que permite ver que modo de falla domina en la planta.",
-      "/work-orders", 2, correctivas, correctivasConFalla),
-
-    revision("planes-con-recursos", "Planes con recursos capturados",
-      "Sin mano de obra ni refacciones estimadas, el plan no se puede presupuestar ni preparar.",
-      "/plans", 2, planes, planesConRecursos),
-
-    revision("refacciones-con-minimo", "Refacciones con mínimo definido",
-      "El mínimo es lo que dispara la alerta de reposición. En cero, nunca avisa.",
-      "/inventory", 2, refacciones, refaccionesConMinimo),
-
-    revision("refacciones-con-costo", "Refacciones con costo unitario",
-      "Sin costo, el consumo de almacén no llega al costo de la orden.",
-      "/inventory", 1, refacciones, refaccionesConCosto),
-
-    revision("activos-ubicados", "Activos con ubicación precisa",
-      "Es como se filtra el trabajo por área y como se encuentra el equipo en piso.",
-      "/assets", 1, activos, activosUbicados),
-
-    revision("activos-clasificados", "Activos con familia asignada",
-      "Es como se filtra «solo compresores» en una linea, y lo que la IA necesita para poder proponer agrupaciones.",
-      "/assets", 1, activos, activosClasificados),
-
-    revision("activos-con-valor", "Activos con costo de reemplazo",
-      "Permite comparar lo gastado contra reponer el equipo: la decision de reemplazo.",
-      "/assets", 1, activos, activosConValor),
-
-    revision("medidores-al-dia", "Medidores con lectura reciente",
-      "Un medidor sin lecturas deja de disparar los planes que dependen de el.",
-      "/meters", 1, medidores, medidoresAlDia),
-  ];
+export async function saludDeDatos(organizationId: string, ahora = new Date()): Promise<SaludDatos> {
+  const reglas = await revisarCalidad(organizationId, ahora);
+  const revisiones: Revision[] = reglas.map((r) => {
+    const cumplidos = Math.max(0, r.total - r.cantidad);
+    return {
+      clave: r.clave,
+      titulo: r.titulo,
+      nivel: r.nivel,
+      porque: r.porque,
+      enlace: r.enlace,
+      peso: r.peso,
+      total: r.total,
+      cumplidos,
+      porcentaje: r.total === 0 ? 100 : Math.round((cumplidos / r.total) * 100),
+      hallazgos: r.hallazgos,
+    };
+  });
 
   // Lo que no existe no se juzga: una planta sin medidores no esta mal por eso.
   const aplicables = revisiones.filter((r) => r.total > 0);
@@ -138,12 +72,13 @@ export async function saludDeDatos(organizationId: string): Promise<SaludDatos> 
     ? 0
     : Math.round(aplicables.reduce((s, r) => s + r.porcentaje * r.peso, 0) / pesoTotal);
 
+  const orden: Record<NivelRegla, number> = { ERROR: 0, ADVERTENCIA: 1, RECOMENDACION: 2 };
   return {
     indice,
     revisiones,
     huecos: aplicables
       .filter((r) => r.porcentaje < 100)
-      .sort((a, b) => (b.peso * (100 - b.porcentaje)) - (a.peso * (100 - a.porcentaje))),
+      .sort((a, b) => orden[a.nivel] - orden[b.nivel] || (b.peso * (100 - b.porcentaje)) - (a.peso * (100 - a.porcentaje))),
   };
 }
 

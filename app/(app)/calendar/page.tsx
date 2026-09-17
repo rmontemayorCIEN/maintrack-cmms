@@ -7,6 +7,8 @@ import { OPEN_STATUSES } from "@/lib/constants";
 import { RunSchedulerButton } from "./run-scheduler";
 import { RevisarSemana } from "./revisar-semana";
 import { Calendario } from "./calendario";
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { estadoDeVencimiento } from "@/lib/vencimiento";
 
 export const metadata = { title: "Calendario" };
 export const dynamic = "force-dynamic";
@@ -53,8 +55,11 @@ export default async function CalendarPage({
     assignedTo: { select: { id: true, name: true, color: true, horasDisponibles: true } },
   };
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  // «Vencida» con la regla de todas las pantallas: abierta y con el dia
+  // compromiso ya pasado EN LA ZONA DE LA EMPRESA. Se acota en la base con un
+  // dia de holgura y se decide con `estadoDeVencimiento`.
+  const zona = await zonaDeLaEmpresa(user.organizationId);
+  const manana = new Date(Date.now() + 86_400_000);
 
   const [ordenes, vencidas, proyectado, j, tecnicos, activos, familias] = await Promise.all([
     prisma.workOrder.findMany({
@@ -70,12 +75,12 @@ export default async function CalendarPage({
       where: {
         organizationId: user.organizationId,
         status: { in: [...OPEN_STATUSES] },
-        dueDate: { lt: hoy },
+        dueDate: { lt: manana },
       },
       include: incluir,
       orderBy: { dueDate: "asc" },
-      take: 50,
-    }),
+      take: 80,
+    }).then((xs) => xs.filter((o) => estadoDeVencimiento(o, { zona }).clave === "VENCIDA").slice(0, 50)),
     forecastSchedule(user.organizationId, 120),
     jornada(user.organizationId, first, last),
     prisma.user.findMany({
@@ -141,6 +146,7 @@ export default async function CalendarPage({
           maintenanceType: o.maintenanceType, status: o.status,
           estimatedHours: o.estimatedHours,
           dueDate: o.dueDate?.toISOString() ?? null,
+          vencimiento: estadoDeVencimiento(o, { zona }).texto,
           asset: o.asset, assignedTo: o.assignedTo,
         }))}
         vencidas={vencidas.map((o) => ({
@@ -148,6 +154,7 @@ export default async function CalendarPage({
           maintenanceType: o.maintenanceType, status: o.status,
           estimatedHours: o.estimatedHours,
           dueDate: o.dueDate?.toISOString() ?? null,
+          vencimiento: estadoDeVencimiento(o, { zona }).texto,
           asset: o.asset, assignedTo: o.assignedTo,
         }))}
         proyecciones={proyecciones.map((p) => ({

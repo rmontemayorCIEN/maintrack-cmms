@@ -1,3 +1,4 @@
+import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui";
@@ -42,7 +43,7 @@ export default async function ParosPage({
       ? { desde: new Date(d), hasta: new Date(hst) }
       : null;
 
-  const v = ventanas(periodo);
+  const v = ventanas(periodo, new Date(), await zonaDeLaEmpresa(user.organizationId));
   const [datos, eventos] = await Promise.all([
     costoComparado(user.organizationId, periodo, undefined, ventanaPropia),
     // El latido siempre muestra el periodo completo: la ventana es una

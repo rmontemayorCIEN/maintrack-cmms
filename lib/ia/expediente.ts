@@ -1,5 +1,7 @@
 import { prisma } from "../db";
-import { assetCostRanking, computeKpis } from "../kpi";
+import { costoYParoPorActivo, indicadoresConComparacion, type Indicadores } from "../indicadores";
+import { describirPeriodo } from "../periodos";
+import { evaluarPuntos } from "../predictive";
 import { saludDeDatos } from "../salud-datos";
 import { contextoDeLaEmpresa } from "../contexto-negocio";
 import { contextoGeografico } from "../geografia";
@@ -22,11 +24,14 @@ import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
 const DIA = 86_400_000;
 
 export async function construirExpediente(organizationId: string, dias = 30) {
+  // Los mismos indicadores, periodo y zona horaria que el Panel y Reportes:
+  // el diagnostico no puede decir un MTTR distinto al que ve la persona.
+  const { actual, previo } = await indicadoresConComparacion(organizationId, dias);
   const hasta = new Date();
-  const desde = new Date(hasta.getTime() - dias * DIA);
-  const desdePrevio = new Date(desde.getTime() - dias * DIA);
+  const desde = actual.periodo.desde;
+  const desdePrevio = previo.periodo.desde;
 
-  const [org, sitios, salud, actual, previo, topCosto] = await Promise.all([
+  const [org, sitios, salud, topCosto] = await Promise.all([
     prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
       select: { name: true, plan: true, currency: true, industry: true, tipoInstalacion: true, queProduce: true, comoOpera: true, noPuedeParar: true, dueleHoy: true, objetivoDelAno: true, contextoAt: true },
@@ -36,19 +41,17 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       select: { name: true, city: true, country: true, address: true, latitud: true, longitud: true, notasAcceso: true },
     }),
     saludDeDatos(organizationId),
-    computeKpis(organizationId, { from: desde, to: hasta }),
-    computeKpis(organizationId, { from: desdePrevio, to: desde }),
-    assetCostRanking(organizationId, 6),
+    costoYParoPorActivo(organizationId, actual.periodo, 6),
   ]);
 
   const [fallas, causas, bajoMinimo, planesVencidos, alertas, sinMovimiento, correctivasRepetidas] =
     await Promise.all([
       // Por fallasCodificadas y no por groupBy: este contaba cualquier OT con
       // codigo, y el modelo razonaba sobre preventivos codificados por error.
-      fallasCodificadas(organizationId, desdePrevio).then(agruparPorCodigo),
+      fallasCodificadas(organizationId, desdePrevio, actual.periodo.hasta).then(agruparPorCodigo),
       prisma.workOrder.groupBy({
         by: ["rootCauseId"],
-        where: { organizationId, rootCauseId: { not: null }, createdAt: { gte: desdePrevio } },
+        where: { organizationId, rootCauseId: { not: null }, status: { not: "CANCELLED" }, createdAt: { gte: desdePrevio } },
         _count: { _all: true },
       }),
       prisma.part.findMany({
@@ -77,7 +80,7 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       prisma.predictiveAlert.findMany({
         where: { organizationId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
         select: {
-          severity: true, message: true, createdAt: true,
+          severity: true, message: true, createdAt: true, sensorId: true, normalizadaEl: true,
           sensor: { select: { name: true, unit: true, asset: { select: { code: true } } } },
         },
         take: 10,
@@ -90,14 +93,23 @@ export async function construirExpediente(organizationId: string, dias = 30) {
       }),
       prisma.workOrder.groupBy({
         by: ["assetId"],
-        where: { organizationId, maintenanceType: "CORRECTIVE", createdAt: { gte: desdePrevio }, assetId: { not: null } },
+        where: { organizationId, maintenanceType: "CORRECTIVE", status: { not: "CANCELLED" }, createdAt: { gte: desdePrevio }, assetId: { not: null } },
         _count: { _all: true },
         having: { assetId: { _count: { gt: 2 } } },
       }),
     ]);
 
+  // La misma evaluacion que Predictivo y Alertas: estado, tendencia y cruces
+  // de hoy, no el mensaje guardado al detectar.
+  const vivas = await evaluarPuntos(organizationId, alertas.map((a) => a.sensorId).filter(Boolean) as string[]);
+
   const sinPlan = await prisma.asset.findMany({
-    where: { organizationId, active: true, plans: { none: {} } },
+    // Por la ASIGNACION activa, no por el encabezado viejo del plan: un equipo
+    // agregado a un plan de varios equipos no tiene el plan en su encabezado.
+    where: {
+      organizationId, active: true, status: { not: "RETIRED" },
+      planesAsignados: { none: { active: true, plan: { active: true } } },
+    },
     select: { code: true, name: true, criticality: true },
     orderBy: [{ criticality: "asc" }, { code: "asc" }],
     take: 15,
@@ -118,8 +130,12 @@ export async function construirExpediente(organizationId: string, dias = 30) {
     }),
   ]);
 
-  const delta = (hoy: number, antes: number) =>
-    antes === 0 ? null : Math.round(((hoy - antes) / antes) * 1000) / 10;
+  const delta = (hoy: number | null, antes: number | null) =>
+    hoy === null || antes === null || antes === 0 ? null : Math.round(((hoy - antes) / antes) * 1000) / 10;
+  const valor = (k: Indicadores, clave: keyof Indicadores["indicadores"], d = 1) => {
+    const v = k.indicadores[clave].valor;
+    return v === null ? null : redondear(v, d);
+  };
 
   const redondear = (n: number, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
 
@@ -134,9 +150,9 @@ export async function construirExpediente(organizationId: string, dias = 30) {
     },
     periodo: {
       dias,
-      desde: desde.toISOString().slice(0, 10),
-      hasta: hasta.toISOString().slice(0, 10),
-      nota: "Los campos «cambio» son variación porcentual contra el periodo inmediato anterior de la misma duración.",
+      dias_completos: describirPeriodo(actual.periodo),
+      zonaHoraria: actual.periodo.zonaHoraria,
+      nota: "Los campos «cambio» son variación porcentual contra el periodo inmediato anterior de la misma duración. Un indicador en null NO es cero: no se pudo calcular, y «sinDato» dice por qué.",
     },
 
     calidadDeCaptura: {
@@ -146,52 +162,69 @@ export async function construirExpediente(organizationId: string, dias = 30) {
         .filter((r) => r.total > 0)
         .map((r) => ({
           revision: r.titulo,
+          nivel: r.nivel,
           porcentaje: r.porcentaje,
           cumplidos: r.cumplidos,
           total: r.total,
-          faltan: r.total - r.cumplidos,
+          conProblema: r.total - r.cumplidos,
           importa: r.porque,
+          ejemplos: r.hallazgos.slice(0, 3).map((h) => (h.detalle ? `${h.etiqueta} (${h.detalle})` : h.etiqueta)),
         })),
     },
 
     confiabilidad: {
-      mttrHoras: redondear(actual.reliability.mttr),
-      mttrCambio: delta(actual.reliability.mttr, previo.reliability.mttr),
-      mtbfHoras: redondear(actual.reliability.mtbf),
-      mtbfCambio: delta(actual.reliability.mtbf, previo.reliability.mtbf),
-      disponibilidad: redondear(actual.reliability.availability, 2),
-      cumplimientoPreventivo: redondear(actual.reliability.pmCompliance),
-      cumplimientoPreventivoCambio: delta(actual.reliability.pmCompliance, previo.reliability.pmCompliance),
-      trabajoPlanificado: redondear(actual.reliability.plannedRatio),
+      mttrHoras: valor(actual, "mttr"),
+      mttrCambio: delta(actual.indicadores.mttr.valor, previo.indicadores.mttr.valor),
+      mtbfHoras: valor(actual, "mtbf"),
+      mtbfCambio: delta(actual.indicadores.mtbf.valor, previo.indicadores.mtbf.valor),
+      disponibilidad: valor(actual, "disponibilidad", 2),
+      cumplimientoPreventivo: valor(actual, "cumplimientoPreventivo"),
+      cumplimientoPreventivoCambio: delta(actual.indicadores.cumplimientoPreventivo.valor, previo.indicadores.cumplimientoPreventivo.valor),
+      trabajoPlanificado: valor(actual, "trabajoPlanificado"),
       metaTrabajoPlanificado: 80,
-      horasParoNoPlaneado: redondear(actual.reliability.unplannedDowntimeMinutes / 60),
-      horasParoNoPlaneadoPrevio: redondear(previo.reliability.unplannedDowntimeMinutes / 60),
-      precisionDeEstimacion: redondear(actual.reliability.estimateAccuracy),
-      tiempoDeRespuestaHoras: redondear(actual.reliability.avgResponseHours),
+      horasParoNoPlaneado: valor(actual, "paroNoPlaneado"),
+      horasParoNoPlaneadoPrevio: valor(previo, "paroNoPlaneado"),
+      horasParoPlaneado: valor(actual, "paroPlaneado"),
+      horasParoAcumulado: valor(actual, "paroTotal"),
+      precisionDeEstimacion: actual.precisionEstimacion === null ? null : redondear(actual.precisionEstimacion),
+      tiempoDeRespuestaHoras: valor(actual, "tiempoRespuesta"),
+      sinDato: Object.fromEntries(
+        Object.values(actual.indicadores).filter((i) => i.sinValor).map((i) => [i.clave, i.sinValor]),
+      ),
+      notas: Object.values(actual.indicadores).flatMap((i) => i.notas.map((n) => `${i.nombre}: ${n}`)),
+      definiciones: Object.values(actual.indicadores).map((i) => ({
+        indicador: i.nombre,
+        formula: i.formula,
+        estados: i.alcance.estadosOT,
+        fechaQueCuenta: i.alcance.fechaQueCuenta,
+      })),
     },
 
     trabajo: {
-      ordenesCreadas: actual.totals.workOrders,
-      ordenesCreadasPrevio: previo.totals.workOrders,
-      ordenesCerradas: actual.totals.completed,
-      backlogAbierto: actual.totals.backlog,
-      backlogVencido: actual.totals.overdue,
-      backlogHoras: redondear(actual.totals.backlogHours),
-      porTipo: actual.byType,
-      porPrioridad: actual.byPriority,
-      activos: actual.totals.assets,
-      activosDetenidos: actual.totals.assetsDown,
-      activosCriticos: actual.totals.criticalAssets,
+      ordenesCreadas: actual.totales.ordenesCreadas,
+      ordenesCreadasPrevio: previo.totales.ordenesCreadas,
+      ordenesCanceladas: actual.totales.ordenesCanceladas,
+      ordenesTerminadas: actual.totales.ordenesTerminadas,
+      backlogAbierto: actual.totales.backlog,
+      backlogVencido: actual.totales.backlogVencido,
+      backlogHoras: redondear(actual.totales.backlogHoras),
+      porTipo: actual.porTipo,
+      porPrioridad: actual.porPrioridad,
+      activos: actual.totales.activosEnServicio,
+      activosDetenidos: actual.totales.activosParados,
+      activosCriticos: actual.totales.activosCriticos,
     },
 
     costos: {
       moneda: org.currency,
-      total: Math.round(actual.costs.totalCost),
-      totalPrevio: Math.round(previo.costs.totalCost),
-      manoDeObra: Math.round(actual.costs.laborCost),
-      refacciones: Math.round(actual.costs.partsCost),
-      serviciosExternos: Math.round(actual.costs.serviceCost),
-      otros: Math.round(actual.costs.otherCost),
+      criterio: "Órdenes terminadas en el periodo; las canceladas no cuentan.",
+      total: actual.costos.total,
+      totalPrevio: previo.costos.total,
+      manoDeObra: actual.costos.mano,
+      refacciones: actual.costos.refacciones,
+      serviciosExternos: actual.costos.servicios,
+      otros: actual.costos.otros,
+      enOrdenesAbiertas: actual.costos.enCurso,
       activosMasCaros: topCosto.map((a) => ({
         activo: `${a.code} ${a.name}`,
         criticidad: a.criticality,
@@ -261,11 +294,26 @@ export async function construirExpediente(organizationId: string, dias = 30) {
     },
 
     predictivo: {
+      nota: "No hay modelo de falla: las fechas son cruces estimados de umbral por tendencia lineal. «Umbral crítico superado» es crítico aunque la tendencia sea estable. Una proyección vencida no es una fecha futura.",
       alertasAbiertas: alertas.map((a) => ({
         severidad: a.severity,
         activo: a.sensor?.asset?.code ?? "?",
         punto: a.sensor?.name ?? "?",
-        mensaje: a.message,
+        mensajeAlDetectar: a.message,
+        ...(() => {
+          const e = a.sensorId ? vivas.get(a.sensorId) : undefined;
+          return e
+            ? {
+                estadoHoy: e.etiquetaEstado,
+                resumenHoy: e.resumen,
+                tendencia: e.etiquetaTendencia,
+                confianza: e.etiquetaConfianza,
+                cruceAdvertencia: e.cruceAdvertencia.texto,
+                cruceCritico: e.cruceCritico.texto,
+              }
+            : {};
+        })(),
+        normalizadaSinValidar: Boolean(a.normalizadaEl),
         diasAbierta: Math.floor((hasta.getTime() - a.createdAt.getTime()) / DIA),
       })),
     },

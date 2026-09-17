@@ -11,6 +11,7 @@
  *
  * Es deliberado que este modulo no borre nada por su cuenta.
  */
+import { tipoPorUnidad } from "../lib/medidores";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -265,6 +266,7 @@ export async function sembrarDemo(opciones: OpcionesDemo) {
           assetId: byCode.get(spec.code)!.id,
           name: spec.name,
           unit: spec.unit,
+          tipo: tipoPorUnidad(spec.unit),
           currentValue: spec.value,
           dailyAverage: spec.daily,
           lastReadingAt: daysAgo(2),
