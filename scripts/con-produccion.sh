@@ -9,6 +9,7 @@
 #   ./scripts/con-produccion.sh scripts/rescatar-levantamiento.ts "Casa Montemayor"
 #
 set -euo pipefail
+source "$(dirname "$0")/ip-publica.sh"
 source "$(dirname "$0")/proyecto.sh"
 cd "$(dirname "$0")/.."
 
@@ -38,8 +39,11 @@ trap limpiar EXIT INT TERM
 
 ./scripts/use-postgres.sh >/dev/null
 
-MI_IP=$(curl -s --max-time 20 https://api.ipify.org)
-[ -z "$MI_IP" ] && { echo "ERROR: no se pudo determinar su IP publica."; exit 1; }
+MI_IP=$(ip_publica) || {
+  echo "ERROR: no se pudo determinar su IP publica: ningun servicio contesto."
+  echo "Es la red, no el codigo. La base NO se toco."
+  exit 1
+}
 
 gcloud sql instances patch "$INSTANCIA_SQL" --authorized-networks="$MI_IP/32" --quiet >/dev/null
 PUERTA_ABIERTA=1
