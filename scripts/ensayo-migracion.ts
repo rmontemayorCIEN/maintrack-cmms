@@ -73,6 +73,9 @@ async function main() {
     WorkOrder: await columnas("WorkOrder"),
     Organization: await columnas("Organization"),
     RevisionAgenda: await columnas("RevisionAgenda"),
+    WorkOrderPart: await columnas("WorkOrderPart"),
+    PurchaseRequestLine: await columnas("PurchaseRequestLine"),
+    GoodsReceipt: await columnas("GoodsReceipt"),
   };
 
   const reporte: {
@@ -135,6 +138,9 @@ async function main() {
     WorkOrder: await columnas("WorkOrder"),
     Organization: await columnas("Organization"),
     RevisionAgenda: await columnas("RevisionAgenda"),
+    WorkOrderPart: await columnas("WorkOrderPart"),
+    PurchaseRequestLine: await columnas("PurchaseRequestLine"),
+    GoodsReceipt: await columnas("GoodsReceipt"),
   };
   const intacta = (Object.keys(antes) as Array<keyof typeof antes>).every(
     (t) => antes[t].length === despues[t].length && antes[t].every((c) => despues[t].includes(c)),
