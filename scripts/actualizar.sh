@@ -199,9 +199,21 @@ if [ "$MIGRAR" = "1" ]; then
     | sed -n 's|^postgresql://maintrack:\(.*\)@localhost/maintrack?host=.*$|\1|p')
   [ -z "$CLAVE" ] && { echo "     ERROR: no se pudo leer la cadena de conexion del Secret Manager."; exit 1; }
 
-  DATABASE_URL="postgresql://maintrack:$CLAVE@$IP_DB:5432/maintrack?sslmode=require" \
-    npx prisma migrate deploy
+  URL_DB="postgresql://maintrack:$CLAVE@$IP_DB:5432/maintrack?sslmode=require"
   unset CLAVE
+
+  # Respaldo manual solo si de verdad hay migraciones por aplicar: marca el
+  # punto exacto antes del cambio. Un despliegue sin migraciones no lo
+  # necesita (el respaldo diario y la recuperacion a un momento ya cubren).
+  # Despues de un respaldo exitoso se limpian los manuales de mas de 30 dias.
+  if DATABASE_URL="$URL_DB" npx prisma migrate status >/dev/null 2>&1; then
+    echo "     Sin migraciones pendientes: no hace falta respaldo manual."
+  else
+    bash "$(dirname "$0")/respaldo-base.sh" "Antes de migrar ($(git log -1 --format=%h))"
+  fi
+
+  DATABASE_URL="$URL_DB" npx prisma migrate deploy
+  unset URL_DB
 
   # Se cierra en cuanto deja de hacer falta: el despliegue que sigue tarda
   # varios minutos y no necesita la base abierta.
