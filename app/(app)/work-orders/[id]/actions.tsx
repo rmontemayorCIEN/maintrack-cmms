@@ -6,7 +6,8 @@ import { CheckCircle2, Loader2, Pause, Play, Sparkles } from "lucide-react";
 import { Dialogo } from "@/components/ui/dialogo";
 import { Button } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
-import { STATUS_TRANSITIONS, WO_STATUS_LABELS } from "@/lib/constants";
+import { accionesDisponibles, motivoValido, type AccionOt } from "@/lib/reglas-ot";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 /**
  * La clave con la que se guarda la falla del encabezado.
@@ -27,7 +28,39 @@ export function WorkOrderActions({
   esOrdenDeFalla,
   puedeGestionarCatalogos = false,
   iaDisponible = false,
+  rol,
+  iniciada,
+  conResponsable,
+  requiereParo,
+  evidenciaRequerida,
+  cierre,
 }: {
+  rol: string;
+  iniciada: boolean;
+  conResponsable: boolean;
+  requiereParo: boolean;
+  evidenciaRequerida: boolean;
+  /**
+   * Lo que el supervisor revisa antes de cerrar, ya calculado en el servidor,
+   * con los faltantes que el servidor mismo rechazaria.
+   */
+  cierre: {
+    horas: number;
+    manoDeObra: number;
+    refacciones: number;
+    servicios: number;
+    otros: number;
+    total: number;
+    minutosParo: number;
+    sinParoConfirmado: boolean;
+    diagnostico: string;
+    resolucion: string | null;
+    actividadesPendientes: number;
+    actividadesEnBacklog: number;
+    archivos: number;
+    moneda: string;
+    faltantes: string[];
+  };
   workOrderId: string;
   status: string;
   failureCodes: Array<{ id: string; code: string; description: string }>;
@@ -63,6 +96,13 @@ export function WorkOrderActions({
   iaDisponible?: boolean;
 }) {
   const router = useRouter();
+  function clavesDeFalla() {
+    return actividadesDeFalla.length
+      ? actividadesDeFalla.map((a) => a.id)
+      : esOrdenDeFalla
+        ? [ENCABEZADO]
+        : [];
+  }
   const [opcionesFallas, setOpcionesFallas] = useState<OpcionCatalogo[]>(
     failureCodes.map((c) => ({ id: c.id, etiqueta: `${c.code} — ${c.description}` })),
   );
@@ -88,19 +128,14 @@ export function WorkOrderActions({
    */
   const [fallas, setFallas] = useState<
     Record<string, { failureCodeId: string; rootCauseId: string; downtimeMinutes: string }>
-  >(() => {
-    const claves = actividadesDeFalla.length
-      ? actividadesDeFalla.map((a) => a.id)
-      : esOrdenDeFalla
-        ? [ENCABEZADO]
-        : [];
-    return Object.fromEntries(
-      claves.map((k) => [k, { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" }]),
-    );
-  });
+  >(() => Object.fromEntries(
+    clavesDeFalla().map((k) => [k, { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" }]),
+  ));
 
   /** Una orden sin actividades de falla no pregunta nada de fallas. */
   const pideFallas = actividadesDeFalla.length > 0 || esOrdenDeFalla;
+  /** Minutos de paro de una orden sin fallas (preventivo que paro el equipo). */
+  const [paroGeneral, setParoGeneral] = useState("0");
 
   function setFalla(clave: string, campo: "failureCodeId" | "rootCauseId" | "downtimeMinutes", valor: string) {
     setFallas((f) => ({ ...f, [clave]: { ...f[clave], [campo]: valor } }));
@@ -177,9 +212,46 @@ export function WorkOrderActions({
     router.refresh();
   }
 
-  const allowed = STATUS_TRANSITIONS[status] ?? [];
+  const faltaDiagnostico = Object.values(fallas).some((f) => !f.failureCodeId || !f.rootCauseId);
+  const acciones = accionesDisponibles({ status, iniciada, conResponsable }, rol);
+  /** El paso que pide motivo (o responsable) y esta esperando que la persona lo escriba. */
+  const [pidiendo, setPidiendo] = useState<AccionOt | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [tomarla, setTomarla] = useState(true);
+  const [revisandoCierre, setRevisandoCierre] = useState(false);
+  const [excepciones, setExcepciones] = useState({ motivoSinHoras: "", sinParoConfirmado: false, motivoSinDiagnostico: "" });
+  const sinHoras = cierre.horas <= 0;
+  const puedeIniciarSinResponsable = ["OWNER", "ADMIN", "SUPERVISOR"].includes(rol);
+
+  function elegir(accion: AccionOt) {
+    setError(null);
+    // Reabrir una cerrada tambien lleva a COMPLETED, pero no es completar: pide motivo, no cierre tecnico.
+    if (accion.a === "COMPLETED" && status !== "CLOSED") {
+      /**
+       * Las fallas se arman al abrir, con las actividades de ESTE momento.
+       * Si se armaran una sola vez al cargar, una actividad enviada al backlog
+       * despues seguiria pidiendo su codigo en el cierre.
+       */
+      setFallas((previas) => Object.fromEntries(clavesDeFalla().map((k) => [
+        k, previas[k] ?? { failureCodeId: "", rootCauseId: "", downtimeMinutes: "0" },
+      ])));
+      setClosing(true);
+      return;
+    }
+    if (accion.a === "CLOSED") { setRevisandoCierre(true); return; }
+    const iniciarSinResponsable = accion.a === "IN_PROGRESS" && !conResponsable;
+    if (accion.pideMotivo || iniciarSinResponsable) {
+      setMotivo("");
+      setTomarla(true);
+      setPidiendo(accion);
+      return;
+    }
+    move(accion.a);
+  }
 
   async function move(next: string, extra?: Record<string, unknown>) {
+    // Un segundo clic mientras el primero viaja no manda nada.
+    if (loading) return;
     setLoading(next);
     setError(null);
     const res = await fetch(`/api/work-orders/${workOrderId}/status`, {
@@ -194,44 +266,162 @@ export function WorkOrderActions({
       return;
     }
     setClosing(false);
+    setPidiendo(null);
+    setRevisandoCierre(false);
     router.refresh();
   }
 
+  /** Lo que se le explica a la persona segun el caso, para pedir el motivo. */
+  const sinResponsableAlIniciar = pidiendo?.a === "IN_PROGRESS" && !conResponsable;
+
   return (
     <div className="relative flex flex-wrap items-center gap-2">
-      {allowed.includes("IN_PROGRESS") ? (
-        <Button size="sm" onClick={() => move("IN_PROGRESS")} disabled={loading !== null}>
-          {loading === "IN_PROGRESS" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          Iniciar
-        </Button>
-      ) : null}
-
-      {allowed.includes("ON_HOLD") ? (
-        <Button size="sm" variant="secondary" onClick={() => move("ON_HOLD")} disabled={loading !== null}>
-          <Pause className="h-3.5 w-3.5" /> Pausar
-        </Button>
-      ) : null}
-
-      {allowed.includes("COMPLETED") ? (
-        <Button size="sm" variant="success" onClick={() => setClosing(true)} disabled={loading !== null}>
-          <CheckCircle2 className="h-3.5 w-3.5" /> Completar
-        </Button>
-      ) : null}
-
-      {allowed.includes("CLOSED") ? (
-        <Button size="sm" variant="success" onClick={() => move("CLOSED")} disabled={loading !== null}>
-          {loading === "CLOSED" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          Cerrar administrativamente
-        </Button>
-      ) : null}
-
-      {allowed.filter((s) => !["IN_PROGRESS", "ON_HOLD", "COMPLETED", "CLOSED"].includes(s)).map((next) => (
-        <Button key={next} size="sm" variant={next === "CANCELLED" ? "danger" : "secondary"} onClick={() => move(next)} disabled={loading !== null}>
-          {WO_STATUS_LABELS[next]}
+      {acciones.map((accion) => (
+        <Button
+          key={accion.a + accion.etiqueta}
+          size="sm"
+          variant={accion.tono === "primary" ? undefined : accion.tono}
+          onClick={() => elegir(accion)}
+          disabled={loading !== null}
+        >
+          {loading === accion.a ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : accion.a === "IN_PROGRESS" && accion.etiqueta === "Iniciar" ? <Play className="h-3.5 w-3.5" />
+            : accion.a === "ON_HOLD" ? <Pause className="h-3.5 w-3.5" />
+            : accion.a === "COMPLETED" && status === "IN_PROGRESS" ? <CheckCircle2 className="h-3.5 w-3.5" />
+            : null}
+          {accion.etiqueta}
         </Button>
       ))}
 
-      {error ? (
+      {pidiendo ? (
+        <Dialogo
+          titulo={sinResponsableAlIniciar ? "Iniciar orden sin responsable" : pidiendo.etiqueta}
+          descripcion={sinResponsableAlIniciar
+            ? "Una orden en proceso necesita a alguien que responda por ella."
+            : pidiendo.preguntaMotivo}
+          onCerrar={() => setPidiendo(null)}
+          pie={
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setPidiendo(null)}>Regresar</Button>
+              <Button
+                variant={pidiendo.tono === "danger" ? "danger" : undefined}
+                disabled={loading !== null || (
+                  sinResponsableAlIniciar ? !tomarla && !motivoValido(motivo) : !motivoValido(motivo)
+                )}
+                onClick={() => move(pidiendo.a, {
+                  motivo: motivo.trim() || undefined,
+                  ...(sinResponsableAlIniciar ? { tomarla } : {}),
+                })}
+              >
+                {loading === pidiendo.a ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {pidiendo.etiqueta}
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid gap-3">
+            {error ? (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+            ) : null}
+            {sinResponsableAlIniciar ? (
+              <>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="radio" checked={tomarla} onChange={() => setTomarla(true)} />
+                  Tomarla yo: quedo como responsable
+                </label>
+                {puedeIniciarSinResponsable ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="radio" checked={!tomarla} onChange={() => setTomarla(false)} />
+                    Iniciarla sin responsable (excepción, con motivo)
+                  </label>
+                ) : null}
+              </>
+            ) : null}
+            {!sinResponsableAlIniciar || !tomarla ? (
+              <div>
+                <label className="label">Motivo</label>
+                <textarea
+                  className="field min-h-20"
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder={pidiendo.preguntaMotivo ?? "Por qué se inicia sin responsable"}
+                  autoFocus
+                />
+                <p className="mt-1 text-[0.6875rem] text-slate-500">
+                  Queda en la bitácora de la orden con su nombre y la fecha.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </Dialogo>
+      ) : null}
+
+      {revisandoCierre ? (
+        <Dialogo
+          titulo="Validar y cerrar"
+          descripcion="Cierre administrativo: revise que lo capturado sea correcto. Cerrada, la orden ya no acepta cambios sin reabrirla con motivo."
+          onCerrar={() => setRevisandoCierre(false)}
+          pie={
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setRevisandoCierre(false)}>Regresar</Button>
+              <Button variant="success" disabled={loading !== null || cierre.faltantes.length > 0} onClick={() => move("CLOSED")}>
+                {loading === "CLOSED" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Cerrar orden
+              </Button>
+            </div>
+          }
+        >
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <dt className="text-slate-500">Horas de mano de obra</dt>
+            <dd className="text-right tabular-nums">{formatNumber(cierre.horas, 1)} h</dd>
+            <dt className="text-slate-500">Mano de obra</dt>
+            <dd className="text-right tabular-nums">{formatCurrency(cierre.manoDeObra, cierre.moneda)}</dd>
+            <dt className="text-slate-500">Refacciones</dt>
+            <dd className="text-right tabular-nums">{formatCurrency(cierre.refacciones, cierre.moneda)}</dd>
+            <dt className="text-slate-500">Servicios externos</dt>
+            <dd className="text-right tabular-nums">{formatCurrency(cierre.servicios, cierre.moneda)}</dd>
+            {cierre.otros > 0 ? (<>
+              <dt className="text-slate-500">Otros</dt>
+              <dd className="text-right tabular-nums">{formatCurrency(cierre.otros, cierre.moneda)}</dd>
+            </>) : null}
+            <dt className="font-medium text-slate-700">Costo total</dt>
+            <dd className="text-right font-medium tabular-nums">{formatCurrency(cierre.total, cierre.moneda)}</dd>
+            <dt className="text-slate-500">Paro del equipo</dt>
+            <dd className="text-right">
+              {cierre.minutosParo > 0 ? `${cierre.minutosParo} min` : cierre.sinParoConfirmado ? "Confirmado: no hubo paro" : requiereParo ? "Sin capturar" : "No requería paro"}
+            </dd>
+            <dt className="text-slate-500">Diagnóstico</dt>
+            <dd className="text-right">{cierre.diagnostico}</dd>
+            <dt className="text-slate-500">Actividades pendientes</dt>
+            <dd className="text-right">
+              {cierre.actividadesPendientes === 0 ? "Ninguna" : cierre.actividadesPendientes}
+              {cierre.actividadesEnBacklog ? ` · ${cierre.actividadesEnBacklog} en backlog` : ""}
+            </dd>
+            <dt className="text-slate-500">Evidencia</dt>
+            <dd className="text-right">{cierre.archivos} archivo(s){evidenciaRequerida ? " · requerida" : ""}</dd>
+          </dl>
+          {cierre.resolucion ? (
+            <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <span className="font-medium">Solución: </span>{cierre.resolucion}
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+          ) : null}
+          {cierre.faltantes.length ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <p className="font-semibold">Antes de cerrar falta:</p>
+              <ul className="mt-1 list-disc pl-4">
+                {cierre.faltantes.map((f) => <li key={f}>{f}</li>)}
+              </ul>
+              <p className="mt-1">Corrija los datos o devuelva la orden a proceso con el motivo.</p>
+            </div>
+          ) : null}
+        </Dialogo>
+      ) : null}
+
+      {/* Con un dialogo abierto el error se muestra adentro, junto a los campos. */}
+      {error && !closing && !pidiendo && !revisandoCierre ? (
         <p className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</p>
       ) : null}
 
@@ -261,6 +451,12 @@ export function WorkOrderActions({
                       rootCauseId: v.rootCauseId || null,
                       downtimeMinutes: Number(v.downtimeMinutes) || 0,
                     })),
+                    // Una orden sin actividades de falla no manda fallas; su paro
+                    // va en el encabezado.
+                    ...(pideFallas ? {} : { downtimeMinutes: Number(paroGeneral) || 0 }),
+                    motivoSinHoras: sinHoras ? excepciones.motivoSinHoras.trim() || null : null,
+                    sinParoConfirmado: requiereParo ? excepciones.sinParoConfirmado : false,
+                    motivoSinDiagnostico: faltaDiagnostico ? excepciones.motivoSinDiagnostico.trim() || null : null,
                   })
                 }
               >
@@ -270,6 +466,9 @@ export function WorkOrderActions({
             </div>
           }
         >
+            {error ? (
+              <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+            ) : null}
             {pendingRequired > 0 ? (
               <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Quedan {pendingRequired} actividad(es) sin resolver. Marque cada una como hecha, o
@@ -348,9 +547,68 @@ export function WorkOrderActions({
                 );
               })}
 
+              {!pideFallas && requiereParo ? (
+                <div>
+                  <label className="label">Tiempo de paro del equipo (minutos)</label>
+                  <input type="number" min="0" className="field" value={paroGeneral} onChange={(e) => setParoGeneral(e.target.value)} />
+                </div>
+              ) : null}
+
+              {requiereParo ? (
+                <label className="flex items-center gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={excepciones.sinParoConfirmado}
+                    onChange={(e) => setExcepciones((x) => ({ ...x, sinParoConfirmado: e.target.checked }))}
+                  />
+                  La orden requería paro, pero finalmente no hubo paro del equipo
+                </label>
+              ) : null}
+              {requiereParo ? (
+                <p className="-mt-2 text-[0.6875rem] text-slate-500">
+                  El paro es el tiempo que el equipo estuvo detenido; no son las horas de trabajo del técnico.
+                </p>
+              ) : null}
+
+              {pideFallas && faltaDiagnostico ? (
+                <div>
+                  <label className="label">Por qué queda sin código o sin causa raíz</label>
+                  <input
+                    className="field"
+                    value={excepciones.motivoSinDiagnostico}
+                    onChange={(e) => setExcepciones((x) => ({ ...x, motivoSinDiagnostico: e.target.value }))}
+                    placeholder="Ej. no se encontró la causa; se sigue observando"
+                  />
+                  <p className="mt-1 text-[0.6875rem] text-slate-500">
+                    Una falla sin diagnóstico solo se completa como «Sin determinar» con justificación.
+                  </p>
+                </div>
+              ) : null}
+
+              {sinHoras ? (
+                <div>
+                  <label className="label">No hay horas registradas: ¿por qué?</label>
+                  <input
+                    className="field"
+                    value={excepciones.motivoSinHoras}
+                    onChange={(e) => setExcepciones((x) => ({ ...x, motivoSinHoras: e.target.value }))}
+                    placeholder="Ej. lo hizo el proveedor; su costo va en servicios"
+                  />
+                  <p className="mt-1 text-[0.6875rem] text-slate-500">
+                    Lo normal es registrar las horas en «Mano de obra» antes de completar: sin horas no hay costo ni MTTR.
+                  </p>
+                </div>
+              ) : null}
+
+              {evidenciaRequerida && cierre.archivos === 0 ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Esta orden requiere evidencia: suba al menos una foto o documento en «Adjuntos» antes de completar.
+                </p>
+              ) : null}
+
               <div>
                 <div className="mb-1 flex items-end justify-between gap-2">
-                  <label className="label mb-0">Solución aplicada</label>
+                  <label className="label mb-0">Solución aplicada o resumen del trabajo *</label>
                   {iaDisponible ? (
                     <button
                       type="button"

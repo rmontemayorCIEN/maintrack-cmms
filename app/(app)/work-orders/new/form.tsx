@@ -1,5 +1,6 @@
 "use client";
 
+import { AdvertenciasProgramacion, type RevisionProgramacion } from "@/components/advertencias-programacion";
 import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -31,6 +32,8 @@ export function NewWorkOrderForm({
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState<RevisionProgramacion | null>(null);
+  const [aceptar, setAceptar] = useState(false);
   const [tasks, setTasks] = useState<string[]>([]);
   const [form, setForm] = useState({
     title: "",
@@ -67,11 +70,17 @@ export function NewWorkOrderForm({
         teamId: form.teamId || null,
         scheduledStart: form.scheduledStart || null,
         tasks: tasks.filter(Boolean).map((title) => ({ title, taskType: "CHECK", required: true })),
+        aceptarAdvertencias: aceptar,
       }),
     });
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
+      if (data.details?.programacion) {
+        setRevision(data.details.programacion);
+        setAceptar(false);
+        return;
+      }
       setError(data.error ?? "No fue posible crear la orden");
       return;
     }
@@ -235,6 +244,15 @@ export function NewWorkOrderForm({
           </div>
         </Card>
 
+        {revision ? (
+          <AdvertenciasProgramacion
+            revision={revision}
+            aceptada={aceptar}
+            onAceptar={setAceptar}
+            onUsarFecha={(f) => { set("dueDate", f); setRevision(null); }}
+            onUsarPersona={(id) => { set("assignedToId", id); setRevision(null); }}
+          />
+        ) : null}
         {error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
         ) : null}

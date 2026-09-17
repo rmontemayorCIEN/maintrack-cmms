@@ -8,6 +8,20 @@ import { prisma } from "../lib/db";
 import { armarOrden, trabajoDisponible } from "../lib/armar-ot";
 import { transitionWorkOrder } from "../lib/workorders";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
   console.log(`  ${ok ? "ok  " : "FALLA"}  ${afirmacion}${detalle ? `  → ${detalle}` : ""}`);
@@ -124,8 +138,8 @@ async function main() {
       where: { workOrderId: orden.id }, data: { done: true, completedAt: new Date() },
     });
     // Por los estados reales, no saltandoselos: OPEN → IN_PROGRESS → COMPLETED.
-    await transitionWorkOrder({ workOrderId: orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: orden.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
       resolution: "Todo hecho", fallas: [],
     });
@@ -173,8 +187,8 @@ async function main() {
     revisar("con dos planes el encabezado queda nulo, no miente", enca2.planId === null, `planId=${enca2.planId}`);
 
     await prisma.workOrderTask.updateMany({ where: { workOrderId: r2.orden.id }, data: { done: true, completedAt: new Date() } });
-    await transitionWorkOrder({ workOrderId: r2.orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r2.orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: r2.orden.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
       resolution: "Los dos", fallas: [],
     });

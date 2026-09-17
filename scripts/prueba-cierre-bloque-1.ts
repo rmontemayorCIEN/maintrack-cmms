@@ -224,7 +224,7 @@ async function main() {
     revisar("cada registro del MTBF y MTTR trae su razón visible",
       [...i30.indicadores.mtbf.detalle, ...i30.indicadores.mttr.detalle].every((r) => !!r.razon), i30.indicadores.mtbf.detalle.map((r) => `${r.folio}: ${r.razon}`));
     const reglas = await revisarCalidad(orgA.id, ahoraReal);
-    revisar("calidad de datos usa la misma regla (universo de «fallas sin causa»)", reglas.find((r) => r.clave === "fallas-sin-causa")!.total === enBase.size);
+    revisar("calidad de datos usa la misma regla (universo de «fallas sin diagnóstico»)", reglas.find((r) => r.clave === "fallas-sin-diagnostico")!.total === enBase.size);
 
     // ─────────────────────────── 6. Proyección suspendida por medidor inválido ───
     console.log("\n6. Proyección suspendida por lectura inválida y reanudación");

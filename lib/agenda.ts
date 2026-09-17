@@ -170,6 +170,57 @@ export function cargaPorDia(
   });
 }
 
+export type PropuestaDeCarga = {
+  persona: string;
+  exceso: number;
+  /** Dias del rango visible en que a esa persona le cabe el exceso. */
+  dias: Array<{ fecha: Date; libres: number }>;
+  /** Personas con lugar ese mismo dia para tomar el exceso. */
+  personas: Array<{ nombre: string; libres: number }>;
+};
+
+/**
+ * Que hacer con un dia sobrecargado, en numeros.
+ *
+ * No reacomoda nada ni elige por nadie: por cada persona que no cabe dice
+ * cuanto le sobra y donde cabria —otros dias del rango que se esta viendo en
+ * que tiene lugar, u otras personas libres ese dia—. Es la misma carga que
+ * pinta el calendario, asi que la propuesta no contradice la pantalla.
+ */
+export function propuestasDeCarga(
+  indice: number,
+  carga: CargaDia[],
+  plantilla: Array<{ id: string; name: string; horasDisponibles: number | null }>,
+  j: Jornada,
+): PropuestaDeCarga[] {
+  const dia = carga[indice];
+  if (!dia?.sobrecargado) return [];
+  const horasDe = (c: CargaDia, userId: string) => c.personas.find((p) => p.userId === userId)?.horas ?? 0;
+  const capacidadDe = (c: CargaDia, horasDisponibles: number | null) => (c.habil ? (horasDisponibles ?? j.horasJornada) : 0);
+
+  return dia.personas
+    .filter((p) => p.ocupacion > 1 && p.userId)
+    .map((p) => {
+      const exceso = Math.round((p.horas - p.capacidad) * 10) / 10;
+      const suya = plantilla.find((x) => x.id === p.userId);
+      const dias = carga
+        .map((c, i) => ({ c, i }))
+        .filter(({ c, i }) => i !== indice && c.habil && c.fecha.getTime() > dia.fecha.getTime())
+        .map(({ c }) => ({ fecha: c.fecha, libres: capacidadDe(c, suya?.horasDisponibles ?? null) - horasDe(c, p.userId!) }))
+        .filter((x) => x.libres >= exceso)
+        .slice(0, 2);
+      const personas = dia.habil
+        ? plantilla
+            .filter((x) => x.id !== p.userId)
+            .map((x) => ({ nombre: x.name, libres: capacidadDe(dia, x.horasDisponibles) - horasDe(dia, x.id) }))
+            .filter((x) => x.libres >= exceso)
+            .sort((a, b) => b.libres - a.libres)
+            .slice(0, 2)
+        : [];
+      return { persona: p.nombre, exceso, dias, personas };
+    });
+}
+
 export class ErrorDeAgenda extends Error {
   constructor(mensaje: string, readonly codigo: number = 422) {
     super(mensaje);

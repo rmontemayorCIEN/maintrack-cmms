@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
+import { asegurarEditable } from "@/lib/workorders";
 
 const schema = z.object({
   taskId: z.string(),
@@ -15,8 +16,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const input = schema.parse(await request.json());
     const task = await prisma.workOrderTask.findFirst({
       where: { id: input.taskId, workOrderId: id, workOrder: { organizationId: orgId } },
+      include: { workOrder: { select: { status: true } } },
     });
     if (!task) return fail("Tarea no encontrada", 404);
+    asegurarEditable(task.workOrder);
+    if (task.liberadaAt && input.done) {
+      return fail("Esa actividad se envió al backlog. Deshaga la liberación antes de marcarla como hecha.", 409);
+    }
 
     // Una medicion se marca como aprobada si cae dentro del rango esperado.
     let passed: boolean | null = task.passed;
@@ -54,7 +60,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   return withAuth("workorder:write", async ({ orgId }) => {
     const wo = await prisma.workOrder.findFirst({ where: { id, organizationId: orgId } });
-    if (!wo) return fail("Orden de trabajo no encontrada", 404);
+    asegurarEditable(wo);
+    if (wo!.status === "COMPLETED") return fail("La orden ya está completada: devuélvala a proceso para agregar actividades.", 409);
     const input = createSchema.parse(await request.json());
     const count = await prisma.workOrderTask.count({ where: { workOrderId: id } });
     const task = await prisma.workOrderTask.create({
@@ -64,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         workOrderId: id,
         position: count,
         origen: "MANUAL",
-        maintenanceType: wo.maintenanceType,
+        maintenanceType: wo!.maintenanceType,
         ...input,
       },
     });

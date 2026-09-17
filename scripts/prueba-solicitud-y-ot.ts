@@ -14,6 +14,20 @@ import { armarOrden } from "../lib/armar-ot";
 import { fallasCodificadas } from "../lib/fallas";
 import { tipoDeTrabajo } from "../lib/tipos-solicitud";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
   console.log(`  ${ok ? "ok  " : "FALLA"}  ${afirmacion}${detalle ? `  → ${detalle}` : ""}`);
@@ -65,13 +79,13 @@ async function main() {
 
     // ── En proceso: nada cambia, sigue atendida ─────────────────────────────
     console.log("\nMientras la orden avanza, sigue atendida");
-    await transitionWorkOrder({ workOrderId: ot.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: ot.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
     e = await estadoDe(sol.id);
     revisar("sigue convertida con la orden en proceso", e.status === "CONVERTED" && e.workOrderId === ot.id);
 
     // ── Se cancela la orden: la solicitud DEBE liberarse ────────────────────
     console.log("\nAl cancelar la orden, la solicitud se libera");
-    await transitionWorkOrder({ workOrderId: ot.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: ot.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
     e = await estadoDe(sol.id);
     revisar("vuelve a pendiente", e.status === "PENDING", e.status);
     revisar("ya no apunta a la orden cancelada", e.workOrderId === null, `${e.workOrderId}`);
@@ -93,8 +107,8 @@ async function main() {
     await prisma.workOrderTask.updateMany({
       where: { workOrderId: r2.orden.id }, data: { done: true, completedAt: new Date() },
     });
-    await transitionWorkOrder({ workOrderId: r2.orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r2.orden.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: r2.orden.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
       resolution: "Se ajusto", fallas: [],
     });
@@ -110,9 +124,9 @@ async function main() {
       title: "Se va a cancelar", actividades: [], reportes: [sol2.id], backlog: [],
     });
     if ("error" in r3) throw new Error(r3.error);
-    await transitionWorkOrder({ workOrderId: r3.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r3.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
     revisar("cancelada, la solicitud quedo libre", (await estadoDe(sol2.id)).status === "PENDING");
-    await transitionWorkOrder({ workOrderId: r3.orden.id, to: "OPEN", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r3.orden.id, to: "OPEN", userId: user.id, organizationId: org.id });
     e = await estadoDe(sol2.id);
     revisar("al reabrir, la retoma", e.status === "CONVERTED" && e.workOrderId === r3.orden.id, e.status);
 
@@ -124,7 +138,7 @@ async function main() {
       title: "Se cancela tambien", actividades: [], reportes: [sol3.id], backlog: [],
     });
     if ("error" in r4) throw new Error(r4.error);
-    await transitionWorkOrder({ workOrderId: r4.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r4.orden.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
     // Alguien mas la atiende mientras tanto.
     const r5 = await armarOrden({
       organizationId: org.id, userId: user.id, assetId: activo.id,
@@ -132,7 +146,7 @@ async function main() {
     });
     if ("error" in r5) throw new Error(r5.error);
     // Y ahora se reabre la primera.
-    await transitionWorkOrder({ workOrderId: r4.orden.id, to: "OPEN", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: r4.orden.id, to: "OPEN", userId: user.id, organizationId: org.id });
     e = await estadoDe(sol3.id);
     revisar("se queda con quien la tomo, no con la que se reabrio",
       e.workOrderId === r5.orden.id, e.workOrderId === r5.orden.id ? "correcto" : "SE LA ARREBATO");
@@ -190,8 +204,8 @@ async function main() {
     await prisma.workOrderTask.update({
       where: { id: tApoyo.id }, data: { failureCodeId: codigo.id, done: true, completedAt: new Date() },
     });
-    await transitionWorkOrder({ workOrderId: apoyo.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: apoyo.id, to: "IN_PROGRESS", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: apoyo.id, to: "COMPLETED", userId: user.id, organizationId: org.id, fallas: [],
     });
     const fallas = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
@@ -246,7 +260,7 @@ async function main() {
       hallazgo.status === "CONVERTED" && hallazgo.workOrderId === otViva.id);
 
     // Y si la orden se cancela, el hallazgo tambien se libera.
-    await transitionWorkOrder({ workOrderId: otViva.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otViva.id, to: "CANCELLED", userId: user.id, organizationId: org.id });
     const eH = await estadoDe(hallazgo.id);
     revisar("si la orden se cancela, el hallazgo vuelve a pendiente",
       eH.status === "PENDING" && eH.workOrderId === null, eH.status);

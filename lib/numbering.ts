@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 
 /**
@@ -24,9 +25,10 @@ const SERIES = {
 
 export type Serie = keyof typeof SERIES;
 
-export async function siguienteFolio(organizationId: string, serie: Serie) {
+/** `cliente`: la transaccion en curso, si el folio se pide dentro de una. */
+export async function siguienteFolio(organizationId: string, serie: Serie, cliente: Prisma.TransactionClient = prisma) {
   const { campo, prefijo } = SERIES[serie];
-  const org = await prisma.organization.update({
+  const org = await cliente.organization.update({
     where: { id: organizationId },
     data: { [campo]: { increment: 1 } },
     select: { [campo]: true },
@@ -35,5 +37,6 @@ export async function siguienteFolio(organizationId: string, serie: Serie) {
   return `${prefijo}-${String(consecutivo).padStart(6, "0")}`;
 }
 
-export const nextWorkOrderNumber = (organizationId: string) => siguienteFolio(organizationId, "ordenTrabajo");
+export const nextWorkOrderNumber = (organizationId: string, cliente?: Prisma.TransactionClient) =>
+  siguienteFolio(organizationId, "ordenTrabajo", cliente);
 export const nextRequestNumber = (organizationId: string) => siguienteFolio(organizationId, "solicitud");

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { Badge, Card, CardHeader, PageHeader, Progress, Stat } from "@/components/ui";
-import { nivelSalud, saludDeDatos } from "@/lib/salud-datos";
+import { FACTOR_CRITICA, nivelSalud, saludDeDatos } from "@/lib/salud-datos";
 import { ultimoDiagnostico } from "@/lib/ia/diagnostico";
 import { consumoIa } from "@/lib/ia/consumo";
 import { iaConfigurada } from "@/lib/ia/cliente";
@@ -107,8 +107,11 @@ export default async function DiagnosticoPage() {
                       </span>
                     </span>
                   </div>
-                  <div className="mt-1"><Progress value={h.porcentaje} tone={h.porcentaje >= 80 ? "good" : h.porcentaje >= 50 ? "warn" : "bad"} /></div>
-                  <p className="mt-1 text-[0.6875rem] text-slate-500">{h.porque}</p>
+                  <div className="mt-1"><Progress value={h.calificacion} tone={h.calificacion >= 80 ? "good" : h.calificacion >= 50 ? "warn" : "bad"} /></div>
+                  <p className="mt-1 text-[0.6875rem] text-slate-500">
+                    {h.porque}
+                    {h.critica ? ` Regla del proceso de órdenes: cada 1 % de incumplimiento resta ${FACTOR_CRITICA} puntos (califica ${Math.round(h.calificacion)}).` : ""}
+                  </p>
                   {h.hallazgos.length ? (
                     <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[0.6875rem]">
                       {h.hallazgos.slice(0, 4).map((x) => (

@@ -30,6 +30,9 @@ import { ServicesPanel } from "./services-panel";
 import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
 import { esFalla, tipoDeActividad } from "@/lib/fallas";
+import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
+import { faltantesDeCierre } from "@/lib/reglas-ot";
+import { BitacoraDeEstados } from "./bitacora";
 
 export const dynamic = "force-dynamic";
 
@@ -163,8 +166,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     : [[], [], [], []];
 
   const [tecnicosWo, cuadrillasWo, activosWo] = await Promise.all([
+    // Responsables posibles: quien ejecuta. Un solicitante o una cuenta de consulta no pueden iniciar la orden.
     prisma.user.findMany({
-      where: { organizationId: user.organizationId, active: true },
+      where: { organizationId: user.organizationId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -259,6 +263,37 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const hayPlaneado = moPlaneada.size + refPlaneadas.size + srvPlaneados.size > 0;
 
   const currency = user.organization.currency;
+
+  // Lo que se revisa al completar y al cerrar: el mismo armado que usa el servidor.
+  const evidenciaRequerida = requiereEvidencia(user.organization, wo);
+  const horasRegistradas = wo.labor.reduce((a, l) => a + l.hours, 0);
+  const datosCierre = datosDeCierre(wo, {
+    horas: horasRegistradas,
+    archivos: wo.attachments.length,
+    evidenciaRequerida,
+  });
+  const diagnosticadas = datosCierre.fallas.filter((f) => f.failureCodeId && f.rootCauseId).length;
+  const cierre = {
+    horas: horasRegistradas,
+    manoDeObra: wo.laborCost,
+    refacciones: wo.partsCost,
+    servicios: wo.serviceCost,
+    otros: wo.otherCost,
+    total: wo.totalCost,
+    minutosParo: datosCierre.minutosParo,
+    sinParoConfirmado: wo.sinParoConfirmado,
+    diagnostico: datosCierre.fallas.length === 0
+      ? "No aplica (sin fallas)"
+      : diagnosticadas === datosCierre.fallas.length
+        ? "Código y causa capturados"
+        : `${diagnosticadas} de ${datosCierre.fallas.length} con código y causa${wo.motivoSinDiagnostico ? ` · sin determinar: ${wo.motivoSinDiagnostico}` : ""}`,
+    resolucion: wo.resolution,
+    actividadesPendientes: datosCierre.actividadesSinResolver,
+    actividadesEnBacklog: wo.tasks.filter((t) => t.liberadaAt).length,
+    archivos: wo.attachments.length,
+    moneda: user.organization.currency,
+    faltantes: wo.status === "COMPLETED" ? faltantesDeCierre(datosCierre) : [],
+  };
   const canExecute = can(user.role, "workorder:execute");
   const canEdit = can(user.role, "workorder:write");
   const doneTasks = wo.tasks.filter((t) => t.done).length;
@@ -314,6 +349,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 esOrdenDeFalla={esFalla(wo.maintenanceType)}
                 pendingRequired={wo.tasks.filter((t) => !t.done && !t.liberadaAt).length}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
+                rol={user.role}
+                iniciada={!!wo.startedAt}
+                conResponsable={!!wo.assignedToId}
+                requiereParo={wo.requiresShutdown}
+                evidenciaRequerida={evidenciaRequerida}
+                cierre={cierre}
               />
             ) : null}
           </>
@@ -560,6 +601,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               editable={canExecute}
             />
           </Card>
+
+          <BitacoraDeEstados organizationId={user.organizationId} workOrderId={wo.id} zona={zona} />
         </div>
 
         <div className="grid content-start gap-4">

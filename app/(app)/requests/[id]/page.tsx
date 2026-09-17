@@ -217,6 +217,13 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
                   {MAINTENANCE_TYPE_LABELS[solicitud.workOrder.maintenanceType]}
                 </Badge>
               </Fila>
+            ) : solicitud.status === "CONVERTED" ? (
+              <Fila label="Orden generada">
+                <span className="text-amber-700">
+                  Sin orden registrada. La solicitud figura como convertida pero no quedó ligada a ninguna OT;
+                  se reporta en la calidad de captura para que alguien la revise.
+                </span>
+              </Fila>
             ) : null}
           </dl>
         </Card>

@@ -14,6 +14,7 @@ const schema = z.object({
   otHorizonteDias: z.coerce.number().int().min(0).max(365).optional(),
   otDiasHabiles: z.boolean().optional(),
   otGeneracion: z.enum(["AUTOMATICA", "MANUAL"]).optional(),
+  otEvidenciaCriticas: z.boolean().optional(),
 });
 
 /** Como se arman las ordenes de trabajo en esta organizacion. */
@@ -27,6 +28,7 @@ export async function PATCH(request: Request) {
     if (datos.otHorizonteDias !== undefined) actualizacion.otHorizonteDias = datos.otHorizonteDias;
     if (datos.otDiasHabiles !== undefined) actualizacion.otDiasHabiles = datos.otDiasHabiles;
     if (datos.otGeneracion !== undefined) actualizacion.otGeneracion = datos.otGeneracion;
+    if (datos.otEvidenciaCriticas !== undefined) actualizacion.otEvidenciaCriticas = datos.otEvidenciaCriticas;
 
     if (!Object.keys(actualizacion).length) return ok({ sinCambios: true });
 
@@ -48,7 +50,9 @@ export async function PATCH(request: Request) {
           : "sin cambio"
       }, horizonte ${datos.otHorizonteDias ?? "sin cambio"} dias, dias ${
         datos.otDiasHabiles === undefined ? "sin cambio" : datos.otDiasHabiles ? "habiles" : "corridos"
-      }, generacion ${datos.otGeneracion ?? "sin cambio"}`,
+      }, generacion ${datos.otGeneracion ?? "sin cambio"}, evidencia en criticas ${
+        datos.otEvidenciaCriticas === undefined ? "sin cambio" : datos.otEvidenciaCriticas ? "encendida" : "apagada"
+      }`,
     });
 
     return ok({ organizacion: org });

@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit, notify } from "@/lib/audit";
 import { OPEN_STATUSES } from "@/lib/constants";
+import { revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
 
 const createSchema = z.object({
   title: z.string().min(3),
@@ -20,6 +21,7 @@ const createSchema = z.object({
   requiresShutdown: z.coerce.boolean().default(false),
   procedure: z.string().optional().nullable(),
   safetyNotes: z.string().optional().nullable(),
+  aceptarAdvertencias: z.boolean().optional(),
   tasks: z.array(z.object({ title: z.string().min(1), taskType: z.string().default("CHECK"), required: z.boolean().default(true) })).optional(),
 });
 
@@ -59,6 +61,28 @@ export async function POST(request: Request) {
     const asset = input.assetId
       ? await prisma.asset.findFirst({ where: { id: input.assetId, organizationId: orgId } })
       : null;
+
+    // Responsable y cuadrilla de la misma empresa: un id ajeno no puede entrar.
+    if (input.assignedToId) {
+      const existe = await prisma.user.count({ where: { id: input.assignedToId, organizationId: orgId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } } });
+      if (!existe) return fail("El responsable indicado no existe, está inactivo o su rol no ejecuta órdenes", 404);
+    }
+    if (input.teamId) {
+      const existe = await prisma.team.count({ where: { id: input.teamId, organizationId: orgId } });
+      if (!existe) return fail("La cuadrilla indicada no existe", 404);
+    }
+    if (input.locationId) {
+      const existe = await prisma.location.count({ where: { id: input.locationId, organizationId: orgId } });
+      if (!existe) return fail("La ubicación indicada no existe", 404);
+    }
+    const dueDate = parseDate(input.dueDate);
+    validarDatosDeProgramacion({ estimatedHours: input.estimatedHours, dueDate, scheduledStart: parseDate(input.scheduledStart) });
+    if (!input.aceptarAdvertencias) {
+      const revision = await revisarProgramacion({
+        organizationId: orgId, fecha: dueDate, responsableId: input.assignedToId || null, horas: input.estimatedHours,
+      });
+      if (revision.advertencias.length) return fail(revision.advertencias.join(" "), 409, { programacion: revision });
+    }
 
     const number = await nextWorkOrderNumber(orgId);
     const workOrder = await prisma.workOrder.create({

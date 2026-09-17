@@ -14,8 +14,10 @@ import { Button, Card } from "@/components/ui";
  * cuenta el siguiente cuando uno se cierra tarde.
  */
 export function ConfiguracionOrdenes({
-  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, generacion, editable,
+  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, generacion, evidenciaCriticas, editable,
 }: {
+  /** Pedir evidencia al completar ordenes de equipos criticos o de seguridad. */
+  evidenciaCriticas: boolean;
   multiOrigen: boolean;
   horizonteDias: number;
   /** CIERRE | PROGRAMADO. Desde donde se cuenta el siguiente preventivo. */
@@ -33,6 +35,7 @@ export function ConfiguracionOrdenes({
   const [dias, setDias] = useState(String(horizonteDias));
   const [desde, setDesde] = useState(recalculo === "PROGRAMADO" ? "PROGRAMADO" : "CIERRE");
   const [habiles, setHabiles] = useState(diasHabiles);
+  const [evidencia, setEvidencia] = useState(evidenciaCriticas);
   const [modo, setModo] = useState(generacion === "MANUAL" ? "MANUAL" : "AUTOMATICA");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -66,6 +69,7 @@ export function ConfiguracionOrdenes({
         recalculoPlan: desde,
         otDiasHabiles: habiles,
         otGeneracion: modo,
+        otEvidenciaCriticas: evidencia,
       }),
     });
     setGuardando(false);
@@ -107,6 +111,25 @@ export function ConfiguracionOrdenes({
             Los planes <b>por medidor</b> se siguen generando solos en los dos casos.
           </p>
         </div>
+
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={evidencia}
+            disabled={!editable}
+            onChange={(e) => setEvidencia(e.target.checked)}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="block text-xs font-medium text-slate-800">
+              Pedir evidencia al completar órdenes de equipos críticos o de seguridad
+            </span>
+            <span className="mt-0.5 block text-[0.6875rem] leading-relaxed text-slate-500">
+              Encendido, una orden de un equipo con criticidad A o de tipo seguridad no se puede
+              completar sin al menos una foto o documento adjunto. Las demás órdenes no la piden.
+            </span>
+          </span>
+        </label>
 
         <label className="flex cursor-pointer items-start gap-2.5">
           <input

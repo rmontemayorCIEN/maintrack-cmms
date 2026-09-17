@@ -136,6 +136,10 @@ export default async function RequestsPage() {
                         <Link href={`/work-orders/${request.workOrder.id}`} className="text-brand-600 hover:underline">
                           {request.workOrder.number}
                         </Link>
+                      ) : request.status === "CONVERTED" ? (
+                        <span className="text-amber-700" title="Marcada como convertida sin orden registrada: aparece en la calidad de captura para revisarla">
+                          Sin OT registrada
+                        </span>
                       ) : "—"}
                     </td>
                     {canReview ? (

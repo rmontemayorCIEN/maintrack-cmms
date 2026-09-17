@@ -26,6 +26,20 @@ import { diariasSinConfirmar, esquemaTarea } from "../lib/plan-tasks";
 import { reemplazarTareasConRastro as reemplazarTareas } from "../lib/tareas-con-rastro";
 import { formatDate, formatDateTime } from "../lib/utils";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 let fallas = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
   if (!ok) fallas++;
@@ -97,7 +111,7 @@ async function main() {
     revisar("terminada el día del compromiso a las 11 pm", et({ status: "COMPLETED", dueDate: diaUtc(-2), completedAt: new Date(medianocheEnZona(...(claveDiaEnZona(diaUtc(-2), "UTC").split("-").map(Number) as [number, number, number]), ZONA).getTime() + 23 * 3_600_000) }) === "Cumplida en fecha");
     revisar("terminada 4 días tarde", et({ status: "CLOSED", dueDate: diaUtc(-6), completedAt: new Date(ahora.getTime() - 2 * DIA) }) === "Terminada con 4 días de atraso", et({ status: "CLOSED", dueDate: diaUtc(-6), completedAt: new Date(ahora.getTime() - 2 * DIA) }));
     revisar("cancelada nunca es vencida", et({ status: "CANCELLED", dueDate: diaUtc(-30) }) === "Cancelada");
-    revisar("sin fecha compromiso", et({ status: "OPEN", dueDate: null }) === "Sin fecha compromiso");
+    revisar("sin fecha compromiso", et({ status: "OPEN", dueDate: null }) === "Sin programar");
 
     // ───────────────────────────────────────────────────── Indicadores ───
     console.log("\nIndicadores: un caso armado a mano");
@@ -174,14 +188,14 @@ async function main() {
     revisar("los datos de B no tocan los indicadores de A", kA.indicadores.costoMantenimiento.valor === 1700 && kA.indicadores.paroNoPlaneado.valor === 2.5 && kA.indicadores.mttr.valor === 4);
 
     const reabre = await prisma.workOrder.create({ data: { organizationId: orgB.id, number: "R1", title: "Reabrir", assetId: b1.id, maintenanceType: "CORRECTIVE", status: "IN_PROGRESS", startedAt: hace(1) } });
-    await transitionWorkOrder({ workOrderId: reabre.id, to: "COMPLETED", userId: userB.id, organizationId: orgB.id, downtimeMinutes: 45 });
-    await transitionWorkOrder({ workOrderId: reabre.id, to: "IN_PROGRESS", userId: userB.id, organizationId: orgB.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: reabre.id, to: "COMPLETED", userId: userB.id, organizationId: orgB.id, downtimeMinutes: 45 });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: reabre.id, to: "IN_PROGRESS", userId: userB.id, organizationId: orgB.id });
     const reabierta = await prisma.workOrder.findUniqueOrThrow({ where: { id: reabre.id } });
     revisar("reabrir borra la fecha de finalización", reabierta.completedAt === null);
     const pB = periodoIndicadores(30, ZONA, new Date());
     const kB1 = await calcularIndicadores(orgB.id, pB);
     revisar("una orden reabierta no cuenta como terminada", !kB1.indicadores.costoMantenimiento.detalle.some((r) => r.id === reabre.id));
-    await transitionWorkOrder({ workOrderId: reabre.id, to: "COMPLETED", userId: userB.id, organizationId: orgB.id, downtimeMinutes: 50 });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: reabre.id, to: "COMPLETED", userId: userB.id, organizationId: orgB.id, downtimeMinutes: 50 });
     const eventos = await prisma.downtimeEvent.findMany({ where: { workOrderId: reabre.id } });
     revisar("completar de nuevo corrige el paro en vez de duplicarlo", eventos.length === 1 && eventos[0].minutes === 50, eventos.map((e) => e.minutes));
     const bitacora = await prisma.auditLog.findFirst({ where: { organizationId: orgB.id, entityId: reabre.id, changes: { contains: "completedAtAnterior" } } });
@@ -377,12 +391,12 @@ async function main() {
 
     console.log("\nPredictivo: completar o cerrar la OT no toca la alerta");
     const otPred = await prisma.workOrder.findFirstOrThrow({ where: { organizationId: orgA.id, maintenanceType: "PREDICTIVE" } });
-    await transitionWorkOrder({ workOrderId: otPred.id, to: "IN_PROGRESS", userId: userA.id, organizationId: orgA.id });
-    await transitionWorkOrder({ workOrderId: otPred.id, to: "COMPLETED", userId: userA.id, organizationId: orgA.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otPred.id, to: "IN_PROGRESS", userId: userA.id, organizationId: orgA.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otPred.id, to: "COMPLETED", userId: userA.id, organizationId: orgA.id });
     al = await alertas();
     revisar("completada la OT con el punto crítico: la alerta sigue abierta y crítica",
       al.length === 1 && al[0].status === "OPEN" && al[0].severity === "CRITICAL" && al[0].normalizadaEl === null, al.map((x) => x.status));
-    await transitionWorkOrder({ workOrderId: otPred.id, to: "CLOSED", userId: userA.id, organizationId: orgA.id });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otPred.id, to: "CLOSED", userId: userA.id, organizationId: orgA.id });
     al = await alertas();
     revisar("cerrada la OT: la alerta sigue igual", al[0].status === "OPEN" && al[0].normalizadaEl === null);
     revisar("no se puede resolver mientras siga fuera de rango",

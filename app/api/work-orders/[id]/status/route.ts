@@ -22,10 +22,17 @@ const schema = z.object({
   rootCauseId: z.string().nullable().optional(),
   failureCodeId: z.string().nullable().optional(),
   downtimeMinutes: z.coerce.number().min(0).optional(),
+  motivo: z.string().trim().max(500).nullable().optional(),
+  tomarla: z.boolean().optional(),
+  motivoSinHoras: z.string().trim().max(500).nullable().optional(),
+  sinParoConfirmado: z.boolean().optional(),
+  motivoSinDiagnostico: z.string().trim().max(500).nullable().optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // El permiso de cada paso lo decide transitionWorkOrder con el rol: cerrar y
+  // reabrir piden mas que iniciar o completar.
   return withAuth("workorder:execute", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
     const workOrder = await transitionWorkOrder({
@@ -33,6 +40,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       to: input.status,
       userId: user.id,
       organizationId: orgId,
+      rol: user.role,
+      motivo: input.motivo,
+      tomarla: input.tomarla,
+      motivoSinHoras: input.motivoSinHoras,
+      sinParoConfirmado: input.sinParoConfirmado,
+      motivoSinDiagnostico: input.motivoSinDiagnostico,
       resolution: input.resolution,
       fallas: input.fallas,
       rootCauseId: input.rootCauseId,

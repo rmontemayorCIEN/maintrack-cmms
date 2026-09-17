@@ -51,6 +51,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (s.assetId && orden.assetId && s.assetId !== orden.assetId) {
         return fail("Ese reporte es de otro equipo.", 409);
       }
+      // Se aparta antes de crear la actividad: un doble clic, o dos personas a
+      // la vez, no pueden sumar el mismo reporte dos veces.
+      const apartado = await prisma.workRequest.updateMany({
+        where: { id: s.id, organizationId: orgId, status: "PENDING" },
+        data: { status: "CONVERTED", workOrderId: orden.id, reviewedById: user.id, reviewedAt: new Date() },
+      });
+      if (apartado.count === 0) return fail("El reporte ya fue atendido", 409);
       solicitud = s;
     } else {
       /**
@@ -102,16 +109,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         required: true,
       },
     });
-
-    if (input.modo === "EXISTENTE") {
-      await prisma.workRequest.update({
-        where: { id: solicitud.id },
-        data: {
-          status: "CONVERTED", workOrderId: orden.id,
-          reviewedById: user.id, reviewedAt: new Date(),
-        },
-      });
-    }
 
     await logAudit({
       organizationId: orgId,

@@ -175,6 +175,7 @@ export default async function SettingsPage({
           recalculo={org.recalculoPlan}
           diasHabiles={org.otDiasHabiles}
           generacion={org.otGeneracion}
+          evidenciaCriticas={org.otEvidenciaCriticas}
           jornadaDias={org.diasHabiles}
           editable={can(user.role, "settings:write")}
         />

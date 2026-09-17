@@ -24,6 +24,17 @@ import { revisarCalidad, type Hallazgo, type NivelRegla } from "./calidad-datos"
  * reparaciones de falla, en la orden o en cualquiera de sus actividades, y se
  * agregaron las reglas de datos imposibles. El indice de una misma cuenta
  * puede moverse respecto al anterior sin que su captura haya cambiado.
+ *
+ * Proceso de ordenes (Bloque 1 nuevo): el indice salia casi perfecto (98) con
+ * 15 ordenes terminadas sin horas y paros sin duracion, porque cada regla
+ * aportaba su porcentaje de cumplimiento y un 85 % se promediaba con veinte
+ * reglas al 100 %. Ahora las reglas `critica` —las que alimentan horas,
+ * costos, MTTR, paros y backlog— se califican con penalizacion triple:
+ *
+ *   calificacion = max(0, 100 − 3 × % de incumplimiento)
+ *
+ * 15 % de ordenes sin horas califica 55, no 85. Sigue siendo aritmetica
+ * auditable, sin IA.
  */
 
 export type Revision = {
@@ -36,9 +47,16 @@ export type Revision = {
   cumplidos: number;
   porcentaje: number;
   peso: number;
+  /** Regla del proceso de ordenes: su incumplimiento pesa el triple. */
+  critica: boolean;
+  /** Lo que aporta al indice: el porcentaje, o el penalizado si es critica. */
+  calificacion: number;
   enlace: string;
   hallazgos: Hallazgo[];
 };
+
+/** Cuantos puntos resta cada punto porcentual de incumplimiento en una regla critica. */
+export const FACTOR_CRITICA = 3;
 
 export type SaludDatos = {
   indice: number;
@@ -51,6 +69,8 @@ export async function saludDeDatos(organizationId: string, ahora = new Date()): 
   const reglas = await revisarCalidad(organizationId, ahora);
   const revisiones: Revision[] = reglas.map((r) => {
     const cumplidos = Math.max(0, r.total - r.cantidad);
+    // Sin redondear aqui: la calificacion penalizada se calcula sobre el valor real.
+    const porcentaje = r.total === 0 ? 100 : (cumplidos / r.total) * 100;
     return {
       clave: r.clave,
       titulo: r.titulo,
@@ -60,7 +80,9 @@ export async function saludDeDatos(organizationId: string, ahora = new Date()): 
       peso: r.peso,
       total: r.total,
       cumplidos,
-      porcentaje: r.total === 0 ? 100 : Math.round((cumplidos / r.total) * 100),
+      porcentaje: Math.floor(porcentaje),
+      critica: !!r.critica,
+      calificacion: r.critica ? Math.max(0, Math.round(100 - FACTOR_CRITICA * (100 - porcentaje))) : porcentaje,
       hallazgos: r.hallazgos,
     };
   });
@@ -70,7 +92,7 @@ export async function saludDeDatos(organizationId: string, ahora = new Date()): 
   const pesoTotal = aplicables.reduce((s, r) => s + r.peso, 0);
   const indice = pesoTotal === 0
     ? 0
-    : Math.round(aplicables.reduce((s, r) => s + r.porcentaje * r.peso, 0) / pesoTotal);
+    : Math.round(aplicables.reduce((s, r) => s + r.calificacion * r.peso, 0) / pesoTotal);
 
   const orden: Record<NivelRegla, number> = { ERROR: 0, ADVERTENCIA: 1, RECOMENDACION: 2 };
   return {
@@ -78,7 +100,7 @@ export async function saludDeDatos(organizationId: string, ahora = new Date()): 
     revisiones,
     huecos: aplicables
       .filter((r) => r.porcentaje < 100)
-      .sort((a, b) => orden[a.nivel] - orden[b.nivel] || (b.peso * (100 - b.porcentaje)) - (a.peso * (100 - a.porcentaje))),
+      .sort((a, b) => orden[a.nivel] - orden[b.nivel] || (b.peso * (100 - b.calificacion)) - (a.peso * (100 - a.calificacion))),
   };
 }
 

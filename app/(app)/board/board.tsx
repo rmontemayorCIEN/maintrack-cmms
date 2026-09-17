@@ -13,6 +13,7 @@ import {
   STATUS_TRANSITIONS,
   WO_STATUS_LABELS,
 } from "@/lib/constants";
+import { pideMotivo } from "@/lib/reglas-ot";
 import { cn, formatNumber } from "@/lib/utils";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 
@@ -36,6 +37,7 @@ export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: st
   const [items, setItems] = useState(workOrders);
   const [dragging, setDragging] = useState<Item | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorOrden, setErrorOrden] = useState<string | null>(null);
 
   async function move(item: Item, status: string) {
     if (item.status === status) return;
@@ -43,7 +45,24 @@ export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: st
       setError(`No se permite mover de ${WO_STATUS_LABELS[item.status]} a ${WO_STATUS_LABELS[status]}`);
       return;
     }
+    /**
+     * Arrastrar no alcanza para los pasos que piden datos: completar pide la
+     * solucion y las horas, pausar y cancelar piden motivo, e iniciar una orden
+     * sin responsable pide quien la toma. Esos se hacen desde la orden, donde
+     * estan los campos; mandarlos vacios solo produciria un rechazo.
+     */
+    const necesita =
+      status === "COMPLETED" ? "completarla (solución, horas y diagnóstico)"
+        : pideMotivo(item.status, status) ? "indicar el motivo"
+        : status === "IN_PROGRESS" && !item.assignee ? "elegir quién la toma"
+        : null;
+    if (necesita) {
+      setError(`Abra ${item.number} para ${necesita}.`);
+      setErrorOrden(item.id);
+      return;
+    }
     setError(null);
+    setErrorOrden(null);
     const previous = items;
     // Al completar, la fecha de finalizacion es ahora; al reabrir se borra,
     // igual que en el servidor. Asi la etiqueta no dice «Vencida» de algo hecho.
@@ -58,6 +77,7 @@ export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: st
     if (!res.ok) {
       const data = await res.json();
       setError(data.error ?? "No fue posible mover la orden");
+      setErrorOrden(item.id);
       setItems(previous);
       return;
     }
@@ -67,7 +87,12 @@ export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: st
   return (
     <>
       {error ? (
-        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{error}</p>
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {error}
+          {errorOrden ? (
+            <Link href={`/work-orders/${errorOrden}`} className="ml-2 font-medium underline">Abrir la orden</Link>
+          ) : null}
+        </p>
       ) : null}
 
       <div className="grid gap-3 overflow-x-auto lg:grid-cols-5">

@@ -1,8 +1,6 @@
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { notify } from "@/lib/audit";
-import { aprobarSolicitud, ErrorDeSolicitud } from "@/lib/solicitudes";
+import { aprobarSolicitud, ErrorDeSolicitud, rechazarSolicitud } from "@/lib/solicitudes";
 
 const schema = z.object({
   action: z.enum(["APPROVE", "REJECT"]),
@@ -36,37 +34,21 @@ const schema = z.object({
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return withAuth("request:review", async ({ user, orgId }) => {
-    const workRequest = await prisma.workRequest.findFirst({
-      where: { id, organizationId: orgId },
-      include: { asset: true },
-    });
-    if (!workRequest) return fail("Solicitud no encontrada", 404);
-    if (workRequest.status !== "PENDING") return fail("La solicitud ya fue revisada", 409);
-
     const input = schema.parse(await request.json());
 
-    if (input.action === "REJECT") {
-      const updated = await prisma.workRequest.update({
-        where: { id },
-        data: {
-          status: "REJECTED",
-          reviewedById: user.id,
-          reviewedAt: new Date(),
-          reviewNotes: input.reviewNotes,
-        },
-      });
-      if (workRequest.requestedById) {
-        await notify({
+    try {
+      if (input.action === "REJECT") {
+        const updated = await rechazarSolicitud({
           organizationId: orgId,
-          userId: workRequest.requestedById,
-          title: `Solicitud ${workRequest.number} rechazada`,
-          body: input.reviewNotes ?? undefined,
-          link: "/requests",
-          kind: "WARNING",
-          tag: workRequest.number,
+          userId: user.id,
+          solicitudId: id,
+          motivo: input.reviewNotes ?? "",
         });
+        return ok({ request: updated });
       }
-      return ok({ request: updated });
+    } catch (e) {
+      if (e instanceof ErrorDeSolicitud) return fail(e.message, e.codigo);
+      throw e;
     }
 
     /**

@@ -49,17 +49,16 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
   });
   if (!solicitud) throw new ErrorDeSolicitud("Solicitud no encontrada", 404);
   if (solicitud.status !== "PENDING") {
-    throw new ErrorDeSolicitud("La solicitud ya fue revisada", 409);
+    throw new ErrorDeSolicitud(yaRevisada(solicitud.status), 409);
   }
 
   /**
    * El equipo se guarda en la SOLICITUD antes de convertirla.
    *
    * La orden lo copia de ahi, y la solicitud conserva a que equipo se refirio
-   * —que es lo que despues explica su historia—. Hasta hoy no habia donde
-   * ponerlo: una solicitud sin equipo se volvia una orden SIN ACTIVO, para
-   * siempre. Esa orden no entra al expediente de ningun equipo, no cuenta en
-   * su Pareto y no suma a su costo de paro. Se veia bien y desaparecia.
+   * —que es lo que despues explica su historia—. Una solicitud sin equipo se
+   * volvia una orden SIN ACTIVO, para siempre: no entraba al expediente de
+   * ningun equipo, no contaba en su Pareto y no sumaba a su costo de paro.
    */
   let assetId = solicitud.assetId;
   let siteId = solicitud.siteId;
@@ -80,45 +79,69 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
     // si el reporte entro por el punto general, no traia ninguno de los dos.
     siteId = asset?.siteId ?? solicitud.siteId;
     locationId = asset?.locationId ?? solicitud.locationId;
-    await prisma.workRequest.update({
-      where: { id: solicitud.id },
-      data: { assetId, siteId, locationId },
+  }
+
+  if (p.assignedToId) {
+    const responsable = await prisma.user.count({
+      where: { id: p.assignedToId, organizationId: p.organizationId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } },
     });
+    if (!responsable) throw new ErrorDeSolicitud("El responsable indicado no existe, está inactivo o su rol no ejecuta órdenes", 404);
   }
 
   const tipoFinal = p.tipo ?? solicitud.tipo;
 
-  /**
-   * El reporte se atiende como ACTIVIDAD, no como encabezado.
-   *
-   * Antes la conversion creaba una OT vacia y el codigo de falla se capturaba
-   * arriba. Eso impedia que una misma orden atendiera dos reportes: un
-   * encabezado no puede tener dos causas.
-   */
-  let workOrder: { id: string; number: string };
-
+  let destino: { id: string; number: string } | null = null;
   if (p.workOrderId) {
-    const destino = await prisma.workOrder.findFirst({
+    const orden = await prisma.workOrder.findFirst({
       where: { id: p.workOrderId, organizationId: p.organizationId },
       select: { id: true, number: true, status: true, assetId: true },
     });
-    if (!destino) throw new ErrorDeSolicitud("La orden de trabajo no existe", 404);
-    if (["COMPLETED", "CANCELLED"].includes(destino.status)) {
-      throw new ErrorDeSolicitud("Esa orden ya esta cerrada. Elija otra o abra una nueva.", 409);
+    if (!orden) throw new ErrorDeSolicitud("La orden de trabajo no existe", 404);
+    if (["COMPLETED", "CLOSED", "CANCELLED"].includes(orden.status)) {
+      throw new ErrorDeSolicitud("Esa orden ya está terminada o cancelada. Elija otra o abra una nueva.", 409);
     }
     // Sumar a una orden de otro equipo mezclaria el historial de dos activos.
-    if (assetId && destino.assetId && assetId !== destino.assetId) {
+    if (assetId && orden.assetId && assetId !== orden.assetId) {
       throw new ErrorDeSolicitud(
         "La orden es de otro equipo. El reporte debe ir a una orden del mismo activo.",
         409,
       );
     }
-    workOrder = destino;
-  } else {
-    workOrder = await prisma.workOrder.create({
+    destino = orden;
+  }
+
+  const ahora = new Date();
+  /**
+   * Todo en una transaccion, y lo PRIMERO es apartar la solicitud.
+   *
+   * Antes se revisaba «esta pendiente» y luego se creaba la orden: dos clics
+   * seguidos pasaban los dos la revision y salian dos ordenes para un mismo
+   * reporte. Ahora el cambio a CONVERTED solo lo gana quien la encuentra
+   * todavia pendiente; el segundo no aparta nada y no crea nada. Si algo falla
+   * a la mitad, la transaccion regresa la solicitud a pendiente sin orden.
+   */
+  const { updated, workOrder } = await prisma.$transaction(async (tx) => {
+    const apartada = await tx.workRequest.updateMany({
+      where: { id: solicitud.id, organizationId: p.organizationId, status: "PENDING" },
+      data: {
+        status: "CONVERTED",
+        tipo: tipoFinal,
+        assetId, siteId, locationId,
+        reviewedById: p.userId,
+        reviewedAt: ahora,
+        reviewNotes: p.reviewNotes,
+      },
+    });
+    if (apartada.count === 0) throw new ErrorDeSolicitud(yaRevisada("CONVERTED"), 409);
+
+    /**
+     * El reporte se atiende como ACTIVIDAD, no como encabezado: asi una misma
+     * orden puede atender dos reportes, cada uno con su propia causa.
+     */
+    const workOrder = destino ?? await tx.workOrder.create({
       data: {
         organizationId: p.organizationId,
-        number: await nextWorkOrderNumber(p.organizationId),
+        number: await nextWorkOrderNumber(p.organizationId, tx),
         title: solicitud.title,
         description: solicitud.description,
         // Del tipo de la solicitud, no a fuego: una mejora o un apoyo no deben
@@ -136,36 +159,30 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
       },
       select: { id: true, number: true },
     });
-  }
 
-  const ultima = await prisma.workOrderTask.aggregate({
-    where: { workOrderId: workOrder.id },
-    _max: { position: true },
-  });
-  await prisma.workOrderTask.create({
-    data: {
-      workOrderId: workOrder.id,
-      position: (ultima._max.position ?? -1) + 1,
-      origen: "SOLICITUD",
-      origenRequestId: solicitud.id,
-      maintenanceType: tipoDeTrabajo(tipoFinal),
-      title: solicitud.title,
-      description: solicitud.description,
-      taskType: "CHECK",
-      required: true,
-    },
-  });
+    const ultima = await tx.workOrderTask.aggregate({
+      where: { workOrderId: workOrder.id },
+      _max: { position: true },
+    });
+    await tx.workOrderTask.create({
+      data: {
+        workOrderId: workOrder.id,
+        position: (ultima._max.position ?? -1) + 1,
+        origen: "SOLICITUD",
+        origenRequestId: solicitud.id,
+        maintenanceType: tipoDeTrabajo(tipoFinal),
+        title: solicitud.title,
+        description: solicitud.description,
+        taskType: "CHECK",
+        required: true,
+      },
+    });
 
-  const updated = await prisma.workRequest.update({
-    where: { id: solicitud.id },
-    data: {
-      status: "CONVERTED",
-      tipo: tipoFinal,
-      reviewedById: p.userId,
-      reviewedAt: new Date(),
-      reviewNotes: p.reviewNotes,
-      workOrderId: workOrder.id,
-    },
+    const updated = await tx.workRequest.update({
+      where: { id: solicitud.id },
+      data: { workOrderId: workOrder.id },
+    });
+    return { updated, workOrder };
   });
 
   await logAudit({
@@ -174,7 +191,8 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
     entity: "WorkRequest",
     entityId: solicitud.id,
     action: "CONVERTED",
-    summary: `${solicitud.number} → ${workOrder.number}`,
+    summary: `${solicitud.number} → ${workOrder.number}${destino ? " (sumada a una orden existente)" : ""}`,
+    changes: { workOrderId: workOrder.id, tipo: tipoFinal, assetId, revisadaPor: p.userId },
   });
 
   if (solicitud.requestedById) {
@@ -190,4 +208,63 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
   }
 
   return { request: updated, workOrder };
+}
+
+function yaRevisada(status: string) {
+  return status === "REJECTED"
+    ? "La solicitud ya fue rechazada."
+    : status === "CONVERTED"
+      ? "La solicitud ya se convirtió en orden de trabajo."
+      : "La solicitud ya fue revisada.";
+}
+
+/**
+ * Rechazar una solicitud. Exige motivo: quien reporto merece saber por que no
+ * se atiende, y sin motivo el rechazo no se puede auditar.
+ */
+export async function rechazarSolicitud(p: {
+  organizationId: string;
+  userId: string;
+  solicitudId: string;
+  motivo: string;
+}) {
+  const motivo = p.motivo?.trim() ?? "";
+  if (motivo.length < 5) throw new ErrorDeSolicitud("Indique el motivo del rechazo.", 422);
+  const solicitud = await prisma.workRequest.findFirst({
+    where: { id: p.solicitudId, organizationId: p.organizationId },
+  });
+  if (!solicitud) throw new ErrorDeSolicitud("Solicitud no encontrada", 404);
+
+  // Mismo apartado atomico que al convertir: un rechazo y una conversion a la
+  // vez no pueden ganar los dos.
+  const apartada = await prisma.workRequest.updateMany({
+    where: { id: solicitud.id, organizationId: p.organizationId, status: "PENDING" },
+    data: { status: "REJECTED", reviewedById: p.userId, reviewedAt: new Date(), reviewNotes: motivo },
+  });
+  if (apartada.count === 0) {
+    const actual = await prisma.workRequest.findUnique({ where: { id: solicitud.id }, select: { status: true } });
+    throw new ErrorDeSolicitud(yaRevisada(actual?.status ?? ""), 409);
+  }
+
+  await logAudit({
+    organizationId: p.organizationId,
+    userId: p.userId,
+    entity: "WorkRequest",
+    entityId: solicitud.id,
+    action: "REJECTED",
+    summary: `${solicitud.number} rechazada — ${motivo}`,
+    changes: { motivo },
+  });
+  if (solicitud.requestedById) {
+    await notify({
+      organizationId: p.organizationId,
+      userId: solicitud.requestedById,
+      title: `Solicitud ${solicitud.number} rechazada`,
+      body: motivo,
+      link: "/requests",
+      kind: "WARNING",
+      tag: solicitud.number,
+    });
+  }
+  return prisma.workRequest.findUniqueOrThrow({ where: { id: solicitud.id } });
 }

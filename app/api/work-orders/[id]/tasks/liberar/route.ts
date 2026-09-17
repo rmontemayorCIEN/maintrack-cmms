@@ -27,6 +27,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   return withAuth("workorder:execute", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
 
+    // «Otro motivo» sin explicar no dice nada a quien la retome.
+    if (input.motivo === "OTRO" && (input.detalle?.trim().length ?? 0) < 5) {
+      return fail("Explique el motivo: «Otro motivo» necesita el detalle.", 422);
+    }
     const task = await prisma.workOrderTask.findFirst({
       where: { id: input.taskId, workOrderId: id, workOrder: { organizationId: orgId } },
       select: { id: true, title: true, done: true, liberadaAt: true, workOrder: { select: { number: true, status: true } } },
@@ -36,8 +40,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (task.done) {
       return fail("Esa actividad ya se marco como hecha. Desmarquela antes de liberarla.", 409);
     }
-    if (["CLOSED", "CANCELLED"].includes(task.workOrder.status)) {
-      return fail("La orden ya esta cerrada; no se pueden liberar actividades.", 409);
+    if (["COMPLETED", "CLOSED", "CANCELLED"].includes(task.workOrder.status)) {
+      return fail("La orden ya está terminada; no se pueden liberar actividades.", 409);
     }
 
     // La refaccion solo tiene sentido con ese motivo, y debe ser de la misma

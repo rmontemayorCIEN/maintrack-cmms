@@ -18,8 +18,7 @@
  * alguien los revise. Corregir en automatico seria esconder la inconsistencia.
  */
 import { prisma } from "./db";
-import { filtroDeFalla } from "./fallas";
-import { ESTADOS_TERMINADOS } from "./vencimiento";
+import { filtrosDelProceso, DIAS_PARA_CERRAR } from "./saneamiento-ot";
 
 const DIA = 86_400_000;
 const HORA = 3_600_000;
@@ -42,6 +41,12 @@ export type ResultadoRegla = {
   enlace: string;
   /** Peso en el indice de captura. */
   peso: number;
+  /**
+   * Regla del proceso de ordenes que alimenta directamente horas, costos,
+   * MTTR, paros o backlog. Su incumplimiento pesa el triple en el indice (ver
+   * `lib/salud-datos.ts`): un 15 % de ordenes sin horas no es «85 % bien».
+   */
+  critica?: boolean;
   /** Universo revisado (lo que DEBERIA cumplir). */
   total: number;
   /** Cuantos no cumplen. */
@@ -84,17 +89,18 @@ export function validarFechasDeActivo(
 }
 
 export async function revisarCalidad(organizationId: string, ahora = new Date()): Promise<ResultadoRegla[]> {
-  const terminadas = { organizationId, status: { in: [...ESTADOS_TERMINADOS] } };
-  // La regla unica de falla; su `status` se sustituye por el de terminadas.
-  const { status: _sinCanceladas, ...esFallaWhere } = await filtroDeFalla(organizationId);
+  // Los huecos del proceso de ordenes: el mismo filtro que la lista de saneamiento.
+  const f = await filtrosDelProceso(organizationId, ahora);
   const selOt = { id: true, number: true, title: true } as const;
   const selActivo = { id: true, code: true, name: true } as const;
   const enServicio = { organizationId, active: true, status: { not: "RETIRED" } };
 
   const [
     nTerminadas, sinHoras,
-    nFallas, fallasSinCausa,
+    nFallas, fallasSinDiagnostico,
     nConParo, paroSinDuracion, eventosSinMinutos,
+    nActivas, activasSinResponsable, nCompletadas, completadasSinCerrar,
+    nConvertidas, solicitudesHuerfanas, nActividadesTerminadas, actividadesSinResolver,
     costosNegativos, laborNegativa, partesNegativas,
     stockNegativo, minimosInvalidos, nRefacciones, refaccionesSinCosto, refaccionesSinMinimo,
     nCriticos, criticosSinPlan,
@@ -104,29 +110,34 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     fechasDeActivo,
     medidores, nMedidores, medidoresSinLectura,
     alertas,
-    nCorrectivas, correctivasSinFalla,
     nOrdenes, nConFechas, nParosCerrados, nExistencias,
   ] = await Promise.all([
-    prisma.workOrder.count({ where: terminadas }),
-    prisma.workOrder.findMany({ where: { ...terminadas, actualHours: { lte: 0 }, labor: { none: {} } }, select: selOt }),
+    prisma.workOrder.count({ where: f.terminadas }),
+    prisma.workOrder.findMany({ where: f.sinHoras, select: selOt }),
 
-    prisma.workOrder.count({ where: { ...terminadas, ...esFallaWhere } }),
-    prisma.workOrder.findMany({
-      where: { ...terminadas, ...esFallaWhere, rootCauseId: null, tasks: { none: { rootCauseId: { not: null } } } },
-      select: selOt,
-    }),
+    prisma.workOrder.count({ where: f.fallasTerminadas }),
+    prisma.workOrder.findMany({ where: f.fallasSinDiagnostico, select: selOt }),
 
-    prisma.workOrder.count({ where: { ...terminadas, requiresShutdown: true } }),
-    prisma.workOrder.findMany({
-      where: {
-        ...terminadas, requiresShutdown: true, downtimeMinutes: { lte: 0 },
-        downtimes: { none: { minutes: { gt: 0 } } }, tasks: { none: { downtimeMinutes: { gt: 0 } } },
-      },
-      select: selOt,
-    }),
+    prisma.workOrder.count({ where: f.conParo }),
+    prisma.workOrder.findMany({ where: f.paroSinDuracion, select: selOt }),
     prisma.downtimeEvent.findMany({
       where: { asset: { organizationId }, minutes: { lte: 0 } },
       select: { id: true, startedAt: true, asset: { select: selActivo } },
+    }),
+
+    prisma.workOrder.count({ where: f.activas }),
+    prisma.workOrder.findMany({ where: f.activasSinResponsable, select: selOt }),
+    prisma.workOrder.count({ where: f.completadas }),
+    prisma.workOrder.findMany({ where: f.completadasSinCerrar, select: { ...selOt, completedAt: true } }),
+    prisma.workRequest.count({ where: f.convertidas }),
+    prisma.workRequest.findMany({
+      where: f.solicitudesHuerfanas,
+      select: { id: true, number: true, title: true, workOrder: { select: { number: true } } },
+    }),
+    prisma.workOrderTask.count({ where: f.actividadesDeTerminadas }),
+    prisma.workOrderTask.findMany({
+      where: f.actividadesSinResolver,
+      select: { id: true, title: true, workOrder: { select: selOt } },
     }),
 
     prisma.workOrder.findMany({
@@ -226,11 +237,6 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       select: { id: true, title: true, createdAt: true, projectedFailureAt: true, fechaCruceCritico: true, fechaCruceAdvertencia: true },
     }),
 
-    prisma.workOrder.count({ where: { ...terminadas, maintenanceType: "CORRECTIVE" } }),
-    prisma.workOrder.findMany({
-      where: { ...terminadas, maintenanceType: "CORRECTIVE", failureCodeId: null, tasks: { none: { failureCodeId: { not: null } } } },
-      select: selOt,
-    }),
 
     // Universos de las reglas de error, para que un solo registro malo pese lo
     // que pesa y no tumbe el indice completo.
@@ -322,19 +328,37 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       enlace: "/meters", peso: 2, total: nMedidores }, medidoresImposibles),
 
     // ── Advertencias ──
-    regla({ clave: "ot-sin-horas", titulo: "Órdenes terminadas sin horas reales", nivel: "ADVERTENCIA",
-      porque: "Sin horas no hay costo de mano de obra, MTTR ni productividad medible.",
-      enlace: "/work-orders", peso: 2, total: nTerminadas }, sinHoras.map((o) => ot(o))),
-    regla({ clave: "fallas-sin-causa", titulo: "Reparaciones de falla sin causa raíz", nivel: "ADVERTENCIA",
-      porque: "Sin causa raíz no hay análisis de fallas: se repara lo mismo una y otra vez.",
-      enlace: "/work-orders", peso: 3, total: nFallas }, fallasSinCausa.map((o) => ot(o))),
-    regla({ clave: "paro-sin-duracion", titulo: "Paros sin duración", nivel: "ADVERTENCIA",
+    regla({ clave: "ot-sin-horas", titulo: "Órdenes terminadas sin horas reales", nivel: "ADVERTENCIA", critica: true,
+      porque: "Sin horas no hay costo de mano de obra, MTTR ni productividad medible. Una excepción justificada al completar no cuenta aquí.",
+      enlace: "/work-orders", peso: 3, total: nTerminadas }, sinHoras.map((o) => ot(o))),
+    regla({ clave: "fallas-sin-diagnostico", titulo: "Correctivas sin diagnóstico (código de falla y causa raíz)", nivel: "ADVERTENCIA", critica: true,
+      porque: "Sin código y causa no hay análisis de fallas: se repara lo mismo una y otra vez. «Sin determinar» con justificación no cuenta aquí.",
+      enlace: "/work-orders", peso: 3, total: nFallas }, fallasSinDiagnostico.map((o) => ot(o))),
+    regla({ clave: "paro-sin-duracion", titulo: "Paros sin duración", nivel: "ADVERTENCIA", critica: true,
       porque: "Una orden que requirió parar el equipo sin minutos de paro esconde pérdida de disponibilidad.",
       enlace: "/work-orders", peso: 2, total: nConParo + eventosSinMinutos.length },
     [
       ...paroSinDuracion.map((o) => ot(o, "requirió paro y no registra duración")),
       ...eventosSinMinutos.map((e) => activo(e.asset, `evento de paro de 0 minutos (${e.startedAt.toISOString().slice(0, 10)})`)),
     ]),
+    regla({ clave: "activas-sin-responsable", titulo: "Órdenes activas sin responsable", nivel: "ADVERTENCIA", critica: true,
+      porque: "Trabajo que nadie tiene en su carga: no aparece en la programación de ninguna persona y se queda sin atender.",
+      enlace: "/backlog", peso: 2, total: nActivas }, activasSinResponsable.map((o) => ot(o))),
+    regla({ clave: "solicitudes-sin-ot", titulo: "Solicitudes convertidas sin orden de trabajo", nivel: "ADVERTENCIA", critica: true,
+      porque: "Quien reportó cree que ya se atiende, pero no hay orden viva que lo haga.",
+      enlace: "/requests", peso: 2, total: nConvertidas },
+    solicitudesHuerfanas.map((r) => ({
+      id: r.id, etiqueta: `${r.number} · ${r.title}`,
+      detalle: r.workOrder ? `ligada a ${r.workOrder.number}, cancelada` : "sin orden registrada",
+      enlace: `/requests/${r.id}`,
+    }))),
+    regla({ clave: "actividades-sin-resolver", titulo: "Actividades sin resolver en órdenes terminadas", nivel: "ADVERTENCIA", critica: true,
+      porque: "Ni se hicieron ni se enviaron al backlog: trabajo que se pierde de vista.",
+      enlace: "/backlog", peso: 2, total: nActividadesTerminadas },
+    actividadesSinResolver.map((t) => ot(t.workOrder, `«${t.title}»`))),
+    regla({ clave: "completadas-sin-cerrar", titulo: `Completadas sin cierre administrativo (más de ${DIAS_PARA_CERRAR} días)`, nivel: "RECOMENDACION",
+      porque: "Mientras nadie valida horas, paros y costos, la cifra de la orden puede estar mal y nadie lo revisa.",
+      enlace: "/work-orders", peso: 1, total: nCompletadas }, completadasSinCerrar.map((o) => ot(o))),
     regla({ clave: "criticos-sin-plan", titulo: "Activos críticos sin plan", nivel: "ADVERTENCIA",
       porque: "Un equipo crítico sin plan solo recibe correctivo: nunca se adelanta a la falla.",
       enlace: "/plans", peso: 3, total: nCriticos }, criticosSinPlan.map((a) => activo(a))),
@@ -351,9 +375,6 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       enlace: "/alerts", peso: 1, total: alertas.length }, alertasIncoherentes),
 
     // ── Recomendaciones ──
-    regla({ clave: "correctivas-sin-falla", titulo: "Correctivas sin código de falla", nivel: "RECOMENDACION",
-      porque: "Es lo que permite ver qué modo de falla domina en la planta.",
-      enlace: "/work-orders", peso: 2, total: nCorrectivas }, correctivasSinFalla.map((o) => ot(o))),
     regla({ clave: "activos-sin-plan", titulo: "Activos sin plan de mantenimiento", nivel: "RECOMENDACION",
       porque: "Un activo sin plan solo genera trabajo correctivo.",
       enlace: "/plans", peso: 2, total: nActivos },

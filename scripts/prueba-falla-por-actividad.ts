@@ -11,6 +11,20 @@ import { prisma } from "../lib/db";
 import { transitionWorkOrder, recalcWorkOrder } from "../lib/workorders";
 import { fallasCodificadas, agruparPorCodigo } from "../lib/fallas";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
   console.log(`  ${ok ? "ok  " : "FALLA"}  ${afirmacion}${detalle ? `  → ${detalle}` : ""}`);
@@ -94,7 +108,7 @@ async function main() {
     // ── El cierre: una causa por cada falla ──────────────────────────────────
     const fuga = tareas.find((t) => t.title === "Fuga por el sello")!;
     const ruido = tareas.find((t) => t.title === "Ruido en el motor")!;
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: ot.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
       resolution: "Se cambio filtro, sello y se ajusto el motor",
       fallas: [
@@ -175,7 +189,7 @@ async function main() {
     await prisma.workOrderTask.create({
       data: { workOrderId: limpia.id, position: 0, origen: "PLAN", maintenanceType: "PREVENTIVE", title: "Revisar", done: true },
     });
-    await transitionWorkOrder({
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA,
       workOrderId: limpia.id, to: "COMPLETED", userId: user.id, organizationId: org.id,
       resolution: "Todo en orden", fallas: [],
     });

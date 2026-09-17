@@ -25,6 +25,20 @@ import {
 } from "../lib/calendario-actividad";
 import { startOfDay, addDays } from "../lib/utils";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: string) {
   console.log(`  ${ok ? "ok  " : "FALLA"}  ${afirmacion}${detalle ? `  → ${detalle}` : ""}`);
@@ -38,7 +52,7 @@ const enDias = (n: number) => iso(addDays(HOY, n));
 /** Una OT no salta de OPEN a COMPLETED: pasa por IN_PROGRESS, como en la vida. */
 async function cerrar(workOrderId: string, organizationId: string, userId: string) {
   for (const to of ["IN_PROGRESS", "COMPLETED"]) {
-    await transitionWorkOrder({ workOrderId, to, userId, organizationId });
+    await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId, to, userId, organizationId });
   }
 }
 

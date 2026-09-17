@@ -1,5 +1,6 @@
 "use client";
 
+import { AdvertenciasProgramacion, type RevisionProgramacion } from "@/components/advertencias-programacion";
 import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -64,6 +65,12 @@ export function EditarOrden({
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState<RevisionProgramacion | null>(null);
+  const [aceptar, setAceptar] = useState(false);
+  const [motivoReprogramacion, setMotivoReprogramacion] = useState("");
+  const fechaOriginal = fecha(orden.dueDate, zona);
+  // Mover la fecha compromiso de una orden ya programada pide el motivo.
+  const reprograma = !!fechaOriginal && v.dueDate !== fechaOriginal;
 
   const set = (c: Partial<typeof v>) => setV((p) => ({ ...p, ...c }));
 
@@ -88,11 +95,17 @@ export function EditarOrden({
         requiresShutdown: v.requiresShutdown,
         procedure: v.procedure || null,
         safetyNotes: v.safetyNotes || null,
+        motivoReprogramacion: reprograma ? motivoReprogramacion : null,
+        aceptarAdvertencias: aceptar,
       }),
     });
     const data = await res.json().catch(() => ({}));
     setGuardando(false);
-    if (!res.ok) { setError(data.error ?? "No fue posible guardar"); return; }
+    if (!res.ok) {
+      if (data.details?.programacion) { setRevision(data.details.programacion); setAceptar(false); return; }
+      setError(data.error ?? "No fue posible guardar");
+      return;
+    }
     setAbierto(false);
     router.refresh();
   }
@@ -214,6 +227,25 @@ export function EditarOrden({
               </div>
             </div>
 
+            {reprograma ? (
+              <div className="mt-3">
+                <label className="text-[0.6875rem] font-medium text-slate-600">Motivo de la reprogramación *</label>
+                <input value={motivoReprogramacion} onChange={(e) => setMotivoReprogramacion(e.target.value)}
+                  placeholder="Por qué cambia la fecha compromiso"
+                  className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs" />
+              </div>
+            ) : null}
+            {revision ? (
+              <div className="mt-3">
+                <AdvertenciasProgramacion
+                  revision={revision}
+                  aceptada={aceptar}
+                  onAceptar={setAceptar}
+                  onUsarFecha={(f) => { set({ dueDate: f }); setRevision(null); }}
+                  onUsarPersona={(id) => { set({ assignedToId: id }); setRevision(null); }}
+                />
+              </div>
+            ) : null}
             {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p> : null}
 
             <div className="mt-4 flex justify-end gap-2">

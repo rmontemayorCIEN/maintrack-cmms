@@ -43,6 +43,12 @@ export async function withAuth<T>(
     if (error instanceof z.ZodError) {
       return fail(mensajeDeValidacion(error), 422, error.flatten());
     }
+    // Los errores de regla de negocio traen su codigo HTTP (ErrorDeOrden,
+    // ErrorDeSolicitud, ErrorDeAgenda): son mensajes para la persona, no fallas.
+    if (error instanceof Error && typeof (error as { codigo?: unknown }).codigo === "number") {
+      const e = error as Error & { codigo: number; detalles?: unknown };
+      return fail(e.message, e.codigo, e.detalles);
+    }
     const message = error instanceof Error ? error.message : "Error interno";
     console.error("[api]", message);
     return fail(message, 500);

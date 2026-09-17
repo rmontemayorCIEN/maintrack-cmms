@@ -97,17 +97,8 @@ export const WO_STATUS_COLORS: Record<string, string> = {
 export const OPEN_STATUSES = ["DRAFT", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"];
 export const BOARD_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD", "COMPLETED"];
 
-/** Transiciones permitidas del flujo de una orden de trabajo. */
-export const STATUS_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ["OPEN", "CANCELLED"],
-  OPEN: ["ASSIGNED", "IN_PROGRESS", "ON_HOLD", "CANCELLED"],
-  ASSIGNED: ["IN_PROGRESS", "ON_HOLD", "OPEN", "CANCELLED"],
-  IN_PROGRESS: ["COMPLETED", "ON_HOLD", "CANCELLED"],
-  ON_HOLD: ["IN_PROGRESS", "ASSIGNED", "OPEN", "CANCELLED"],
-  COMPLETED: ["CLOSED", "IN_PROGRESS"],
-  CLOSED: [],
-  CANCELLED: ["OPEN"],
-};
+/** Transiciones del flujo de una orden de trabajo: viven en `lib/reglas-ot.ts`. */
+export { TRANSICIONES_OT as STATUS_TRANSITIONS } from "./reglas-ot";
 
 export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 export const PRIORITY_LABELS: Record<string, string> = {

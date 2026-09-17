@@ -6,6 +6,7 @@ export type Permission =
   | "workorder:write"
   | "workorder:close"
   | "workorder:execute"
+  | "workorder:reopen"
   | "request:create"
   | "request:review"
   | "inventory:write"
@@ -22,8 +23,12 @@ const MATRIX: Record<Permission, string[]> = {
   "asset:write": ["OWNER", "ADMIN", "SUPERVISOR"],
   "plan:write": ["OWNER", "ADMIN", "SUPERVISOR"],
   "workorder:write": ["OWNER", "ADMIN", "SUPERVISOR"],
+  // Completar (cierre tecnico) lo hace quien ejecuta; cerrar (cierre
+  // administrativo) lo valida el supervisor; reabrir una orden ya cerrada es
+  // una excepcion y la gestiona la administracion.
   "workorder:close": ["OWNER", "ADMIN", "SUPERVISOR"],
   "workorder:execute": ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"],
+  "workorder:reopen": ["OWNER", "ADMIN"],
   "request:create": ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN", "REQUESTER"],
   "request:review": ["OWNER", "ADMIN", "SUPERVISOR"],
   "inventory:write": ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"],

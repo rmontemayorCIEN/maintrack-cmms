@@ -1,6 +1,12 @@
 import { prisma } from "./db";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "./almacen";
-import { STATUS_TRANSITIONS } from "./constants";
+import { can } from "./rbac";
+import { esFalla, tipoDeActividad } from "./fallas";
+import { WO_STATUS_LABELS } from "./constants";
+import {
+  esTransicionPosible, faltantesDeCierre, motivoValido, permisoDeTransicion, pideMotivo,
+  type DatosDeCierre,
+} from "./reglas-ot";
 import { rollForwardPlan } from "./scheduler";
 import { avanzarActividadesDeOrden } from "./calendario-actividad";
 import { logAudit, notify } from "./audit";
@@ -98,24 +104,151 @@ export async function actividadValida(
   return t?.id ?? null;
 }
 
-export function canTransition(from: string, to: string) {
-  return STATUS_TRANSITIONS[from]?.includes(to) ?? false;
+/** Un paso del ciclo que no procede. Trae su codigo HTTP y, si aplica, la lista de faltantes. */
+export class ErrorDeOrden extends Error {
+  constructor(mensaje: string, readonly codigo: number = 409, readonly detalles?: string[]) {
+    super(mensaje);
+    this.name = "ErrorDeOrden";
+  }
+}
+
+type OrdenParaCierre = {
+  maintenanceType: string;
+  requiresShutdown: boolean;
+  resolution: string | null;
+  failureCodeId: string | null;
+  rootCauseId: string | null;
+  downtimeMinutes: number;
+  motivoSinHoras: string | null;
+  sinParoConfirmado: boolean;
+  motivoSinDiagnostico: string | null;
+  tasks: Array<{
+    id: string; title: string; done: boolean; liberadaAt: Date | null; maintenanceType: string | null;
+    failureCodeId: string | null; rootCauseId: string | null; downtimeMinutes: number;
+  }>;
+};
+
+/**
+ * Arma lo que `faltantesDeCierre` revisa, con lo guardado en la orden y —al
+ * completar— lo que llega en el formulario encima. Un solo armado para
+ * completar y para cerrar: las dos preguntas son la misma.
+ */
+export function datosDeCierre(
+  wo: OrdenParaCierre,
+  extra: {
+    horas: number;
+    archivos: number;
+    evidenciaRequerida: boolean;
+    resolution?: string | null;
+    motivoSinHoras?: string | null;
+    sinParoConfirmado?: boolean;
+    motivoSinDiagnostico?: string | null;
+    downtimeMinutes?: number;
+    failureCodeId?: string | null;
+    rootCauseId?: string | null;
+    fallas?: Array<{ taskId: string | null; failureCodeId: string | null; rootCauseId: string | null; downtimeMinutes: number }>;
+  },
+): DatosDeCierre {
+  const delForm = new Map((extra.fallas ?? []).map((f) => [f.taskId, f]));
+  const vivas = wo.tasks.filter((t) => !t.liberadaAt);
+  const deFalla = vivas.filter((t) => esFalla(tipoDeActividad(t.maintenanceType, wo.maintenanceType)));
+
+  const fallas: DatosDeCierre["fallas"] = deFalla.map((t) => {
+    const f = delForm.get(t.id);
+    return {
+      etiqueta: `«${t.title}»`,
+      failureCodeId: f ? f.failureCodeId : t.failureCodeId,
+      rootCauseId: f ? f.rootCauseId : t.rootCauseId,
+    };
+  });
+  // Ordenes viejas de falla sin actividades: el diagnostico va en el encabezado.
+  const encabezado = delForm.get(null);
+  if (!deFalla.length && !vivas.length && esFalla(wo.maintenanceType)) {
+    fallas.push({
+      etiqueta: "la orden",
+      failureCodeId: encabezado ? encabezado.failureCodeId : extra.failureCodeId !== undefined ? extra.failureCodeId : wo.failureCodeId,
+      rootCauseId: encabezado ? encabezado.rootCauseId : extra.rootCauseId !== undefined ? extra.rootCauseId : wo.rootCauseId,
+    });
+  }
+
+  // Mismo calculo que el evento de paro al completar: lo de cada actividad
+  // mas lo del encabezado (el de una orden sin actividades de falla).
+  const minutosParo = extra.fallas
+    ? extra.fallas.filter((f) => f.taskId !== null).reduce((a, f) => a + (f.downtimeMinutes || 0), 0) +
+      (encabezado?.downtimeMinutes ?? extra.downtimeMinutes ?? 0)
+    : (extra.downtimeMinutes ?? wo.downtimeMinutes) + vivas.reduce((a, t) => a + t.downtimeMinutes, 0);
+
+  return {
+    resolucion: extra.resolution !== undefined && extra.resolution !== null ? extra.resolution : wo.resolution,
+    horas: extra.horas,
+    motivoSinHoras: extra.motivoSinHoras !== undefined ? extra.motivoSinHoras : wo.motivoSinHoras,
+    requiereParo: wo.requiresShutdown,
+    minutosParo,
+    sinParoConfirmado: extra.sinParoConfirmado ?? wo.sinParoConfirmado,
+    fallas,
+    motivoSinDiagnostico: extra.motivoSinDiagnostico !== undefined ? extra.motivoSinDiagnostico : wo.motivoSinDiagnostico,
+    actividadesSinResolver: vivas.filter((t) => !t.done).length,
+    evidenciaRequerida: extra.evidenciaRequerida,
+    archivos: extra.archivos,
+  };
+}
+
+/** Si la empresa pide evidencia para esta orden: equipo critico (A) o trabajo de seguridad. */
+export function requiereEvidencia(
+  org: { otEvidenciaCriticas: boolean },
+  wo: { maintenanceType: string; asset: { criticality: string } | null },
+) {
+  return org.otEvidenciaCriticas && (wo.asset?.criticality === "A" || wo.maintenanceType === "SAFETY");
+}
+
+/** Lo que le falta HOY a una orden guardada para completarse o cerrarse. */
+export async function faltantesDeLaOrden(organizationId: string, workOrderId: string) {
+  const wo = await prisma.workOrder.findFirst({
+    where: { id: workOrderId, organizationId },
+    include: {
+      tasks: true,
+      asset: { select: { criticality: true } },
+      organization: { select: { otEvidenciaCriticas: true } },
+      _count: { select: { attachments: true } },
+    },
+  });
+  if (!wo) throw new ErrorDeOrden("Orden de trabajo no encontrada", 404);
+  const horas = (await prisma.workOrderLabor.aggregate({ where: { workOrderId }, _sum: { hours: true } }))._sum.hours ?? 0;
+  return faltantesDeCierre(datosDeCierre(wo, {
+    horas,
+    archivos: wo._count.attachments,
+    evidenciaRequerida: requiereEvidencia(wo.organization, wo),
+  }));
 }
 
 /**
- * Cambia el estado de una OT aplicando los efectos colaterales del flujo:
- * marcas de tiempo, registro de paro del activo, cierre del plan preventivo,
- * resolucion de alertas predictivas y notificaciones.
+ * Cambia el estado de una OT aplicando las reglas del ciclo (`lib/reglas-ot.ts`)
+ * y los efectos colaterales del flujo: marcas de tiempo, registro de paro del
+ * activo, avance del plan preventivo y notificaciones.
+ *
+ * Todo lo decide el servidor: permiso del rol para ESE paso, motivo cuando se
+ * pide, responsable antes de iniciar, y la informacion esencial antes de
+ * completar o cerrar. La pantalla solo evita ofrecer lo que aqui se rechaza.
  */
 export async function transitionWorkOrder(params: {
   workOrderId: string;
   to: string;
   userId: string;
   organizationId: string;
+  /** Rol de quien lo pide: cada paso tiene su permiso (ver `permisoDeTransicion`). */
+  rol: string;
+  /** Poner en espera, cancelar, devolver, reabrir o reactivar. */
+  motivo?: string | null;
+  /** Al iniciar una orden sin responsable: quien la inicia se vuelve responsable. */
+  tomarla?: boolean;
   resolution?: string;
   rootCauseId?: string | null;
   failureCodeId?: string | null;
   downtimeMinutes?: number;
+  /** Excepciones justificadas del cierre tecnico. */
+  motivoSinHoras?: string | null;
+  sinParoConfirmado?: boolean;
+  motivoSinDiagnostico?: string | null;
   /**
    * Una falla por actividad. Es la forma nueva de cerrar: una OT mezclada
    * puede traer varios reportes y cada uno conserva su codigo, su causa y su
@@ -130,38 +263,100 @@ export async function transitionWorkOrder(params: {
 }) {
   const wo = await prisma.workOrder.findFirst({
     where: { id: params.workOrderId, organizationId: params.organizationId },
-    include: { tasks: true },
+    include: {
+      tasks: true,
+      asset: { select: { criticality: true } },
+      organization: { select: { otEvidenciaCriticas: true } },
+      _count: { select: { attachments: true } },
+    },
   });
-  if (!wo) throw new Error("Orden de trabajo no encontrada");
+  if (!wo) throw new ErrorDeOrden("Orden de trabajo no encontrada", 404);
+  // Reintento o doble clic que llega despues del primero: ya esta hecho.
   if (wo.status === params.to) return wo;
-  if (!canTransition(wo.status, params.to)) {
-    throw new Error(`Transicion no permitida: ${wo.status} → ${params.to}`);
-  }
 
-  if (params.to === "COMPLETED") {
-    // Una OT completa no deja actividades en el aire. Cada una tiene que estar
-    // hecha o liberada con motivo; la liberada se va al backlog y se retoma
-    // despues. Antes solo se revisaban las obligatorias, asi que una actividad
-    // opcional sin capturar se quedaba en `done: false` para siempre dentro de
-    // una orden cerrada: ni hecha, ni pendiente para nadie, ni visible.
-    const abiertas = wo.tasks.filter((t) => !t.done && !t.liberadaAt);
-    if (abiertas.length) {
-      throw new Error(
-        `Quedan ${abiertas.length} actividad(es) sin resolver. ` +
-          `Marque cada una como hecha, o liberela indicando por que no se pudo hacer.`,
-      );
-    }
+  const etiqueta = (s: string) => WO_STATUS_LABELS[s] ?? s;
+  if (!esTransicionPosible(wo.status, params.to)) {
+    throw new ErrorDeOrden(`Una orden ${etiqueta(wo.status).toLowerCase()} no puede pasar a ${etiqueta(params.to).toLowerCase()}.`, 409);
+  }
+  if (!can(params.rol, permisoDeTransicion(wo.status, params.to))) {
+    throw new ErrorDeOrden(
+      params.to === "CLOSED" ? "Cerrar una orden lo valida un supervisor o la administración."
+        : wo.status === "CLOSED" ? "Reabrir una orden cerrada lo autoriza la administración o el propietario."
+        : "Su rol no puede hacer este cambio de estado.",
+      403,
+    );
+  }
+  const motivo = params.motivo?.trim() || null;
+  if (pideMotivo(wo.status, params.to) && !motivoValido(motivo)) {
+    throw new ErrorDeOrden("Indique el motivo del cambio.", 422);
   }
 
   const now = new Date();
   const data: Record<string, unknown> = { status: params.to };
+  let excepcionSinResponsable = false;
+
+  if (params.to === "IN_PROGRESS" && !wo.assignedToId) {
+    if (params.tomarla) {
+      data.assignedToId = params.userId;
+    } else if (can(params.rol, "workorder:write") && motivoValido(motivo)) {
+      excepcionSinResponsable = true;
+    } else {
+      throw new ErrorDeOrden(
+        "La orden no tiene responsable. Tómela usted al iniciar, o asígnela antes" +
+          (can(params.rol, "workorder:write") ? " (o indique el motivo para iniciarla sin responsable)." : "."),
+        422,
+      );
+    }
+  }
+  if (params.to === "ASSIGNED" && !wo.assignedToId) {
+    throw new ErrorDeOrden("Para dejarla asignada necesita un responsable.", 422);
+  }
+
+  // Completar (desde proceso) y cerrar revisan la informacion esencial. Reabrir
+  // una cerrada tambien llega a COMPLETED, pero no vuelve a «completarse»: no
+  // repite efectos ni exige de nuevo lo que ya tenia.
+  const completando = params.to === "COMPLETED" && wo.status !== "CLOSED";
+  if (completando || params.to === "CLOSED") {
+    const horas = (await prisma.workOrderLabor.aggregate({ where: { workOrderId: wo.id }, _sum: { hours: true } }))._sum.hours ?? 0;
+    const faltan = faltantesDeCierre(datosDeCierre(wo, {
+      horas,
+      archivos: wo._count.attachments,
+      evidenciaRequerida: requiereEvidencia(wo.organization, wo),
+      ...(completando ? {
+        resolution: params.resolution,
+        motivoSinHoras: params.motivoSinHoras,
+        sinParoConfirmado: params.sinParoConfirmado,
+        motivoSinDiagnostico: params.motivoSinDiagnostico,
+        downtimeMinutes: params.downtimeMinutes,
+        failureCodeId: params.failureCodeId,
+        rootCauseId: params.rootCauseId,
+        fallas: params.fallas,
+      } : {}),
+    }));
+    if (faltan.length) {
+      throw new ErrorDeOrden(
+        `No se puede ${completando ? "completar" : "cerrar"} la orden todavía: ${faltan.join(" ")}`,
+        422,
+        faltan,
+      );
+    }
+  }
 
   if (params.to === "IN_PROGRESS" && !wo.startedAt) {
     data.startedAt = now;
     data.responseMinutes = Math.round((now.getTime() - wo.createdAt.getTime()) / 60000);
   }
-  if (params.to === "COMPLETED") {
+  if (params.to === "ON_HOLD") data.motivoEspera = motivo;
+  if (wo.status === "ON_HOLD") data.motivoEspera = null;
+  if (params.to === "CANCELLED") data.motivoCancelacion = motivo;
+  if (wo.status === "CANCELLED") data.motivoCancelacion = null;
+  if (wo.status === "CLOSED") data.closedAt = null;
+
+  if (completando) {
     data.completedAt = now;
+    if (params.motivoSinHoras !== undefined) data.motivoSinHoras = params.motivoSinHoras?.trim() || null;
+    if (params.sinParoConfirmado !== undefined) data.sinParoConfirmado = params.sinParoConfirmado;
+    if (params.motivoSinDiagnostico !== undefined) data.motivoSinDiagnostico = params.motivoSinDiagnostico?.trim() || null;
     if (params.resolution) data.resolution = params.resolution;
     if (params.rootCauseId !== undefined) data.rootCauseId = params.rootCauseId;
     if (params.failureCodeId !== undefined) data.failureCodeId = params.failureCodeId;
@@ -211,7 +406,7 @@ export async function transitionWorkOrder(params: {
    * que siguen libres: si alguien ya las atendio en otra orden mientras tanto,
    * arrebatarselas dejaria dos ordenes creyendo que atienden el mismo reporte.
    */
-  if (params.to === "OPEN" && wo.status === "CANCELLED") {
+  if ((params.to === "OPEN" || params.to === "ASSIGNED") && wo.status === "CANCELLED") {
     const suyas = await prisma.workOrderTask.findMany({
       where: { workOrderId: wo.id, origenRequestId: { not: null } },
       select: { origenRequestId: true },
@@ -225,9 +420,28 @@ export async function transitionWorkOrder(params: {
     }
   }
 
-  const updated = await prisma.workOrder.update({ where: { id: wo.id }, data });
+  /**
+   * El cambio se aplica solo si la orden sigue en el estado que se leyo.
+   *
+   * Dos clics seguidos, o dos personas a la vez, leian el mismo estado y las
+   * dos escribian: el paro se registraba dos veces y el plan avanzaba doble.
+   * Ahora gana una; la otra encuentra la orden ya movida y no repite nada.
+   */
+  const aplicado = await prisma.workOrder.updateMany({
+    where: { id: wo.id, organizationId: params.organizationId, status: wo.status },
+    data,
+  });
+  if (aplicado.count === 0) {
+    const ahora = await prisma.workOrder.findUnique({ where: { id: wo.id } });
+    if (ahora?.status === params.to) return ahora;
+    throw new ErrorDeOrden(
+      `La orden cambió de estado mientras tanto (ahora está ${etiqueta(ahora?.status ?? "").toLowerCase()}). Recargue la página.`,
+      409,
+    );
+  }
+  const updated = (await prisma.workOrder.findUnique({ where: { id: wo.id } }))!;
 
-  if (params.to === "COMPLETED") {
+  if (completando) {
     /**
      * Cada actividad guarda su propia falla. Se valida que la actividad sea de
      * esta orden: un taskId de otra orden escribiria la falla en el historial
@@ -261,7 +475,7 @@ export async function transitionWorkOrder(params: {
        */
       const sumaDeActividades = porActividad.reduce((a, f) => a + f.downtimeMinutes, 0);
       const minutes = params.fallas
-        ? sumaDeActividades + (params.fallas.find((f) => f.taskId === null)?.downtimeMinutes ?? 0)
+        ? sumaDeActividades + (params.fallas.find((f) => f.taskId === null)?.downtimeMinutes ?? params.downtimeMinutes ?? 0)
         : params.downtimeMinutes ?? wo.downtimeMinutes;
       /**
        * Un paro por orden. Completar, reabrir y volver a completar creaba un
@@ -394,17 +608,49 @@ export async function transitionWorkOrder(params: {
     entity: "WorkOrder",
     entityId: wo.id,
     action: "STATUS_CHANGED",
-    summary: `${wo.number}: ${wo.status} → ${params.to}`,
+    summary: `${wo.number}: ${wo.status} → ${params.to}${motivo ? ` — ${motivo}` : ""}`,
     changes: {
       from: wo.status,
       to: params.to,
+      ...(motivo ? { motivo } : {}),
+      ...(data.assignedToId ? { tomadaPor: params.userId } : {}),
+      ...(excepcionSinResponsable ? { iniciadaSinResponsable: true } : {}),
       // Lo que se borra al reabrir se guarda aqui, para no perder cuando se
       // habia dado por terminada la primera vez.
       ...(data.completedAt === null && wo.completedAt ? { completedAtAnterior: wo.completedAt.toISOString() } : {}),
     },
   });
 
+  // El motivo tambien queda a la vista en la orden, donde lo lee quien la retome.
+  if (motivo) {
+    const PASO: Record<string, string> = {
+      ON_HOLD: "En espera", CANCELLED: "Cancelada", IN_PROGRESS: "Devuelta a proceso",
+      COMPLETED: "Reabierta", OPEN: "Reactivada", ASSIGNED: wo.status === "CANCELLED" ? "Reactivada" : "Reanudada",
+    };
+    await prisma.workOrderComment.create({
+      data: {
+        workOrderId: wo.id,
+        userId: params.userId,
+        body: `${PASO[params.to] ?? etiqueta(params.to)}${excepcionSinResponsable ? " sin responsable" : ""}: ${motivo}`,
+      },
+    });
+  }
+
   return updated;
+}
+
+/**
+ * Una orden cerrada o cancelada ya no acepta cambios sensibles (horas,
+ * refacciones, servicios, actividades). Para corregirla se reabre con motivo.
+ */
+export function asegurarEditable(wo: { status: string } | null) {
+  if (!wo) throw new ErrorDeOrden("Orden de trabajo no encontrada", 404);
+  if (wo.status === "CLOSED") {
+    throw new ErrorDeOrden("La orden está cerrada. Para cambiarla, reábrala indicando el motivo.", 409);
+  }
+  if (wo.status === "CANCELLED") {
+    throw new ErrorDeOrden("La orden está cancelada. Reactívela si el trabajo sigue pendiente.", 409);
+  }
 }
 
 /** Consume refacciones del almacen y las carga a la OT. */
@@ -422,7 +668,13 @@ export async function consumePart(params: {
   const part = await prisma.part.findFirst({
     where: { id: params.partId, organizationId: params.organizationId },
   });
-  if (!part) throw new Error("Refacción no encontrada");
+  if (!part) throw new ErrorDeOrden("Refacción no encontrada", 404);
+  // La orden tambien debe ser de la empresa: sin esto el cargo y la salida de
+  // almacen podian colgarse de la orden de otra cuenta con solo conocer su id.
+  asegurarEditable(await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: { status: true },
+  }));
   if (part.quantityOnHand < params.quantity) {
     throw new Error(`Existencia insuficiente: ${part.quantityOnHand} ${part.unit} disponibles`);
   }

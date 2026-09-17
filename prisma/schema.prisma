@@ -127,6 +127,12 @@ model Organization {
   /// tienen reloj por actividad, y en MANUAL no habria quien los programara.
   otGeneracion String @default("AUTOMATICA")
 
+  /// Pedir al menos un archivo de evidencia al completar ordenes de equipos
+  /// criticos (A) o de seguridad. Apagado por omision: la evidencia no aporta
+  /// lo mismo en todas las ordenes y exigirla siempre llena el sistema de fotos
+  /// de relleno.
+  otEvidenciaCriticas Boolean @default(false)
+
   /// Desde donde se cuenta el siguiente preventivo: CIERRE | PROGRAMADO.
   ///
   /// CIERRE —lo de siempre— cuenta desde que se hizo de verdad. Si el
@@ -833,6 +839,20 @@ model WorkOrder {
   procedure        String?
   safetyNotes      String?
   meterValue       Float?
+
+  // ── Cierre y motivos (Bloque 1: proceso operativo) ──────────────────────
+  /// Excepcion justificada al completar sin horas de mano de obra (p. ej. lo
+  /// hizo un contratista cuyo costo va en servicios). Sin horas ni motivo no
+  /// se puede completar.
+  motivoSinHoras        String?
+  /// Requeria paro pero al final no hubo: se confirma expresamente al
+  /// completar. Distingue «no hubo paro» de «no se capturo».
+  sinParoConfirmado     Boolean @default(false)
+  /// En una falla, por que queda sin codigo o sin causa raiz («Sin determinar»).
+  motivoSinDiagnostico  String?
+  /// Por que esta en espera. Se limpia al reanudar; la historia queda en auditoria.
+  motivoEspera          String?
+  motivoCancelacion     String?
   laborCost        Float     @default(0)
   partsCost        Float     @default(0)
   serviceCost      Float     @default(0)

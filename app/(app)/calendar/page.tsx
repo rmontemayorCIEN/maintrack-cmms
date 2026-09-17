@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { forecastSchedule } from "@/lib/scheduler";
-import { cargaPorDia, jornada } from "@/lib/agenda";
+import { cargaPorDia, jornada, propuestasDeCarga } from "@/lib/agenda";
 import { PageHeader } from "@/components/ui";
 import { OPEN_STATUSES } from "@/lib/constants";
 import { RunSchedulerButton } from "./run-scheduler";
@@ -116,6 +116,10 @@ export default async function CalendarPage({
     return d;
   });
   const carga = cargaPorDia(dias, ordenes, j);
+  const plantilla = await prisma.user.findMany({
+    where: { organizationId: user.organizationId, active: true, role: { in: ["TECHNICIAN", "SUPERVISOR"] } },
+    select: { id: true, name: true, horasDisponibles: true },
+  });
 
   return (
     <>
@@ -140,7 +144,14 @@ export default async function CalendarPage({
         semana={first.toISOString().slice(0, 10)}
         dia={first.toISOString().slice(0, 10)}
         dias={dias.map((d) => d.toISOString())}
-        carga={carga.map((c) => ({ ...c, fecha: c.fecha.toISOString() }))}
+        carga={carga.map((c, i) => ({
+          ...c,
+          fecha: c.fecha.toISOString(),
+          propuestas: propuestasDeCarga(i, carga, plantilla, j).map((p) => ({
+            ...p,
+            dias: p.dias.map((d) => ({ fecha: d.fecha.toISOString(), libres: d.libres })),
+          })),
+        }))}
         ordenes={ordenes.map((o) => ({
           id: o.id, number: o.number, title: o.title,
           maintenanceType: o.maintenanceType, status: o.status,

@@ -379,7 +379,7 @@ export function TaskList({
                   </>
                 ) : null}
 
-                <label className="label mt-3 block">Detalle (opcional)</label>
+                <label className="label mt-3 block">{motivo === "OTRO" ? "Detalle (obligatorio con «Otro motivo»)" : "Detalle (opcional)"}</label>
                 <textarea
                   className="field min-h-16"
                   maxLength={400}

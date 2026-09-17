@@ -14,6 +14,20 @@ import { transitionWorkOrder } from "../lib/workorders";
 import { aplicarMovimiento } from "../lib/almacen";
 import { backlog } from "../lib/backlog";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 const prisma = new PrismaClient();
 let fallas = 0;
 const paso = (t: string) => console.log(`\n${t}\n`);
@@ -162,8 +176,8 @@ async function main() {
   const antes = await prisma.planAsset.findMany({
     where: { planId: plan.id }, select: { assetId: true, nextDueDate: true },
   });
-  await transitionWorkOrder({ workOrderId: ot!.id, to: "IN_PROGRESS", userId: tecnico.id, organizationId: org.id });
-  await transitionWorkOrder({ workOrderId: ot!.id, to: "COMPLETED", userId: tecnico.id, organizationId: org.id });
+  await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: ot!.id, to: "IN_PROGRESS", userId: tecnico.id, organizationId: org.id });
+  await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: ot!.id, to: "COMPLETED", userId: tecnico.id, organizationId: org.id });
 
   const despues = await prisma.planAsset.findMany({
     where: { planId: plan.id }, select: { assetId: true, nextDueDate: true, lastCompletedAt: true },
@@ -213,8 +227,8 @@ async function main() {
     where: { workOrderId: otB!.id, position: 0 },
     data: { liberadaAt: new Date(), liberadaPorId: tecnico.id, motivoLiberacion: "SIN_REFACCION", bloqueadaPorPartId: filtro.id },
   });
-  await transitionWorkOrder({ workOrderId: otB!.id, to: "IN_PROGRESS", userId: tecnico.id, organizationId: org.id });
-  await transitionWorkOrder({ workOrderId: otB!.id, to: "COMPLETED", userId: tecnico.id, organizationId: org.id });
+  await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otB!.id, to: "IN_PROGRESS", userId: tecnico.id, organizationId: org.id });
+  await transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: otB!.id, to: "COMPLETED", userId: tecnico.id, organizationId: org.id });
   revisar("cierra aunque quede trabajo liberado",
     (await prisma.workOrder.findUnique({ where: { id: otB!.id }, select: { status: true } }))?.status, "COMPLETED");
   const pend = await backlog(org.id);

@@ -75,7 +75,10 @@ const crearColumnas = (zona: string): Columna<FilaOrden>[] => [
         <Avatar name={w.responsable} color={w.responsableColor ?? undefined} />
         <span className="text-xs text-slate-600">{w.responsable}</span>
       </div>
-    ) : <span className="text-xs text-slate-400">Sin asignar</span>,
+    ) : ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(w.status)
+      // Activa sin responsable es trabajo que nadie tiene en su carga: se marca.
+      ? <span className="text-xs font-medium text-amber-700">Sin responsable</span>
+      : <span className="text-xs text-slate-400">Sin asignar</span>,
   },
   {
     id: "vencimiento", etiqueta: "Vencimiento",

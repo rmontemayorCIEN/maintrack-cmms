@@ -88,7 +88,7 @@ export function estadoDeVencimiento(
   if (!compromiso) {
     return {
       clave: "SIN_FECHA",
-      texto: "Sin fecha compromiso",
+      texto: esTerminada ? "Sin fecha compromiso" : "Sin programar",
       tono: "muted",
       diasAtraso: 0,
       diasFaltan: null,

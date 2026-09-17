@@ -29,6 +29,7 @@ export function ReviewActions({
   const router = useRouter();
   const [open, setOpen] = useState<"APPROVE" | "REJECT" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [assignedToId, setAssignedToId] = useState("");
   /**
    * Quien revisa clasifica, no quien reporta.
@@ -56,6 +57,11 @@ export function ReviewActions({
   const [assetId, setAssetId] = useState(assetActual ?? "");
 
   async function submit() {
+    if (open === "REJECT" && notes.trim().length < 5) {
+      setError("Indique el motivo del rechazo: quien reportó lo recibe.");
+      return;
+    }
+    setError(null);
     setLoading(true);
     const res = await fetch(`/api/requests/${requestId}`, {
       method: "POST",
@@ -70,8 +76,14 @@ export function ReviewActions({
     });
     const data = await res.json();
     setLoading(false);
+    // Un error se muestra en el dialogo: cerrarlo en silencio hacia creer que
+    // la solicitud se habia atendido.
+    if (!res.ok) {
+      setError(data.error ?? "No fue posible revisar la solicitud");
+      return;
+    }
     setOpen(null);
-    if (res.ok && data.workOrder) {
+    if (data.workOrder) {
       router.push(`/work-orders/${data.workOrder.id}`);
       return;
     }
@@ -164,12 +176,20 @@ export function ReviewActions({
                 </div>
               ) : null}
               <div>
-                <label className="label">Notas de revisión</label>
-                <textarea className="field min-h-20" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <label className="label">{open === "REJECT" ? "Motivo del rechazo (obligatorio)" : "Notas de revisión"}</label>
+                <textarea
+                  className="field min-h-20"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={open === "REJECT" ? "Por qué no se atiende. Quien reportó recibe este motivo." : undefined}
+                />
               </div>
+              {error ? (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</p>
+              ) : null}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setOpen(null)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => { setOpen(null); setError(null); }}>Cancelar</Button>
               <Button variant={open === "APPROVE" ? "success" : "danger"} onClick={submit} disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {open === "APPROVE" ? "Aprobar" : "Rechazar"}

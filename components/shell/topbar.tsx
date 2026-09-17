@@ -1,5 +1,6 @@
 "use client";
 
+import { can } from "@/lib/rbac";
 import { useZona } from "@/components/zona-empresa";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -79,12 +80,16 @@ export function Topbar({
       </form>
 
       <div className="ml-auto flex items-center gap-2">
-        <Link
-          href="/work-orders/new"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
-        >
-          <Plus className="h-3.5 w-3.5" /> Nueva OT
-        </Link>
+        {/* Solo a quien puede crear ordenes: al solicitante o al tecnico el boton
+            los llevaba a un formulario que el servidor les rechaza al guardar. */}
+        {can(user.role, "workorder:write") ? (
+          <Link
+            href="/work-orders/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+          >
+            <Plus className="h-3.5 w-3.5" /> Nueva OT
+          </Link>
+        ) : null}
 
         <BotonAyuda />
 

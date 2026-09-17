@@ -9,6 +9,20 @@ import { PrismaClient } from "@prisma/client";
 import { backlog, vecesLiberada } from "../lib/backlog";
 import { transitionWorkOrder } from "../lib/workorders";
 
+/**
+ * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
+ * esta prueba, que prueba otra cosa. Los campos propios de cada llamada ganan.
+ */
+const CICLO_DE_PRUEBA = {
+  rol: "OWNER",
+  tomarla: true,
+  motivo: "Motivo de prueba automatizada",
+  resolution: "Trabajo realizado en prueba automatizada",
+  motivoSinHoras: "Prueba automatizada sin horas",
+  motivoSinDiagnostico: "Prueba automatizada sin diagnóstico",
+};
+
+
 const prisma = new PrismaClient();
 let fallas = 0;
 
@@ -58,7 +72,7 @@ async function main() {
     });
 
   const cerrar = (id: string) =>
-    transitionWorkOrder({ workOrderId: id, to: "COMPLETED", userId: user.id, organizationId: org.id });
+    transitionWorkOrder({ ...CICLO_DE_PRUEBA, workOrderId: id, to: "COMPLETED", userId: user.id, organizationId: org.id });
 
   console.log("\nLA OT NO SE COMPLETA CON TRABAJO EN EL AIRE\n");
 

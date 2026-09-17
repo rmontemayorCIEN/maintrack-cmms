@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { recalcWorkOrder } from "@/lib/workorders";
+import { esReprogramacion, revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
+import { OPEN_STATUSES } from "@/lib/constants";
+import { motivoValido } from "@/lib/reglas-ot";
 
 const patchSchema = z.object({
   title: z.string().min(3).optional(),
@@ -24,6 +27,10 @@ const patchSchema = z.object({
   failureCodeId: z.string().nullable().optional(),
   downtimeMinutes: z.coerce.number().min(0).optional(),
   meterValue: z.coerce.number().nullable().optional(),
+  /** Por que cambia la fecha compromiso de una orden que ya estaba programada. */
+  motivoReprogramacion: z.string().trim().max(500).nullable().optional(),
+  /** Quien programa acepta programar en dia no laborable o sobre la capacidad. */
+  aceptarAdvertencias: z.boolean().optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -59,7 +66,8 @@ export async function PATCH(request: Request, { params }: Params) {
       return fail("Una orden cerrada o cancelada ya no se edita. Su historial es el respaldo de lo que costo.", 409);
     }
 
-    const data: Record<string, unknown> = { ...input };
+    const { motivoReprogramacion, aceptarAdvertencias, ...campos } = input;
+    const data: Record<string, unknown> = { ...campos };
 
     // Cambiar de activo arrastra su sitio y su ubicacion: son del equipo, no de
     // la orden, y dejarlos desalineados haria que el trabajo apareciera en un
@@ -82,10 +90,11 @@ export async function PATCH(request: Request, { params }: Params) {
     // El responsable y la cuadrilla se validan contra la organizacion.
     if (input.assignedToId) {
       const responsable = await prisma.user.findFirst({
-        where: { id: input.assignedToId, organizationId: orgId, active: true },
+        // Responsable = quien ejecuta: un solicitante o una cuenta de consulta no pueden iniciarla.
+        where: { id: input.assignedToId, organizationId: orgId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } },
         select: { id: true },
       });
-      if (!responsable) return fail("El responsable indicado no existe o esta inactivo", 404);
+      if (!responsable) return fail("El responsable indicado no existe, está inactivo o su rol no ejecuta órdenes", 404);
     }
     if (input.teamId) {
       const cuadrilla = await prisma.team.findFirst({
@@ -98,7 +107,35 @@ export async function PATCH(request: Request, { params }: Params) {
     if (input.scheduledStart !== undefined) data.scheduledStart = parseDate(input.scheduledStart);
     if (input.assignedToId !== undefined) {
       data.assignedToId = input.assignedToId || null;
+      // El estado sigue al responsable: «asignada» sin nadie, o «abierta» con
+      // alguien, eran estados que se contradecian con la pantalla.
       if (input.assignedToId && existing.status === "OPEN") data.status = "ASSIGNED";
+      if (!input.assignedToId && existing.status === "ASSIGNED") data.status = "OPEN";
+    }
+
+    // ── Programacion ────────────────────────────────────────────────────
+    const dueDate = data.dueDate !== undefined ? (data.dueDate as Date | null) : existing.dueDate;
+    const scheduledStart = data.scheduledStart !== undefined ? (data.scheduledStart as Date | null) : existing.scheduledStart;
+    const horas = input.estimatedHours ?? existing.estimatedHours;
+    const responsableId = input.assignedToId !== undefined ? input.assignedToId || null : existing.assignedToId;
+    validarDatosDeProgramacion({
+      estimatedHours: input.estimatedHours !== undefined ? input.estimatedHours : undefined,
+      dueDate, scheduledStart,
+    });
+
+    const abierta = OPEN_STATUSES.includes(existing.status);
+    const reprograma = input.dueDate !== undefined &&
+      esReprogramacion({ status: existing.status, fechaAnterior: existing.dueDate, fechaNueva: dueDate });
+    if (reprograma && !motivoValido(motivoReprogramacion)) {
+      return fail("Indique el motivo de la reprogramación.", 422, { pideMotivoReprogramacion: true });
+    }
+
+    const tocaCarga = input.dueDate !== undefined || input.assignedToId !== undefined || input.estimatedHours !== undefined;
+    if (abierta && tocaCarga && !aceptarAdvertencias) {
+      const revision = await revisarProgramacion({ organizationId: orgId, fecha: dueDate, responsableId, horas, ordenId: id });
+      if (revision.advertencias.length) {
+        return fail(revision.advertencias.join(" "), 409, { programacion: revision });
+      }
     }
 
     await prisma.workOrder.update({ where: { id }, data });
@@ -110,9 +147,21 @@ export async function PATCH(request: Request, { params }: Params) {
       entity: "WorkOrder",
       entityId: id,
       action: "UPDATED",
-      summary: `${existing.number} actualizada`,
-      changes: input,
+      summary: `${existing.number} actualizada${aceptarAdvertencias ? " (con advertencias de programación aceptadas)" : ""}`,
+      changes: campos,
     });
+    if (reprograma) {
+      const texto = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "sin fecha");
+      await logAudit({
+        organizationId: orgId,
+        userId: user.id,
+        entity: "WorkOrder",
+        entityId: id,
+        action: "RESCHEDULED",
+        summary: `${existing.number}: ${texto(existing.dueDate)} → ${texto(dueDate)} — ${motivoReprogramacion!.trim()}`,
+        changes: { antes: existing.dueDate, despues: dueDate, motivo: motivoReprogramacion!.trim() },
+      });
+    }
 
     return ok({ workOrder });
   });

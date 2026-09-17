@@ -23,7 +23,18 @@ type Orden = {
 };
 
 type Persona = { userId: string | null; nombre: string; color: string | null; horas: number; capacidad: number; ordenes: number; ocupacion: number };
-type Dia = { fecha: string; habil: boolean; festivo: string | null; horas: number; capacidad: number; personas: Persona[]; sobrecargado: boolean };
+type Propuesta = {
+  persona: string;
+  exceso: number;
+  dias: Array<{ fecha: string; libres: number }>;
+  personas: Array<{ nombre: string; libres: number }>;
+};
+type Dia = {
+  fecha: string; habil: boolean; festivo: string | null; horas: number; capacidad: number;
+  personas: Persona[]; sobrecargado: boolean;
+  /** Donde cabe lo que sobra, calculado en el servidor con la misma carga. */
+  propuestas?: Propuesta[];
+};
 type Proyeccion = {
   id: string; title: string; asset: string; date: string;
   assetId: string | null; categoryId: string | null;
@@ -501,6 +512,24 @@ function DetalleDia({
                 {p.horas}h {p.capacidad > 0 ? `/ ${p.capacidad}h` : "(no laborable)"}
               </span>
             </div>
+          ))}
+        </div>
+      ) : null}
+
+      {dia.propuestas?.length ? (
+        <div className="mb-4 grid gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <p className="font-semibold">Cómo resolver la sobrecarga</p>
+          {dia.propuestas.map((p) => (
+            <p key={p.persona}>
+              A <span className="font-medium">{p.persona}</span> le sobran {p.exceso} h.{" "}
+              {p.dias.length
+                ? `Le caben en ${p.dias.map((d) => `${new Intl.DateTimeFormat("es-MX", { weekday: "short", day: "numeric" }).format(diaDeCalendario(d.fecha, zona))} (${d.libres} h libres)`).join(" o ")}`
+                : "No tiene días con lugar en lo que se está viendo"}
+              {p.personas.length
+                ? `; ese mismo día pueden tomarlas ${p.personas.map((x) => `${x.nombre} (${x.libres} h)`).join(" o ")}.`
+                : "; nadie más tiene lugar ese día."}
+              {" "}Reprograme o asigne desde la orden: el cambio de fecha pide motivo.
+            </p>
           ))}
         </div>
       ) : null}
