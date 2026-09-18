@@ -11,6 +11,7 @@
  * y por eso aquí solo se lee.
  */
 import { prisma } from "./db";
+import { medianocheEnZona } from "./periodos";
 
 /** Los grupos con los que se filtra, en lenguaje de negocio. */
 export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: string[] }> = {
@@ -40,10 +41,26 @@ export type FiltroBitacora = {
 /** Cuántos renglones se traen. Más que esto se filtra, no se hojea. */
 export const TOPE_BITACORA = 200;
 
-export async function consultarBitacora(organizationId: string, filtro: FiltroBitacora) {
-  const desde = filtro.desde ? new Date(`${filtro.desde}T00:00:00`) : null;
-  // «Hasta» incluye el día completo: quien escribe el 17 espera ver lo del 17.
-  const hasta = filtro.hasta ? new Date(`${filtro.hasta}T23:59:59.999`) : null;
+/**
+ * La medianoche de un «aaaa-mm-dd» en la zona de la EMPRESA.
+ *
+ * `new Date("2026-09-17T00:00:00")` se lee en la zona del servidor, y Cloud Run
+ * corre en UTC: en produccion «hoy» empezaba a las 6 de la tarde de ayer, hora
+ * de Monterrey, y se comia la noche. Pasaba las pruebas en la Mac, que esta en
+ * hora de Mexico, y fallaba justo donde se usa.
+ */
+function medianocheDe(dia: string, zona: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dia);
+  if (!m) return null;
+  return medianocheEnZona(Number(m[1]), Number(m[2]), Number(m[3]), zona);
+}
+
+export async function consultarBitacora(organizationId: string, filtro: FiltroBitacora, zona: string) {
+  const desde = filtro.desde ? medianocheDe(filtro.desde, zona) : null;
+  // «Hasta» incluye el dia completo: quien escribe el 17 espera ver lo del 17.
+  // Es la medianoche del dia siguiente, menos un milisegundo.
+  const finDelDia = filtro.hasta ? medianocheDe(filtro.hasta, zona) : null;
+  const hasta = finDelDia ? new Date(finDelDia.getTime() + 86_400_000 - 1) : null;
   const entidades = filtro.modulo ? MODULOS_BITACORA[filtro.modulo]?.entidades : undefined;
 
   return prisma.auditLog.findMany({

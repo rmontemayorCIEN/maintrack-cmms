@@ -14,6 +14,7 @@ import { consultarBitacora, hayFiltro, MODULOS_BITACORA } from "../lib/bitacora"
 import { logAudit } from "../lib/audit";
 import { ACCIONES_POR_ROL, ROLES_DEL_SISTEMA, rolesQuePueden, resumenDeRol } from "../lib/matriz-roles";
 import { can } from "../lib/rbac";
+import { claveDiaEnZona } from "../lib/periodos";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -23,14 +24,15 @@ function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
 
 const ayer = (dias: number) => new Date(Date.now() - dias * 86_400_000);
 
+/** La zona de las empresas de prueba: la de la mayoria de los clientes. */
+const ZONA = "America/Monterrey";
+
 /**
- * El dia LOCAL en aaaa-mm-dd, que es lo que manda un `<input type="date">`.
- *
- * `toISOString()` da el dia UTC: a las 8 de la noche en Monterrey ya es el dia
- * siguiente, y el filtro «hoy» se iria al futuro y no traeria nada.
+ * El dia en aaaa-mm-dd EN LA ZONA DE LA EMPRESA, que es lo que escribe quien
+ * filtra. No el de la maquina: la prueba tiene que dar lo mismo en la Mac, que
+ * esta en hora de Mexico, que en Cloud Run, que esta en UTC.
  */
-const diaLocalDe = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const diaLocalDe = (d: Date) => claveDiaEnZona(d, ZONA);
 
 async function main() {
   const sello = `bit-${Date.now()}`;
@@ -65,36 +67,51 @@ async function main() {
     await prisma.auditLog.update({ where: { id: viejo.id }, data: { createdAt: ayer(30) } });
 
     console.log("\n1. La bitácora es de la empresa de la sesión");
-    const deA = await consultarBitacora(orgA.id, {});
+    const deA = await consultarBitacora(orgA.id, {}, ZONA);
     revisar("solo trae renglones de su empresa",
       deA.length === 5 && !deA.some((r) => r.summary?.includes("otra empresa")), deA.length);
-    const deB = await consultarBitacora(orgB.id, {});
+    const deB = await consultarBitacora(orgB.id, {}, ZONA);
     revisar("y la otra empresa ve los suyos, nada más", deB.length === 1 && Boolean(deB[0].summary?.includes("otra empresa")));
 
     console.log("\n2. Cada filtro acota lo que debe");
     const hoy = diaLocalDe(new Date());
-    const porFecha = await consultarBitacora(orgA.id, { desde: hoy, hasta: hoy });
+    const porFecha = await consultarBitacora(orgA.id, { desde: hoy, hasta: hoy }, ZONA);
     revisar("por fecha: el registro de hace un mes se queda fuera",
       porFecha.length === 4 && !porFecha.some((r) => r.summary === "Cambio de hace un mes"), porFecha.length);
     revisar("y con el rango abierto sí aparece",
-      (await consultarBitacora(orgA.id, { desde: diaLocalDe(ayer(40)) })).length === 5);
+      (await consultarBitacora(orgA.id, { desde: diaLocalDe(ayer(40)) }, ZONA)).length === 5);
 
-    const porUsuario = await consultarBitacora(orgA.id, { usuarioId: beto.id });
+    const porUsuario = await consultarBitacora(orgA.id, { usuarioId: beto.id }, ZONA);
     revisar("por usuario: solo lo de esa persona",
       porUsuario.length === 1 && porUsuario[0].user?.name === "Beto", porUsuario.map((r) => r.summary));
 
-    const porModulo = await consultarBitacora(orgA.id, { modulo: "ALMACEN" });
+    const porModulo = await consultarBitacora(orgA.id, { modulo: "ALMACEN" }, ZONA);
     revisar("por módulo: almacén trae el ajuste y nada de órdenes",
       porModulo.length === 1 && porModulo[0].entity === "Part", porModulo.map((r) => r.entity));
 
-    const porAccion = await consultarBitacora(orgA.id, { accion: "EXPORTED" });
+    const porAccion = await consultarBitacora(orgA.id, { accion: "EXPORTED" }, ZONA);
     revisar("por acción: las exportaciones, y solo de esta empresa",
       porAccion.length === 1 && porAccion[0].summary === "Exportó órdenes", porAccion.map((r) => r.summary));
 
-    const combinado = await consultarBitacora(orgA.id, { usuarioId: ana.id, modulo: "ORDENES", desde: hoy });
+    const combinado = await consultarBitacora(orgA.id, { usuarioId: ana.id, modulo: "ORDENES", desde: hoy }, ZONA);
     revisar("los filtros se combinan", combinado.length === 2, combinado.map((r) => r.action));
 
     revisar("se sabe cuándo la lista viene filtrada", hayFiltro({ accion: "EXPORTED" }) && !hayFiltro({}));
+
+    // Lo que fallo en produccion: Cloud Run corre en UTC. Un acceso a las 9 de
+    // la noche del 10 en Monterrey es el 11 a las 3 de la mañana en UTC, y el
+    // filtro «10 de septiembre» lo dejaba fuera.
+    const nocturno = await prisma.auditLog.create({
+      data: { organizationId: orgA.id, userId: ana.id, entity: "User", entityId: ana.id, action: "LOGIN", summary: "Acceso de noche", changes: "{}" },
+    });
+    await prisma.auditLog.update({ where: { id: nocturno.id }, data: { createdAt: new Date("2026-09-11T03:00:00Z") } });
+    const del10 = await consultarBitacora(orgA.id, { desde: "2026-09-10", hasta: "2026-09-10" }, ZONA);
+    const del11 = await consultarBitacora(orgA.id, { desde: "2026-09-11", hasta: "2026-09-11" }, ZONA);
+    revisar("un acceso a las 9 p.m. del 10, hora de Monterrey, cae en el filtro del 10",
+      del10.some((r) => r.id === nocturno.id), del10.map((r) => r.summary));
+    revisar("y NO en el del 11, aunque en UTC ya sea el 11",
+      !del11.some((r) => r.id === nocturno.id), del11.map((r) => r.summary));
+    await prisma.auditLog.delete({ where: { id: nocturno.id } });
 
     console.log("\n3. Los módulos cubren las entidades que se auditan");
     const entidadesReales = [...new Set((await prisma.auditLog.findMany({ select: { entity: true }, distinct: ["entity"] })).map((r) => r.entity))];

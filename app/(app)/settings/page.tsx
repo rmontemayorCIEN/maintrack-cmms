@@ -32,6 +32,7 @@ import { PanelSeguridad } from "./seguridad";
 import { ReferenciaDeRoles } from "./referencia-roles";
 import { FiltrosBitacora } from "./filtros-bitacora";
 import { consultarBitacora, hayFiltro, TOPE_BITACORA } from "@/lib/bitacora";
+import { ZONA_POR_OMISION } from "@/lib/periodos";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
@@ -61,6 +62,10 @@ export default async function SettingsPage({
 }) {
   const user = await requireUser();
   const org = user.organization;
+  // Las fechas se pintan en la hora de la EMPRESA, no en la del servidor: Cloud
+  // Run corre en UTC, y sin esto un acceso de las 7 de la noche en Monterrey
+  // aparecia a la 1 de la mañana del dia siguiente.
+  const zona = org.timezone || ZONA_POR_OMISION;
   const params = await searchParams;
   const canManage = can(user.role, "user:manage");
 
@@ -141,7 +146,7 @@ export default async function SettingsPage({
       ? consultarBitacora(org.id, {
           desde: params.desde, hasta: params.hasta,
           usuarioId: params.usuario, modulo: params.modulo, accion: params.accion,
-        })
+        }, zona)
       : Promise.resolve(null),
     // Para el filtro por persona: quien aparece en la bitacora es de la empresa.
     activa === "auditoria"
@@ -211,7 +216,7 @@ export default async function SettingsPage({
       {activa === "seguridad" ? (
         <PanelSeguridad
           puedeExportar={can(user.role, "data:export")}
-          ultimoAcceso={user.lastLoginAt ? formatDateTime(user.lastLoginAt) : null}
+          ultimoAcceso={user.lastLoginAt ? formatDateTime(user.lastLoginAt, zona) : null}
         />
       ) : null}
 
@@ -231,7 +236,7 @@ export default async function SettingsPage({
               PREGUNTAS.map((p) => [p.clave, org[p.clave]]),
             ) as Record<ClavePregunta, string | null>}
             tipoInstalacion={org.tipoInstalacion}
-            actualizadoEl={org.contextoAt ? formatDate(org.contextoAt) : null}
+            actualizadoEl={org.contextoAt ? formatDate(org.contextoAt, zona) : null}
             envejecido={contextoEnvejecido(org)}
             editable={can(user.role, "settings:write")}
           />
@@ -251,7 +256,7 @@ export default async function SettingsPage({
               <Row label="Tipo de instalación">{instalacionDe(org.tipoInstalacion).nombre}</Row>
               <Row label="Zona horaria">{org.timezone}</Row>
               <Row label="Moneda">{org.currency}</Row>
-              <Row label="Alta">{formatDate(org.createdAt)}</Row>
+              <Row label="Alta">{formatDate(org.createdAt, zona)}</Row>
               <Row label="Folios emitidos">
                 {org.woSequence} OT · {org.wrSequence} solicitudes
               </Row>
@@ -414,7 +419,7 @@ export default async function SettingsPage({
                     <td className="text-right tabular-nums text-xs">
                       {formatCurrency(miembro.hourlyRate, org.currency)}
                     </td>
-                    <td className="text-xs text-slate-500">{formatDateTime(miembro.lastLoginAt)}</td>
+                    <td className="text-xs text-slate-500">{formatDateTime(miembro.lastLoginAt, zona)}</td>
                     <td>
                       <Badge tone={miembro.active ? "success" : "muted"}>
                         {miembro.active ? "Activo" : "Inactivo"}
@@ -482,7 +487,7 @@ export default async function SettingsPage({
                 <tbody>
                   {bitacora.map((entrada) => (
                     <tr key={entrada.id}>
-                      <td className="text-xs text-slate-500">{formatDateTime(entrada.createdAt)}</td>
+                      <td className="text-xs text-slate-500">{formatDateTime(entrada.createdAt, zona)}</td>
                       <td className="text-xs text-slate-600">{entrada.user?.name ?? "Sistema"}</td>
                       <td className="text-xs text-slate-600">{entrada.entity}</td>
                       <td><Badge tone="muted">{entrada.action}</Badge></td>
