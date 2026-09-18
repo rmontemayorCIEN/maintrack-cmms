@@ -235,3 +235,15 @@ export function terminoConjunto(org: {
     varios: f ? "varias" : "varios",
   };
 }
+
+/**
+ * Cómo se llama la pantalla de conjuntos: «Mapa de líneas», «Mapa de
+ * sistemas», «Mapa de rutas»… Lo que más vale ahí es el mapa —el acomodo con
+ * el estado vivo de cada equipo—, y «Líneas» a secas no lo decía.
+ */
+export function nombreDelMapa(t: TerminoConjunto): string {
+  return `Mapa de ${t.plural.toLowerCase()}`;
+}
+
+/** Dónde guarda el navegador el último mapa abierto, para volver a él de un toque. */
+export const CLAVE_ULTIMO_MAPA = "maintrack:ultimo-mapa";

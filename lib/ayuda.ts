@@ -1134,21 +1134,23 @@ export const AYUDA: Record<string, FichaAyuda> = {
   },
 
   "/conjuntos": {
-    titulo: "Líneas, sistemas y servicios",
-    que: "Los grupos de equipos que sirven o no sirven como un todo, y de los que alguien responde.",
+    titulo: "Mapa de líneas, sistemas y servicios",
+    que: "Sus líneas (o sistemas, servicios, rutas) dibujadas como de verdad están, con el estado vivo de cada equipo, lo que costaron y lo que traen pendiente.",
     hacer: [
       "Agrupar los equipos que dependen unos de otros, aunque estén en áreas distintas",
       "Ver de un vistazo si lo que alguien cuida está completo o tiene algo abajo",
       "Saber qué equipos no están en ningún grupo todavía",
       "Poner nombre y responsable a cada uno",
       "Entrar a uno y dibujarlo: acomodar sus equipos como de verdad están",
+      "Ver de reojo cada mapa en su miniatura: verde opera, ámbar degradado, rojo abajo",
+      "Volver de un toque al último mapa que abrió, y desde la ficha de un equipo, verlo en el mapa de cada línea donde está",
     ],
     flujo: [
-      "El nombre del grupo lo pone su tipo de instalación: en una planta son Líneas, en un edificio Sistemas, en un club o un hotel Servicios, en una flotilla Rutas. Se puede cambiar por la palabra que usted use.",
+      "El nombre lo pone su tipo de instalación: en una planta es «Mapa de líneas», en un edificio «Mapa de sistemas», en un club o un hotel «Mapa de servicios», en una flotilla «Mapa de rutas». Si la empresa usa su propia palabra, el mapa la toma.",
       "Un grupo NO es un área. Las áreas son geografía y son exclusivas —un equipo está en un solo lugar—; los grupos son función y se traslapan. La subestación puede alimentar la línea, los elevadores y la alberca al mismo tiempo, y estar en los tres.",
       "El estado sale del estado vivo de cada equipo. Un equipo se marca abajo solo cuando entra a ejecución una orden que requiere paro, y vuelve a operar al completarse: nadie tiene que acordarse de actualizarlo.",
       "Los equipos que no están en ningún grupo se calculan solos y aparecen abajo. Un equipo nuevo entra ahí sin que nadie lo ponga: por eso no existe un grupo de «Equipos varios» que alguien tenga que mantener.",
-      "Toque el nombre de un grupo para entrar a su lienzo. Ahí acomoda sus equipos como de verdad están y el color le dice qué pasa con cada uno.",
+      "Toque la miniatura, el nombre o «Ver mapa» para entrar. Ahí acomoda sus equipos como de verdad están y el color le dice qué pasa con cada uno. La miniatura solo muestra los equipos ya colocados.",
       "El mismo acomodo se ve de tres maneras: «cómo está ahora» (el estado vivo de cada equipo), «lo que costó» (horas de paro y dinero, con su periodo) y «lo que trae pendiente» (planes vencidos y órdenes abiertas). Cruzado con el filtro de familia, cada combinación es la pregunta de alguien: solo compresores + cómo están ahora es la mañana del jefe de mantenimiento; solo bombas + lo que costó es su junta de presupuesto.",
       "En el lienzo, si su línea es una cadena, acomódela de izquierda a derecha: el dibujo dice el orden sin que el sistema guarde ninguna secuencia. El mismo equipo puede estar en varios grupos y tiene una posición distinta en cada lienzo — acomodar uno no mueve los demás.",
       "Dos equipos nunca quedan encimados. Si suelta uno sobre otro se intercambian de lugar; si cae sobre varios, se va al primer hueco libre.",

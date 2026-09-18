@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { BandaCliente } from "@/components/shell/banda-cliente";
 import { RegistrarSW } from "@/components/registrar-sw";
-import { terminoConjunto } from "@/lib/instalaciones";
+import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { ZonaEmpresaProvider } from "@/components/zona-empresa";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         orgName={user.organization.name}
         plan={user.organization.plan}
         esSuperAdmin={user.isSuperAdmin}
-        terminoConjuntoPlural={terminoConjunto(user.organization).plural}
+        terminoConjuntoPlural={nombreDelMapa(terminoConjunto(user.organization))}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         {user.actuandoComoCliente ? (

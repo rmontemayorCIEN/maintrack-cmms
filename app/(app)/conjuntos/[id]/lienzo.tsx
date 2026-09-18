@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CircleAlert, CircleCheck, CircleMinus, X } from "lucide-react";
@@ -10,6 +10,7 @@ import { WO_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
 import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
 import type { EstadoConjunto } from "@/lib/conjuntos";
+import { CLAVE_ULTIMO_MAPA } from "@/lib/instalaciones";
 import type { TerminoConjunto } from "@/lib/instalaciones";
 
 type Equipo = {
@@ -63,6 +64,11 @@ export function Lienzo({
   editable: boolean;
 }) {
   const router = useRouter();
+  // El último mapa abierto: el listado ofrece volver a él de un toque. Es del
+  // navegador de cada quien (el que usa el jefe de la línea 4 no es el del hotel).
+  useEffect(() => {
+    try { localStorage.setItem(CLAVE_ULTIMO_MAPA, JSON.stringify({ id: conjuntoId, nombre })); } catch { /* sin almacenamiento: no pasa nada */ }
+  }, [conjuntoId, nombre]);
   const params = useSearchParams();
   const [lente, setLente] = useState<Lente>("AHORA");
   const [categoria, setCategoria] = useState<string | null>(null);

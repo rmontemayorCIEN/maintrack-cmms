@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Boxes, CircleAlert, CircleCheck, CircleMinus, LayoutGrid, Loader2, Pencil, Plus, Trash2, Unlink } from "lucide-react";
+import { ArrowRight, Boxes, CircleAlert, CircleCheck, CircleMinus, LayoutGrid, Loader2, Map as IconoMapa, Pencil, Plus, Trash2, Unlink } from "lucide-react";
 import { Badge, Button, EmptyState } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectorMultiple } from "@/components/selector-multiple";
 import { claveSugerida, type EstadoConjunto, type Residual } from "@/lib/conjuntos";
-import type { TerminoConjunto } from "@/lib/instalaciones";
+import { CLAVE_ULTIMO_MAPA, type TerminoConjunto } from "@/lib/instalaciones";
 
 type Equipo = {
   id: string; code: string; name: string; status: string;
@@ -23,7 +23,56 @@ type Fila = {
   equipos: number; abajo: number; abajoQueDetienen: number; aMedias: number;
   estado: EstadoConjunto; sinColocar: number;
   assetIds: string[];
+  plano: Array<{ x: number; y: number; w: number; h: number; estado: "OPERA" | "MEDIAS" | "ABAJO" }>;
 };
+
+const COLOR_EQUIPO = { OPERA: "fill-emerald-400", MEDIAS: "fill-amber-400", ABAJO: "fill-red-500" } as const;
+
+/**
+ * La miniatura del mapa: el mismo acomodo, sin nombres, con el color del
+ * estado de cada equipo. Es la invitación a entrar: antes el mapa —lo que más
+ * vale de esta pantalla— solo se encontraba tocando el nombre.
+ */
+function MiniMapa({ plano, sinColocar }: { plano: Fila["plano"]; sinColocar: number }) {
+  if (!plano.length) {
+    return (
+      <div className="grid h-24 place-items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center text-[0.6875rem] text-slate-500">
+        {sinColocar ? "Todavía sin dibujar: entre y acomode sus equipos" : "Sin equipos todavía"}
+      </div>
+    );
+  }
+  const minX = Math.min(...plano.map((p) => p.x));
+  const minY = Math.min(...plano.map((p) => p.y));
+  const ancho = Math.max(...plano.map((p) => p.x + p.w)) - minX;
+  const alto = Math.max(...plano.map((p) => p.y + p.h)) - minY;
+  return (
+    <svg viewBox={`${minX - 0.5} ${minY - 0.5} ${ancho + 1} ${alto + 1}`} preserveAspectRatio="xMidYMid meet"
+      className="h-24 w-full rounded-lg bg-slate-50" role="img" aria-label="Miniatura del mapa">
+      {plano.map((p, i) => (
+        <rect key={i} x={p.x + 0.1} y={p.y + 0.1} width={p.w - 0.2} height={p.h - 0.2} rx={0.3} className={COLOR_EQUIPO[p.estado]} />
+      ))}
+    </svg>
+  );
+}
+
+/** «Volver al mapa de…»: el último que abrió esta persona, en este navegador. */
+function UltimoMapa({ conjuntos }: { conjuntos: Fila[] }) {
+  const [ultimo, setUltimo] = useState<{ id: string; nombre: string } | null>(null);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(CLAVE_ULTIMO_MAPA) ?? "null");
+      // Solo si sigue existiendo en esta empresa.
+      if (v?.id && conjuntos.some((c) => c.id === v.id)) setUltimo({ id: v.id, nombre: conjuntos.find((c) => c.id === v.id)!.name });
+    } catch { /* sin almacenamiento */ }
+  }, [conjuntos]);
+  if (!ultimo) return null;
+  return (
+    <Link href={`/conjuntos/${ultimo.id}`}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100">
+      <IconoMapa className="h-3.5 w-3.5" /> Volver al mapa: {ultimo.nombre} <ArrowRight className="h-3 w-3" />
+    </Link>
+  );
+}
 
 /**
  * El dictamen, concordado.
@@ -94,6 +143,8 @@ export function Panel({
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
       ) : null}
 
+      <UltimoMapa conjuntos={conjuntos} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
           {residual.total > 0 ? (
@@ -158,6 +209,10 @@ export function Panel({
                   {f.aMedias > 0 ? ` · ${f.aMedias} degradado${f.aMedias === 1 ? "" : "s"}` : ""}
                 </p>
 
+                <Link href={`/conjuntos/${f.id}`} className="block rounded-lg ring-brand-300 transition hover:ring-2" title="Abrir el mapa">
+                  <MiniMapa plano={f.plano} sinColocar={f.sinColocar} />
+                </Link>
+
                 <p className="text-[0.6875rem] text-slate-500">
                   {f.responsable ? (
                     <>Responsable: <span className="text-slate-700">{f.responsable.name}</span></>
@@ -180,9 +235,9 @@ export function Panel({
                 <div className="mt-1 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
                   <Link
                     href={`/conjuntos/${f.id}`}
-                    className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-[0.6875rem] font-medium text-brand-700 hover:bg-brand-100"
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-[0.6875rem] font-medium text-white hover:bg-brand-700"
                   >
-                    <LayoutGrid className="h-3 w-3" /> Ver el lienzo
+                    <LayoutGrid className="h-3 w-3" /> Ver mapa
                   </Link>
                   {editable ? (
                     <>

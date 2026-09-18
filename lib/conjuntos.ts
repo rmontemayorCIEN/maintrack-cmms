@@ -38,6 +38,11 @@ export type ConjuntoEnLista = {
   estado: EstadoConjunto;
   /** Cuantos equipos siguen sin lugar en el lienzo. */
   sinColocar: number;
+  /**
+   * El acomodo del mapa, para la miniatura de la lista: celdas y estado de
+   * los equipos ya colocados. Sin nombres: solo forma y color.
+   */
+  plano: Array<{ x: number; y: number; w: number; h: number; estado: "OPERA" | "MEDIAS" | "ABAJO" }>;
 };
 
 /**
@@ -64,7 +69,7 @@ export async function conjuntosDe(organizationId: string): Promise<ConjuntoEnLis
       responsable: { select: { id: true, name: true } },
       equipos: {
         select: {
-          planoX: true,
+          planoX: true, planoY: true, planoAncho: true, planoAlto: true,
           asset: { select: { status: true, detieneLinea: true, active: true } },
         },
       },
@@ -86,6 +91,12 @@ export async function conjuntosDe(organizationId: string): Promise<ConjuntoEnLis
       abajoQueDetienen: abajo.filter((e) => e.asset.detieneLinea === true).length,
       estado: estadoDe(base),
       sinColocar: vivos.filter((e) => e.planoX === null).length,
+      plano: vivos
+        .filter((e) => e.planoX !== null && e.planoY !== null)
+        .map((e) => ({
+          x: e.planoX!, y: e.planoY!, w: e.planoAncho, h: e.planoAlto,
+          estado: e.asset.status === ABAJO ? "ABAJO" as const : e.asset.status === A_MEDIAS ? "MEDIAS" as const : "OPERA" as const,
+        })),
     };
   });
 }

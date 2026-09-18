@@ -3,14 +3,14 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui";
 import { conjuntosDe, residualDe } from "@/lib/conjuntos";
-import { terminoConjunto } from "@/lib/instalaciones";
+import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { Panel } from "./panel";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   const user = await requireUser();
-  return { title: terminoConjunto(user.organization).plural };
+  return { title: nombreDelMapa(terminoConjunto(user.organization)) };
 }
 
 /**
@@ -68,8 +68,8 @@ export default async function ConjuntosPage() {
   return (
     <div>
       <PageHeader
-        title={termino.plural}
-        description={`${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} es un grupo de equipos que sirve o no sirve como un todo, y del que alguien responde. Puede cruzar áreas. Toque «Ver el lienzo» para dibujarlo.`}
+        title={nombreDelMapa(termino)}
+        description={`Sus ${termino.plural.toLowerCase()} dibujadas como de verdad están, con el estado vivo de cada equipo, lo que costaron y lo que traen pendiente. ${termino.un.charAt(0).toUpperCase()}${termino.un.slice(1)} ${termino.singular.toLowerCase()} es un grupo de equipos que sirve o no sirve como un todo y del que alguien responde; puede cruzar áreas.`}
       />
       <Panel
         termino={termino}

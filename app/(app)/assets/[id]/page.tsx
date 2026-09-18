@@ -178,6 +178,13 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const totalCost = costs._sum.totalCost ?? 0;
   const ratio = asset.replacementCost ? (totalCost / asset.replacementCost) * 100 : 0;
 
+  // Los mapas donde aparece este equipo (un equipo puede estar en varios).
+  const mapas = await prisma.conjuntoAsset.findMany({
+    where: { assetId: asset.id, organizationId: user.organizationId, conjunto: { active: true } },
+    select: { conjunto: { select: { id: true, name: true } } },
+    orderBy: { conjunto: { name: "asc" } },
+  });
+
   return (
     <>
       <PageHeader
@@ -236,6 +243,13 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             Pertenece a {asset.parent.code}
           </Link>
         ) : null}
+        {/* Verlo donde vive: en el mapa de cada línea (sistema, ruta…) a la que pertenece. */}
+        {mapas.map((m) => (
+          <Link key={m.conjunto.id} href={`/conjuntos/${m.conjunto.id}`}
+            className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs text-brand-700 hover:bg-brand-100">
+            <MapPin className="h-3 w-3" /> Verlo en el mapa: {m.conjunto.name}
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

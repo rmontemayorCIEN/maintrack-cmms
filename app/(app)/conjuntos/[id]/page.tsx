@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui";
 import { estadoDe } from "@/lib/conjuntos";
-import { terminoConjunto } from "@/lib/instalaciones";
+import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { costoDeParar, esPeriodo, ventanas, type ClavePeriodo } from "@/lib/costo-de-parar";
 import { Lienzo } from "./lienzo";
 
@@ -103,7 +103,7 @@ export default async function ConjuntoPage({ params, searchParams }: Params) {
         title={conjunto.name}
         breadcrumb={
           <Link href="/conjuntos" className="hover:underline">
-            {termino.plural}
+            {nombreDelMapa(termino)}
           </Link>
         }
         description={
