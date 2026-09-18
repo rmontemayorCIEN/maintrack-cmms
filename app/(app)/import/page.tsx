@@ -17,14 +17,17 @@ export default async function ImportPage() {
     titulo: IMPORTACIONES[clave].titulo,
     descripcion: IMPORTACIONES[clave].descripcion,
     requisitos: IMPORTACIONES[clave].requisitos ?? null,
+    erroresComunes: IMPORTACIONES[clave].erroresComunes ?? [],
     columnas: IMPORTACIONES[clave].columnas,
+    // Si un duplicado exacto se puede actualizar, o solo omitir.
+    actualizable: Boolean(IMPORTACIONES[clave].actualizar),
   }));
 
   return (
     <>
       <PageHeader
         title="Importar datos"
-        description="Cargue su información desde Excel en vez de capturarla a mano. Cada tipo tiene su plantilla, y antes de guardar nada se muestra exactamente que va a pasar."
+        description="Cargue su información desde Excel en vez de capturarla a mano. Cada tipo tiene su plantilla; antes de guardar nada se muestra qué va a pasar con cada renglón, y cada importación se puede revertir."
       />
       <AsistenteImportacion tipos={tipos} />
     </>

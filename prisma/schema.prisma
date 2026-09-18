@@ -192,17 +192,28 @@ model Organization {
   /// Apagarlo no borra las suscripciones: se dejan de usar y vuelven a servir
   /// si se enciende otra vez. Quien se dio de baja no tiene por que volver a
   /// hacer el tramite en el telefono por una decision de la empresa.
-  avisosPush         Boolean  @default(false)
+  avisosPush         Boolean   @default(false)
   /// Complemento "IA Avanzada" contratado sobre el plan.
-  iaComplemento      Boolean  @default(false)
+  iaComplemento      Boolean   @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
-  iaExtra            Int      @default(0)
+  iaExtra            Int       @default(0)
   /// Direccion del aviso de privacidad de la empresa, si tiene uno propio.
   /// Se enlaza desde el formulario publico del QR. Vacio: se enlaza el aviso
   /// del sistema, que explica que se hace con los datos de quien reporta.
   avisoPrivacidadUrl String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  /// Cuando la empresa declaro que empieza a operar de verdad.
+  ///
+  /// Antes de esta fecha la cuenta esta en puesta en marcha: se vale cargar
+  /// datos de demostracion, importar y corregir. Para ponerla no puede quedar
+  /// ningun dato de demostracion vivo: asi los ejemplos nunca se cuelan en los
+  /// indicadores de una empresa que ya opera. Nula = todavia no arranca.
+  operandoDesde      DateTime?
+  /// Los modulos que la empresa dijo que NO usara, en JSON: {"almacen":false}.
+  /// Un paso de la puesta en marcha que la empresa no va a usar se muestra
+  /// como «no aplica» y no le baja el avance. Sin decidir = se espera.
+  modulosPuesta      String    @default("{}")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   users             User[]
   sites             Site[]
@@ -256,6 +267,7 @@ model Organization {
   calendariosTarea  PlanTaskAsset[]
   revisionesAgenda  RevisionAgenda[]
   passwordResets    PasswordReset[]
+  importBatches     ImportBatch[]
 }
 
 model User {
@@ -353,6 +365,61 @@ model Invitation {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+/// Una importacion —o una carga de datos de demostracion— como unidad.
+///
+/// Sin esto una importacion era una linea en la bitacora: no se sabia que
+/// registros habia creado, y deshacerla era buscar a mano. Ahora cada lote
+/// sabe quien lo hizo, de que archivo —su huella, no su contenido—, cuantos
+/// creo, actualizo y rechazo, y cuales son exactamente sus registros.
+///
+/// Los datos de demostracion son un lote de tipo DEMO: se eliminan con la misma
+/// reversion segura que una importacion, que no toca lo que ya se uso.
+model ImportBatch {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String?
+  /// sitios | activos | refacciones | ... | DEMO
+  tipo           String
+  archivoNombre  String?
+  /// SHA-256 del archivo. Identifica cual fue sin guardar su contenido.
+  archivoHuella  String?
+  /// IMPORTADO | FALLIDO | REVERTIDO | REVERSION_PARCIAL
+  estado         String
+  leidos         Int       @default(0)
+  creados        Int       @default(0)
+  actualizados   Int       @default(0)
+  omitidos       Int       @default(0)
+  rechazados     Int       @default(0)
+  /// Resumen de lo que paso, en JSON: motivo de falla o detalle de reversion.
+  detalle        String    @default("{}")
+  revertidoAt    DateTime?
+  revertidoPorId String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  registros    ImportRecord[]
+
+  @@index([organizationId, createdAt])
+}
+
+/// Un registro que tocó un lote: cual, de que tipo, y si lo creo o lo actualizo.
+model ImportRecord {
+  id       String  @id @default(cuid())
+  batchId  String
+  /// Site | Location | Asset | Part | Supplier | MaintenancePlan | ...
+  entity   String
+  entityId String
+  /// CREATED | UPDATED
+  accion   String
+  /// Los valores anteriores de un registro actualizado, para poder revisarlo.
+  antes    String?
+
+  batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([entity, entityId])
 }
 
 /// Restablecimiento de contrasena: un solo uso y con vencimiento.
@@ -1280,6 +1347,10 @@ model Supplier {
   id             String   @id @default(cuid())
   organizationId String
   name           String
+  /// Registro Federal de Contribuyentes. Opcional —no todo proveedor factura—,
+  /// pero cuando existe es la mejor forma de saber que dos proveedores con
+  /// nombre distinto son el mismo.
+  rfc            String?
   contactName    String?
   email          String?
   phone          String?

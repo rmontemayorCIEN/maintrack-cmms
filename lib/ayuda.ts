@@ -178,11 +178,27 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/import": {
     titulo: "Importar datos",
-    que: "Cargar activos, refacciones, planes y catálogos desde una hoja de cálculo.",
-    hacer: ["Bajar la plantilla, llenarla y subirla", "Revisar los errores por renglón antes de confirmar"],
+    que: "Cargar sitios, activos, refacciones, planes, proveedores y catálogos desde una hoja de cálculo, con vista previa y reversión.",
+    hacer: [
+      "Bajar la plantilla, llenarla y subirla",
+      "Revisar la vista previa: qué es nuevo, qué ya existe, qué parece duplicado y qué tiene error",
+      "Decidir los duplicados: omitirlos, actualizar los existentes o crear uno que se parece pero es distinto",
+      "Descargar el detalle de errores con fila y columna, corregir y volver a validar",
+      "Revertir una importación desde el historial",
+    ],
     flujo: [
-      "Se valida todo antes de escribir: si un renglón falla, le dice cuál y por qué, y no se carga nada a medias.",
-      "Hay orden: los activos necesitan sus sitios, y los planes necesitan sus activos.",
+      "Validar no guarda nada. Se puede elegir el mismo archivo las veces que haga falta.",
+      "Con un solo renglón con error no se importa: se corrige el archivo y se vuelve a subir. Así nunca queda una carga a medias.",
+      "Se guarda todo o nada. Si algo falla a la mitad —un corte, un registro que alguien creó al mismo tiempo—, no queda ningún renglón.",
+      "Duplicado exacto: la misma clave (el mismo TAG, el mismo código). Posible duplicado: otra clave, pero el mismo nombre en la misma ubicación, el mismo número de serie, el mismo RFC o, en planes, el mismo equipo con la misma frecuencia. Los posibles se omiten salvo que usted marque «crearlo de todos modos». Nada se combina solo.",
+      "Hay orden: los activos necesitan sus sitios, las refacciones sus unidades, y los planes sus activos.",
+      "Revertir borra solo lo que la importación creó y nadie ha usado. Un equipo con órdenes o una refacción con movimientos se queda, y se le dice por qué. Lo que la importación actualizó no se regresa: se le muestra para que lo revise.",
+    ],
+    campos: [
+      { nombre: "Fechas", explica: "dd/mm/aaaa, por ejemplo 15/09/2026. Una fecha que no existe —30 de febrero— se rechaza en lugar de moverse al día siguiente." },
+      { nombre: "Números", explica: "Con punto decimal: 1.5. La coma solo separa miles: 1,250.50. «1,5» se rechaza porque no se sabe si es uno y medio o quince." },
+      { nombre: "Unidades", explica: "«Pieza», «pz» y «PZA» se reconocen como la misma unidad, pero tiene que existir en su catálogo de unidades." },
+      { nombre: "Dato opcional mal escrito", explica: "Si una fecha de compra o un teléfono vienen mal, el registro se crea sin ese dato y se le avisa; no se detiene la carga por un dato que no era obligatorio." },
     ],
   },
 
@@ -1353,9 +1369,22 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/puesta-en-marcha": {
     titulo: "Puesta en marcha",
-    que: "Los pasos para dejar el sistema operando, con el avance de cada uno.",
-    hacer: ["Ver qué falta y entrar directo a resolverlo"],
-    flujo: ["El sistema palomea solo cada paso cuando detecta que ya está hecho. No hay que marcar nada a mano."],
+    que: "Los doce pasos para dejar la empresa operando, con lo que ya está bien, lo que falta y lo que hay que corregir.",
+    hacer: [
+      "Elegir cómo empezar: vacía, con la estructura recomendada o con datos de demostración",
+      "Ver los pendientes en orden de importancia, con los registros concretos y cómo resolverlos",
+      "Declarar que un módulo no se usará —almacén, compras, medidores— para que no se exija",
+      "Quitar los datos de demostración",
+      "Comenzar a operar cuando todo lo obligatorio esté en regla",
+    ],
+    flujo: [
+      "El avance cuenta solo lo que ya sirve. Un activo sin ubicación, un plan sin actividades o sin equipo asignado, un técnico desactivado o una refacción cuya existencia no cuadra NO suman, aunque existan.",
+      "Cada paso tiene un estado: completo, en proceso, requiere corrección, opcional o no aplica. Los opcionales y los que no aplican no le bajan el porcentaje.",
+      "El porcentaje es el mismo aquí, en el panel principal y en la consola del operador: sale de un solo cálculo.",
+      "Lo que captura en cada pantalla se guarda ahí mismo. Puede ir y volver entre pasos, o dejarlo a medias, sin perder nada.",
+      "Los datos de demostración llevan «[DEMO]» en el nombre. Mientras existan no se puede comenzar a operar, para que no se cuelen en los indicadores. Quitarlos borra solo lo que nadie usó.",
+      "Comenzar a operar pasa por la misma revisión que muestra la pantalla, y queda en la bitácora.",
+    ],
   },
 };
 

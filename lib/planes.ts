@@ -219,6 +219,12 @@ export async function verificarCupo(
   organizationId: string,
   plan: string,
   recurso: Recurso,
+  /**
+   * Cuántos se van a dar de alta de un golpe. Una importación de 400 activos
+   * con 380 lugares libres tiene que rechazarse ANTES de empezar: contar solo
+   * «¿cabe uno más?» dejaba pasar la carga completa por encima del plan.
+   */
+  cantidad = 1,
 ): Promise<{ permitido: true } | { permitido: false; mensaje: string }> {
   const definicion = planDe(plan);
   const limite = definicion.limites[recurso];
@@ -236,7 +242,17 @@ export async function verificarCupo(
   };
 
   const actual = await contadores[recurso]();
-  if (actual < limite) return { permitido: true };
+  // El almacenamiento se mide en gigas, no en piezas: ahi basta con no haberse
+  // pasado ya. Lo demas se cuenta con lo que se va a agregar.
+  const cabe = recurso === "storageGb" ? actual < limite : actual + cantidad <= limite;
+  if (cabe) return { permitido: true };
+
+  if (cantidad > 1 && actual < limite) {
+    return {
+      permitido: false,
+      mensaje: `El plan ${definicion.nombre} permite ${limite} ${NOMBRE_RECURSO[recurso]}. Ya hay ${actual} y la carga agregaría ${cantidad}: caben ${limite - actual}. Divida el archivo o actualice su plan.`,
+    };
+  }
 
   // El limite 0 significa que la funcion no viene en el plan, no que se agoto.
   if (limite === 0) {

@@ -13,6 +13,7 @@
  * una sola orden al armarla, con la ventana que ya configura la organizacion
  * —`otHorizonteDias`—, en vez de deducirlo de una aritmetica.
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { jornada } from "./agenda";
 import { describirIntervalo, siguienteFecha, type ReglaCalendario, type Unidad } from "./calendario";
@@ -160,8 +161,15 @@ export async function sembrarCalendario(p: {
   arranquePorOmision: { fecha: Date; esUltima: boolean };
   /** Fechas distintas para actividades puntuales, por id de actividad. */
   arranques?: Map<string, { fecha: Date; esUltima: boolean }>;
+  /**
+   * La transaccion en curso, si la hay. Una importacion crea el plan y lo
+   * asigna en la misma transaccion: leer con el cliente global no veria el plan
+   * recien creado, que todavia no se confirma.
+   */
+  db?: Prisma.TransactionClient;
 }): Promise<{ creados: number; sinFrecuencia: string[] }> {
-  const plan = await prisma.maintenancePlan.findFirst({
+  const db = p.db ?? prisma;
+  const plan = await db.maintenancePlan.findFirst({
     where: { id: p.planId, organizationId: p.organizationId },
     select: {
       intervalDays: true,
@@ -176,7 +184,7 @@ export async function sembrarCalendario(p: {
   if (!plan) return { creados: 0, sinFrecuencia: [] };
 
   const regla = await reglaDeOrganizacion(p.organizationId);
-  const existentes = await prisma.planTaskAsset.findMany({
+  const existentes = await db.planTaskAsset.findMany({
     where: { assetId: p.assetId, planTaskId: { in: plan.tasks.map((t) => t.id) } },
     select: { planTaskId: true },
   });
@@ -203,7 +211,7 @@ export async function sembrarCalendario(p: {
     );
     if (!proxima) sinFrecuencia.push(tarea.title);
 
-    await prisma.planTaskAsset.create({
+    await db.planTaskAsset.create({
       data: {
         organizationId: p.organizationId,
         planTaskId: tarea.id,

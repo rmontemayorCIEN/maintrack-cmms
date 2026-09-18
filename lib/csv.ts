@@ -72,7 +72,7 @@ function agruparLineas(texto: string): string[] {
 }
 
 export function leerCsv(contenido: string): { encabezados: string[]; filas: FilaCsv[] } {
-  const limpio = contenido.replace(/^﻿/, "").trim();
+  const limpio = contenido.replace(/^\ufeff/, "").trim();
   if (!limpio) return { encabezados: [], filas: [] };
 
   const lineas = agruparLineas(limpio).filter((l) => l.trim() !== "");
@@ -97,5 +97,5 @@ export function plantillaCsv(columnas: string[], ejemplos: string[][]) {
   const escapar = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const lineas = [columnas.map(escapar).join(",")];
   for (const fila of ejemplos) lineas.push(fila.map(escapar).join(","));
-  return "﻿" + lineas.join("\r\n") + "\r\n";
+  return "\ufeff" + lineas.join("\r\n") + "\r\n";
 }

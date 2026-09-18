@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       summary: `Exportó ordenes de trabajo (${workOrders.length} renglones)`,
     });
 
-    return new Response(`﻿${csv}`, {
+    return new Response(`\ufeff${csv}`, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="ordenes-trabajo-${new Date().toISOString().slice(0, 10)}.csv"`,

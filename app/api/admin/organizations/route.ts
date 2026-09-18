@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { sembrarCatalogosEstandar } from "@/lib/catalogos-estandar";
 import { fail, ok } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
 import { requireSuperAdmin } from "@/lib/superadmin";
@@ -70,46 +71,13 @@ export async function POST(request: Request) {
       plan: input.plan,
       status: input.trialDays > 0 ? "TRIAL" : "ACTIVE",
       trialEndsAt,
-      // Catalogos minimos para que el cliente pueda trabajar desde el dia uno.
-      sites: { create: { name: "Planta principal", code: "P01", country: "Mexico" } },
-      assetCategories: {
-        create: [
-          { name: "Equipo de proceso", code: "PROC" },
-          { name: "Equipo eléctrico", code: "ELEC" },
-          { name: "Equipo de transporte", code: "TRAN" },
-          { name: "Instalaciones", code: "INST" },
-        ],
-      },
-      failureCodes: {
-        create: [
-          { code: "MEC-01", description: "Desgaste mecánico", category: "MECANICO" },
-          { code: "MEC-02", description: "Desalineacion", category: "MECANICO" },
-          { code: "LUB-01", description: "Lubricacion deficiente", category: "MECANICO" },
-          { code: "ELE-01", description: "Falla electrica", category: "ELECTRICO" },
-          { code: "HID-01", description: "Fuga hidraulica", category: "HIDRAULICO" },
-          { code: "OPE-01", description: "Error de operacion", category: "OPERACION" },
-        ],
-      },
-      partCategories: {
-        create: [
-          { code: "RODAMIENTOS", name: "Rodamientos y baleros" },
-          { code: "SELLOS", name: "Sellos y retenes" },
-          { code: "FILTROS", name: "Filtros" },
-          { code: "LUBRICANTES", name: "Lubricantes y grasas" },
-          { code: "ELECTRICO", name: "Material eléctrico" },
-          { code: "TORNILLERIA", name: "Tornilleria y sujeción" },
-          { code: "OTRO", name: "Otros" },
-        ],
-      },
-      partUnits: {
-        create: [
-          { code: "pza", name: "Pieza" }, { code: "jgo", name: "Juego" },
-          { code: "m", name: "Metro" }, { code: "kg", name: "Kilogramo" },
-          { code: "lt", name: "Litro" }, { code: "caja", name: "Caja" },
-        ],
-      },
     },
   });
+
+  // Los catálogos base del tipo de instalación —categorías, códigos de falla,
+  // unidades— y nada más. La estructura (sitio, almacén) y los datos de ejemplo
+  // los elige la empresa en la puesta en marcha: empezar vacía también vale.
+  await sembrarCatalogosEstandar(org.id, input.tipoInstalacion || null);
 
   await prisma.user.create({
     data: {

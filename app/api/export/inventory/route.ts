@@ -38,7 +38,7 @@ export async function GET() {
       summary: `Exportó inventario (${parts.length} renglones)`,
     });
 
-    return new Response(`﻿${csv}`, {
+    return new Response(`\ufeff${csv}`, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="inventario-${new Date().toISOString().slice(0, 10)}.csv"`,

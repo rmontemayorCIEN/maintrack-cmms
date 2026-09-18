@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { sembrarCatalogosEstandar } from "@/lib/catalogos-estandar";
 import { createSession, hashPassword } from "@/lib/auth";
 import { fail, ok } from "@/lib/api";
 import { slugify } from "@/lib/utils";
@@ -51,27 +52,13 @@ export async function POST(request: Request) {
       plan: "PROFESSIONAL",
       status: "TRIAL",
       trialEndsAt,
-      sites: {
-        create: { name: "Planta principal", code: "P01", country: "Mexico" },
-      },
-      assetCategories: {
-        create: [
-          { name: "Equipo de proceso", code: "PROC" },
-          { name: "Equipo eléctrico", code: "ELEC" },
-          { name: "Equipo de transporte", code: "TRAN" },
-          { name: "Instalaciones", code: "INST" },
-        ],
-      },
-      failureCodes: {
-        create: [
-          { code: "MEC-01", description: "Desgaste mecánico", category: "MECANICO" },
-          { code: "ELE-01", description: "Falla electrica", category: "ELECTRICO" },
-          { code: "LUB-01", description: "Lubricacion deficiente", category: "MECANICO" },
-          { code: "OPE-01", description: "Error de operacion", category: "OPERACION" },
-        ],
-      },
     },
   });
+
+  // Los catálogos base del tipo de instalación —categorías, códigos de falla,
+  // unidades— y nada más. La estructura (sitio, almacén) y los datos de ejemplo
+  // los elige la empresa en la puesta en marcha: empezar vacía también vale.
+  await sembrarCatalogosEstandar(organization.id, input.tipoInstalacion ?? null);
 
   const user = await prisma.user.create({
     data: {

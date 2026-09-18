@@ -128,7 +128,7 @@ export default async function DashboardPage() {
             <ListChecks className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-brand-900">
+            <p className="text-sm font-semibold text-brand-900" data-porcentaje={marcha.porcentaje}>
               Puesta en marcha al {marcha.porcentaje}%
             </p>
             <p className="text-xs text-brand-800/80">

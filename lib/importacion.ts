@@ -1,17 +1,26 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { almacenPorOmision, aplicarMovimiento } from "./almacen";
+import { aplicarMovimiento } from "./almacen";
 import type { Recurso } from "./planes";
 import { asignarPlan } from "./asignaciones";
+import { medianocheEnZona } from "./periodos";
+import * as N from "./normalizar";
 
 /**
- * Importacion desde CSV.
+ * Qué se puede importar desde CSV y cómo se convierte cada renglón.
  *
- * Cada tipo declara sus columnas y como convertir un renglon de texto en un
- * registro. Las referencias se resuelven por CODIGO, no por identificador
- * interno: quien exporta desde Excel conoce "BOM-101", no un cuid.
+ * Cada tipo declara sus columnas y sabe cuatro cosas: convertir un renglón en
+ * datos —o decir, por columna, por qué no—, reconocer lo que ya existe, crear
+ * lo nuevo y, cuando tiene sentido, actualizar lo existente. El recorrido
+ * completo —validar, clasificar duplicados, guardar todo o nada, dejar el lote
+ * trazable— vive en `lib/importacion-motor.ts`, y lo usan igual la pantalla y
+ * las pruebas.
+ *
+ * Las referencias se resuelven por CÓDIGO, no por identificador interno: quien
+ * exporta desde Excel conoce «BOM-101», no un cuid.
  *
  * El orden de la lista es el orden en que conviene importar: un activo
- * necesita su sitio, una refaccion su unidad, un plan su activo.
+ * necesita su sitio, una refacción su unidad, un plan su activo.
  */
 
 export type ClaveImportacion =
@@ -27,143 +36,288 @@ export type Columna = {
   ejemplo: string;
 };
 
+/** Un problema de un renglón, con la columna donde está. */
+export type Falla = { columna?: string; motivo: string };
+
+/**
+ * Lo que sirve para darse cuenta de que dos registros son el mismo aunque el
+ * código difiera. Cada campo se compara ya normalizado —sin acentos ni
+ * mayúsculas—; nunca se guarda.
+ */
+export type Comparable = {
+  /** Nombre comparable. Junto con `ambito`: mismo nombre en el mismo lugar. */
+  nombre?: string;
+  ambito?: string;
+  serie?: string;
+  rfc?: string;
+  correo?: string;
+  /** Firma libre: en planes, «activo|frecuencia». */
+  firma?: string;
+};
+
 export type ResultadoFila =
-  | { ok: true; datos: Record<string, unknown>; clave: string }
-  | { ok: false; motivo: string };
+  | {
+      ok: true;
+      clave: string;
+      resumen: string;
+      datos: Record<string, unknown>;
+      comparar: Comparable;
+      advertencias: Falla[];
+    }
+  | { ok: false; resumen: string; fallas: Falla[] };
+
+export type Existente = { id: string; clave: string; resumen: string; comparar: Comparable };
+
+export type Contexto = {
+  /** Zona de la empresa: a qué hora empieza un día de una fecha importada. */
+  zona: string;
+  mapas: Record<string, Map<string, string>>;
+};
+
+export type Db = Prisma.TransactionClient;
 
 export type DefinicionImportacion = {
   titulo: string;
   descripcion: string;
-  /** Que debe existir antes de importar esto. */
+  /** Qué debe existir antes de importar esto. */
   requisitos?: string;
+  /** Errores comunes, para la ayuda de la pantalla. */
+  erroresComunes?: string[];
   columnas: Columna[];
   /** Recurso del plan que consume, si aplica. */
   recurso?: Recurso;
-  /** Datos que se cargan una vez y sirven para resolver referencias. */
+  /** Modelo de Prisma que se crea, para el lote y la reversión. */
+  entidad: string;
   contexto: (orgId: string) => Promise<Record<string, Map<string, string>>>;
-  /** Convierte un renglon en datos listos para insertar, o explica por que no. */
-  convertir: (
-    fila: Record<string, string>,
-    ctx: Record<string, Map<string, string>>,
-    orgId: string,
-  ) => ResultadoFila;
-  insertar: (orgId: string, datos: Record<string, unknown>) => Promise<unknown>;
-  /** Claves ya existentes, para omitir duplicados en vez de fallar. */
-  existentes: (orgId: string) => Promise<Set<string>>;
+  convertir: (fila: Record<string, string>, ctx: Contexto) => ResultadoFila;
+  existentes: (orgId: string) => Promise<Existente[]>;
+  insertar: (db: Db, orgId: string, datos: Record<string, unknown>) => Promise<{ id: string }>;
+  /**
+   * Actualiza el existente con lo del renglón. Devuelve cómo estaba, para que
+   * el lote pueda mostrarlo. Sin esta función, un duplicado exacto solo se
+   * omite.
+   */
+  actualizar?: (db: Db, orgId: string, id: string, datos: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
 
-const txt = (v?: string) => (v ?? "").trim();
-const num = (v?: string) => {
-  const limpio = txt(v).replace(/[$,\s]/g, "").replace(/,/g, "");
-  if (limpio === "") return null;
-  const n = Number(limpio);
-  return Number.isFinite(n) ? n : null;
-};
-const fecha = (v?: string) => {
-  const s = txt(v);
-  if (!s) return null;
-  // Se admite dd/mm/aaaa ademas de ISO: es lo que produce Excel en español.
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  const d = m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-};
+// ───────────────────────────────────────────────────────── Ayudantes ───
 
-async function mapaPorCodigo(
-  filas: Array<{ id: string; code: string }>,
-): Promise<Map<string, string>> {
-  return new Map(filas.map((f) => [f.code.toUpperCase(), f.id]));
+/** Recolecta fallas de columna en vez de detenerse en la primera. */
+class Renglon {
+  fallas: Falla[] = [];
+  advertencias: Falla[] = [];
+  constructor(readonly fila: Record<string, string>) {}
+
+  /** Texto obligatorio: si falta, se anota y se regresa vacío. */
+  requerido(columna: string, limite = 200, etiqueta?: string) {
+    const v = N.texto(this.fila[columna], limite);
+    if (!v) this.fallas.push({ columna, motivo: `Falta ${etiqueta ?? `«${columna}»`}` });
+    return v;
+  }
+  opcional(columna: string, limite = 500) {
+    return N.texto(this.fila[columna], limite) || null;
+  }
+  /** Veredicto de un normalizador: si falla, se anota en la columna. */
+  valor<T>(columna: string, v: N.Veredicto<T>, respaldo: T): T {
+    if (v.ok) return v.valor;
+    this.fallas.push({ columna, motivo: v.motivo });
+    return respaldo;
+  }
+  /** Igual, pero si falla solo avisa: el dato era opcional y se omite. */
+  valorOpcional<T>(columna: string, v: N.Veredicto<T | null>): T | null {
+    if (v.ok) return v.valor;
+    this.advertencias.push({ columna, motivo: `${v.motivo}. Se deja vacío.` });
+    return null;
+  }
+  referencia(columna: string, mapa: Map<string, string> | undefined, que: string, obligatoria: boolean) {
+    const v = N.codigo(this.fila[columna]);
+    if (!v) {
+      if (obligatoria) this.fallas.push({ columna, motivo: `Falta ${que}` });
+      return null;
+    }
+    const id = mapa?.get(v) ?? null;
+    if (!id) this.fallas.push({ columna, motivo: `No existe ${que} «${v}». Impórtelo o dé de alta primero.` });
+    return id;
+  }
+  resultado(clave: string, resumen: string, datos: Record<string, unknown>, comparar: Comparable): ResultadoFila {
+    if (this.fallas.length) return { ok: false, resumen, fallas: this.fallas };
+    return { ok: true, clave, resumen, datos, comparar, advertencias: this.advertencias };
+  }
 }
+
+const porCodigo = (filas: Array<{ id: string; code: string }>) =>
+  new Map(filas.map((f) => [N.codigo(f.code), f.id]));
+
+const fechaEnZona = (d: N.DiaCalendario | null, zona: string) =>
+  d ? medianocheEnZona(d.anio, d.mes, d.dia, zona) : null;
+
+/** Lo que había antes de actualizar, solo con los campos que se tocaron. */
+function antesDe(registro: Record<string, unknown>, datos: Record<string, unknown>) {
+  return Object.fromEntries(Object.keys(datos).map((k) => [k, registro[k] ?? null]));
+}
+
+/** Catálogo simple de código y nombre: se repite en seis tipos, se escribe una vez. */
+function catalogoSimple(p: {
+  titulo: string;
+  descripcion: string;
+  entidad: string;
+  ejemplo: [string, string];
+  campoNombre: "name" | "description";
+  conFamilia?: boolean;
+  conTarifa?: boolean;
+  delegado: (db: Db) => {
+    findMany: (a: unknown) => Promise<Array<Record<string, unknown>>>;
+    create: (a: unknown) => Promise<{ id: string }>;
+    update: (a: unknown) => Promise<unknown>;
+    findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;
+  };
+  /** Si el código conserva mayúsculas y minúsculas (unidades: «pza», no «PZA»). */
+  respetaCaso?: boolean;
+}): DefinicionImportacion {
+  const etiqueta = p.campoNombre === "name" ? "nombre" : "descripcion";
+  return {
+    titulo: p.titulo,
+    descripcion: p.descripcion,
+    entidad: p.entidad,
+    columnas: [
+      { nombre: "codigo", requerido: true, ejemplo: p.ejemplo[0] },
+      { nombre: etiqueta, requerido: true, ejemplo: p.ejemplo[1] },
+      ...(p.conFamilia ? [{ nombre: "familia", ejemplo: "MECANICO" }] : []),
+      ...(p.conTarifa ? [{ nombre: "tarifa_hora", ayuda: "Costo interno de la hora-hombre", ejemplo: "180" }] : []),
+    ],
+    contexto: async () => ({}),
+    convertir: (f) => {
+      const r = new Renglon(f);
+      const bruto = r.requerido("codigo", 60, "el código");
+      const code = p.respetaCaso ? N.texto(bruto, 60) : N.codigo(bruto);
+      const nombre = r.requerido(etiqueta, 200, `el ${etiqueta}`);
+      const datos: Record<string, unknown> = { code, [p.campoNombre]: nombre };
+      if (p.conFamilia) datos.category = r.opcional("familia", 60);
+      if (p.conTarifa) datos.hourlyRate = r.valor("tarifa_hora", N.numero(f.tarifa_hora, { minimo: 0, campo: "La tarifa" }), 0) ?? 0;
+      return r.resultado(N.codigo(code), nombre || code, datos, { nombre: N.claveComparable(nombre) });
+    },
+    existentes: async (orgId) =>
+      (await p.delegado(prisma as unknown as Db).findMany({ where: { organizationId: orgId } })).map((x) => ({
+        id: String(x.id),
+        clave: N.codigo(String(x.code)),
+        resumen: String(x[p.campoNombre] ?? x.code),
+        comparar: { nombre: N.claveComparable(String(x[p.campoNombre] ?? "")) },
+      })),
+    insertar: (db, orgId, d) => p.delegado(db).create({ data: { ...d, organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _orgId, id, d) => {
+      const { code: _codigo, ...cambios } = d;
+      void _codigo;
+      const antes = await p.delegado(db).findUnique({ where: { id } });
+      await p.delegado(db).update({ where: { id }, data: cambios });
+      return antesDe(antes ?? {}, cambios);
+    },
+  };
+}
+
+// ────────────────────────────────────────────────────── Definiciones ───
 
 export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   // ─────────────────────────────────────────────────────────── Sitios
   sitios: {
     titulo: "Sitios",
-    descripcion: "Plantas o centros de trabajo. Importelos primero: los activos y las ubicaciones dependen de ellos.",
+    descripcion: "Plantas, edificios, sucursales o centros de trabajo. Impórtelos primero: los activos y las ubicaciones dependen de ellos.",
+    erroresComunes: ["Dos sitios con el mismo código", "Usar el nombre en lugar del código en los archivos que siguen"],
     recurso: "sites",
+    entidad: "Site",
     columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "P01", ayuda: "Corto y unico" },
+      { nombre: "codigo", requerido: true, ejemplo: "P01", ayuda: "Corto y único" },
       { nombre: "nombre", requerido: true, ejemplo: "Planta Apodaca" },
       { nombre: "ciudad", ejemplo: "Apodaca" },
       { nombre: "direccion", ejemplo: "Parque Industrial Milenium" },
     ],
     contexto: async () => ({}),
     convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el código" };
-      if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
-      return {
-        ok: true, clave: code,
-        datos: { code, name: txt(f.nombre), city: txt(f.ciudad) || null, address: txt(f.direccion) || null },
-      };
+      const r = new Renglon(f);
+      const code = N.codigo(r.requerido("codigo", 30, "el código"));
+      const nombre = r.requerido("nombre", 120, "el nombre");
+      return r.resultado(code, nombre || code,
+        { code, name: nombre, city: r.opcional("ciudad", 80), address: r.opcional("direccion", 200) },
+        { nombre: N.claveComparable(nombre) });
     },
-    insertar: (orgId, d) => prisma.site.create({ data: { ...d, organizationId: orgId } as never }),
     existentes: async (orgId) =>
-      new Set((await prisma.site.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
+      (await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, code: true, name: true } }))
+        .map((x) => ({ id: x.id, clave: N.codigo(x.code), resumen: x.name, comparar: { nombre: N.claveComparable(x.name) } })),
+    insertar: (db, orgId, d) => db.site.create({ data: { ...(d as { code: string; name: string }), organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _o, id, d) => {
+      const { code: _c, ...cambios } = d; void _c;
+      const antes = await db.site.findUniqueOrThrow({ where: { id } });
+      await db.site.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
+    },
   },
 
   // ────────────────────────────────────────────────────── Ubicaciones
   ubicaciones: {
     titulo: "Ubicaciones",
-    descripcion: "Áreas, lineas o cuartos dentro de un sitio.",
+    descripcion: "Áreas, líneas, cuartos o niveles dentro de un sitio.",
     requisitos: "Los sitios deben existir.",
+    erroresComunes: ["Poner el nombre del sitio en vez de su código", "Repetir el mismo nombre de ubicación con otro código"],
+    entidad: "Location",
     columnas: [
       { nombre: "sitio", requerido: true, ejemplo: "P01", ayuda: "Código del sitio" },
       { nombre: "codigo", requerido: true, ejemplo: "LIN-A" },
-      { nombre: "nombre", requerido: true, ejemplo: "Línea de produccion A" },
+      { nombre: "nombre", requerido: true, ejemplo: "Línea de producción A" },
       { nombre: "descripcion", ejemplo: "Nave norte" },
     ],
     contexto: async (orgId) => ({
-      sitios: await mapaPorCodigo(await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
+      sitios: porCodigo(await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
     }),
     convertir: (f, ctx) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el código" };
-      if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
-      const siteId = ctx.sitios.get(txt(f.sitio).toUpperCase());
-      if (!siteId) return { ok: false, motivo: `El sitio "${txt(f.sitio)}" no existe` };
-      return {
-        ok: true, clave: `${txt(f.sitio).toUpperCase()}|${code}`,
-        datos: { code, name: txt(f.nombre), description: txt(f.descripcion) || null, siteId },
-      };
+      const r = new Renglon(f);
+      const siteId = r.referencia("sitio", ctx.mapas.sitios, "el sitio", true);
+      const code = N.codigo(r.requerido("codigo", 30, "el código"));
+      const nombre = r.requerido("nombre", 120, "el nombre");
+      return r.resultado(`${N.codigo(f.sitio)}|${code}`, nombre || code,
+        { code, name: nombre, description: r.opcional("descripcion", 300), siteId },
+        { nombre: N.claveComparable(nombre), ambito: siteId ?? "" });
     },
-    insertar: (orgId, d) => prisma.location.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) => {
-      const filas = await prisma.location.findMany({
+    existentes: async (orgId) =>
+      (await prisma.location.findMany({
         where: { organizationId: orgId },
-        select: { code: true, site: { select: { code: true } } },
-      });
-      return new Set(filas.map((x) => `${x.site.code.toUpperCase()}|${x.code.toUpperCase()}`));
+        select: { id: true, code: true, name: true, siteId: true, site: { select: { code: true } } },
+      })).map((x) => ({
+        id: x.id, clave: `${N.codigo(x.site.code)}|${N.codigo(x.code)}`, resumen: x.name,
+        comparar: { nombre: N.claveComparable(x.name), ambito: x.siteId },
+      })),
+    insertar: (db, orgId, d) => db.location.create({ data: { ...(d as { code: string; name: string; siteId: string }), organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _o, id, d) => {
+      const { code: _c, siteId: _s, ...cambios } = d; void _c; void _s;
+      const antes = await db.location.findUniqueOrThrow({ where: { id } });
+      await db.location.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
     },
   },
 
-  // ────────────────────────────────────────── Categorias de activo
-  "categorias-activo": {
+  // ────────────────────────────────────────── Categorías de activo
+  "categorias-activo": catalogoSimple({
     titulo: "Categorías de activo",
     descripcion: "Familias de equipo para agrupar y filtrar.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "BOMB" },
-      { nombre: "nombre", requerido: true, ejemplo: "Bombas centrifugas" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
-      return { ok: true, clave: code, datos: { code, name: txt(f.nombre) } };
-    },
-    insertar: (orgId, d) => prisma.assetCategory.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.assetCategory.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+    entidad: "AssetCategory",
+    ejemplo: ["BOMB", "Bombas centrífugas"],
+    campoNombre: "name",
+    delegado: (db) => db.assetCategory as never,
+  }),
 
   // ────────────────────────────────────────────────────────── Activos
   activos: {
     titulo: "Activos",
-    descripcion: "El catálogo de equipos. Es la importación mas importante y la que mas tiempo ahorra.",
+    descripcion: "El catálogo de equipos. Es la importación más importante y la que más tiempo ahorra.",
     requisitos: "Los sitios deben existir. Ubicaciones y categorías son opcionales, pero si se indican deben existir.",
+    erroresComunes: [
+      "Fechas en formato mes/día: se leen como día/mes (15/09/2026)",
+      "El mismo equipo con dos TAG distintos: se detecta como posible duplicado por nombre y ubicación, o por número de serie",
+      "Poner el nombre de la ubicación en vez de su código",
+    ],
     recurso: "assets",
+    entidad: "Asset",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "BOM-101", ayuda: "TAG del equipo, no se puede repetir" },
-      { nombre: "nombre", requerido: true, ejemplo: "Bomba centrifuga de alimentacion" },
+      { nombre: "nombre", requerido: true, ejemplo: "Bomba centrífuga de alimentación" },
       { nombre: "sitio", requerido: true, ejemplo: "P01", ayuda: "Código del sitio" },
       { nombre: "ubicacion", ejemplo: "LIN-A", ayuda: "Código de la ubicación" },
       { nombre: "categoria", ejemplo: "BOMB", ayuda: "Código de la categoría" },
@@ -176,68 +330,80 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "fecha_compra", ejemplo: "12/10/2023", ayuda: "dd/mm/aaaa" },
       { nombre: "costo_adquisicion", ejemplo: "95000" },
       { nombre: "costo_reposicion", ejemplo: "130000" },
-      { nombre: "fin_garantia", ejemplo: "29/04/2026" },
+      { nombre: "fin_garantia", ejemplo: "29/04/2026", ayuda: "dd/mm/aaaa" },
     ],
-    contexto: async (orgId) => ({
-      sitios: await mapaPorCodigo(await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
-      ubicaciones: await mapaPorCodigo(await prisma.location.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
-      categorias: await mapaPorCodigo(await prisma.assetCategory.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
-    }),
-    convertir: (f, ctx) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el codigo (TAG)" };
-      if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
-
-      const siteId = ctx.sitios.get(txt(f.sitio).toUpperCase());
-      if (!siteId) return { ok: false, motivo: `El sitio "${txt(f.sitio)}" no existe` };
-
-      let locationId: string | null = null;
-      if (txt(f.ubicacion)) {
-        locationId = ctx.ubicaciones.get(txt(f.ubicacion).toUpperCase()) ?? null;
-        if (!locationId) return { ok: false, motivo: `La ubicacion "${txt(f.ubicacion)}" no existe` };
-      }
-      let categoryId: string | null = null;
-      if (txt(f.categoria)) {
-        categoryId = ctx.categorias.get(txt(f.categoria).toUpperCase()) ?? null;
-        if (!categoryId) return { ok: false, motivo: `La categoria "${txt(f.categoria)}" no existe` };
-      }
-
-      const criticidad = (txt(f.criticidad) || "B").toUpperCase();
-      if (!["A", "B", "C"].includes(criticidad)) {
-        return { ok: false, motivo: `Criticidad "${txt(f.criticidad)}" invalida: use A, B o C` };
-      }
-      const estado = (txt(f.estado) || "OPERATIONAL").toUpperCase();
-      if (!["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY", "RETIRED"].includes(estado)) {
-        return { ok: false, motivo: `Estado "${txt(f.estado)}" invalido` };
-      }
-
+    contexto: async (orgId) => {
+      const ubicaciones = await prisma.location.findMany({
+        where: { organizationId: orgId }, select: { id: true, code: true, siteId: true },
+      });
       return {
-        ok: true, clave: code,
-        datos: {
-          code, name: txt(f.nombre), siteId, locationId, categoryId,
-          criticality: criticidad, status: estado,
-          manufacturer: txt(f.fabricante) || null,
-          model: txt(f.modelo) || null,
-          serialNumber: txt(f.numero_serie) || null,
-          description: txt(f.descripcion) || null,
-          purchaseDate: fecha(f.fecha_compra),
-          purchaseCost: num(f.costo_adquisicion) ?? 0,
-          replacementCost: num(f.costo_reposicion) ?? 0,
-          warrantyExpiry: fecha(f.fin_garantia),
-        },
+        sitios: porCodigo(await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
+        ubicaciones: porCodigo(ubicaciones),
+        // De que sitio es cada ubicacion: un equipo no puede estar en el sitio A
+        // y en una ubicacion del sitio B.
+        sitioDeUbicacion: new Map(ubicaciones.map((u) => [u.id, u.siteId])),
+        categorias: porCodigo(await prisma.assetCategory.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
       };
     },
-    insertar: (orgId, d) => prisma.asset.create({ data: { ...d, organizationId: orgId } as never }),
+    convertir: (f, ctx) => {
+      const r = new Renglon(f);
+      const code = N.codigo(r.requerido("codigo", 40, "el código (TAG)"));
+      const nombre = r.requerido("nombre", 160, "el nombre");
+      const siteId = r.referencia("sitio", ctx.mapas.sitios, "el sitio", true);
+      const locationId = r.referencia("ubicacion", ctx.mapas.ubicaciones, "la ubicación", false);
+      if (locationId && siteId && ctx.mapas.sitioDeUbicacion.get(locationId) !== siteId) {
+        r.fallas.push({ columna: "ubicacion", motivo: `La ubicación «${N.codigo(f.ubicacion)}» es de otro sitio` });
+      }
+      const categoryId = r.referencia("categoria", ctx.mapas.categorias, "la categoría", false);
+
+      const criticidad = (N.texto(f.criticidad, 2) || "B").toUpperCase();
+      if (!["A", "B", "C"].includes(criticidad)) r.fallas.push({ columna: "criticidad", motivo: `Criticidad «${f.criticidad}» inválida: use A, B o C` });
+      const estado = (N.texto(f.estado, 20) || "OPERATIONAL").toUpperCase();
+      if (!["OPERATIONAL", "DEGRADED", "DOWN", "STANDBY", "RETIRED"].includes(estado)) {
+        r.fallas.push({ columna: "estado", motivo: `Estado «${f.estado}» inválido: use OPERATIONAL, DEGRADED, DOWN, STANDBY o RETIRED` });
+      }
+      if (!locationId) r.advertencias.push({ columna: "ubicacion", motivo: "Sin ubicación: el técnico no sabrá dónde encontrarlo, y la puesta en marcha lo marcará incompleto" });
+
+      const serieNum = N.serie(f.numero_serie) || null;
+      return r.resultado(code, nombre || code, {
+        code, name: nombre, siteId, locationId, categoryId,
+        criticality: criticidad, status: estado,
+        manufacturer: r.opcional("fabricante", 80),
+        model: r.opcional("modelo", 80),
+        serialNumber: serieNum,
+        description: r.opcional("descripcion", 500),
+        purchaseDate: fechaEnZona(r.valorOpcional("fecha_compra", N.fecha(f.fecha_compra, "La fecha de compra")), ctx.zona),
+        purchaseCost: r.valor("costo_adquisicion", N.numero(f.costo_adquisicion, { minimo: 0, campo: "El costo" }), 0) ?? 0,
+        replacementCost: r.valor("costo_reposicion", N.numero(f.costo_reposicion, { minimo: 0, campo: "El costo" }), 0) ?? 0,
+        warrantyExpiry: fechaEnZona(r.valorOpcional("fin_garantia", N.fecha(f.fin_garantia, "El fin de garantía")), ctx.zona),
+      }, { nombre: N.claveComparable(nombre), ambito: locationId ?? siteId ?? "", serie: serieNum ? N.serieComparable(serieNum) : undefined });
+    },
     existentes: async (orgId) =>
-      new Set((await prisma.asset.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
+      (await prisma.asset.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, code: true, name: true, siteId: true, locationId: true, serialNumber: true },
+      })).map((x) => ({
+        id: x.id, clave: N.codigo(x.code), resumen: x.name,
+        comparar: { nombre: N.claveComparable(x.name), ambito: x.locationId ?? x.siteId, serie: x.serialNumber ? N.serieComparable(x.serialNumber) : undefined },
+      })),
+    insertar: (db, orgId, d) => db.asset.create({ data: { ...(d as { code: string; name: string; siteId: string }), organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _o, id, d) => {
+      const { code: _c, ...cambios } = d; void _c;
+      const antes = await db.asset.findUniqueOrThrow({ where: { id } });
+      await db.asset.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
+    },
   },
 
   // ──────────────────────────────────────────────────────── Proveedores
   proveedores: {
     titulo: "Proveedores",
-    descripcion: "Quien surte las refacciones.",
+    descripcion: "Quién surte las refacciones y los servicios.",
+    erroresComunes: ["El mismo proveedor con razón social y nombre comercial: el RFC lo delata", "Teléfonos con letras o extensiones pegadas"],
+    entidad: "Supplier",
     columnas: [
       { nombre: "nombre", requerido: true, ejemplo: "Refacciones Industriales del Norte" },
+      { nombre: "rfc", ejemplo: "RIN850101AB3", ayuda: "Opcional; si lo tiene, evita duplicados" },
       { nombre: "contacto", ejemplo: "Ing. Patricia Luna" },
       { nombre: "correo", ejemplo: "ventas@refaccionesnorte.mx" },
       { nombre: "telefono", ejemplo: "81 8100 2200" },
@@ -245,156 +411,169 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     ],
     contexto: async () => ({}),
     convertir: (f) => {
-      const nombre = txt(f.nombre);
-      if (!nombre) return { ok: false, motivo: "Falta el nombre" };
-      const correo = txt(f.correo);
-      if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
-        return { ok: false, motivo: `Correo "${correo}" invalido` };
-      }
-      return {
-        ok: true, clave: nombre.toUpperCase(),
-        datos: {
-          name: nombre, contactName: txt(f.contacto) || null,
-          email: correo || null, phone: txt(f.telefono) || null,
-          leadTimeDays: num(f.dias_entrega) ?? 7,
-        },
-      };
+      const r = new Renglon(f);
+      const nombre = r.requerido("nombre", 160, "el nombre");
+      const rfc = r.valor("rfc", N.rfc(f.rfc), null);
+      const correo = r.valor("correo", N.correo(f.correo), null);
+      const telefono = r.valorOpcional("telefono", N.telefono(f.telefono));
+      return r.resultado(N.claveComparable(nombre), nombre, {
+        name: nombre, rfc, contactName: r.opcional("contacto", 120),
+        email: correo, phone: telefono,
+        leadTimeDays: r.valor("dias_entrega", N.numero(f.dias_entrega, { minimo: 0, entero: true, campo: "Los días de entrega" }), 7) ?? 7,
+      }, { nombre: N.claveComparable(nombre), rfc: rfc ?? undefined });
     },
-    insertar: (orgId, d) => prisma.supplier.create({ data: { ...d, organizationId: orgId } as never }),
     existentes: async (orgId) =>
-      new Set((await prisma.supplier.findMany({ where: { organizationId: orgId }, select: { name: true } })).map((x) => x.name.toUpperCase())),
+      (await prisma.supplier.findMany({ where: { organizationId: orgId }, select: { id: true, name: true, rfc: true } }))
+        .map((x) => ({ id: x.id, clave: N.claveComparable(x.name), resumen: x.name, comparar: { nombre: N.claveComparable(x.name), rfc: x.rfc ?? undefined } })),
+    insertar: (db, orgId, d) => db.supplier.create({ data: { ...(d as { name: string }), organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _o, id, d) => {
+      const { name: _n, ...cambios } = d; void _n;
+      const antes = await db.supplier.findUniqueOrThrow({ where: { id } });
+      await db.supplier.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
+    },
   },
 
-  // ──────────────────────────────────── Familias de refaccion
-  "familias-refaccion": {
+  // ──────────────────────────────────── Familias de refacción
+  "familias-refaccion": catalogoSimple({
     titulo: "Familias de refacción",
     descripcion: "Clasificación de las refacciones del almacén.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "RODAMIENTOS" },
-      { nombre: "nombre", requerido: true, ejemplo: "Rodamientos y baleros" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
-      return { ok: true, clave: code, datos: { code, name: txt(f.nombre) } };
-    },
-    insertar: (orgId, d) => prisma.partCategory.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.partCategory.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+    entidad: "PartCategory",
+    ejemplo: ["RODAMIENTOS", "Rodamientos y baleros"],
+    campoNombre: "name",
+    delegado: (db) => db.partCategory as never,
+  }),
 
   // ──────────────────────────────────────────── Unidades de medida
-  unidades: {
+  unidades: catalogoSimple({
     titulo: "Unidades de medida",
-    descripcion: "Como se cuenta cada refacción.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "pza" },
-      { nombre: "nombre", requerido: true, ejemplo: "Pieza" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo);
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
-      return { ok: true, clave: code.toUpperCase(), datos: { code, name: txt(f.nombre) } };
-    },
-    insertar: (orgId, d) => prisma.partUnit.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.partUnit.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+    descripcion: "Cómo se cuenta cada refacción.",
+    entidad: "PartUnit",
+    ejemplo: ["pza", "Pieza"],
+    campoNombre: "name",
+    respetaCaso: true,
+    delegado: (db) => db.partUnit as never,
+  }),
 
   // ────────────────────────────────────────────────────── Refacciones
   refacciones: {
     titulo: "Refacciones",
     descripcion: "El catálogo del almacén con sus existencias iniciales.",
-    requisitos: "Las familias y unidades deben existir. El proveedor es opcional.",
+    requisitos: "Las familias y unidades deben existir, y la cuenta debe tener un almacén si trae existencias. El proveedor es opcional.",
+    erroresComunes: [
+      "Unidades escritas de muchas formas: «Pieza», «pz» y «PZA» se reconocen como la misma",
+      "Existencia con decimales en una unidad que no los admite",
+      "Mínimo mayor que máximo",
+    ],
+    entidad: "Part",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "ROD-6205" },
       { nombre: "nombre", requerido: true, ejemplo: "Rodamiento 6205-2RS" },
       { nombre: "unidad", requerido: true, ejemplo: "pza", ayuda: "Código de la unidad" },
       { nombre: "familia", ejemplo: "RODAMIENTOS", ayuda: "Código de la familia" },
-      { nombre: "proveedor", ejemplo: "Refacciones Industriales del Norte", ayuda: "Nombre exacto" },
-      { nombre: "descripcion", ejemplo: "Rodamiento rigido de bolas" },
+      { nombre: "proveedor", ejemplo: "Refacciones Industriales del Norte", ayuda: "Nombre del proveedor" },
+      { nombre: "descripcion", ejemplo: "Rodamiento rígido de bolas" },
       { nombre: "costo_unitario", ejemplo: "320" },
-      { nombre: "existencia", ejemplo: "12", ayuda: "Cantidad inicial en almacén" },
+      { nombre: "existencia", ejemplo: "12", ayuda: "Cantidad inicial en el almacén general" },
       { nombre: "minimo", ejemplo: "4" },
       { nombre: "maximo", ejemplo: "20" },
       { nombre: "ubicacion_almacen", ejemplo: "A-03-2" },
     ],
-    contexto: async (orgId) => ({
-      familias: await mapaPorCodigo(await prisma.partCategory.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
-      unidades: await mapaPorCodigo(await prisma.partUnit.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
-      proveedores: new Map(
-        (await prisma.supplier.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }))
-          .map((s) => [s.name.toUpperCase(), s.id]),
-      ),
-      // Se guarda el codigo tal cual esta en el catalogo, respetando mayusculas.
-      unidadesTexto: new Map(
-        (await prisma.partUnit.findMany({ where: { organizationId: orgId }, select: { code: true } }))
-          .map((u) => [u.code.toUpperCase(), u.code]),
-      ),
-      familiasTexto: new Map(
-        (await prisma.partCategory.findMany({ where: { organizationId: orgId }, select: { code: true } }))
-          .map((c) => [c.code.toUpperCase(), c.code]),
-      ),
-    }),
-    convertir: (f, ctx) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code) return { ok: false, motivo: "Falta el código" };
-      if (!txt(f.nombre)) return { ok: false, motivo: "Falta el nombre" };
-
-      const unidad = ctx.unidadesTexto.get(txt(f.unidad).toUpperCase());
-      if (!unidad) return { ok: false, motivo: `La unidad "${txt(f.unidad)}" no esta en el catalogo` };
-
-      let familia: string | null = null;
-      if (txt(f.familia)) {
-        familia = ctx.familiasTexto.get(txt(f.familia).toUpperCase()) ?? null;
-        if (!familia) return { ok: false, motivo: `La familia "${txt(f.familia)}" no esta en el catalogo` };
-      }
-      let supplierId: string | null = null;
-      if (txt(f.proveedor)) {
-        supplierId = ctx.proveedores.get(txt(f.proveedor).toUpperCase()) ?? null;
-        if (!supplierId) return { ok: false, motivo: `El proveedor "${txt(f.proveedor)}" no existe` };
-      }
-
+    contexto: async (orgId) => {
+      const [familias, unidades, proveedores, almacen] = await Promise.all([
+        prisma.partCategory.findMany({ where: { organizationId: orgId }, select: { code: true } }),
+        prisma.partUnit.findMany({ where: { organizationId: orgId }, select: { code: true } }),
+        prisma.supplier.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+        prisma.warehouse.findFirst({
+          where: { organizationId: orgId, active: true },
+          orderBy: [{ esGeneral: "desc" }, { code: "asc" }],
+          select: { id: true },
+        }),
+      ]);
       return {
-        ok: true, clave: code,
-        datos: {
-          code, name: txt(f.nombre), unit: unidad, category: familia, supplierId,
-          description: txt(f.descripcion) || null,
-          unitCost: num(f.costo_unitario) ?? 0,
-          quantityOnHand: num(f.existencia) ?? 0,
-          minQuantity: num(f.minimo) ?? 0,
-          maxQuantity: num(f.maximo) ?? 0,
-          bin: txt(f.ubicacion_almacen) || null,
-        },
+        // Se guarda el código tal cual está en el catálogo, respetando mayúsculas.
+        unidades: new Map(unidades.map((u) => [N.unidad(u.code), u.code])),
+        familias: new Map(familias.map((c) => [N.codigo(c.code), c.code])),
+        proveedores: new Map(proveedores.map((s) => [N.claveComparable(s.name), s.id])),
+        almacen: new Map(almacen ? [["general", almacen.id]] : []),
       };
     },
-    insertar: async (orgId, d) => {
-      const datos = d as { quantityOnHand: number; unitCost: number };
-      const part = await prisma.part.create({
-        data: { ...d, quantityOnHand: 0, organizationId: orgId } as never,
+    convertir: (f, ctx) => {
+      const r = new Renglon(f);
+      const code = N.codigo(r.requerido("codigo", 40, "el código"));
+      const nombre = r.requerido("nombre", 160, "el nombre");
+
+      let unidad: string | null = null;
+      if (N.texto(f.unidad)) {
+        unidad = ctx.mapas.unidades.get(N.unidad(f.unidad)) ?? null;
+        if (!unidad) r.fallas.push({ columna: "unidad", motivo: `La unidad «${f.unidad}» no está en el catálogo` });
+      } else r.fallas.push({ columna: "unidad", motivo: "Falta la unidad" });
+
+      let familia: string | null = null;
+      if (N.texto(f.familia)) {
+        familia = ctx.mapas.familias.get(N.codigo(f.familia)) ?? null;
+        if (!familia) r.fallas.push({ columna: "familia", motivo: `La familia «${f.familia}» no está en el catálogo` });
+      }
+      let supplierId: string | null = null;
+      if (N.texto(f.proveedor)) {
+        supplierId = ctx.mapas.proveedores.get(N.claveComparable(f.proveedor)) ?? null;
+        if (!supplierId) r.fallas.push({ columna: "proveedor", motivo: `El proveedor «${f.proveedor}» no existe` });
+      }
+
+      const existencia = r.valor("existencia", N.numero(f.existencia, { minimo: 0, campo: "La existencia" }), 0) ?? 0;
+      const minimo = r.valor("minimo", N.numero(f.minimo, { minimo: 0, campo: "El mínimo" }), 0) ?? 0;
+      const maximo = r.valor("maximo", N.numero(f.maximo, { minimo: 0, campo: "El máximo" }), 0) ?? 0;
+      if (maximo > 0 && minimo > maximo) r.fallas.push({ columna: "minimo", motivo: `El mínimo (${minimo}) es mayor que el máximo (${maximo})` });
+      if (existencia > 0 && !ctx.mapas.almacen.get("general")) {
+        r.fallas.push({ columna: "existencia", motivo: "La cuenta no tiene almacén: dé de alta uno antes de importar existencias" });
+      }
+      const costo = r.valor("costo_unitario", N.numero(f.costo_unitario, { minimo: 0, campo: "El costo" }), 0) ?? 0;
+      if (existencia > 0 && costo === 0) {
+        r.advertencias.push({ columna: "costo_unitario", motivo: "Existencia sin costo: el inventario valdrá $0 y el consumo no cargará costo a las órdenes" });
+      }
+
+      return r.resultado(code, nombre || code, {
+        code, name: nombre, unit: unidad, category: familia, supplierId,
+        description: r.opcional("descripcion", 500),
+        unitCost: costo, quantityOnHand: existencia, minQuantity: minimo, maxQuantity: maximo,
+        bin: r.opcional("ubicacion_almacen", 40),
+        almacenId: ctx.mapas.almacen.get("general") ?? null,
+      }, { nombre: N.claveComparable(nombre) });
+    },
+    existentes: async (orgId) =>
+      (await prisma.part.findMany({ where: { organizationId: orgId }, select: { id: true, code: true, name: true } }))
+        .map((x) => ({ id: x.id, clave: N.codigo(x.code), resumen: x.name, comparar: { nombre: N.claveComparable(x.name) } })),
+    /**
+     * La existencia inicial entra como MOVIMIENTO, dentro de la misma
+     * transacción: el kardex cuadra desde el primer día y queda asentada en un
+     * almacén. Si el movimiento falla, la refacción tampoco se crea.
+     */
+    insertar: async (db, orgId, d) => {
+      const { quantityOnHand, almacenId, ...datos } = d as { quantityOnHand: number; almacenId: string | null; unitCost: number } & Record<string, unknown>;
+      const part = await db.part.create({
+        data: { ...(datos as unknown as { code: string; name: string; unit: string }), quantityOnHand: 0, organizationId: orgId },
+        select: { id: true },
       });
-      // La existencia inicial entra como movimiento, para que el kardex cuadre
-      // desde el primer dia en vez de aparecer una cantidad sin origen, y para
-      // que quede asentada en un almacen concreto.
-      if (datos.quantityOnHand > 0) {
-        const almacen = await almacenPorOmision(orgId);
-        if (!almacen) throw new Error("La cuenta no tiene ningún almacén activo");
+      if (quantityOnHand > 0 && almacenId) {
         await aplicarMovimiento({
-          organizationId: orgId,
-          partId: (part as { id: string }).id,
-          warehouseId: almacen.id,
-          tipo: "IN",
-          cantidad: datos.quantityOnHand,
-          costoUnitario: datos.unitCost,
+          organizationId: orgId, partId: part.id, warehouseId: almacenId,
+          tipo: "IN", cantidad: quantityOnHand, costoUnitario: datos.unitCost as number,
           referencia: "Importación inicial",
-        });
+        }, db);
       }
       return part;
     },
-    existentes: async (orgId) =>
-      new Set((await prisma.part.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
+    /**
+     * Actualizar NO toca la existencia: mover stock solo pasa por
+     * `aplicarMovimiento`, y una importación no es un conteo. Si cambió, se
+     * ajusta desde el almacén, con su motivo.
+     */
+    actualizar: async (db, _o, id, d) => {
+      const { code: _c, quantityOnHand: _q, almacenId: _a, ...cambios } = d; void _c; void _q; void _a;
+      const antes = await db.part.findUniqueOrThrow({ where: { id } });
+      await db.part.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
+    },
   },
 
   // ──────────────────────────────────────────────────────────── Planes
@@ -402,8 +581,13 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     titulo: "Planes de mantenimiento",
     descripcion: "Los planes preventivos por calendario, cada uno ya aplicado a su equipo. Para que generen órdenes les faltan sus actividades: se agregan después, abriendo cada plan.",
     requisitos: "Los activos deben existir.",
+    erroresComunes: [
+      "Frecuencia en texto («mensual»): se escribe en días (30)",
+      "Dos planes del mismo equipo con la misma frecuencia: se marcan como posible duplicado",
+    ],
+    entidad: "MaintenancePlan",
     columnas: [
-      { nombre: "nombre", requerido: true, ejemplo: "Lubricacion mensual de bomba" },
+      { nombre: "nombre", requerido: true, ejemplo: "Lubricación mensual de bomba" },
       { nombre: "activo", requerido: true, ejemplo: "BOM-101", ayuda: "Código (TAG) del activo" },
       { nombre: "cada_dias", requerido: true, ejemplo: "30", ayuda: "Frecuencia en días" },
       { nombre: "prioridad", ejemplo: "MEDIUM", ayuda: "LOW, MEDIUM, HIGH o CRITICAL" },
@@ -414,145 +598,125 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "primer_vencimiento", ejemplo: "15/09/2026", ayuda: "dd/mm/aaaa. Si se omite, se calcula" },
     ],
     contexto: async (orgId) => ({
-      activos: await mapaPorCodigo(await prisma.asset.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
+      activos: porCodigo(await prisma.asset.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
     }),
     convertir: (f, ctx) => {
-      const nombre = txt(f.nombre);
-      if (!nombre) return { ok: false, motivo: "Falta el nombre del plan" };
-      const assetId = ctx.activos.get(txt(f.activo).toUpperCase());
-      if (!assetId) return { ok: false, motivo: `El activo "${txt(f.activo)}" no existe` };
+      const r = new Renglon(f);
+      const nombre = r.requerido("nombre", 160, "el nombre del plan");
+      const assetId = r.referencia("activo", ctx.mapas.activos, "el activo", true);
+      const dias = r.valor("cada_dias", N.numero(f.cada_dias, { minimo: 1, entero: true, campo: "La frecuencia" }), null);
+      if (dias === null && N.texto(f.cada_dias) === "") r.fallas.push({ columna: "cada_dias", motivo: "Falta la frecuencia en días" });
 
-      const dias = num(f.cada_dias);
-      if (!dias || dias < 1) return { ok: false, motivo: "La frecuencia en días debe ser un número mayor que cero" };
-
-      const prioridad = (txt(f.prioridad) || "MEDIUM").toUpperCase();
+      const prioridad = (N.texto(f.prioridad, 10) || "MEDIUM").toUpperCase();
       if (!["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(prioridad)) {
-        return { ok: false, motivo: `Prioridad "${txt(f.prioridad)}" invalida` };
+        r.fallas.push({ columna: "prioridad", motivo: `Prioridad «${f.prioridad}» inválida: use LOW, MEDIUM, HIGH o CRITICAL` });
       }
+      const primer = r.valor("primer_vencimiento", N.fecha(f.primer_vencimiento, "El primer vencimiento"), null);
+      const proximo = primer
+        ? fechaEnZona(primer, ctx.zona)
+        : dias ? new Date(Date.now() + dias * 86_400_000) : null;
 
-      const paro = txt(f.requiere_paro).toUpperCase();
-      const proximo = fecha(f.primer_vencimiento) ?? new Date(Date.now() + dias * 86_400_000);
-
-      return {
-        ok: true, clave: `${txt(f.activo).toUpperCase()}|${nombre.toUpperCase()}`,
-        datos: {
-          name: nombre, assetId, intervalDays: dias,
-          maintenanceType: "PREVENTIVE", triggerType: "CALENDAR",
-          priority: prioridad,
-          estimatedHours: num(f.horas_estimadas) ?? 1,
-          leadTimeDays: num(f.anticipacion_dias) ?? 3,
-          description: txt(f.descripcion) || null,
-          requiresShutdown: ["SI", "SÍ", "YES", "TRUE", "1"].includes(paro),
-          nextDueDate: proximo,
-        },
-      };
+      r.advertencias.push({ motivo: "El plan se importa sin actividades: agréguelas abriendo el plan, o no generará órdenes" });
+      return r.resultado(`${N.codigo(f.activo)}|${N.claveComparable(nombre)}`, nombre, {
+        name: nombre, assetId, intervalDays: dias,
+        maintenanceType: "PREVENTIVE", triggerType: "CALENDAR",
+        priority: prioridad,
+        estimatedHours: r.valor("horas_estimadas", N.numero(f.horas_estimadas, { minimo: 0, campo: "Las horas" }), 1) ?? 1,
+        leadTimeDays: r.valor("anticipacion_dias", N.numero(f.anticipacion_dias, { minimo: 0, entero: true, campo: "La anticipación" }), 3) ?? 3,
+        description: r.opcional("descripcion", 500),
+        requiresShutdown: N.siNo(f.requiere_paro),
+        nextDueDate: proximo,
+      }, { nombre: N.claveComparable(nombre), firma: assetId && dias ? `${assetId}|${dias}` : undefined });
     },
+    existentes: async (orgId) =>
+      (await prisma.maintenancePlan.findMany({
+        where: { organizationId: orgId },
+        select: {
+          id: true, name: true, assetId: true, intervalDays: true,
+          asset: { select: { code: true } },
+          asignaciones: { select: { assetId: true, asset: { select: { code: true } } } },
+        },
+      })).flatMap((p) => {
+        // Un plan puede estar en varios equipos: cuenta como existente en cada
+        // uno. Las asignaciones mandan; el equipo del encabezado es el respaldo
+        // de los planes viejos.
+        const equipos = new Map<string, string>();
+        for (const a of p.asignaciones) equipos.set(a.assetId, a.asset.code);
+        if (p.assetId && !equipos.has(p.assetId)) equipos.set(p.assetId, p.asset?.code ?? "");
+        return [...equipos].map(([assetId, code]) => ({
+          id: p.id,
+          clave: `${N.codigo(code)}|${N.claveComparable(p.name)}`,
+          resumen: p.name,
+          comparar: { nombre: N.claveComparable(p.name), firma: p.intervalDays ? `${assetId}|${p.intervalDays}` : undefined },
+        }));
+      }),
     /**
-     * El plan Y su asignacion al equipo.
+     * El plan Y su asignación al equipo, en la misma transacción.
      *
-     * Antes solo se creaba el plan con el equipo en el encabezado, y el
-     * programador no lee el encabezado: itera asignaciones. Cada plan importado
-     * se veia perfecto en la lista, con su fecha, y no generaba una sola orden
-     * nunca, sin avisar —el mismo defecto que ya dejo diez planes muertos en el
-     * alta a mano—.
-     *
-     * La fecha del renglon es un VENCIMIENTO ("primer_vencimiento"), asi que se
-     * asigna como "arranca ese dia", no como "la ultima vez se hizo".
+     * El programador no lee el encabezado: itera asignaciones. Un plan sin
+     * asignación se ve perfecto en la lista y no genera una sola orden nunca.
+     * La fecha del renglón es un VENCIMIENTO, así que se asigna como «arranca
+     * ese día».
      */
-    insertar: async (orgId, d) => {
-      const { nextDueDate, ...datosPlan } = d as { nextDueDate: Date; assetId: string } & Record<string, unknown>;
-      const plan = await prisma.maintenancePlan.create({
-        data: { ...datosPlan, nextDueDate, organizationId: orgId } as never,
+    insertar: async (db, orgId, d) => {
+      const { nextDueDate, ...datosPlan } = d as { nextDueDate: Date; assetId: string; name: string } & Record<string, unknown>;
+      const plan = await db.maintenancePlan.create({
+        data: { ...(datosPlan as { name: string }), nextDueDate, organizationId: orgId },
         select: { id: true },
       });
       await asignarPlan({
         organizationId: orgId,
         planId: plan.id,
-        equipos: [{ assetId: datosPlan.assetId as string, desde: nextDueDate, desdeEsUltima: false }],
+        equipos: [{ assetId: datosPlan.assetId, desde: nextDueDate, desdeEsUltima: false }],
+        db,
       });
       return plan;
     },
-    existentes: async (orgId) => {
-      const filas = await prisma.maintenancePlan.findMany({
-        where: { organizationId: orgId },
-        select: { name: true, asset: { select: { code: true } } },
-      });
-      return new Set(filas.map((p) => `${(p.asset?.code ?? "").toUpperCase()}|${p.name.toUpperCase()}`));
-    },
   },
 
-  // ────────────────────────────────────────────── Codigos de falla
-  "codigos-falla": {
+  // ────────────────────────────────────────────── Códigos de falla
+  "codigos-falla": catalogoSimple({
     titulo: "Códigos de falla",
-    descripcion: "Que fallo. Se usa al cerrar una orden correctiva.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "MEC-01" },
-      { nombre: "descripcion", requerido: true, ejemplo: "Desgaste de rodamiento" },
-      { nombre: "familia", ejemplo: "MECANICO" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan código o descripción" };
-      return { ok: true, clave: code, datos: { code, description: txt(f.descripcion), category: txt(f.familia) || null } };
-    },
-    insertar: (orgId, d) => prisma.failureCode.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.failureCode.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+    descripcion: "Qué falló. Se usa al cerrar una orden correctiva.",
+    entidad: "FailureCode",
+    ejemplo: ["MEC-01", "Desgaste de rodamiento"],
+    campoNombre: "description",
+    conFamilia: true,
+    delegado: (db) => db.failureCode as never,
+  }),
 
-  // ────────────────────────────────────────────────── Causas raiz
-  "causas-raiz": {
-    titulo: "Causas raiz",
-    descripcion: "Por que fallo. Alimenta el análisis de fallas repetidas.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "LUB-NO-EJECUTADA" },
-      { nombre: "descripcion", requerido: true, ejemplo: "Ruta de lubricación no ejecutada" },
-      { nombre: "familia", ejemplo: "MANTENIMIENTO" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.descripcion)) return { ok: false, motivo: "Faltan código o descripción" };
-      return { ok: true, clave: code, datos: { code, description: txt(f.descripcion), category: txt(f.familia) || null } };
-    },
-    insertar: (orgId, d) => prisma.rootCause.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.rootCause.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+  // ────────────────────────────────────────────────── Causas raíz
+  "causas-raiz": catalogoSimple({
+    titulo: "Causas raíz",
+    descripcion: "Por qué falló. Alimenta el análisis de fallas repetidas.",
+    entidad: "RootCause",
+    ejemplo: ["LUB-NO-EJECUTADA", "Ruta de lubricación no ejecutada"],
+    campoNombre: "description",
+    conFamilia: true,
+    delegado: (db) => db.rootCause as never,
+  }),
 
   // ─────────────────────────────────────────────── Especialidades
-  especialidades: {
+  especialidades: catalogoSimple({
     titulo: "Especialidades",
     descripcion: "Los oficios del personal y su tarifa por hora, para estimar la mano de obra de los planes.",
-    columnas: [
-      { nombre: "codigo", requerido: true, ejemplo: "MEC" },
-      { nombre: "nombre", requerido: true, ejemplo: "Mecanico" },
-      { nombre: "tarifa_hora", ayuda: "Costo interno de la hora-hombre", ejemplo: "180" },
-    ],
-    contexto: async () => ({}),
-    convertir: (f) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
-      return {
-        ok: true, clave: code,
-        datos: { code, name: txt(f.nombre), hourlyRate: num(f.tarifa_hora) ?? 0 },
-      };
-    },
-    insertar: (orgId, d) => prisma.specialty.create({ data: { ...d, organizationId: orgId } as never }),
-    existentes: async (orgId) =>
-      new Set((await prisma.specialty.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
-  },
+    entidad: "Specialty",
+    ejemplo: ["MEC", "Mecánico"],
+    campoNombre: "name",
+    conTarifa: true,
+    delegado: (db) => db.specialty as never,
+  }),
 
   // ──────────────────────────────────────────── Servicios externos
   "servicios-externos": {
     titulo: "Servicios externos",
     descripcion: "Los trabajos que se subcontratan a proveedores. Son el tercer costo de una orden, junto a mano de obra y refacciones.",
     requisitos: "Los proveedores, si va a indicar el habitual de cada servicio.",
+    entidad: "ExternalService",
     columnas: [
       { nombre: "codigo", requerido: true, ejemplo: "SRV-REB" },
       { nombre: "nombre", requerido: true, ejemplo: "Rebobinado de motor eléctrico" },
-      { nombre: "proveedor", ayuda: "Nombre tal como esta dado de alta", ejemplo: "Servicios Electromecanicos del Bajio" },
+      { nombre: "proveedor", ayuda: "Nombre tal como está dado de alta", ejemplo: "Servicios Electromecánicos del Bajío" },
       { nombre: "unidad", ejemplo: "servicio" },
       { nombre: "costo_unitario", ejemplo: "14500" },
       { nombre: "descripcion", ejemplo: "Incluye desmontaje, barnizado y prueba" },
@@ -560,31 +724,35 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
     contexto: async (orgId) => ({
       proveedores: new Map(
         (await prisma.supplier.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }))
-          .map((p) => [p.name.toUpperCase(), p.id]),
+          .map((p) => [N.claveComparable(p.name), p.id]),
       ),
     }),
     convertir: (f, ctx) => {
-      const code = txt(f.codigo).toUpperCase();
-      if (!code || !txt(f.nombre)) return { ok: false, motivo: "Faltan código o nombre" };
-      const proveedor = txt(f.proveedor);
+      const r = new Renglon(f);
+      const code = N.codigo(r.requerido("codigo", 40, "el código"));
+      const nombre = r.requerido("nombre", 160, "el nombre");
       let supplierId: string | null = null;
-      if (proveedor) {
-        supplierId = ctx.proveedores?.get(proveedor.toUpperCase()) ?? null;
-        if (!supplierId) return { ok: false, motivo: `No existe el proveedor "${proveedor}"` };
+      if (N.texto(f.proveedor)) {
+        supplierId = ctx.mapas.proveedores.get(N.claveComparable(f.proveedor)) ?? null;
+        if (!supplierId) r.fallas.push({ columna: "proveedor", motivo: `No existe el proveedor «${f.proveedor}»` });
       }
-      return {
-        ok: true, clave: code,
-        datos: {
-          code, name: txt(f.nombre), supplierId,
-          unit: txt(f.unidad) || "servicio",
-          unitCost: num(f.costo_unitario) ?? 0,
-          description: txt(f.descripcion) || null,
-        },
-      };
+      return r.resultado(code, nombre || code, {
+        code, name: nombre, supplierId,
+        unit: r.opcional("unidad", 30) || "servicio",
+        unitCost: r.valor("costo_unitario", N.numero(f.costo_unitario, { minimo: 0, campo: "El costo" }), 0) ?? 0,
+        description: r.opcional("descripcion", 500),
+      }, { nombre: N.claveComparable(nombre) });
     },
-    insertar: (orgId, d) => prisma.externalService.create({ data: { ...d, organizationId: orgId } as never }),
     existentes: async (orgId) =>
-      new Set((await prisma.externalService.findMany({ where: { organizationId: orgId }, select: { code: true } })).map((x) => x.code.toUpperCase())),
+      (await prisma.externalService.findMany({ where: { organizationId: orgId }, select: { id: true, code: true, name: true } }))
+        .map((x) => ({ id: x.id, clave: N.codigo(x.code), resumen: x.name, comparar: { nombre: N.claveComparable(x.name) } })),
+    insertar: (db, orgId, d) => db.externalService.create({ data: { ...(d as { code: string; name: string }), organizationId: orgId }, select: { id: true } }),
+    actualizar: async (db, _o, id, d) => {
+      const { code: _c, ...cambios } = d; void _c;
+      const antes = await db.externalService.findUniqueOrThrow({ where: { id } });
+      await db.externalService.update({ where: { id }, data: cambios });
+      return antesDe(antes, cambios);
+    },
   },
 };
 

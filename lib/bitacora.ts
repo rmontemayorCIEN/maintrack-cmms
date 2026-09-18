@@ -19,7 +19,8 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   ORDENES: { titulo: "Órdenes de trabajo", entidades: ["WorkOrder", "WorkOrderTask", "WorkRequest"] },
   ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "Meter", "MeterReading", "Sensor", "PlanRequest", "Conjunto"] },
   ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier"] },
-  CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "ReportPoint", "Attachment", "ReferenceLink"] },
+  CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink"] },
+  IMPORTACION: { titulo: "Importaciones y puesta en marcha", entidades: ["Importacion", "ImportBatch"] },
 };
 
 /** Acciones que vale la pena poder aislar de un vistazo. */

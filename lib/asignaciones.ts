@@ -6,6 +6,7 @@
  * plan pero cada uno lleva su propia proxima fecha, porque en la realidad no
  * se instalaron el mismo dia ni se les hizo servicio el mismo dia.
  */
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { esHabil, jornada } from "./agenda";
 import { sembrarCalendario } from "./calendario-actividad";
@@ -83,8 +84,11 @@ export async function asignarPlan(params: {
   }[];
   escalonarAuto?: boolean;
   userId?: string | null;
+  /** La transaccion en curso: la importacion crea el plan y lo asigna de un golpe. */
+  db?: Prisma.TransactionClient;
 }) {
-  const plan = await prisma.maintenancePlan.findFirst({
+  const db = params.db ?? prisma;
+  const plan = await db.maintenancePlan.findFirst({
     where: { id: params.planId, organizationId: params.organizationId },
     select: { id: true, intervalDays: true, triggerType: true, intervalMeter: true },
   });
@@ -92,7 +96,7 @@ export async function asignarPlan(params: {
   if (!params.equipos.length) throw new ErrorDeAsignacion("Elija al menos un equipo.");
 
   const ids = params.equipos.map((e) => e.assetId);
-  const activos = await prisma.asset.findMany({
+  const activos = await db.asset.findMany({
     where: { id: { in: ids }, organizationId: params.organizationId },
     select: { id: true, code: true, criticality: true },
   });
@@ -110,7 +114,7 @@ export async function asignarPlan(params: {
     const hasta = new Date(hoy);
     hasta.setDate(hoy.getDate() + plan.intervalDays + 15);
     const j = await jornada(params.organizationId, hoy, hasta);
-    const previas = await prisma.planAsset.findMany({
+    const previas = await db.planAsset.findMany({
       where: { organizationId: params.organizationId, assetId: { in: ids } },
       select: { assetId: true, lastCompletedAt: true },
     });
@@ -137,7 +141,7 @@ export async function asignarPlan(params: {
   // Los medidores de cada equipo, para poder ligarlos sin que el usuario
   // tenga que saber ids.
   const medidores = porMedidor
-    ? await prisma.meter.findMany({
+    ? await db.meter.findMany({
         where: { organizationId: params.organizationId, assetId: { in: ids } },
         select: { id: true, assetId: true, name: true },
         orderBy: { createdAt: "asc" },
@@ -153,7 +157,7 @@ export async function asignarPlan(params: {
   /** Equipos que quedaron sin medidor en un plan que lo necesita. */
   const sinMedidor: string[] = [];
   for (const e of params.equipos) {
-    const existente = await prisma.planAsset.findUnique({
+    const existente = await db.planAsset.findUnique({
       where: { planId_assetId: { planId: plan.id, assetId: e.assetId } },
       select: { id: true },
     });
@@ -163,7 +167,7 @@ export async function asignarPlan(params: {
     const meterId = e.meterId ?? medidorDe.get(e.assetId) ?? null;
     if (porMedidor && !meterId) sinMedidor.push(codigo);
 
-    await prisma.planAsset.create({
+    await db.planAsset.create({
       data: {
         organizationId: params.organizationId,
         planId: plan.id,
@@ -196,6 +200,7 @@ export async function asignarPlan(params: {
         esUltima: e.desdeEsUltima ?? false,
       },
       arranques,
+      db: params.db,
     });
     // Una actividad sin frecuencia nunca genera y se ve igual que una que
     // todavia no toca. Se reporta hacia arriba en vez de quedarse callada.

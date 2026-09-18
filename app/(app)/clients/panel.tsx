@@ -333,7 +333,7 @@ export function PanelClientes({
                               : org.avance.porcentaje >= 50 ? "text-amber-600"
                               : "text-red-600"
                           }`}>
-                            {org.avance.porcentaje}%
+                            <span data-porcentaje={org.avance.porcentaje}>{org.avance.porcentaje}%</span>
                           </span>
                           {org.avance.siguiente ? (
                             <span className="truncate text-[0.625rem] text-slate-400">{org.avance.siguiente}</span>

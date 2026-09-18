@@ -25,7 +25,7 @@ import { prisma } from "../lib/db";
 import { altaDePlan } from "../lib/alta-de-plan";
 import { asignarPlan } from "../lib/asignaciones";
 import { armarOrden } from "../lib/armar-ot";
-import { IMPORTACIONES } from "../lib/importacion";
+import { ejecutarImportacion } from "../lib/importacion-motor";
 import { ErrorDeFechas, corregirFechas, fechasDeAsignacion } from "../lib/calendario-actividad";
 import { startOfDay, addDays } from "../lib/utils";
 
@@ -241,19 +241,20 @@ async function main() {
 
   // ── 6 · La importación asigna el equipo ───────────────────────────────────
   console.log("\nUn plan importado queda aplicado a su equipo, no solo anotado");
-  const def = IMPORTACIONES.planes;
-  const ctx = await def.contexto(org.id);
-  const fila = def.convertir(
-    { nombre: "Importado", activo: "CNC-801", cada_dias: "30", primer_vencimiento: "" } as never,
-    ctx as never,
-    org.id,
-  );
-  revisar("el renglón se convierte", fila.ok, fila.ok ? "ok" : fila.motivo);
-  if (fila.ok) {
-    const insertado = (await def.insertar(org.id, fila.datos)) as { id: string };
-    const asigImport = await prisma.planAsset.count({ where: { planId: insertado.id, assetId: cnc1.id, active: true } });
-    revisar("y tiene su asignación: sin ella el programador nunca lo vería", asigImport === 1, `${asigImport}`);
-  }
+  // Por el motor de importación, que es lo que corre la pantalla: el plan y
+  // su asignación se crean en la misma transacción.
+  const importado = await ejecutarImportacion({
+    tipo: "planes",
+    contenido: "nombre,activo,cada_dias\nImportado,CNC-801,30",
+    organizationId: org.id, userId: gestor.id, plan: "ENTERPRISE",
+    // Ese equipo ya tiene un plan cada 30 días: el motor lo marca como posible
+    // duplicado, y crearlo pide decirlo expresamente.
+    decisiones: { exactos: "omitir", crearPosibles: [2] },
+  });
+  revisar("el renglón se importa", importado.creados === 1, JSON.stringify(importado));
+  const insertado = await prisma.maintenancePlan.findFirstOrThrow({ where: { organizationId: org.id, name: "Importado" } });
+  const asigImport = await prisma.planAsset.count({ where: { planId: insertado.id, assetId: cnc1.id, active: true } });
+  revisar("y tiene su asignación: sin ella el programador nunca lo vería", asigImport === 1, `${asigImport}`);
 
   // ── Limpieza ─────────────────────────────────────────────────────────────
   for (const o of [org.id, vecino.id]) {

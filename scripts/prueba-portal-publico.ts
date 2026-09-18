@@ -50,8 +50,8 @@ async function main() {
   try {
     console.log("\n0. Lo que se limpia antes de guardarse (sin servidor)");
     revisar("un texto con caracteres invisibles queda limpio",
-      textoDeFuera("Fuga​ en la‮ bomba", 140) === "Fuga en la bomba",
-      textoDeFuera("Fuga​ en la‮ bomba", 140));
+      textoDeFuera("Fuga\u200b en la\u202e bomba", 140) === "Fuga en la bomba",
+      textoDeFuera("Fuga\u200b en la\u202e bomba", 140));
     revisar("el teléfono se queda en dígitos", telefonoDeFuera("81-1234 5678 ext. 9") === "8112345678" + "9", telefonoDeFuera("81-1234 5678 ext. 9"));
     revisar("una fórmula de Excel deja de serlo al exportar",
       seguroParaHoja('=HYPERLINK("http://x","clic")').startsWith("'"),
@@ -137,12 +137,12 @@ async function main() {
       }).then(async (r) => ({ status: r.status, cuerpo: await r.json().catch(() => ({})) as { error?: string } }));
 
     console.log("\n4. El reporte entra, limpio, y con su lugar guardado por dentro");
-    const r1 = await enviar(punto.token, "=SUM(A1:A9) la bomba​ truena");
+    const r1 = await enviar(punto.token, "=SUM(A1:A9) la bomba\u200b truena");
     revisar("el reporte se levanta", r1.status === 201, r1.cuerpo);
     const solicitud = await prisma.workRequest.findFirstOrThrow({
       where: { organizationId: org.id }, orderBy: { createdAt: "desc" },
     });
-    revisar("el título quedó sin caracteres invisibles", !solicitud.title.includes("​"), solicitud.title);
+    revisar("el título quedó sin caracteres invisibles", !solicitud.title.includes("\u200b"), solicitud.title);
     revisar("y con el equipo, el área y la planta que puso el QR, aunque no se enseñen",
       solicitud.assetId === activo.id && solicitud.locationId === ubicacion.id && solicitud.siteId === sitio.id);
     const csv = toCsv([{ Folio: solicitud.number, Titulo: solicitud.title }]);
