@@ -251,6 +251,7 @@ model Organization {
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
   entregasAviso     EntregaAviso[]
+  historialAvisos   HistorialAviso[]
   configAvisos      ConfigAvisos?
   escalamientos     Escalamiento[]
   credencialesApi   CredencialApi[]
@@ -2497,10 +2498,49 @@ model Notification {
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   entregas     EntregaAviso[]
+  historial    HistorialAviso[]
 
   @@unique([userId, claveDedup])
   @@index([userId])
   @@index([organizationId, entidad, entidadId])
+}
+
+/// Cada vez que un aviso cambia de pendiente a atendido, o vuelve a abrirse.
+///
+/// Un aviso se atiende cuando la condicion que lo origino deja de existir
+/// (lib/avisos/condiciones.ts), no cuando alguien lo lee o toca el registro.
+/// Aqui queda el porque: que condicion habia, cual hay ahora, que accion la
+/// resolvio, quien la hizo y que proceso lo confirmo. La bitacora general no
+/// lo repite: esto es historial tecnico del aviso.
+model HistorialAviso {
+  id                String   @id @default(cuid())
+  organizationId    String
+  notificationId    String
+  /// El destinatario del aviso.
+  userId            String
+  tipo              String
+  entidadId         String?
+  /// ATENDIDA | REABIERTA
+  cambio            String
+  /// Lo que habia cuando se aviso y lo que hay ahora, en palabras.
+  condicionAnterior String?
+  condicionActual   String?
+  /// La accion o evento que lo resolvio: «Cambio de estado IN_PROGRESS → COMPLETED».
+  evento            String?
+  /// Quien hizo la accion, cuando se sabe.
+  actorId           String?
+  /// FLUJO (lo resolvio una accion en el momento) | RECONCILIACION (lo
+  /// confirmo el proceso programado) | PROGRAMADOR
+  origen            String
+  /// El motivo que ve la persona.
+  motivo            String?
+  createdAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([organizationId, entidadId])
 }
 
 /// Cada intento de llevar un aviso por un canal: correo, navegador, webhook.

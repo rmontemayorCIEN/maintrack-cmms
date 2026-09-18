@@ -29,7 +29,10 @@ export async function ejecutarProgramador(
   const generar = opciones.generar ?? generateScheduledWorkOrders;
   try {
     const r = await generar(organizationId, { horizonDays: 0 });
-    await atenderAvisos({ organizationId, entidadId: `${organizationId}:programador`, tipos: ["PLAN_FALLO_GENERAR"], motivo: "el programador volvió a correr bien" });
+    await atenderAvisos({
+      organizationId, entidadId: `${organizationId}:programador`, tipos: ["PLAN_FALLO_GENERAR"],
+      motivo: "El programador de preventivos volvió a correr sin error", condicionActual: "Corrida sin error", evento: "Corrida del programador",
+    });
 
     // Planes que no pueden programarse, con el motivo que da el propio programador.
     const sinRegla = r.details.filter((d) => d.reason && SIN_PROGRAMACION.test(d.reason));
@@ -49,7 +52,10 @@ export async function ejecutarProgramador(
     });
     for (const n of abiertos) {
       if (n.entidadId && !vigentes.has(n.entidadId)) {
-        await atenderAvisos({ organizationId, entidadId: n.entidadId, tipos: ["PLAN_SIN_PROGRAMACION"], motivo: "el plan ya se puede programar" });
+        await atenderAvisos({
+          organizationId, entidadId: n.entidadId, tipos: ["PLAN_SIN_PROGRAMACION"],
+          motivo: "El plan ya tiene programación válida: el programador ya puede calcular cuándo toca", condicionActual: "Programable", evento: "Corrida del programador",
+        });
       }
     }
     return { ok: true as const, generadas: r.generated, omitidas: r.skipped, sinProgramacion: sinRegla.length };

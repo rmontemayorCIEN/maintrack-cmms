@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
 import { siguienteFolio } from "./numbering";
-import { atenderAvisos, emitirAviso } from "./avisos/emitir";
+import { emitirAviso } from "./avisos/emitir";
+import { reconciliar } from "./avisos/condiciones";
 import { avisarCompraPorAutorizar } from "./avisos/detectores";
 
 /**
@@ -235,8 +236,8 @@ export async function autorizar(params: {
     select: { id: true, folio: true, estado: true },
   });
 
-  // Ya se firmó: el aviso de «por autorizar» queda atendido y su escalamiento se detiene.
-  await atenderAvisos({ organizationId: params.organizationId, entidadId: req.id, tipos: ["REQUISICION_POR_AUTORIZAR"], motivo: params.aprueba ? "se autorizó" : "se rechazó" });
+  // Ya se firmó: los avisos de «por autorizar» se reconcilian contra el estado nuevo.
+  await reconciliar({ organizationId: params.organizationId, entidadId: req.id, origen: "FLUJO", actorId: params.userId, evento: params.aprueba ? "Autorización" : "Rechazo" });
   // Quien pidio se entera sin tener que ir a revisar.
   if (req.solicitanteId) {
     await emitirAviso({
@@ -273,11 +274,13 @@ export async function enCompra(params: {
   }
   if (!params.ordenCompra.trim()) throw new ErrorDeCompra("Indique el folio de la orden de compra");
 
-  return prisma.purchaseRequest.update({
+  const colocada = await prisma.purchaseRequest.update({
     where: { id: req.id },
     data: { estado: "EN_COMPRA", ordenCompra: params.ordenCompra.trim() },
     select: { id: true, folio: true, estado: true },
   });
+  await reconciliar({ organizationId: params.organizationId, entidadId: req.id, origen: "FLUJO", evento: "Orden de compra colocada" });
+  return colocada;
 }
 
 /**
@@ -350,7 +353,9 @@ export async function recibir(params: {
   const folio = await siguienteFolio(params.organizationId, "recepcion");
 
   try {
-    return await registrarRecepcion(params, folio, utiles);
+    const recepcion = await registrarRecepcion(params, folio, utiles);
+    await reconciliarRecepcion(params);
+    return recepcion;
   } catch (e) {
     /**
      * Dos clics a la vez pasan los dos la revision de la clave y el segundo
@@ -368,6 +373,22 @@ export async function recibir(params: {
     }
     throw e;
   }
+}
+
+/**
+ * Lo que la mercancía que entró pudo resolver, en el momento: la compra
+ * recibida (parcial o completa), su orden de compra vencida, las refacciones
+ * bajo mínimo o agotadas. Cada aviso se atiende solo si su condición se acabó.
+ */
+async function reconciliarRecepcion(params: Parameters<typeof recibir>[0]) {
+  const organizationId = params.organizationId;
+  const evento = "Recepción de mercancía";
+  if (params.purchaseRequestId) {
+    await reconciliar({ organizationId, entidadId: params.purchaseRequestId, origen: "FLUJO", actorId: params.userId, evento });
+    const ordenes = await prisma.purchaseOrder.findMany({ where: { organizationId, purchaseRequestId: params.purchaseRequestId }, select: { id: true } });
+    for (const o of ordenes) await reconciliar({ organizationId, entidadId: o.id, origen: "FLUJO", actorId: params.userId, evento });
+  }
+  await reconciliar({ organizationId, tipos: ["REFACCION_BAJO_MINIMO", "REFACCION_CRITICA_AGOTADA"], origen: "FLUJO", actorId: params.userId, evento });
 }
 
 async function registrarRecepcion(
@@ -645,5 +666,6 @@ export async function emitirOrdenDeCompra(params: {
     }),
   ]);
 
+  await reconciliar({ organizationId: params.organizationId, entidadId: compra.id, origen: "FLUJO", actorId: params.userId, evento: "Orden de compra emitida" });
   return orden;
 }

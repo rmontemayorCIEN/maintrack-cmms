@@ -142,7 +142,7 @@ export async function PATCH(request: Request, { params }: Params) {
     await prisma.workOrder.update({ where: { id }, data });
     const workOrder = await recalcWorkOrder(id);
     // Cambió el responsable o la prioridad: se avisa a quien corresponde.
-    await avisarCambiosDeOrden(orgId, existing);
+    await avisarCambiosDeOrden(orgId, existing, user.id);
 
     await logAudit({
       organizationId: orgId,

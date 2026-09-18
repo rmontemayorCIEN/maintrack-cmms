@@ -3,13 +3,19 @@
  *
  * Seis flujos crean órdenes (alta manual, armador, solicitud convertida,
  * programador, predictivo, agenda) y dos las cambian (edición y transición de
- * estado). Cada uno llama aquí con una línea; qué se avisa, a quién y qué se
- * da por atendido se decide aquí. El proceso programado es, además, red de
- * seguridad: si algún flujo no llamó, el aviso sale en el siguiente barrido.
+ * estado). Cada uno llama aquí con una línea; qué se avisa y a quién se decide
+ * aquí. Qué queda atendido NO se decide aquí: después de cada cambio se
+ * reconcilian los avisos de la orden contra su estado real
+ * (lib/avisos/condiciones.ts). Así editar una OT vencida sin reprogramarla a
+ * una fecha futura no la da por atendida. El proceso programado es, además,
+ * red de seguridad: si algún flujo no llamó, el aviso sale en el siguiente
+ * barrido.
  */
 import { prisma } from "../db";
-import { atenderAvisos, emitirAviso } from "./emitir";
-import { avisarAsignacion, avisarOtCritica } from "./detectores";
+import { emitirAviso } from "./emitir";
+import { avisarAsignacion, avisarOtCritica, avisarVencimiento } from "./detectores";
+import { reconciliar } from "./condiciones";
+import { configDe } from "./config";
 
 const PESO: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3 };
 const ETIQUETA: Record<string, string> = { LOW: "baja", MEDIUM: "media", HIGH: "alta", CRITICAL: "crítica" };
@@ -19,6 +25,7 @@ async function leer(organizationId: string, id: string) {
     where: { id, organizationId },
     select: {
       id: true, number: true, title: true, priority: true, status: true, assignedToId: true, createdById: true, siteId: true,
+      maintenanceType: true, dueDate: true, planId: true, plan: { select: { toleranceDays: true } },
       asset: { select: { code: true, criticality: true } },
       requests: { select: { requestedById: true }, take: 1 },
     },
@@ -35,10 +42,22 @@ export async function avisarNuevaOrden(organizationId: string, workOrderId: stri
   } catch { /* el aviso nunca tumba la operación */ }
 }
 
-/** Cambios de la edición: responsable y prioridad. */
+/**
+ * Después de cualquier cambio: se reconcilian los avisos de la orden (se
+ * atiende solo lo que se resolvió de verdad) y se revisa su vencimiento (el
+ * responsable nuevo recibe el suyo; una fecha nueva ya pasada actualiza el
+ * mismo aviso).
+ */
+async function alDia(organizationId: string, o: NonNullable<Awaited<ReturnType<typeof leer>>>, evento: string, actorId?: string | null) {
+  await reconciliar({ organizationId, entidadId: o.id, origen: "FLUJO", actorId, evento });
+  await avisarVencimiento(organizationId, o, await configDe(organizationId));
+}
+
+/** Cambios de la edición: responsable, prioridad y fecha. */
 export async function avisarCambiosDeOrden(
   organizationId: string,
   antes: { id: string; assignedToId: string | null; priority: string },
+  actorId?: string | null,
 ) {
   try {
     const o = await leer(organizationId, antes.id);
@@ -46,7 +65,6 @@ export async function avisarCambiosDeOrden(
     if ((o.assignedToId ?? null) !== (antes.assignedToId ?? null)) {
       if (o.assignedToId) await avisarAsignacion(organizationId, o);
       if (antes.assignedToId) {
-        await atenderAvisos({ organizationId, entidadId: o.id, tipos: ["OT_ASIGNADA", "OT_SIN_ACEPTAR", "OT_POR_VENCER", "OT_VENCIDA"], motivo: "la orden cambió de responsable" });
         await emitirAviso({
           organizationId, tipo: "OT_REASIGNADA", entidad: "WorkOrder", entidadId: o.id, version: `${antes.assignedToId}->${o.assignedToId ?? "nadie"}`,
           titulo: `${o.number} ya no está a su cargo`, cuerpo: o.title, enlace: `/work-orders/${o.id}`,
@@ -68,20 +86,18 @@ export async function avisarCambiosDeOrden(
       });
       if (o.priority === "CRITICAL") await avisarOtCritica(organizationId, o);
     }
+    await alDia(organizationId, o, "Edición de la OT", actorId);
   } catch { /* el aviso nunca tumba la operación */ }
 }
 
 /** Cambios de estado: iniciar, detener, terminar, devolver, cerrar, cancelar. */
 export async function avisarTransicion(
-  organizationId: string, workOrderId: string, de: string, a: string, motivo?: string | null,
+  organizationId: string, workOrderId: string, de: string, a: string, motivo?: string | null, actorId?: string | null,
 ) {
   try {
     const o = await leer(organizationId, workOrderId);
     if (!o) return;
     const ctx = { responsableId: o.assignedToId, siteId: o.siteId };
-    if (a === "IN_PROGRESS" && de !== "COMPLETED") {
-      await atenderAvisos({ organizationId, entidadId: o.id, tipos: ["OT_ASIGNADA", "OT_SIN_ACEPTAR", "OT_CRITICA_CREADA", "OT_DETENIDA"], motivo: de === "ON_HOLD" ? "la orden se reanudó" : "la orden se inició" });
-    }
     if (a === "ON_HOLD") {
       await emitirAviso({
         organizationId, tipo: "OT_DETENIDA", entidad: "WorkOrder", entidadId: o.id, version: new Date().toISOString().slice(0, 16),
@@ -92,7 +108,6 @@ export async function avisarTransicion(
       });
     }
     if (a === "COMPLETED") {
-      await atenderAvisos({ organizationId, entidadId: o.id, tipos: ["OT_ASIGNADA", "OT_SIN_ACEPTAR", "OT_CRITICA_CREADA", "OT_POR_VENCER", "OT_VENCIDA", "OT_DETENIDA", "OT_DEVUELTA", "PREVENTIVO_INCUMPLIDO"], motivo: "la orden se terminó" });
       await emitirAviso({
         organizationId, tipo: "OT_LISTA_REVISION", entidad: "WorkOrder", entidadId: o.id, version: new Date().toISOString().slice(0, 16),
         titulo: `${o.number} terminada: lista para revisión`, cuerpo: o.title,
@@ -102,7 +117,6 @@ export async function avisarTransicion(
       });
     }
     if (de === "COMPLETED" && a === "IN_PROGRESS") {
-      await atenderAvisos({ organizationId, entidadId: o.id, tipos: ["OT_LISTA_REVISION"], motivo: "la orden se devolvió" });
       await emitirAviso({
         organizationId, tipo: "OT_DEVUELTA", entidad: "WorkOrder", entidadId: o.id, version: new Date().toISOString().slice(0, 16),
         titulo: `${o.number} devuelta en revisión`, cuerpo: motivo ? `Motivo: ${motivo}` : o.title,
@@ -112,7 +126,6 @@ export async function avisarTransicion(
       });
     }
     if (a === "CLOSED") {
-      await atenderAvisos({ organizationId, entidadId: o.id, motivo: "la orden se cerró" });
       const solicitante = o.requests[0]?.requestedById ?? o.createdById;
       await emitirAviso({
         organizationId, tipo: "OT_CERRADA", entidad: "WorkOrder", entidadId: o.id,
@@ -120,8 +133,6 @@ export async function avisarTransicion(
         contexto: { solicitanteId: solicitante }, tag: o.number, datos: { folio: o.number },
       });
     }
-    if (a === "CANCELLED") {
-      await atenderAvisos({ organizationId, entidadId: o.id, motivo: "la orden se canceló" });
-    }
+    await alDia(organizationId, o, `Cambio de estado ${de} → ${a}`, actorId);
   } catch { /* el aviso nunca tumba la operación */ }
 }

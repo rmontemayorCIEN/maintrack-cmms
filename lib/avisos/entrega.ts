@@ -132,6 +132,16 @@ export async function registrarAviso(p: Params): Promise<import("../audit").Resu
         data: { ...datos, read: false, leidaEl: null, atendidaEl: null, atendidaMotivo: null, veces: { increment: 1 }, actualizadaEl: ahora },
         select: { id: true, veces: true },
       });
+      // La condición había quedado resuelta y volvió: es un ciclo nuevo del mismo aviso, y queda dicho.
+      if (regreso) {
+        await prisma.historialAviso.create({
+          data: {
+            organizationId: p.organizationId, notificationId: previa.id, userId: persona.id, tipo, entidadId: p.entidadId ?? null,
+            cambio: "REABIERTA", condicionActual: recortar(p.title, 180), evento: "La condición volvió a presentarse",
+            origen: "RECONCILIACION", motivo: recortar(p.porQue ?? p.title, 180),
+          },
+        }).catch(() => undefined);
+      }
       notificacion = act;
       estado = "ACTUALIZADA";
     }

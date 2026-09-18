@@ -19,14 +19,21 @@ import { resolverDestinatarios, type Contexto } from "./destinatarios";
 import { idDeEvento } from "./entrega";
 import { leerJson } from "./config";
 import { consumirLimite } from "../integraciones/limites";
+import { condicionDe, marcarAtendido } from "./condiciones";
 
 export type Evento = {
   organizationId: string;
   tipo: TipoEvento;
   entidad?: string;
   entidadId?: string;
-  /** Lo que, si cambia, hace que sea un aviso nuevo: el responsable, el nivel, la fecha. */
+  /** Lo que, si cambia, hace que sea un aviso nuevo: el responsable, el nivel. */
   version?: string;
+  /**
+   * La condición sigue siendo la misma aunque cambien sus datos (una OT que
+   * se reprograma a otra fecha que también ya pasó sigue vencida): se
+   * actualiza el aviso abierto de cada persona en vez de abrir otro.
+   */
+  continuar?: boolean;
   titulo: string;
   cuerpo?: string;
   enlace?: string;
@@ -68,6 +75,7 @@ export async function emitirAviso(e: Evento): Promise<ResultadoEmision> {
 
     const salida: ResultadoEmision = { ...vacio };
     for (const d of r.destinatarios) {
+      const clave = e.continuar ? await claveAbierta(e, d.userId) ?? claveDedup : claveDedup;
       // Obligatorio: por catálogo; por ser el único que puede actuar; o por
       // ser el responsable directo de algo alto o crítico.
       const obligatorio = def.categoria === "OBLIGATORIO" ||
@@ -76,7 +84,7 @@ export async function emitirAviso(e: Evento): Promise<ResultadoEmision> {
       const res = await notify({
         organizationId: e.organizationId, userId: d.userId, title: e.titulo, body: e.cuerpo, link: e.enlace,
         tipo: e.tipo, prioridad, modulo: def.modulo, entidad: e.entidad, entidadId: e.entidadId,
-        requiereAccion: def.requiereAccion, porQue: e.porQue, accion: e.accion, claveDedup, eventoId,
+        requiereAccion: def.requiereAccion, porQue: e.porQue, accion: e.accion, claveDedup: clave, eventoId,
         obligatorio, recordar: e.recordar, tag: e.tag, kind: e.kind,
       });
       if (res.estado === "OMITIDA") salida.omitidos++;
@@ -93,6 +101,21 @@ export async function emitirAviso(e: Evento): Promise<ResultadoEmision> {
   } catch {
     return vacio;
   }
+}
+
+/**
+ * El aviso de esta persona para la misma condición y registro: el abierto, si
+ * lo hay; si no, el último (se reabre como ciclo nuevo en vez de crear otro).
+ * Los recordatorios de escalamiento son otra condición y no cuentan.
+ */
+async function claveAbierta(e: Evento, userId: string): Promise<string | null> {
+  if (!e.entidadId) return null;
+  const previos = await prisma.notification.findMany({
+    where: { organizationId: e.organizationId, userId, tipo: e.tipo, entidadId: e.entidadId },
+    select: { claveDedup: true, atendidaEl: true }, orderBy: { createdAt: "desc" }, take: 20,
+  });
+  const mismos = previos.filter((n) => n.claveDedup && condicionDe({ tipo: e.tipo, claveDedup: n.claveDedup }) === e.tipo);
+  return (mismos.find((n) => !n.atendidaEl) ?? mismos[0])?.claveDedup ?? null;
 }
 
 /**
@@ -155,32 +178,26 @@ async function encolarWebhooks(e: Evento, eventoId: string, prioridad: Prioridad
 }
 
 /**
- * Marca como atendidos los avisos de un registro: se resolvió lo que los
- * originó. Cancela sus entregas pendientes y detiene sus escalamientos.
- * Leerlos no los atiende; esto sí.
+ * Atiende avisos cuya condición no vive en la base y solo la conoce un
+ * proceso: el programador sabe si volvió a correr bien o si un plan ya se
+ * puede programar. Todo lo demás se atiende por `reconciliar()`
+ * (lib/avisos/condiciones.ts), que lee el estado real del registro.
+ * Deja el mismo historial y detiene los escalamientos del registro.
  */
 export async function atenderAvisos(p: {
-  organizationId: string; entidadId: string; tipos?: TipoEvento[]; motivo: string; reglas?: string[];
+  organizationId: string; entidadId: string; tipos: TipoEvento[]; motivo: string; condicionActual: string; evento: string;
 }) {
   try {
     const ahora = new Date();
-    const where = {
-      organizationId: p.organizationId, entidadId: p.entidadId, atendidaEl: null, requiereAccion: true,
-      ...(p.tipos ? { tipo: { in: p.tipos as string[] } } : {}),
-    };
-    const ids = (await prisma.notification.findMany({ where, select: { id: true } })).map((n) => n.id);
-    if (ids.length) {
-      await prisma.notification.updateMany({ where: { id: { in: ids } }, data: { atendidaEl: ahora, atendidaMotivo: p.motivo.slice(0, 180) } });
-      await prisma.entregaAviso.updateMany({
-        where: { notificationId: { in: ids }, estado: { in: ["PENDIENTE", "EN_REINTENTO"] } },
-        data: { estado: "CANCELADA", errorCategoria: "RESUELTO", errorDetalle: p.motivo.slice(0, 180) },
-      });
-    }
-    await prisma.escalamiento.updateMany({
-      where: { organizationId: p.organizationId, entidadId: p.entidadId, estado: "ACTIVO", ...(p.reglas ? { regla: { in: p.reglas } } : {}) },
-      data: { estado: "DETENIDO", detenidoEl: ahora, motivoDetencion: p.motivo.slice(0, 180) },
+    const abiertos = await prisma.notification.findMany({
+      where: { organizationId: p.organizationId, entidadId: p.entidadId, atendidaEl: null, requiereAccion: true, tipo: { in: p.tipos as string[] } },
+      select: { id: true, organizationId: true, userId: true, tipo: true, entidadId: true, claveDedup: true },
     });
-    return ids.length;
+    let n = 0;
+    for (const a of abiertos) {
+      if (await marcarAtendido(a, { motivo: p.motivo, condicionActual: p.condicionActual, evento: p.evento, origen: "PROGRAMADOR" }, ahora)) n++;
+    }
+    return n;
   } catch {
     return 0;
   }

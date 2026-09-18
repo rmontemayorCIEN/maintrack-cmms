@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
 import { logAudit } from "./audit";
-import { atenderAvisos, emitirAviso } from "./avisos/emitir";
+import { emitirAviso } from "./avisos/emitir";
+import { reconciliar } from "./avisos/condiciones";
 import { avisarNuevaOrden } from "./avisos/ordenes";
 import { tipoDeTrabajo } from "./tipos-solicitud";
 
@@ -197,7 +198,7 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
     changes: { workOrderId: workOrder.id, tipo: tipoFinal, assetId, revisadaPor: p.userId },
   });
 
-  await atenderAvisos({ organizationId: p.organizationId, entidadId: solicitud.id, motivo: "la solicitud se convirtió en orden" });
+  await reconciliar({ organizationId: p.organizationId, entidadId: solicitud.id, origen: "FLUJO", actorId: p.userId, evento: "Conversión en OT" });
   await avisarNuevaOrden(p.organizationId, workOrder.id);
   if (solicitud.requestedById) {
     await emitirAviso({
@@ -256,7 +257,7 @@ export async function rechazarSolicitud(p: {
     summary: `${solicitud.number} rechazada — ${motivo}`,
     changes: { motivo },
   });
-  await atenderAvisos({ organizationId: p.organizationId, entidadId: solicitud.id, motivo: "la solicitud se rechazó" });
+  await reconciliar({ organizationId: p.organizationId, entidadId: solicitud.id, origen: "FLUJO", actorId: p.userId, evento: "Rechazo" });
   if (solicitud.requestedById) {
     await emitirAviso({
       organizationId: p.organizationId, tipo: "SOLICITUD_RECHAZADA", entidad: "WorkRequest", entidadId: solicitud.id,

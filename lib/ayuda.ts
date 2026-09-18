@@ -217,7 +217,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Leer no es atender. Un aviso que pide acción sigue pendiente hasta que se resuelve lo que lo originó —la orden se inicia, la compra se autoriza, la refacción se repone— y entonces se marca «atendida» solo, con el motivo.",
       "«Enterado» deja dicho que ya lo vio. En las situaciones donde con eso basta (una alerta crítica, una orden crítica sin aceptar) detiene los recordatorios; el problema sigue pendiente hasta resolverse.",
-      "Si el mismo problema sigue, no llegan avisos nuevos: se actualiza el mismo, y dice cuántas veces se le ha recordado.",
+      "Editar o reprogramar una orden no atiende su aviso por sí solo. Una OT vencida queda atendida cuando se termina, se cierra, se cancela o se reprograma a una fecha futura; reprogramarla a otra fecha que ya pasó la deja vencida, en el mismo aviso con la fecha nueva.",
+      "«Vencida» y «vencida sin movimiento» son dos avisos. El segundo se atiende con un avance real —iniciarla, una actividad, horas, material, un cambio de estado— aunque la orden siga vencida; comentar o cambiar un campo no cuenta.",
+      "Si la orden cambia de responsable, el aviso de quien la tenía se cierra por reasignación y el nuevo responsable recibe el suyo.",
+      "Si el mismo problema sigue, no llegan avisos nuevos: se actualiza el mismo, y dice cuántas veces se le ha recordado. Si se resolvió y vuelve a pasar, se reabre.",
+      "El resumen diario muestra cada registro una sola vez, en la sección que más le toca: Mis pendientes, Pendientes que debo autorizar, Pendientes de mi equipo, Situaciones generales de la empresa o Información relevante.",
       "Cada aviso dice qué pasó, por qué importa, qué hacer y desde cuándo. La prioridad sale de reglas fijas: la de la orden, la criticidad del equipo, el tiempo vencido, si hay un equipo parado. Estar vencido sube la prioridad pero no vuelve crítico a nada por sí solo.",
     ],
     campos: [

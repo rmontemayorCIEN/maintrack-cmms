@@ -52,10 +52,10 @@ export const REGLAS_RECOMENDADAS = {
   }),
   OT_VENCIDA_SIN_ACTUALIZAR: r({
     titulo: "OT vencida sin movimiento",
-    cuando: "Una orden vencida no ha cambiado en un día de trabajo.",
+    cuando: "Una orden vencida no tiene movimiento válido (inicio, avance, cambio de estado o reprogramación a fecha futura) en un día de trabajo.",
     evento: "OT_VENCIDA", esperaMin: 480, soloJornada: true,
     primerNivel: ["RESPONSABLE"], siguienteNivel: ["SUPERVISORES"], maxRecordatorios: 2,
-    seDetiene: "Al terminarse, reprogramarse, reasignarse o cancelarse.", reconocerDetiene: false, activa: true,
+    seDetiene: "Al reprogramarse a una fecha futura, terminarse o cancelarse. Un movimiento válido reinicia la espera; si se reasigna, empieza de nuevo para la persona nueva.", reconocerDetiene: false, activa: true,
   }),
   SOLICITUD_CRITICA_SIN_CLASIFICAR: r({
     titulo: "Solicitud crítica sin revisar",

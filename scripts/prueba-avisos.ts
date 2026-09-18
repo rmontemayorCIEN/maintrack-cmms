@@ -188,7 +188,7 @@ async function main() {
     const reasigTec1 = await avisosDe(tec1.id, "OT_REASIGNADA");
     const viejo = await prisma.notification.findFirst({ where: { userId: tec1.id, tipo: "OT_ASIGNADA", entidadId: ot1.id } });
     revisar("5. cambio de responsable: al nuevo le llega la asignación, al anterior que ya no es suya", cambio.status === 200 && asigTec2.length === 1 && reasigTec1.length === 1, { status: cambio.status });
-    revisar("   y el aviso viejo queda atendido (no se borra, se atiende)", Boolean(viejo?.atendidaEl) && viejo?.atendidaMotivo === "la orden cambió de responsable");
+    revisar("   y el aviso viejo queda atendido (no se borra, se atiende)", Boolean(viejo?.atendidaEl) && viejo?.atendidaMotivo === "La OT se reasignó a Tec2", viejo?.atendidaMotivo);
 
     // ─────────────────────────────────────────── 6-13 Otros eventos
     console.log("\n6-13. Solicitudes, preventivo, medidores, almacén y compras");
@@ -322,8 +322,9 @@ async function main() {
     const rSup = await resumenDiario(A.id, { id: sup.id, role: "SUPERVISOR", name: "Sup" }, cA, lunes8);
     const rDueno = await resumenDiario(A.id, { id: dueno.id, role: "OWNER", name: "Dueno" }, cA, lunes8);
     const titulos = (r: { secciones: Array<{ titulo: string }> }) => r.secciones.map((s) => s.titulo);
+    const textos = (r: { secciones: Array<{ items: Array<{ texto: string }> }> }) => r.secciones.flatMap((x) => x.items.map((i) => i.texto)).join(" | ");
     revisar("24. resumen diario según el rol: el técnico ve lo suyo, supervisión la operación, el dueño además lo que espera su firma",
-      titulos(rTec).every((t) => t.startsWith("Sus") || t.startsWith("Vencen")) && titulos(rSup).includes("Órdenes vencidas") && titulos(rDueno).includes("Compras por autorizar") && !titulos(rSup).includes("Compras por autorizar"),
+      titulos(rTec).every((t) => t === "Mis pendientes") && titulos(rSup).includes("Pendientes de mi equipo") && textos(rDueno).includes("compra por autorizar") && !textos(rSup).includes("compra por autorizar"),
       { tec: titulos(rTec), sup: titulos(rSup), dueno: titulos(rDueno) });
     revisar("   sin secciones vacías y con el periodo dicho", [rTec, rSup, rDueno].every((r) => r.secciones.every((s) => s.total > 0) && r.periodo.startsWith("Hoy")));
     const env = await enviarResumenes(A.id, cA, lunes8);

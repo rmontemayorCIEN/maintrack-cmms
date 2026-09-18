@@ -5,6 +5,7 @@ import { fail, ok, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { validarNormalizacion } from "@/lib/predictive";
+import { reconciliar } from "@/lib/avisos/condiciones";
 
 const schema = z.object({
   action: z.enum(["ACKNOWLEDGE", "DISMISS", "RESOLVE", "CREATE_WORK_ORDER", "VALIDATE_NORMALIZATION"]),
@@ -68,6 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (input.action === "VALIDATE_NORMALIZATION" || input.action === "RESOLVE") {
       const r = await validarNormalizacion({ organizationId: orgId, alertId: id, userId: user.id, nota: input.nota });
       if ("error" in r) return fail(r.error, 409);
+      await reconciliar({ organizationId: orgId, entidadId: id, origen: "FLUJO", actorId: user.id, evento: "Resolución de la alerta" });
       return ok({ alert: r.alerta });
     }
 
@@ -81,6 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         organizationId: orgId, userId: user.id, entity: "PredictiveAlert", entityId: id,
         action: "DESCARTADA", summary: `${alert.title}: descartada. ${input.nota}`,
       });
+      await reconciliar({ organizationId: orgId, entidadId: id, origen: "FLUJO", actorId: user.id, evento: "Descarte de la alerta" });
       return ok({ alert: updated });
     }
 
@@ -88,6 +91,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       where: { id },
       data: { status: "ACKNOWLEDGED", acknowledgedById: user.id, acknowledgedAt: new Date() },
     });
+    // Reconocerla atiende el recordatorio «sin reconocer»; el aviso de la alerta sigue hasta resolverla.
+    await reconciliar({ organizationId: orgId, entidadId: id, origen: "FLUJO", actorId: user.id, evento: "Reconocimiento de la alerta" });
     return ok({ alert: updated });
   });
 }

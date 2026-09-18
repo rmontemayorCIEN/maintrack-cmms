@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       // Si cambió el responsable, al nuevo le llega la asignación y al anterior
       // que ya no es suya. Aquí y no en lib/agenda: ese archivo lo lee también
       // una pantalla del navegador, y los avisos son código de servidor.
-      if (antes) await avisarCambiosDeOrden(orgId, antes);
+      if (antes) await avisarCambiosDeOrden(orgId, antes, user.id);
 
       await logAudit({
         organizationId: orgId,
@@ -47,6 +47,9 @@ export async function POST(request: Request) {
           ` → ${input.aFecha}` +
           (input.aResponsable && !resultado.aviso ? `, responsable ${input.aResponsable}` : "") +
           " (propuesta de la revision de la semana)",
+        // Con fechas y motivo, como la reprogramación de la pantalla: de aquí
+        // lee el aviso de «OT vencida sin movimiento» si hubo movimiento válido.
+        changes: { antes: antes?.dueDate ?? null, despues: input.aFecha, motivo: "Propuesta de la revisión de la semana" },
       });
 
       return ok({ orden: resultado.numero, aviso: resultado.aviso });

@@ -131,7 +131,7 @@ desde cuándo, quién debe actuar y qué hacer.
 |---|---|---|---|---|---|---|
 | OT crítica sin aceptar | 30 min | 24 h | responsable | supervisores + administración | 2 | iniciada, «Enterado», reasignada, cerrada |
 | OT alta sin aceptar | 4 h | sí | responsable | supervisores | 1 | igual |
-| OT vencida sin movimiento | 8 h | sí | responsable | supervisores | 2 | terminada, reprogramada; un movimiento reinicia la espera |
+| OT vencida sin movimiento | 8 h | sí | responsable | supervisores | 2 | terminada, cancelada, reprogramada a fecha futura; un movimiento válido reinicia la espera |
 | Solicitud crítica sin revisar | 30 min | 24 h | revisores | administración | 2 | revisada |
 | Compra sin autorizar | 8 h (1 h con equipo parado) | sí | autorizadores | dueño | 2 | autorizada, rechazada |
 | Alerta crítica sin reconocer | 1 h | 24 h | supervisores | administración | 2 | reconocida, resuelta |
@@ -142,6 +142,59 @@ Un recordatorio vuelve a entregar la MISMA notificación («recordado 2
 veces»). Subir de nivel queda en la bitácora. Cambiar de responsable reinicia
 el escalamiento para la persona nueva. Cada empresa ajusta espera,
 recordatorios, jornada o apaga una regla.
+
+## Cuándo un aviso queda atendido
+
+Un aviso que pide acción se atiende cuando la **condición que lo originó deja
+de existir**, no cuando alguien hace algo con el registro. La regla de cada
+tipo —cuándo nace, permanece, se actualiza, escala y se atiende, y la función
+que lo decide leyendo el estado real— vive en un solo lugar:
+`REGLAS_DE_AVISO` en `lib/avisos/condiciones.ts`. Hay una por cada uno de los
+30 tipos que piden acción y una por cada regla de escalamiento.
+
+**Leído, enterado y atendido son tres cosas distintas:**
+
+| | Qué es | Qué cambia |
+|---|---|---|
+| Leído | La persona lo abrió | Deja de contar como no leído. Nada más |
+| «Enterado» | La persona dice que ya lo vio | Lo marca leído y detiene el escalamiento en las reglas donde reconocer basta (OT sin aceptar, alerta crítica sin reconocer). **No lo atiende** |
+| Atendido | La condición ya no existe | Sale de pendientes, cancela sus entregas por salir y queda su motivo |
+
+**Reconciliación.** `reconciliar()` compara cada aviso abierto con su
+registro y atiende solo los que se resolvieron, con un motivo que dice qué
+pasó («La OT fue terminada», «La fecha compromiso se cambió a una fecha
+futura (23 sep 2026)», «La requisición fue autorizada», «La existencia se
+repuso: 2 pza»). La llaman los flujos en el momento (cambio de estado,
+edición, autorización, recepción, conversión o rechazo de solicitud,
+acciones sobre alertas) y el proceso programado cada cinco minutos, que
+corrige lo que haya quedado inconsistente. Si una persona tiene dos avisos
+abiertos de la misma condición sobre el mismo registro, deja uno.
+
+**Una condición, un aviso.** La OT vencida que se reprograma a otra fecha que
+también ya pasó sigue vencida: se actualiza el mismo aviso con la fecha
+nueva, no se abre otro. Si la condición se resuelve y vuelve (se reprogramó a
+futuro y otra vez venció), se reabre el mismo aviso como ciclo nuevo.
+
+**Vencida y sin movimiento son dos condiciones.** El recordatorio «OT vencida
+sin movimiento» se atiende con movimiento válido aunque la OT siga vencida; el
+aviso «OT vencida» sigue hasta que deja de estarlo. Movimiento válido
+(`lib/avisos/movimiento.ts`): inicio, actividad hecha o liberada, horas de
+mano de obra, material cargado, cambio de estado o reprogramación con motivo
+a fecha futura. No cuentan: abrir, leer, «Enterado», comentar, editar otro
+campo, guardar sin cambios, cambiar el responsable ni cambiar algo y
+regresarlo en menos de diez minutos.
+
+**Reasignación.** Se cierra el aviso del responsable anterior («La OT se
+reasignó a …»), el responsable nuevo recibe el suyo en el momento, y el de
+supervisión sigue mientras la OT siga vencida.
+
+**Historial.** Cada cambio de pendiente a atendido, y cada reapertura, queda
+en `HistorialAviso`: fecha, condición anterior y actual, evento que lo
+resolvió, quién actuó, qué proceso lo confirmó (flujo, reconciliación o
+programador) y el motivo mostrado. No se repite en la bitácora general.
+
+Revisar datos reales sin escribir: `./scripts/con-produccion.sh
+scripts/reconciliar-avisos.ts --folio OT-000001` (con `--aplicar`, corrige).
 
 ## Preferencias
 
@@ -166,6 +219,23 @@ preventivo, trabajo planeado, tiempo de atención, equipos con más fallas y
 consumo (solo roles con acceso a costos). Sin secciones vacías; si no hay
 nada, no se manda (salvo que la empresa pida el «sin pendientes»). Todo
 calculado en código, sin IA.
+
+**Un registro, una vez.** Antes de armar el resumen se juntan todas las
+apariciones de cada registro (`consolidar()` en `lib/avisos/resumenes.ts`):
+la misma OT puede salir como propia, como del equipo y como escalada si la
+persona es responsable, supervisora y dueña. Queda en la sección más
+específica, con la prioridad más alta, la acción de esa sección y todas sus
+etiquetas («crítica · vencida · escalado»). Orden de clasificación:
+
+1. Requiere una acción directa suya → **Mis pendientes**
+2. Es responsabilidad directa suya → **Mis pendientes**
+3. Requiere su autorización → **Pendientes que debo autorizar**
+4. Es del equipo o área que supervisa → **Pendientes de mi equipo**
+5. Es situación general de la empresa → **Situaciones generales de la empresa**
+6. Es solo informativo → **Información relevante**
+
+Registros distintos siguen separados: la alerta predictiva y la OT que
+generó son dos renglones. El semanal pasa por `sinRepetir()`.
 
 ## Entrega, reintentos y deduplicación
 
@@ -260,6 +330,7 @@ intentos automáticos de entrega van al historial técnico, no a la bitácora.
 | Prueba | Cubre |
 |---|---|
 | `prueba-avisos.ts` | Las 45 obligatorias, en tres empresas exclusivas; nada sale a la calle (correo de prueba, navegador simulado, receptor de webhooks local). Al final comprueba que las demás empresas quedaron idénticas |
+| `prueba-avisos-atendidos.ts` | Resúmenes sin repetidos (10) y avisos atendidos solo por resolución real (20), más el caso de producción de OT-000001 y OT-000004; edición, «Enterado» y alertas por HTTP contra la ruta real |
 
 ## Migración
 
@@ -267,6 +338,8 @@ intentos automáticos de entrega van al historial técnico, no a la bitácora.
 `Notification` y tablas `EntregaAviso`, `PreferenciaAvisos`, `ConfigAvisos`,
 `Escalamiento`, `CredencialApi`, `UsoApi`, `Webhook`, `ClaveIdempotencia`,
 `LimiteUso`.
+
+`20260918123130_historial_de_avisos` — aditiva: tabla `HistorialAviso`.
 
 ## Riesgos y pendientes reales
 
@@ -286,5 +359,13 @@ intentos automáticos de entrega van al historial técnico, no a la bitácora.
 - **Llave de integraciones.** Si falta `LLAVE_INTEGRACIONES`, la de webhooks
   se deriva de `AUTH_SECRET`: rotar esa variable obliga a regenerar los
   secretos de los webhooks.
+- **La orden de compra no cambia de estado al recibir.** La recepción
+  actualiza la requisición (parcial, recibida), no `PurchaseOrder.estado`,
+  que se queda «ABIERTA». Los avisos leen la requisición para no quedarse
+  abiertos; la pantalla de compras que muestre el estado de la orden de
+  compra lo seguirá viendo abierta.
+- **Avisos de abuso de credenciales.** Se atienden al revocar la
+  credencial; si la integración simplemente deja de rebasar su límite, el
+  aviso sigue abierto hasta revisarlo.
 - **Historial.** Las notificaciones y entregas no se purgan solas (no se
   borra información). Crecerán; una política de retención queda por decidir.

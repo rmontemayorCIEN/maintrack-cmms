@@ -26,7 +26,9 @@ import { reglasDeEmpresa, ventanaDe, type ConfigEmpresa } from "./config";
 import { sumarEspera } from "./horario";
 import { tiempoPendiente } from "./prioridad";
 import type { ClaveRegla, ReglaEscalamiento } from "./reglas";
-import { refaccionesCriticasAgotadas } from "./detectores";
+import { ordenesCompraEnEspera, refaccionesCriticasAgotadas } from "./situaciones";
+import { ultimosMovimientos } from "./movimiento";
+import { motivoDeDetencion } from "./condiciones";
 import type { Contexto } from "./destinatarios";
 
 type Candidato = {
@@ -39,7 +41,7 @@ type Candidato = {
   titulo: string;
   enlace: string;
   contexto: Contexto;
-  /** Si hubo movimiento reciente que reinicia la espera (OT vencida que alguien actualizó). */
+  /** Si hubo movimiento válido que reinicia la espera (lib/avisos/movimiento.ts): no cualquier edición. */
   movimientoEl?: Date;
   /** Otra espera para este registro (una compra con equipo parado espera menos). */
   esperaMin?: number;
@@ -74,11 +76,12 @@ async function candidatos(organizationId: string, clave: ClaveRegla, ahora: Date
     case "OT_VENCIDA_SIN_ACTUALIZAR": {
       const ots = await prisma.workOrder.findMany({
         where: { organizationId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS"] }, dueDate: { lt: ahora } },
-        select: { id: true, number: true, title: true, assignedToId: true, siteId: true, dueDate: true, updatedAt: true },
+        select: { id: true, number: true, title: true, assignedToId: true, siteId: true, dueDate: true },
         take: 1000,
       });
+      const movimientos = await ultimosMovimientos(organizationId, ots.map((o) => o.id));
       return ots.map((o) => ({
-        entidad: "WorkOrder", entidadId: o.id, responsableId: o.assignedToId, desde: o.dueDate!, movimientoEl: o.updatedAt,
+        entidad: "WorkOrder", entidadId: o.id, responsableId: o.assignedToId, desde: o.dueDate!, movimientoEl: movimientos.get(o.id)?.el,
         titulo: `${o.number} vencida sin movimiento: ${o.title}`, enlace: `/work-orders/${o.id}`,
         contexto: { responsableId: o.assignedToId, siteId: o.siteId },
       }));
@@ -134,11 +137,7 @@ async function candidatos(organizationId: string, clave: ClaveRegla, ahora: Date
       }));
     }
     case "COMPRA_VENCIDA_SIN_RECEPCION": {
-      const ocs = await prisma.purchaseOrder.findMany({
-        where: { organizationId, estado: { in: ["ABIERTA", "RECIBIDA_PARCIAL"] }, fechaPrometida: { lt: ahora } },
-        select: { id: true, folio: true, fechaPrometida: true, warehouseId: true, purchaseRequestId: true, supplier: { select: { name: true } } },
-        take: 500,
-      });
+      const ocs = (await ordenesCompraEnEspera(organizationId)).filter((o) => o.fechaPrometida! < ahora);
       return ocs.map((o) => ({
         entidad: "PurchaseOrder", entidadId: o.id, desde: o.fechaPrometida!,
         titulo: `${o.folio} sigue sin recibirse (${o.supplier.name})`, enlace: `/compras/${o.purchaseRequestId}`,
@@ -167,7 +166,10 @@ export async function procesarEscalamientos(organizationId: string, cfg: ConfigE
       if (!porEntidad.has(f.entidadId)) {
         await prisma.escalamiento.update({
           where: { id: f.id },
-          data: { estado: "DETENIDO", detenidoEl: ahora, motivoDetencion: regla.activa ? "se atendió o dejó de existir la condición" : "la regla está apagada" },
+          data: {
+            estado: "DETENIDO", detenidoEl: ahora,
+            motivoDetencion: regla.activa ? (await motivoDeDetencion(organizationId, clave, f.entidadId, ahora, cfg)).slice(0, 180) : "La regla está apagada",
+          },
         });
         res.detenidos++;
       }

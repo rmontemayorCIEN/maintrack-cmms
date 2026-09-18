@@ -638,7 +638,7 @@ export async function transitionWorkOrder(params: {
   }
 
   // Avisos del cambio de estado: a quién le toca actuar ahora y qué quedó atendido.
-  await avisarTransicion(params.organizationId, wo.id, wo.status, params.to, motivo);
+  await avisarTransicion(params.organizationId, wo.id, wo.status, params.to, motivo, params.userId);
 
   return updated;
 }
