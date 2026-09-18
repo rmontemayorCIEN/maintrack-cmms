@@ -85,7 +85,7 @@ const buttonStyles: Record<ButtonVariant, string> = {
 
 export function buttonClass(variant: ButtonVariant = "primary", size: "sm" | "md" = "md") {
   return cn(
-    "inline-flex items-center justify-center gap-1.5 rounded-lg border font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+    "boton inline-flex items-center justify-center gap-1.5 rounded-lg border font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
     size === "sm" ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
     buttonStyles[variant],
   );

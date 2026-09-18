@@ -19,11 +19,14 @@ export function NewWorkOrderForm({
   technicians,
   teams,
   puedeGestionarCatalogos = false,
+  activoInicial = "",
 }: {
   assets: Array<{ id: string; code: string; name: string; criticality: string }>;
   technicians: Option[];
   teams: Option[];
   puedeGestionarCatalogos?: boolean;
+  /** Llega desde el QR o la ficha del equipo: la orden ya sabe de qué equipo es. */
+  activoInicial?: string;
 }) {
   const zona = useZona();
   const router = useRouter();
@@ -40,7 +43,7 @@ export function NewWorkOrderForm({
     description: "",
     maintenanceType: "CORRECTIVE",
     priority: "MEDIUM",
-    assetId: "",
+    assetId: assets.some((a) => a.id === activoInicial) ? activoInicial : "",
     assignedToId: "",
     teamId: "",
     dueDate: claveDia(new Date(Date.now() + 3 * 86_400_000), zona),
@@ -206,7 +209,7 @@ export function NewWorkOrderForm({
             </div>
             <div>
               <label className="label">Horas estimadas</label>
-              <input type="number" step="0.5" min="0" className="field" value={form.estimatedHours} onChange={(e) => set("estimatedHours", e.target.value)} />
+              <input type="number" inputMode="decimal" step="0.5" min="0" className="field" value={form.estimatedHours} onChange={(e) => set("estimatedHours", e.target.value)} />
             </div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={form.requiresShutdown} onChange={(e) => set("requiresShutdown", e.target.checked)} className="h-4 w-4 rounded border-slate-300" />

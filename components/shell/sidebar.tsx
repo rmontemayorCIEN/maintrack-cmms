@@ -3,167 +3,33 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  BookOpen,
-  Boxes,
-  Building2,
-  CalendarDays,
-  ChevronRight,
-  ClipboardList,
-  Cpu,
-  Factory,
-  Flame,
-  Gauge,
-  Rocket,
-  Inbox,
-  UsersRound,
-  Waypoints,
-  PackageX,
-  KanbanSquare,
-  Library,
-  ListChecks,
-  Menu,
-  MessageCircleQuestion,
-  QrCode,
-  Settings,
-  ShoppingCart,
-  Sparkles,
-  Truck,
-  Upload,
-  Wrench,
-  X,
-} from "lucide-react";
+import { ChevronRight, Menu, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { menuDe } from "@/lib/pantallas";
+import { IconoMenu } from "./iconos";
 
 /**
- * El menu, ordenado por el dia de quien lo usa, no por como esta hecho el
- * sistema.
- *
- * El orden responde a las preguntas en el orden en que aparecen: como voy, que
- * me llego, que tengo que hacer, sobre que equipos, con que material, como me
- * fue. La configuracion va al final a proposito: se toca las primeras semanas
- * y casi nunca despues, asi que arriba solo estorbaria todos los dias.
+ * El menú, ordenado por el día de quien lo usa y filtrado por su rol: sale de
+ * `menuDe()` en lib/pantallas.ts, la misma tabla con que el servidor decide
+ * qué pantallas responde. Nunca ofrece una liga que termina en «Sin permiso».
  */
-const NAV: Array<{
-  section: string;
-  /** Para recordar si el grupo quedo abierto o cerrado. */
-  clave: string;
-  items: Array<{
-    href: string;
-    label: string;
-    icon: React.ReactNode;
-    /**
-     * La etiqueta la pone la instalacion, no este archivo.
-     *
-     * Un club no tiene "Lineas" y una planta no tiene "Servicios". Con esta
-     * marca, el nombre sale de terminoConjunto() y aqui solo queda un texto de
-     * respaldo por si el termino no llega.
-     */
-    porInstalacion?: boolean;
-  }>;
-}> = [
-  {
-    section: "Como voy",
-    clave: "inicio",
-    items: [
-      { href: "/dashboard", label: "Panel de control", icon: <Gauge className="h-4 w-4" /> },
-      { href: "/board", label: "Tablero", icon: <KanbanSquare className="h-4 w-4" /> },
-      { href: "/calendar", label: "Calendario", icon: <CalendarDays className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "Lo que llega",
-    clave: "entradas",
-    items: [
-      { href: "/requests", label: "Solicitudes", icon: <Inbox className="h-4 w-4" /> },
-      { href: "/requests/puntos", label: "Puntos de reporte QR", icon: <QrCode className="h-4 w-4" /> },
-      { href: "/alerts", label: "Alertas", icon: <AlertTriangle className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "El trabajo",
-    clave: "trabajo",
-    items: [
-      { href: "/work-orders", label: "Órdenes de trabajo", icon: <ClipboardList className="h-4 w-4" /> },
-      { href: "/work-orders/armar", label: "Armar una orden", icon: <Wrench className="h-4 w-4" /> },
-      { href: "/backlog", label: "Trabajo pendiente", icon: <PackageX className="h-4 w-4" /> },
-      // "Personal" y no "Equipo": en el mismo menu, "equipos" son las maquinas.
-      // Tampoco "Mano de obra", que es la linea de costo y no las personas —si
-      // manana hay una pantalla de costo de mano de obra, se llamaria asi.
-      { href: "/equipo", label: "Personal", icon: <UsersRound className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "Equipos y planes",
-    clave: "activos",
-    items: [
-      // "Activo" es jerga de CMMS; en piso se dice equipo. El glosario mismo
-      // define activo usando la palabra equipo, asi que se ponen las dos.
-      { href: "/assets", label: "Activos / Equipos", icon: <Factory className="h-4 w-4" /> },
-      { href: "/meters", label: "Medidores", icon: <Cpu className="h-4 w-4" /> },
-      { href: "/plans", label: "Planes preventivos", icon: <ListChecks className="h-4 w-4" /> },
-      { href: "/conjuntos", label: "Conjuntos", icon: <Waypoints className="h-4 w-4" />, porInstalacion: true },
-      { href: "/predictive", label: "Predictivo", icon: <Activity className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "Almacén y compras",
-    clave: "almacen",
-    items: [
-      { href: "/inventory", label: "Almacén", icon: <Boxes className="h-4 w-4" /> },
-      { href: "/requisiciones", label: "Requisiciones", icon: <ClipboardList className="h-4 w-4" /> },
-      { href: "/compras", label: "Compras", icon: <ShoppingCart className="h-4 w-4" /> },
-      { href: "/suppliers", label: "Proveedores", icon: <Truck className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "Como me fue",
-    clave: "analisis",
-    items: [
-      { href: "/paros", label: "Dónde para la planta", icon: <Flame className="h-4 w-4" /> },
-      { href: "/reports", label: "Reportes", icon: <BarChart3 className="h-4 w-4" /> },
-      { href: "/consulta", label: "Pregunte a sus datos", icon: <MessageCircleQuestion className="h-4 w-4" /> },
-      { href: "/diagnostico", label: "Diagnóstico IA", icon: <Sparkles className="h-4 w-4" /> },
-    ],
-  },
-  {
-    section: "Configuración",
-    clave: "config",
-    items: [
-      { href: "/puesta-en-marcha", label: "Puesta en marcha", icon: <Rocket className="h-4 w-4" /> },
-      { href: "/catalogs", label: "Catálogos", icon: <Library className="h-4 w-4" /> },
-      { href: "/import", label: "Importar datos", icon: <Upload className="h-4 w-4" /> },
-      { href: "/glossary", label: "Glosario", icon: <BookOpen className="h-4 w-4" /> },
-      { href: "/settings", label: "Ajustes", icon: <Settings className="h-4 w-4" /> },
-    ],
-  },
-];
-
 const LLAVE_ABIERTOS = "mt_menu_abiertos";
 
-/** Solo para el super-admin. Tipado como NAV o la union pierde sus campos. */
-const NAV_PLATAFORMA: typeof NAV = [
-  {
-    section: "Plataforma",
-    clave: "plataforma",
-    items: [
-      { href: "/clients", label: "Empresas cliente", icon: <Building2 className="h-4 w-4" /> },
-    ],
-  },
-];
+/** El botón «Menú» de la barra inferior del teléfono abre este mismo cajón. */
+export const EVENTO_ABRIR_MENU = "mt:abrir-menu";
 
 export function Sidebar({
   orgName,
   plan,
+  rol,
   esSuperAdmin = false,
   tieneLogo = false,
   terminoConjuntoPlural,
 }: {
   orgName: string;
   plan: string;
+  /** El rol efectivo (el del operador dentro de un cliente es OWNER). */
+  rol: string;
   esSuperAdmin?: boolean;
   /** Si la empresa subio su logotipo, sustituye al icono generico. */
   tieneLogo?: boolean;
@@ -180,9 +46,27 @@ export function Sidebar({
    * usuario todavia no sabe que existe. Quien ya lo conoce cierra lo que no
    * usa y el navegador se lo recuerda.
    */
+  const menu = menuDe(rol, { esSuperAdmin });
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(NAV.map((g) => [g.clave, true])),
+    Object.fromEntries(menu.map((g) => [g.clave, true])),
   );
+
+  // Cerrar el cajón al cambiar de pantalla, y abrirlo desde la barra inferior.
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    const abrir = () => setOpen(true);
+    window.addEventListener(EVENTO_ABRIR_MENU, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_MENU, abrir);
+  }, []);
+  // Con el cajón abierto, Escape lo cierra y la página de atrás no se desplaza.
+  useEffect(() => {
+    if (!open) return;
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", tecla);
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", tecla); document.body.style.overflow = antes; };
+  }, [open]);
 
   // Se lee despues del primer dibujado: en el servidor no hay localStorage, y
   // leerlo durante el render daria una pantalla distinta a la del cliente.
@@ -225,8 +109,8 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {(esSuperAdmin ? [...NAV, ...NAV_PLATAFORMA] : NAV).map((group) => (
-          <div key={group.section} className="mb-3">
+        {menu.map((group) => (
+          <div key={group.clave} className="mb-3">
             {/* El grupo que contiene la pagina actual se muestra abierto
                 aunque este cerrado: esconder donde esta parado el usuario
                 seria desorientarlo. */}
@@ -249,7 +133,7 @@ export function Sidebar({
                         abierto && "rotate-90",
                       )}
                     />
-                    {group.section}
+                    {group.seccion}
                   </button>
                   <ul className={cn("grid gap-0.5", !abierto && "hidden")}>
               {group.items.map((item) => {
@@ -259,15 +143,16 @@ export function Sidebar({
                     <Link
                       href={item.href}
                       onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                        "flex min-h-10 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors lg:min-h-0",
                         active
                           ? "bg-brand-50 font-medium text-brand-700"
                           : "text-slate-600 hover:bg-slate-100",
                       )}
                     >
-                      <span className={active ? "text-brand-600" : "text-slate-400"}>{item.icon}</span>
-                      {item.porInstalacion ? terminoConjuntoPlural ?? item.label : item.label}
+                      <span className={active ? "text-brand-600" : "text-slate-400"}><IconoMenu nombre={item.icono} /></span>
+                      {item.porInstalacion ? terminoConjuntoPlural ?? item.etiqueta : item.etiqueta}
                     </Link>
                   </li>
                 );
@@ -291,8 +176,9 @@ export function Sidebar({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed left-3 top-3 z-30 grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white lg:hidden no-print"
+        className="fixed left-2 top-2.5 z-30 grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white lg:hidden no-print"
         aria-label="Abrir menú"
+        aria-expanded={open}
       >
         <Menu className="h-4 w-4" />
       </button>
@@ -302,13 +188,13 @@ export function Sidebar({
       </aside>
 
       {open ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menú">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl">
+          <div className="absolute left-0 top-0 h-full w-[min(18rem,85vw)] bg-white shadow-xl">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="absolute right-2 top-3 grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"
+              className="absolute right-2 top-3 grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100"
               aria-label="Cerrar menú"
             >
               <X className="h-4 w-4" />

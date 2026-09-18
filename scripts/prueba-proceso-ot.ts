@@ -89,8 +89,8 @@ async function main() {
       JSON.stringify(etiquetas("COMPLETED", "SUPERVISOR")) === JSON.stringify(["Validar y cerrar", "Devolver a proceso"]));
     revisar("completada: el técnico no ve acciones", etiquetas("COMPLETED", "TECHNICIAN").length === 0);
     revisar("cerrada: solo administración ve «Reabrir»", etiquetas("CLOSED", "ADMIN").includes("Reabrir") && etiquetas("CLOSED", "SUPERVISOR").length === 0);
-    revisar("en proceso: el técnico ve «Pausar» y «Completar», no «Cancelar»",
-      JSON.stringify(etiquetas("IN_PROGRESS", "TECHNICIAN")) === JSON.stringify(["Pausar", "Completar"]));
+    revisar("en proceso: el técnico ve «Pausar o reportar bloqueo» y «Terminar y enviar a revisión», no «Cancelar»",
+      JSON.stringify(etiquetas("IN_PROGRESS", "TECHNICIAN")) === JSON.stringify(["Pausar o reportar bloqueo", "Terminar y enviar a revisión"]));
     revisar("consulta y solicitante no ven acciones", etiquetas("OPEN", "VIEWER").length === 0 && etiquetas("OPEN", "REQUESTER").length === 0);
     revisar("en espera sin iniciar: «Reanudar» regresa a asignada, no a en proceso",
       accionesDisponibles({ status: "ON_HOLD", iniciada: false, conResponsable: true }, "TECHNICIAN")[0]?.a === "ASSIGNED");

@@ -31,7 +31,10 @@ import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
 import { esFalla, tipoDeActividad } from "@/lib/fallas";
 import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
-import { faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
+import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
+import { puedeVerRuta, verCostos } from "@/lib/pantallas";
+import { MeterReadingForm } from "../../meters/reading-form";
+import { FichaDeEjecucion, IndiceDeSecciones } from "./ejecucion";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
 
@@ -264,6 +267,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const hayPlaneado = moPlaneada.size + refPlaneadas.size + srvPlaneados.size > 0;
 
   const currency = user.organization.currency;
+  // Quien ejecuta no ve importes: lib/pantallas.ts verCostos.
+  const conCostos = verCostos(user.role);
+  const moneda = conCostos ? currency : "";
+  const medidores = wo.assetId
+    ? await prisma.meter.findMany({ where: { organizationId: user.organizationId, assetId: wo.assetId }, select: { id: true, name: true, unit: true, currentValue: true }, orderBy: { name: "asc" } })
+    : [];
+  const vencida = Boolean(wo.dueDate && wo.dueDate < new Date() && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status));
 
   // Orden activa sin responsable: se dice en la orden, no solo al presionar «Iniciar».
   const activaSinResponsable = !wo.assignedToId && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status);
@@ -314,6 +324,18 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const canExecute = can(user.role, "workorder:execute");
   const canEdit = can(user.role, "workorder:write");
   const doneTasks = wo.tasks.filter((t) => t.done).length;
+  const hayAcciones = accionesDisponibles({ status: wo.status, iniciada: !!wo.startedAt, conResponsable: !!wo.assignedToId }, user.role).length > 0;
+  // La secuencia del trabajo, en el orden en que se hace.
+  const indice = [
+    { id: "actividades", texto: "Actividades" },
+    ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad" }] : []),
+    { id: "tiempo", texto: "Tiempo" },
+    { id: "materiales", texto: "Materiales" },
+    ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas" }] : []),
+    { id: "evidencias", texto: "Evidencias" },
+    { id: "bitacora", texto: "Bitácora" },
+    ...(wo.completedAt ? [{ id: "resultado", texto: "Resultado" }] : []),
+  ];
 
   return (
     <>
@@ -355,25 +377,6 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             >
               <Printer className="h-3.5 w-3.5" /> Imprimir
             </Link>
-            {canExecute ? (
-              <WorkOrderActions
-              iaDisponible={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("CIERRE_OT")}
-                workOrderId={wo.id}
-                status={wo.status}
-                failureCodes={failureCodes}
-                causasRaiz={causasRaiz}
-                actividadesDeFalla={actividadesDeFalla}
-                esOrdenDeFalla={esFalla(wo.maintenanceType)}
-                pendingRequired={wo.tasks.filter((t) => !t.done && !t.liberadaAt).length}
-                puedeGestionarCatalogos={can(user.role, "settings:write")}
-                rol={user.role}
-                iniciada={!!wo.startedAt}
-                conResponsable={!!wo.assignedToId}
-                requiereParo={wo.requiresShutdown}
-                evidenciaRequerida={evidenciaRequerida}
-                cierre={cierre}
-              />
-            ) : null}
           </>
         }
       />
@@ -404,6 +407,30 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         ))}
       </div>
 
+      {canExecute && hayAcciones ? (
+        // En el teléfono, las acciones del paso siguiente quedan fijas abajo, sobre la barra de navegación:
+        // iniciar, pausar o terminar sin recorrer toda la orden. En computadora van en su renglón.
+        <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-slate-200 bg-white px-3 py-2 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] no-print lg:static lg:z-auto lg:mb-4 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none [&_button]:min-h-11 lg:[&_button]:min-h-0">
+              <WorkOrderActions
+              iaDisponible={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("CIERRE_OT")}
+                workOrderId={wo.id}
+                status={wo.status}
+                failureCodes={failureCodes}
+                causasRaiz={causasRaiz}
+                actividadesDeFalla={actividadesDeFalla}
+                esOrdenDeFalla={esFalla(wo.maintenanceType)}
+                pendingRequired={wo.tasks.filter((t) => !t.done && !t.liberadaAt).length}
+                puedeGestionarCatalogos={can(user.role, "settings:write")}
+                rol={user.role}
+                iniciada={!!wo.startedAt}
+                conResponsable={!!wo.assignedToId}
+                requiereParo={wo.requiresShutdown}
+                evidenciaRequerida={evidenciaRequerida}
+                cierre={cierre}
+              />
+        </div>
+      ) : null}
+
       {activaSinResponsable ? (
         <div role="note" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {wo.startedAt ? (
@@ -423,8 +450,22 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="grid content-start gap-4 lg:col-span-2">
+      {/* minmax(0,1fr): sin esto la columna crece con el contenido (un nombre de equipo largo) y se corta en el teléfono. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 lg:col-span-2">
+          <FichaDeEjecucion
+            compromiso={wo.dueDate ? formatDia(wo.dueDate, { zona }) : null}
+            vencida={vencida}
+            activo={wo.asset ? { id: wo.asset.id, texto: `${wo.asset.code} · ${wo.asset.name}` } : null}
+            puedeVerActivo={puedeVerRuta(user.role, "/assets")}
+            ubicacion={[wo.site?.name, wo.location?.name].filter(Boolean).join(" / ") || null}
+            responsable={wo.assignedTo?.name ?? null}
+            requiereParo={wo.requiresShutdown} conSeguridad={Boolean(wo.safetyNotes || wo.procedure)}
+            actividades={{ hechas: doneTasks, total: wo.tasks.length }}
+          />
+          <IndiceDeSecciones secciones={indice} />
+
+          <section id="actividades" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
             <CardHeader
               title="Lista de verificación"
@@ -462,6 +503,53 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             />
           </Card>
 
+          </section>
+          {wo.procedure || wo.safetyNotes ? (
+          <section id="seguridad" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          {wo.procedure || wo.safetyNotes ? (
+            <Card>
+              <CardHeader title="Procedimiento y seguridad" />
+              {wo.procedure ? (
+                <div className="mb-4">
+                  <p className="label">Procedimiento</p>
+                  <p className="whitespace-pre-wrap text-sm text-slate-700">{wo.procedure}</p>
+                </div>
+              ) : null}
+              {wo.safetyNotes ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Seguridad</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">{wo.safetyNotes}</p>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
+
+          </section>
+          ) : null}
+          <section id="tiempo" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <Card>
+            <CardHeader title="Mano de obra" subtitle={`${formatNumber(wo.actualHours, 1)} h registradas${conCostos ? ` · ${formatCurrency(wo.laborCost, currency)}` : ""}`} />
+            <LaborPanel
+              workOrderId={wo.id}
+              actividades={actividadesCargables}
+              entries={wo.labor.map((l) => ({
+                id: l.id,
+                name: l.user.name,
+                color: l.user.color,
+                hours: l.hours,
+                cost: l.cost,
+                workedAt: l.workedAt.toISOString(),
+                notes: l.notes,
+              }))}
+              technicians={technicians}
+              currentUserId={user.id}
+              currency={moneda}
+              editable={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
+            />
+          </Card>
+
+          </section>
+          <section id="materiales" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           {hayPlaneado ? (
             <Card>
               <CardHeader
@@ -491,94 +579,97 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </Card>
           ) : null}
 
-          {wo.procedure || wo.safetyNotes ? (
-            <Card>
-              <CardHeader title="Procedimiento y seguridad" />
-              {wo.procedure ? (
-                <div className="mb-4">
-                  <p className="label">Procedimiento</p>
-                  <p className="whitespace-pre-wrap text-sm text-slate-700">{wo.procedure}</p>
-                </div>
-              ) : null}
-              {wo.safetyNotes ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Seguridad</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">{wo.safetyNotes}</p>
-                </div>
-              ) : null}
-            </Card>
+          {delPlan ? (
+            <RefaccionesDelPlan
+              plan={delPlan.plan}
+              renglones={delPlan.renglones}
+              orden={{ id: wo.id, etiqueta: `${wo.number} · ${wo.title}`, activo: wo.asset ? `${wo.asset.code} · ${wo.asset.name}` : null }}
+              almacenes={almacenesWo.map((a) => ({ id: a.id, etiqueta: a.name }))}
+              refacciones={catalogoWo}
+              existencias={stockWo}
+              requisiciones={requisicionesWo.map((r) => ({
+                id: r.id, folio: r.folio, estado: r.estado,
+                porSurtir: r.renglones.reduce((sum, l) => sum + (l.cantidadSolicitada - l.cantidadSurtida), 0),
+              }))}
+              puedePedir={can(user.role, "requisition:create")}
+            />
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader title="Refacciones" subtitle={conCostos ? formatCurrency(wo.partsCost, currency) : "Lo que se usó en este trabajo"} />
+            <PartsPanel
+              workOrderId={wo.id}
+              actividades={actividadesCargables}
+              used={wo.partsUsed.map((p) => ({
+                id: p.id,
+                code: p.part.code,
+                name: p.part.name,
+                unit: p.part.unit,
+                quantity: p.quantity,
+                cost: p.cost,
+              }))}
+              catalog={parts}
+              currency={moneda}
+              editable={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
+            />
+          </Card>
+          </section>
+          {medidores.length > 0 ? (
+          <section id="lecturas" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
             <Card>
-              <CardHeader title="Mano de obra" subtitle={`${formatNumber(wo.actualHours, 1)} h · ${formatCurrency(wo.laborCost, currency)}`} />
-              <LaborPanel
-                workOrderId={wo.id}
-                actividades={actividadesCargables}
-                entries={wo.labor.map((l) => ({
-                  id: l.id,
-                  name: l.user.name,
-                  color: l.user.color,
-                  hours: l.hours,
-                  cost: l.cost,
-                  workedAt: l.workedAt.toISOString(),
-                  notes: l.notes,
-                }))}
-                technicians={technicians}
-                currentUserId={user.id}
-                currency={currency}
-                editable={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
-              />
+              <CardHeader title="Lecturas del equipo" subtitle="Registre el horómetro o contador si lo tomó en este trabajo." />
+              <ul className="grid gap-3">
+                {medidores.map((m) => (
+                  <li key={m.id} className="rounded-lg border border-slate-200 p-3">
+                    <p className="mb-2 text-sm font-medium text-slate-800">
+                      {m.name} <span className="font-normal text-slate-500">· actual {m.currentValue === null ? "sin lectura" : `${formatNumber(m.currentValue, 1)} ${m.unit}`}</span>
+                    </p>
+                    {canExecute && !["CLOSED", "CANCELLED"].includes(wo.status) ? <MeterReadingForm meterId={m.id} unit={m.unit} current={m.currentValue} /> : null}
+                  </li>
+                ))}
+              </ul>
             </Card>
+          </section>
+          ) : null}
+          <section id="evidencias" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <Card>
+            {/* Los adjuntos se permiten en cualquier estado, tambien en OT
+                cerradas o canceladas: el reporte del proveedor, la factura o la
+                foto del retrabajo suelen llegar dias despues. Lo que si queda
+                congelado al cerrar son las tareas, las horas y los costos, que
+                son los que sostienen los indicadores. */}
+            <Adjuntos
+              destino={{ workOrderId: wo.id }}
+              editable={canExecute}
+              titulo="Evidencia del trabajo"
+              ayuda="Fotos del antes y después, video del síntoma, reporte del proveedor."
+              adjuntos={wo.attachments.map((a) => ({
+                id: a.id, name: a.name, kind: a.kind, size: a.size,
+                mimeType: a.mimeType, createdAt: a.createdAt.toISOString(),
+                subidoPor: a.uploadedBy?.name ?? null,
+              }))}
+            />
+          </Card>
 
-            {!delPlan ? (
-              <ProcedimientoIa
-                workOrderId={wo.id}
-                disponible={
-                  iaConfigurada() &&
-                  (user.isSuperAdmin || iaDeLaOrganizacion(user.organization).funciones.includes("PROCEDIMIENTO"))
-                }
-                editable={can(user.role, "workorder:write") && !["CLOSED", "CANCELLED"].includes(wo.status)}
-                yaTieneActividades={wo.tasks.length > 0}
-              />
-            ) : null}
+          </section>
+          <section id="bitacora" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <Card>
+            <CardHeader title="Bitácora" subtitle="Notas del equipo. Si necesita ayuda, pida apoyo aquí." />
+            <CommentsPanel
+              workOrderId={wo.id}
+              comments={wo.comments.map((c) => ({
+                id: c.id,
+                body: c.body,
+                name: c.user.name,
+                color: c.user.color,
+                createdAt: c.createdAt.toISOString(),
+              }))}
+              editable={canExecute}
+            />
+          </Card>
 
-            {delPlan ? (
-              <RefaccionesDelPlan
-                plan={delPlan.plan}
-                renglones={delPlan.renglones}
-                orden={{ id: wo.id, etiqueta: `${wo.number} · ${wo.title}`, activo: wo.asset ? `${wo.asset.code} · ${wo.asset.name}` : null }}
-                almacenes={almacenesWo.map((a) => ({ id: a.id, etiqueta: a.name }))}
-                refacciones={catalogoWo}
-                existencias={stockWo}
-                requisiciones={requisicionesWo.map((r) => ({
-                  id: r.id, folio: r.folio, estado: r.estado,
-                  porSurtir: r.renglones.reduce((sum, l) => sum + (l.cantidadSolicitada - l.cantidadSurtida), 0),
-                }))}
-                puedePedir={can(user.role, "requisition:create")}
-              />
-            ) : null}
-
-            <Card>
-              <CardHeader title="Refacciones" subtitle={formatCurrency(wo.partsCost, currency)} />
-              <PartsPanel
-                workOrderId={wo.id}
-                actividades={actividadesCargables}
-                used={wo.partsUsed.map((p) => ({
-                  id: p.id,
-                  code: p.part.code,
-                  name: p.part.name,
-                  unit: p.part.unit,
-                  quantity: p.quantity,
-                  cost: p.cost,
-                }))}
-                catalog={parts}
-                currency={currency}
-                editable={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
-              />
-            </Card>
-          </div>
-
+          </section>
+          {conCostos ? (
           <Card>
             <CardHeader
               title="Servicios externos"
@@ -607,46 +698,26 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             />
           </Card>
 
-          <Card>
-            {/* Los adjuntos se permiten en cualquier estado, tambien en OT
-                cerradas o canceladas: el reporte del proveedor, la factura o la
-                foto del retrabajo suelen llegar dias despues. Lo que si queda
-                congelado al cerrar son las tareas, las horas y los costos, que
-                son los que sostienen los indicadores. */}
-            <Adjuntos
-              destino={{ workOrderId: wo.id }}
-              editable={canExecute}
-              titulo="Evidencia del trabajo"
-              ayuda="Fotos del antes y después, video del síntoma, reporte del proveedor."
-              adjuntos={wo.attachments.map((a) => ({
-                id: a.id, name: a.name, kind: a.kind, size: a.size,
-                mimeType: a.mimeType, createdAt: a.createdAt.toISOString(),
-                subidoPor: a.uploadedBy?.name ?? null,
-              }))}
-            />
-          </Card>
+          ) : null}
 
-          <Card>
-            <CardHeader title="Bitacora" subtitle="Notas del equipo de mantenimiento" />
-            <CommentsPanel
+          {!delPlan ? (
+            <ProcedimientoIa
               workOrderId={wo.id}
-              comments={wo.comments.map((c) => ({
-                id: c.id,
-                body: c.body,
-                name: c.user.name,
-                color: c.user.color,
-                createdAt: c.createdAt.toISOString(),
-              }))}
-              editable={canExecute}
+              disponible={
+                iaConfigurada() &&
+                (user.isSuperAdmin || iaDeLaOrganizacion(user.organization).funciones.includes("PROCEDIMIENTO"))
+              }
+              editable={can(user.role, "workorder:write") && !["CLOSED", "CANCELLED"].includes(wo.status)}
+              yaTieneActividades={wo.tasks.length > 0}
             />
-          </Card>
+          ) : null}
 
-          <MaterialPorActividad organizationId={user.organizationId} workOrderId={wo.id} moneda={currency} />
+          <MaterialPorActividad organizationId={user.organizationId} workOrderId={wo.id} moneda={moneda} />
 
           <BitacoraDeEstados organizationId={user.organizationId} workOrderId={wo.id} zona={zona} />
         </div>
 
-        <div className="grid content-start gap-4">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
             <CardHeader title="Resumen" />
             <dl className="grid gap-3 text-sm">
@@ -689,6 +760,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </dl>
           </Card>
 
+          {conCostos ? (
           <Card>
             <CardHeader title="Costos" />
             <dl className="grid gap-2 text-sm">
@@ -704,10 +776,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               </div>
             </dl>
           </Card>
+          ) : null}
 
           {wo.completedAt ? (
-            <Card>
-              <CardHeader title="Cierre técnico" />
+            <Card id="resultado">
+              <CardHeader title="Resultado del trabajo" />
               <dl className="grid gap-3 text-sm">
                 <Row label="Código de falla">
                   {wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}
@@ -721,6 +794,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           ) : null}
         </div>
       </div>
+      {/* Lugar para la barra de acciones fija del teléfono: el final de la orden no queda debajo. */}
+      {canExecute && hayAcciones ? <div className="h-20 lg:hidden" aria-hidden /> : null}
     </>
   );
 }

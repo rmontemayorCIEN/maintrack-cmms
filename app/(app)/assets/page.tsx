@@ -12,6 +12,7 @@ import {
   OPEN_STATUSES,
 } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { verCostos } from "@/lib/pantallas";
 import { AssetDialog } from "./asset-dialog";
 import { TablaActivos, type FilaActivo } from "./tabla-activos";
 import { vistaGuardada } from "@/lib/vistas";
@@ -22,9 +23,10 @@ export const dynamic = "force-dynamic";
 export default async function AssetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; criticality?: string; status?: string; siteId?: string }>;
+  searchParams: Promise<{ q?: string; criticality?: string; status?: string; siteId?: string; nuevo?: string }>;
 }) {
   const user = await requireUser();
+  const conCostos = verCostos(user.role);
   const params = await searchParams;
   const orgId = user.organizationId;
 
@@ -90,8 +92,8 @@ export default async function AssetsPage({
     manufacturer: a.manufacturer,
     model: a.model,
     serialNumber: a.serialNumber,
-    purchaseCost: a.purchaseCost,
-    replacementCost: a.replacementCost,
+    purchaseCost: conCostos ? a.purchaseCost : 0,
+    replacementCost: conCostos ? a.replacementCost : 0,
     detieneLinea: a.detieneLinea,
     expectedLifeYears: a.expectedLifeYears,
     commissionedAt: a.commissionedAt?.toISOString() ?? null,
@@ -121,6 +123,7 @@ export default async function AssetsPage({
                 <Wand2 className="h-3.5 w-3.5" /> Levantamiento asistido
               </Link>
               <AssetDialog
+                abrirAlInicio={params.nuevo === "1"}
                 sites={sites}
                 locations={locations}
                 categories={categories}
@@ -135,7 +138,7 @@ export default async function AssetsPage({
         <Stat label="Activos registrados" value={assets.length} />
         <Stat label="Criticidad A" value={criticalA} hint="Equipos de mayor impacto" />
         <Stat label="Fuera de servicio" value={down} tone={down ? "bad" : "good"} />
-        <Stat label="Valor de reposición" value={formatCurrency(totalValue, user.organization.currency)} />
+        {conCostos ? <Stat label="Valor de reposición" value={formatCurrency(totalValue, user.organization.currency)} /> : null}
       </div>
 
       <form className="mb-4 flex flex-wrap items-center gap-2">
@@ -174,7 +177,7 @@ export default async function AssetsPage({
       {assets.length === 0 ? (
         <EmptyState title="Sin activos" description="Registre su primer equipo para comenzar a programar mantenimiento." />
       ) : (
-        <TablaActivos activos={filas} vistaInicial={vista} puedeEditar={can(user.role, "asset:write")} />
+        <TablaActivos activos={filas} vistaInicial={vista} puedeEditar={can(user.role, "asset:write")} conCostos={conCostos} />
       )}
     </>
   );

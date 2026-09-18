@@ -11,6 +11,7 @@ import { rollForwardPlan } from "./scheduler";
 import { avanzarActividadesDeOrden } from "./calendario-actividad";
 import { logAudit } from "./audit";
 import { avisarTransicion } from "./avisos/ordenes";
+import { enFila, hace } from "./repeticion";
 import { avisarInventario } from "./avisos/detectores";
 
 /**
@@ -669,6 +670,20 @@ export async function consumePart(params: {
   /** A que actividad se le carga la refaccion. */
   taskId?: string | null;
 }) {
+  // El doble toque no saca dos veces del almacén (lib/repeticion.ts).
+  return enFila(`consumo:${params.userId}:${params.workOrderId}:${params.partId}:${params.quantity}`, async () => {
+    const repetido = await prisma.stockMovement.count({
+      where: {
+        organizationId: params.organizationId, workOrderId: params.workOrderId, partId: params.partId,
+        userId: params.userId, quantity: params.quantity, createdAt: { gte: hace() },
+      },
+    });
+    if (repetido) throw new ErrorDeOrden("Ese consumo ya se registró hace un momento. No se volvió a descontar del almacén.", 409);
+    return consumirRefaccion(params);
+  });
+}
+
+async function consumirRefaccion(params: Parameters<typeof consumePart>[0]) {
   const part = await prisma.part.findFirst({
     where: { id: params.partId, organizationId: params.organizationId },
   });

@@ -1,445 +1,167 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  CalendarClock,
-  CircleDollarSign,
-  Clock,
-  Gauge,
-  ShieldAlert,
-  Timer,
-  Wrench,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { calcularIndicadores, costoYParoPorActivo, periodoDeLaEmpresa, tendenciaMensual } from "@/lib/indicadores";
-import { estadoDeVencimiento } from "@/lib/vencimiento";
-import { TarjetaIndicador } from "@/components/tarjeta-indicador";
-import { Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, Progress, Stat } from "@/components/ui";
-import { CostRankingChart, DonutChart, MixChart, TrendChart } from "@/components/charts/dashboard-charts";
-import {
-  MAINTENANCE_TYPE_COLORS,
-  MAINTENANCE_TYPE_LABELS,
-  OPEN_STATUSES,
-  PRIORITY_COLORS,
-  PRIORITY_LABELS,
-  WO_STATUS_COLORS,
-  WO_STATUS_LABELS,
-} from "@/lib/constants";
-import { formatCurrency, formatNumber } from "@/lib/utils";
-import { ArrowRight, ListChecks } from "lucide-react";
-import { ESTADO_OPERATIVO, puestaEnMarcha } from "@/lib/puesta-en-marcha";
-import { evaluarPuntos } from "@/lib/predictive";
+import { inicioDe, type Bloque, type Cifra, type Renglon, type Tono } from "@/lib/inicio";
+import { PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
+import { IconoMenu } from "@/components/shell/iconos";
+import { cn } from "@/lib/utils";
+import { PanelIndicadores } from "./panel-indicadores";
 
-export const metadata = { title: "Panel de control" };
+export const metadata = { title: "Inicio" };
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+/**
+ * El inicio, distinto para cada rol (lib/inicio.ts). Esta pantalla no decide
+ * nada: pinta el resumen, las acciones rápidas y los bloques que le tocan a
+ * quien entra. En el teléfono todo va en una columna, con lo urgente arriba.
+ */
+export default async function InicioPage() {
   const user = await requireUser();
-  const orgId = user.organizationId;
-  const currency = user.organization.currency;
-  const DIAS = 90;
-  const periodo = await periodoDeLaEmpresa(orgId, DIAS);
-
-  const [kpis, trend, ranking, upcoming, criticalOpen, alerts, stockParts, pendingRequests] =
-    await Promise.all([
-      calcularIndicadores(orgId, periodo),
-      tendenciaMensual(orgId, 6),
-      costoYParoPorActivo(orgId, periodo, 8),
-      prisma.workOrder.findMany({
-        where: { organizationId: orgId, status: { in: OPEN_STATUSES } },
-        include: {
-          asset: { select: { code: true, name: true } },
-          assignedTo: { select: { name: true, color: true } },
-        },
-        orderBy: [{ dueDate: "asc" }],
-        take: 8,
-      }),
-      prisma.workOrder.count({
-        where: { organizationId: orgId, status: { in: OPEN_STATUSES }, priority: "CRITICAL" },
-      }),
-      prisma.predictiveAlert.findMany({
-        where: { organizationId: orgId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
-        include: { asset: { select: { code: true, name: true } } },
-        orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
-        take: 5,
-      }),
-      // Comparar dos columnas entre si no se expresa con el API de Prisma, y una
-      // consulta cruda no seria portable: PostgreSQL pliega los identificadores
-      // sin comillas a minusculas y trata `active` como booleano, mientras que
-      // SQLite acepta ambas formas. Se filtra en memoria: el catalogo de
-      // refacciones de una planta cabe de sobra.
-      prisma.part.findMany({
-        where: { organizationId: orgId, active: true },
-        select: {
-          id: true, code: true, name: true,
-          quantityOnHand: true, minQuantity: true, unit: true,
-        },
-        orderBy: { quantityOnHand: "asc" },
-        take: 2000,
-      }),
-      prisma.workRequest.count({ where: { organizationId: orgId, status: "PENDING" } }),
-    ]);
-
-  // Bajo minimo, de lo mas critico a lo menos.
-  const lowStock = stockParts
-    .filter((part) => part.quantityOnHand <= part.minQuantity)
-    .sort((a, b) => a.quantityOnHand - a.minQuantity - (b.quantityOnHand - b.minQuantity))
-    .slice(0, 5);
-
-  const typeData = Object.entries(kpis.porTipo).map(([key, value]) => ({
-    name: MAINTENANCE_TYPE_LABELS[key] ?? key,
-    value,
-  }));
-
-  const ind = kpis.indicadores;
-  // El estado de hoy de cada punto con alerta, no el texto guardado al detectar.
-  const vivas = await evaluarPuntos(orgId, alerts.map((a) => a.sensorId).filter(Boolean) as string[]);
-  const tonoMinimo = (v: number | null, bueno: number, regular: number) =>
-    v === null ? "default" : v >= bueno ? "good" : v >= regular ? "warn" : "bad";
-
-  // Mientras la cuenta no este lista, el panel abre con lo que falta: los
-  // indicadores de una cuenta a medio configurar no significan nada todavia.
-  const marcha = await puestaEnMarcha(user.organizationId);
+  const inicio = await inicioDe(user);
 
   return (
     <>
-      <PageHeader
-        title={`Hola, ${user.name.split(" ")[0]}`}
-        description={`Resumen operativo de ${user.organization.name} — últimos ${DIAS} días`}
-        actions={
-          <>
-            <LinkButton href="/reports" variant="secondary" size="sm">
-              Ver reportes
-            </LinkButton>
-            <LinkButton href="/work-orders/new" size="sm">
-              Nueva orden
-            </LinkButton>
-          </>
-        }
-      />
+      <header className="mb-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Hola, {user.name.split(" ")[0]}</p>
+        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{inicio.titulo}</h1>
+      </header>
 
-      {!marcha.completa ? (
-        <Link
-          href="/puesta-en-marcha"
-          className="mb-6 flex flex-wrap items-center gap-4 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3 transition-colors hover:bg-brand-50"
-        >
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-brand-600">
-            <ListChecks className="h-5 w-5" />
-          </span>
+      {inicio.acciones.length ? (
+        <nav aria-label="Acciones rápidas" className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {inicio.acciones.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:border-brand-300 hover:bg-brand-50"
+            >
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700"><IconoMenu nombre={a.icono} /></span>
+              <span className="min-w-0 leading-tight">{a.etiqueta}</span>
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {inicio.puesta ? (
+        <Link href="/puesta-en-marcha" className="mb-4 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3 hover:bg-brand-50">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-brand-900" data-porcentaje={marcha.porcentaje}>
-              Puesta en marcha al {marcha.porcentaje}%
-              <span className="ml-2 text-xs font-medium text-brand-800/80" data-estado-operativo={marcha.estadoOperativo}>
-                · {ESTADO_OPERATIVO[marcha.estadoOperativo].texto}
-              </span>
+            <p className="text-sm font-semibold text-brand-900" data-porcentaje={inicio.puesta.porcentaje}>
+              Puesta en marcha al {inicio.puesta.porcentaje}% <span className="text-xs font-medium text-brand-800/80">· {inicio.puesta.estado}</span>
             </p>
-            <p className="text-xs text-brand-800/80">
-              {marcha.siguiente
-                ? `Sigue: ${marcha.siguiente.titulo}. ${marcha.siguiente.falta}`
-                : "Ya casi termina."}
-            </p>
-            <div className="mt-1.5 max-w-md">
-              <Progress value={marcha.porcentaje} tone={marcha.porcentaje >= 60 ? "good" : "warn"} />
+            {inicio.puesta.siguiente ? <p className="text-xs text-brand-800/80">{inicio.puesta.siguiente}</p> : null}
+            <div className="mt-1.5 h-1.5 max-w-md overflow-hidden rounded-full bg-white">
+              <div className="h-full bg-brand-500" style={{ width: `${inicio.puesta.porcentaje}%` }} />
             </div>
           </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-brand-600" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-brand-600" aria-hidden />
         </Link>
       ) : null}
 
-      {(criticalOpen > 0 || alerts.length > 0 || pendingRequests > 0) && (
-        <div className="mb-6 grid gap-3 md:grid-cols-3">
-          {criticalOpen > 0 && (
-            <AlertCard
-              href="/work-orders?priority=CRITICAL"
-              tone="danger"
-              icon={<ShieldAlert className="h-4 w-4" />}
-              title={`${criticalOpen} OT criticas abiertas`}
-              detail="Requieren atención inmediata"
-            />
-          )}
-          {alerts.length > 0 && (
-            <AlertCard
-              href="/alerts"
-              tone="warning"
-              icon={<AlertTriangle className="h-4 w-4" />}
-              title={`${alerts.length} alertas predictivas activas`}
-              detail="Monitoreo de condición fuera de umbral"
-            />
-          )}
-          {pendingRequests > 0 && (
-            <AlertCard
-              href="/requests"
-              tone="info"
-              icon={<CalendarClock className="h-4 w-4" />}
-              title={`${pendingRequests} solicitudes por revisar`}
-              detail="Pendientes de aprobación"
-            />
-          )}
+      {inicio.resumen.length ? (
+        <section aria-label="Resumen" className="mb-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {inicio.resumen.map((c) => <TarjetaCifra key={c.etiqueta} cifra={c} />)}
+        </section>
+      ) : null}
+
+      {inicio.alDia ? (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-800">
+          Todo al día: no hay pendientes que pidan su atención.
+        </p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {inicio.bloques.map((b) => <TarjetaBloque key={b.id} bloque={b} />)}
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TarjetaIndicador
-          indicador={ind.disponibilidad}
-          dias={DIAS}
-          pista={`${formatNumber(ind.paroNoPlaneado.valor ?? 0, 1)} h de paro no planeado · ${formatNumber(ind.paroTotal.valor ?? 0, 1)} h de paro acumulado`}
-          tono={tonoMinimo(ind.disponibilidad.valor, 95, 90)}
-          icono={<Gauge className="h-4 w-4" />}
-        />
-        <TarjetaIndicador
-          indicador={ind.cumplimientoPreventivo}
-          dias={DIAS}
-          etiqueta="Cumplimiento PM"
-          decimales={0}
-          pista="Programadas terminadas a más tardar el día compromiso"
-          tono={tonoMinimo(ind.cumplimientoPreventivo.valor, 90, 75)}
-          icono={<Wrench className="h-4 w-4" />}
-        />
-        <TarjetaIndicador
-          indicador={ind.mttr}
-          dias={DIAS}
-          etiqueta="MTTR"
-          pista="Tiempo medio de reparación"
-          icono={<Timer className="h-4 w-4" />}
-        />
-        <TarjetaIndicador
-          indicador={ind.mtbf}
-          dias={DIAS}
-          etiqueta="MTBF"
-          decimales={0}
-          pista="Tiempo medio entre fallas"
-          icono={<Clock className="h-4 w-4" />}
-        />
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TarjetaIndicador
-          indicador={ind.backlog}
-          dias={DIAS}
-          etiqueta="Backlog abierto"
-          pista={`${formatNumber(kpis.totales.backlogHoras, 0)} h estimadas`}
-        />
-        <Stat
-          label="OT vencidas"
-          value={kpis.totales.backlogVencido}
-          tone={kpis.totales.backlogVencido > 0 ? "bad" : "good"}
-          hint="Abiertas con la fecha compromiso ya pasada"
-          href="/work-orders?vencidas=1"
-        />
-        <TarjetaIndicador
-          indicador={ind.trabajoPlanificado}
-          dias={DIAS}
-          decimales={0}
-          pista="Meta de clase mundial: 80%"
-          tono={ind.trabajoPlanificado.valor === null ? "default" : ind.trabajoPlanificado.valor >= 80 ? "good" : "warn"}
-        />
-        <TarjetaIndicador
-          indicador={ind.costoMantenimiento}
-          dias={DIAS}
-          moneda={currency}
-          etiqueta="Costo del periodo"
-          pista={`MO ${formatCurrency(kpis.costos.mano, currency)} · Refacciones ${formatCurrency(kpis.costos.refacciones, currency)}`}
-          icono={<CircleDollarSign className="h-4 w-4" />}
-        />
-      </div>
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title="Carga de trabajo y costo"
-            subtitle="Órdenes creadas contra completadas por mes"
-          />
-          <TrendChart data={trend} />
-        </Card>
-        <Card>
-          <CardHeader title="Distribución por tipo" subtitle="Órdenes creadas en el periodo, sin canceladas" />
-          <DonutChart data={typeData} />
-        </Card>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title="Mezcla preventivo / predictivo / correctivo"
-            subtitle="Proporción mensual — una mezcla sana favorece el trabajo planificado"
-          />
-          <MixChart data={trend} />
-        </Card>
-        <Card>
-          <CardHeader title="Activos con mayor costo" subtitle={`Órdenes terminadas en los últimos ${DIAS} días`} />
-          <CostRankingChart data={ranking} />
-        </Card>
-      </div>
-
-      {/* `grid-cols-[minmax(0,1fr)]`: en el telefono esta rejilla es de una sola
-          columna, y una columna implicita se mide por el contenido. Con la tabla
-          de abajo adentro, la pista crecia a 620 px y sacaba de lado a toda la
-          pantalla. Ver components/tabla-configurable.tsx. */}
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2" padded={false}>
-          <div className="flex items-center justify-between px-5 py-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">Proximas órdenes</h3>
-              <p className="text-xs text-slate-500">Backlog ordenado por fecha compromiso</p>
-            </div>
-            <Link href="/work-orders" className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
-              Ver todas <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </div>
-          {upcoming.length === 0 ? (
-            <div className="px-5 pb-5">
-              <EmptyState title="Sin órdenes abiertas" description="Ejecute el programador para generar los preventivos del periodo." />
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Folio</th>
-                    <th>Descripción</th>
-                    <th>Tipo</th>
-                    <th>Prioridad</th>
-                    <th>Estado</th>
-                    <th>Vencimiento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcoming.map((wo) => {
-                    const due = estadoDeVencimiento(wo, { zona: periodo.zonaHoraria });
-                    return (
-                      <tr key={wo.id}>
-                        <td>
-                          <Link href={`/work-orders/${wo.id}`} className="font-medium text-brand-600 hover:underline">
-                            {wo.number}
-                          </Link>
-                        </td>
-                        <td>
-                          <p className="font-medium text-slate-800">{wo.title}</p>
-                          <p className="text-xs text-slate-500">
-                            {wo.asset ? `${wo.asset.code} · ${wo.asset.name}` : "Sin activo"}
-                          </p>
-                        </td>
-                        <td>
-                          <Badge className={MAINTENANCE_TYPE_COLORS[wo.maintenanceType]}>
-                            {MAINTENANCE_TYPE_LABELS[wo.maintenanceType]}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge className={PRIORITY_COLORS[wo.priority]}>{PRIORITY_LABELS[wo.priority]}</Badge>
-                        </td>
-                        <td>
-                          <Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge>
-                        </td>
-                        <td>
-                          <Badge tone={due.tono}>{due.texto}</Badge>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader
-              title="Alertas predictivas"
-              subtitle="Condición fuera de parámetro"
-              action={
-                <Link href="/alerts" className="text-xs font-medium text-brand-600 hover:underline">
-                  Ver
-                </Link>
-              }
-            />
-            {alerts.length === 0 ? (
-              <p className="py-6 text-center text-xs text-slate-400">Todos los equipos dentro de parametro</p>
-            ) : (
-              <ul className="grid gap-2.5">
-                {alerts.map((alert) => (
-                  <li key={alert.id} className="rounded-lg border border-slate-200 p-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-medium text-slate-800">{alert.asset.name}</p>
-                      <Badge tone={alert.severity === "CRITICAL" ? "danger" : "warning"}>
-                        {alert.severity === "CRITICAL" ? "Crítica" : "Advertencia"}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-[0.6875rem] leading-snug text-slate-500">
-                      {(alert.sensorId && vivas.get(alert.sensorId)?.resumen) || alert.message}
-                      {alert.normalizadaEl ? " Normalizada: falta validar." : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Refacciones bajo mínimo"
-              subtitle="Requieren reposición"
-              action={
-                <Link href="/inventory" className="text-xs font-medium text-brand-600 hover:underline">
-                  Almacén
-                </Link>
-              }
-            />
-            {lowStock.length === 0 ? (
-              <p className="py-6 text-center text-xs text-slate-400">Inventario en niveles adecuados</p>
-            ) : (
-              <ul className="grid gap-3">
-                {lowStock.map((part) => (
-                  <li key={part.id}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-700">{part.name}</span>
-                      <span className="tabular-nums text-slate-500">
-                        {formatNumber(part.quantityOnHand, 0)} / {formatNumber(part.minQuantity, 0)} {part.unit}
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <Progress
-                        value={part.minQuantity ? (part.quantityOnHand / part.minQuantity) * 100 : 0}
-                        tone={part.quantityOnHand === 0 ? "bad" : "warn"}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-      </div>
+      {inicio.conIndicadores ? (
+        <Suspense fallback={<p className="mt-8 text-sm text-slate-500" role="status">Cargando resultados…</p>}>
+          <PanelIndicadores />
+        </Suspense>
+      ) : null}
     </>
   );
 }
 
-function AlertCard({
-  href,
-  tone,
-  icon,
-  title,
-  detail,
-}: {
-  href: string;
-  tone: "danger" | "warning" | "info";
-  icon: React.ReactNode;
-  title: string;
-  detail: string;
-}) {
-  const tones = {
-    danger: "border-red-200 bg-red-50 text-red-800",
-    warning: "border-amber-200 bg-amber-50 text-amber-800",
-    info: "border-blue-200 bg-blue-50 text-blue-800",
-  };
+const TONO: Record<Tono, string> = {
+  normal: "border-slate-200",
+  bien: "border-emerald-200",
+  atencion: "border-amber-300",
+  critico: "border-red-300",
+};
+const MARCA: Record<Tono, string> = {
+  normal: "bg-slate-300",
+  bien: "bg-emerald-500",
+  atencion: "bg-amber-500",
+  critico: "bg-red-600",
+};
+/** El estado no se dice solo con color: también con palabras. */
+const PALABRA: Record<Tono, string> = { normal: "", bien: "Al día", atencion: "Revisar", critico: "Urgente" };
+
+function TarjetaCifra({ cifra }: { cifra: Cifra }) {
+  const contenido = (
+    <>
+      <p className="text-[0.6875rem] font-medium leading-tight text-slate-500">{cifra.etiqueta}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{cifra.valor}</p>
+      {PALABRA[cifra.tono] ? (
+        <p className="mt-0.5 flex items-center gap-1 text-[0.6875rem] font-medium text-slate-600">
+          <span className={cn("h-2 w-2 rounded-full", MARCA[cifra.tono])} aria-hidden />{PALABRA[cifra.tono]}
+        </p>
+      ) : null}
+    </>
+  );
+  const clase = cn("block rounded-xl border bg-white p-3", TONO[cifra.tono]);
+  return cifra.enlace ? <Link href={cifra.enlace} className={cn(clase, "hover:bg-slate-50")}>{contenido}</Link> : <div className={clase}>{contenido}</div>;
+}
+
+function TarjetaBloque({ bloque }: { bloque: Bloque }) {
   return (
-    <Link href={href} className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-opacity hover:opacity-90 ${tones[tone]}`}>
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/70">{icon}</span>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{title}</p>
-        <p className="truncate text-xs opacity-80">{detail}</p>
+    <section id={bloque.id} aria-labelledby={`t-${bloque.id}`} className="scroll-mt-20 rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <div className="min-w-0">
+          <h2 id={`t-${bloque.id}`} className="text-sm font-semibold text-slate-900">
+            {bloque.titulo} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600">{bloque.total}</span>
+          </h2>
+          {bloque.descripcion ? <p className="mt-0.5 text-xs text-slate-500">{bloque.descripcion}</p> : null}
+        </div>
+        {bloque.verTodo ? (
+          <Link href={bloque.verTodo.enlace} className="inline-flex min-h-9 shrink-0 items-center text-xs font-medium text-brand-700 hover:underline">{bloque.verTodo.texto}</Link>
+        ) : null}
       </div>
-    </Link>
+      <ul className="divide-y divide-slate-100">
+        {bloque.renglones.map((r) => <FilaInicio key={r.id} r={r} />)}
+      </ul>
+      {bloque.total > bloque.renglones.length ? (
+        <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">y {bloque.total - bloque.renglones.length} más</p>
+      ) : null}
+    </section>
+  );
+}
+
+function FilaInicio({ r }: { r: Renglon }) {
+  const cuerpo = (
+    <div className="flex min-w-0 flex-1 items-start gap-2.5">
+      <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", MARCA[r.tono])} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">{r.folio}</span>
+          {r.estado ? <span>{WO_STATUS_LABELS[r.estado] ?? r.estado}</span> : null}
+          {r.prioridad ? <span>· Prioridad {PRIORITY_LABELS[r.prioridad] ?? r.prioridad}</span> : null}
+          {r.tono === "critico" ? <span className="font-semibold text-red-700">· Urgente</span> : null}
+        </p>
+        <p className="mt-0.5 break-words text-sm font-medium text-slate-900">{r.titulo}</p>
+        {r.detalle ? <p className="mt-0.5 break-words text-xs text-slate-500">{r.detalle}</p> : null}
+        {r.fecha ? <p className={cn("mt-0.5 text-xs", r.fecha.startsWith("Venció") ? "font-medium text-red-700" : "text-slate-500")}>{r.fecha}</p> : null}
+      </div>
+    </div>
+  );
+  return (
+    <li className="flex items-center gap-2 px-4 py-3">
+      {r.enlace ? <Link href={r.enlace} className="flex min-w-0 flex-1 items-start gap-2 hover:opacity-90">{cuerpo}</Link> : cuerpo}
+      {r.accion ? (
+        <Link href={r.accion.enlace} className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-brand-700 hover:bg-brand-50">
+          {r.accion.texto}<ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : r.enlace ? <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" aria-hidden /> : null}
+    </li>
   );
 }

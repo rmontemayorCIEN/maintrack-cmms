@@ -168,11 +168,11 @@ export function ServicesPanel({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">Cantidad</label>
-              <input type="number" step="0.5" min="0.5" className="field" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              <input type="number" inputMode="decimal" step="0.5" min="0.5" className="field" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
             </div>
             <div>
               <label className="label">Costo unitario</label>
-              <input type="number" step="0.01" min="0" className="field" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+              <input type="number" inputMode="decimal" step="0.01" min="0" className="field" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
             </div>
           </div>
           <input

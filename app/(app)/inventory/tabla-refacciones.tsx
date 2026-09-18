@@ -44,8 +44,10 @@ function nivel(p: FilaRefaccion) {
 
 export function TablaRefacciones({
   refacciones, vistaInicial, editable, suppliers, familias, unidades, puedeGestionarCatalogos,
-  warehouseId,
+  warehouseId, conCostos = true,
 }: {
+  /** Sin costos (técnico): costo unitario y valor no se ofrecen. */
+  conCostos?: boolean;
   refacciones: FilaRefaccion[];
   vistaInicial: Vista;
   editable: boolean;
@@ -179,7 +181,7 @@ export function TablaRefacciones({
     <TablaConfigurable
       filas={refacciones}
       fijas={FIJAS}
-      columnas={COLUMNAS}
+      columnas={conCostos ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "costoUnit" && c.id !== "valor")}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="refacciones"

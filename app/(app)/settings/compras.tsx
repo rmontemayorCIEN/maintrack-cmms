@@ -68,7 +68,7 @@ export function ConfiguracionCompras({
             Monto a partir del cual se necesita autorización ({moneda})
           </label>
           <input
-            type="number" min="0" step="any" value={monto} disabled={!editable}
+            type="number" inputMode="decimal" min="0" step="any" value={monto} disabled={!editable}
             onChange={(e) => setMonto(e.target.value)}
             className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums sm:max-w-48"
           />

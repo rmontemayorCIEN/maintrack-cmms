@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ok, withAuth } from "@/lib/api";
+import { ok, withAuth, withVista } from "@/lib/api";
+import { veTodasLasSolicitudes } from "@/lib/pantallas";
 import { nextRequestNumber } from "@/lib/numbering";
 import { avisarSolicitudNueva } from "@/lib/avisos/detectores";
 
@@ -10,12 +11,20 @@ const schema = z.object({
   assetId: z.string().optional().nullable(),
   locationId: z.string().optional().nullable(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  // Las preguntas del formulario sencillo: dónde, si impide trabajar, si hay
+  // riesgo y cómo contactar. Todo opcional: la API sigue aceptando lo de antes.
+  donde: z.string().trim().max(200).optional().nullable(),
+  impideTrabajar: z.boolean().optional(),
+  riesgo: z.enum(["NINGUNO", "ALTO"]).optional(),
+  riesgoMotivo: z.string().trim().max(300).optional().nullable(),
+  contacto: z.string().trim().max(80).optional().nullable(),
 });
 
 export async function GET() {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/requests", async ({ orgId, user }) => {
+    // El solicitante y el técnico ven las que levantaron; quien revisa, todas.
     const requests = await prisma.workRequest.findMany({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, ...(veTodasLasSolicitudes(user.role) ? {} : { requestedById: user.id }) },
       include: {
         asset: { select: { code: true, name: true } },
         requestedBy: { select: { name: true, color: true } },
@@ -41,7 +50,16 @@ export async function POST(request: Request) {
         organizationId: orgId,
         number,
         title: input.title,
-        description: input.description,
+        // Dónde y si impide trabajar van en el texto, con palabras: es lo que
+        // lee quien revisa, y no piden columnas nuevas.
+        description: [
+          input.description?.trim() || null,
+          input.donde ? `Dónde: ${input.donde}` : null,
+          input.impideTrabajar === undefined ? null : `Impide trabajar: ${input.impideTrabajar ? "sí" : "no"}`,
+        ].filter(Boolean).join("\n") || null,
+        riesgo: input.riesgo ?? "NINGUNO",
+        riesgoMotivo: input.riesgo === "ALTO" ? input.riesgoMotivo || "Quien reporta indicó que hay riesgo" : null,
+        reporterCelular: input.contacto || null,
         assetId: asset?.id ?? null,
         siteId: asset?.siteId ?? null,
         locationId: input.locationId ?? asset?.locationId ?? null,

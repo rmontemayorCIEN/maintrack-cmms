@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { tipoPorUnidad } from "@/lib/medidores";
 
 const createSchema = z.object({
@@ -12,7 +12,7 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/meters", async ({ orgId }) => {
     const meters = await prisma.meter.findMany({
       where: { organizationId: orgId },
       include: { asset: { select: { code: true, name: true } } },

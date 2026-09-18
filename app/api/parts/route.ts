@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { almacenPorOmision, aplicarMovimiento } from "@/lib/almacen";
 
 const schema = z.object({
@@ -18,7 +18,7 @@ const schema = z.object({
 });
 
 export async function GET(request: Request) {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/inventory", async ({ orgId }) => {
     const url = new URL(request.url);
     const q = url.searchParams.get("q");
     const parts = await prisma.part.findMany({

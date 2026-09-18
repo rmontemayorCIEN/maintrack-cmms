@@ -183,7 +183,7 @@ export function ConfigDeAvisos({ puedeEditar, sitios, supervisa }: { puedeEditar
               <div className="grid gap-2 sm:grid-cols-3">
                 <label className="grid gap-1">Avisos no críticos desde<input type="time" className="field py-1 text-xs" value={cfg.horaInicio} onChange={(e) => setCfg({ ...cfg, horaInicio: e.target.value })} /></label>
                 <label className="grid gap-1">hasta<input type="time" className="field py-1 text-xs" value={cfg.horaFin} onChange={(e) => setCfg({ ...cfg, horaFin: e.target.value })} /></label>
-                <label className="grid gap-1">Avisar vencimientos con (horas)<input type="number" min={1} max={336} className="field py-1 text-xs" value={cfg.anticipacionHoras} onChange={(e) => setCfg({ ...cfg, anticipacionHoras: Number(e.target.value) })} /></label>
+                <label className="grid gap-1">Avisar vencimientos con (horas)<input type="number" inputMode="decimal" min={1} max={336} className="field py-1 text-xs" value={cfg.anticipacionHoras} onChange={(e) => setCfg({ ...cfg, anticipacionHoras: Number(e.target.value) })} /></label>
               </div>
               <p className="-mt-2 text-[0.6875rem] text-slate-500">En la zona y los días laborables de la empresa (Configuración → Jornada). Fuera de la ventana, lo no crítico espera a que abra.</p>
 
@@ -219,8 +219,8 @@ export function ConfigDeAvisos({ puedeEditar, sitios, supervisa }: { puedeEditar
                             <td className="max-w-56"><p className="font-medium text-slate-700">{r.titulo}</p><p className="text-[0.6875rem] text-slate-500">{r.cuando} Se detiene: {r.seDetiene.toLowerCase()}</p></td>
                             <td className="text-[0.6875rem]">{r.primerNivel.map(nombreGrupo).join(", ")}</td>
                             <td className="text-[0.6875rem]">{r.siguienteNivel.map(nombreGrupo).join(", ")}</td>
-                            <td><input type="number" min={5} max={10080} className="field w-20 py-1 text-xs" value={r.esperaMin} onChange={(e) => cambiar({ esperaMin: Number(e.target.value) })} /></td>
-                            <td><input type="number" min={0} max={10} className="field w-16 py-1 text-xs" value={r.maxRecordatorios} onChange={(e) => cambiar({ maxRecordatorios: Number(e.target.value) })} /></td>
+                            <td><input type="number" inputMode="decimal" min={5} max={10080} className="field w-20 py-1 text-xs" value={r.esperaMin} onChange={(e) => cambiar({ esperaMin: Number(e.target.value) })} /></td>
+                            <td><input type="number" inputMode="decimal" min={0} max={10} className="field w-16 py-1 text-xs" value={r.maxRecordatorios} onChange={(e) => cambiar({ maxRecordatorios: Number(e.target.value) })} /></td>
                             <td><input type="checkbox" checked={r.soloJornada} onChange={(e) => cambiar({ soloJornada: e.target.checked })} /></td>
                             <td><input type="checkbox" checked={r.activa} onChange={(e) => cambiar({ activa: e.target.checked })} /></td>
                           </tr>

@@ -232,9 +232,26 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/search": {
     titulo: "Búsqueda",
-    que: "Encontrar una orden, un activo o una refacción por código o por nombre.",
-    hacer: ["Escribir parte del código o del nombre"],
-    flujo: ["Busca en toda la cuenta. Para preguntas en lenguaje natural, use Pregunte a sus datos."],
+    que: "Encontrar una orden por su folio, un equipo por su código, nombre o número de serie, una refacción, una solicitud o un proveedor.",
+    hacer: ["Escribir parte del código, del nombre o del folio", "Abrir el resultado; «atrás» regresa a donde estaba"],
+    flujo: [
+      "No importan acentos ni mayúsculas: «valvula» encuentra «Válvula».",
+      "Solo aparece lo que su rol puede abrir, y siempre de su empresa: quien reporta encuentra sus reportes, no los de otros.",
+      "El folio exacto sale primero. Cada registro aparece una sola vez.",
+      "Para preguntas en lenguaje natural, use Pregunte a sus datos.",
+    ],
+  },
+
+  "/escanear": {
+    titulo: "Escanear QR",
+    que: "Leer el código QR de un equipo o de un punto de reporte y hacer, con su usuario, lo que su rol permite con ese equipo.",
+    hacer: ["Abrir la cámara y apuntar al código", "Escribir el código del equipo o un folio si no hay cámara"],
+    flujo: [
+      "La cámara se pide solo cuando toca «Abrir cámara», y se apaga al leer o al salir.",
+      "En teléfonos cuyo navegador no lee QR (el iPhone), abra la cámara del teléfono, apunte al código y toque el enlace: llega al mismo lugar con su usuario.",
+      "El código lleva al portal del equipo. Con sesión le ofrece abrir el equipo, crear una orden, registrar una lectura o reportar con su usuario, según su rol. Sin sesión es el reporte público de siempre, que no muestra datos internos.",
+      "Un código de otra empresa no abre nada de la suya.",
+    ],
   },
 
   "/clients": {
@@ -250,17 +267,20 @@ export const AYUDA: Record<string, FichaAyuda> = {
   },
 
   "/dashboard": {
-    titulo: "Panel de control",
-    que: "El estado de la operación de un vistazo: qué está detenido, qué vence hoy y en qué se está yendo el dinero.",
+    titulo: "Inicio",
+    que: "Lo que usted tiene que ver primero, según su rol: el dueño, el estado de la empresa; supervisión, el trabajo del día; el técnico, sus órdenes; compras, requisiciones y entregas; quien reporta, sus reportes.",
     hacer: [
-      "Ver los indicadores del periodo y los equipos con más incidencias",
-      "Entrar directo a lo que necesita atención desde cada tarjeta",
+      "Usar las acciones rápidas de arriba para lo que hace todos los días",
+      "Entrar directo a cada pendiente desde su renglón",
+      "Ver los resultados del periodo (dueño)",
     ],
     flujo: [
-      "Los números salen de las órdenes de trabajo cerradas y del kardex del almacén; no se capturan en ningún lado.",
-      "Si un número se ve raro, ábralo: cada tarjeta de indicador abre su fórmula y los registros exactos que lo forman.",
-      "«Paro no planeado» es la pérdida por fallas; «paro acumulado» suma también el planeado. La disponibilidad solo descuenta el no planeado.",
-      "El vencimiento de cada orden depende de su estado: «Vencida hace X días», «Vence hoy», «Cumplida en fecha», «Terminada con X días de atraso». Una cancelada nunca aparece vencida.",
+      "Cada rol ve un inicio distinto. No es una pantalla por rol: son los mismos registros, ordenados para lo que cada quien hace.",
+      "Un registro aparece una vez, en el primer bloque que le toca: una orden crítica y vencida sale en «críticas», no repetida en «vencidas».",
+      "Los colores siempre van con palabras («Urgente», «Revisar», «Al día»): se leen igual con el sol de frente o sin distinguir colores.",
+      "Si no hay nada pendiente, se dice «Todo al día» en vez de mostrar bloques vacíos.",
+      "Los números salen de las órdenes y del almacén; no se capturan en ningún lado. En «Resultados», cada tarjeta de indicador abre su fórmula y los registros que la forman.",
+      "Quien ejecuta no ve costos: mano de obra, refacciones y valor de equipos los ven la administración, supervisión y consulta.",
     ],
   },
 
@@ -424,6 +444,13 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Cambiar la fecha compromiso de una orden ya programada pide el motivo de la reprogramación. Si la fecha no es laborable o el responsable no tiene capacidad ese día, el sistema advierte, propone días y personas con lugar, y deja programarla así si usted lo confirma.",
       "En las preventivas, el plan ya dice qué refacciones se van a consumir: la requisición se arma con eso y descuenta lo que ya se pidió o se consumió.",
       "Al pedir, el sistema dice cuánto cubre el almacén y cuánto no, para poder empezar con lo que hay y mandar el resto a compras.",
+      "En el teléfono, cada orden se lee en el orden del trabajo: qué es, dónde está el equipo, actividades, seguridad, tiempo, materiales, lecturas, evidencias y resultado, con un índice arriba para saltar a cada paso. Las acciones del paso siguiente (iniciar, pausar o reportar bloqueo, terminar y enviar a revisión) quedan fijas abajo.",
+      "«Pausar o reportar bloqueo» deja la orden en espera con el motivo. Para pedir ayuda sin pausar, escriba en la bitácora y marque «Pedir apoyo a supervisión»: la nota queda en la orden y a supervisión le llega un aviso.",
+      "Las fotos de evidencia se eligen, se ven y se pueden quitar antes de subirlas; se reducen para que suban por datos móviles sin perder lo que muestran. Si una falla, se reintenta sola esa.",
+      "Un doble toque no registra dos veces el mismo consumo de refacción ni las mismas horas: la segunda se rechaza y se avisa que la primera sí quedó.",
+      "Si otra persona cambió un dato de la orden mientras usted la editaba, no se pisa: se avisa qué cambió, se carga lo vigente y lo que usted escribió se queda en el formulario para revisarlo.",
+      "La lista acepta ligas con filtros: «mis órdenes», vencidas, sin responsable, por estado o por prioridad. En el teléfono se ve como tarjetas; en computadora, como tabla.",
+      "Quien ejecuta no ve costos en la orden ni en la lista: los ven la administración, supervisión y consulta.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -931,7 +958,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/requests": {
     titulo: "Solicitudes de servicio",
     camposBuscables: true,
-    que: "Lo que reporta quien no es de mantenimiento: se revisa y se convierte en orden, o se descarta.",
+    que: "Lo que reporta quien no es de mantenimiento: se revisa y se convierte en orden, o se descarta. Quien reporta ve aquí solo sus reportes («Mis reportes») y en qué van.",
     hacer: [
       "Levantar una solicitud a mano",
       "Revisarla y convertirla en orden de trabajo",
@@ -946,6 +973,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Al aprobarla nace una orden de trabajo con su folio propio, o se suma como actividad a una orden abierta del mismo equipo. La solicitud muestra siempre la OT ligada.",
       "Convertir es a prueba de doble clic: aunque se presione dos veces, sale una sola orden. Queda registrado quién la aprobó y convirtió, o quién la rechazó.",
       "Rechazar exige motivo, y quien reportó lo recibe.",
+      "El formulario de reporte habla como quien lo ve: qué sucede, dónde, qué tan urgente parece, si impide trabajar, si hay riesgo, fotos y un teléfono. Lo técnico lo decide quien revisa. Si hay riesgo, el aviso sale como crítico.",
+      "Lo que se escribe y no se envía se conserva unas horas en ese dispositivo (si se cae la señal o se cierra sin querer). Las fotos se eligen antes, se ven, se pueden quitar, y se suben al enviar; si una falla, se reintenta sola esa.",
+      "Quien reporta y el técnico ven sus propias solicitudes (el técnico, también las de sus órdenes); quien revisa, todas.",
       "Una solicitud convertida que no tiene una OT activa —porque nunca quedó ligada a una orden, o porque su orden está cancelada— se muestra «Sin OT activa» y aparece en la calidad de captura. El sistema no le inventa ni le reasigna una orden: alguien decide si se vuelve a atender.",
     ],
     campos: [

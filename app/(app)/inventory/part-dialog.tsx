@@ -183,21 +183,21 @@ export function PartDialog({
           />
           <div>
             <label className="label">Costo unitario</label>
-            <input type="number" min="0" step="0.01" className="field" value={form.unitCost} onChange={(e) => set("unitCost", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" step="0.01" className="field" value={form.unitCost} onChange={(e) => set("unitCost", e.target.value)} />
           </div>
           {!editando ? (
             <div>
               <label className="label">Existencia inicial</label>
-              <input type="number" min="0" step="0.5" className="field" value={form.quantityOnHand} onChange={(e) => set("quantityOnHand", e.target.value)} />
+              <input type="number" inputMode="decimal" min="0" step="0.5" className="field" value={form.quantityOnHand} onChange={(e) => set("quantityOnHand", e.target.value)} />
             </div>
           ) : null}
           <div>
             <label className="label">Mínimo (punto de reorden)</label>
-            <input type="number" min="0" step="0.5" className="field" value={form.minQuantity} onChange={(e) => set("minQuantity", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" step="0.5" className="field" value={form.minQuantity} onChange={(e) => set("minQuantity", e.target.value)} />
           </div>
           <div>
             <label className="label">Máximo</label>
-            <input type="number" min="0" step="0.5" className="field" value={form.maxQuantity} onChange={(e) => set("maxQuantity", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" step="0.5" className="field" value={form.maxQuantity} onChange={(e) => set("maxQuantity", e.target.value)} />
           </div>
           <div>
             <label className="label">Ubicación en almacén</label>

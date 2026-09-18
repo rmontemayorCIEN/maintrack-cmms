@@ -116,7 +116,7 @@ export function PanelIntegracion() {
               ))}
             </div>
             <label className="flex items-center gap-2">Vence en
-              <input type="number" min={1} max={730} className="field w-24 py-1 text-xs" placeholder="nunca" value={nuevaCred.expiraDias} onChange={(e) => setNuevaCred({ ...nuevaCred, expiraDias: e.target.value })} /> días
+              <input type="number" inputMode="decimal" min={1} max={730} className="field w-24 py-1 text-xs" placeholder="nunca" value={nuevaCred.expiraDias} onChange={(e) => setNuevaCred({ ...nuevaCred, expiraDias: e.target.value })} /> días
             </label>
             <div>
               <Button size="sm" disabled={ocupado !== null || nuevaCred.nombre.trim().length < 3 || !nuevaCred.alcances.length} onClick={() => accion("cred", async () => {

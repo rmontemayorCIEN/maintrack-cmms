@@ -30,6 +30,24 @@ body {
   height: 100%;
 }
 
+html {
+  /* El teléfono no agranda el texto por su cuenta al girar. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Los saltos a una sección (#actividades) no quedan debajo del encabezado fijo. */
+  scroll-padding-top: 4rem;
+}
+
+/* Foco visible para quien navega con teclado: nunca se quita sin reemplazo. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
 body {
   background: var(--surface);
   color: var(--ink);
@@ -77,6 +95,35 @@ body {
 .field:disabled {
   background: #f8fafc;
   color: var(--muted);
+}
+
+/* En el teléfono los campos van a 16 px: con menos, el iPhone hace zoom a la
+   página cada vez que se toca uno, y al salir la deja desacomodada. Con altura
+   mínima de 44 px se atinan con el dedo (y con guante ligero). */
+@media (max-width: 767px) {
+  .field, select, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea {
+    font-size: 16px;
+  }
+  .field:not(textarea) { min-height: 2.75rem; }
+  .field.compacto { font-size: 16px; }
+}
+
+/* Controles al tamaño del dedo en pantallas táctiles angostas: 40 px mínimo
+   de alto para botones, selectores y botones-liga (Apple pide 44, WCAG 24).
+   Se aplica aquí una vez, no botón por botón: así lo ganan también los que
+   se agreguen mañana. Las ligas dentro de un texto no se tocan. */
+@media (max-width: 767px) {
+  button, select, .boton {
+    min-height: 2.5rem;
+  }
+  button:not(.w-full):not([class*="w-"]) {
+    min-width: 2.5rem;
+  }
+  .tarjeta-tabla a, .liga-tactil {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+  }
 }
 
 /* Variante compacta: para barras de filtros donde varios controles

@@ -23,6 +23,7 @@ export function AssetDialog({
   categories,
   activo,
   puedeGestionarCatalogos = false,
+  abrirAlInicio = false,
 }: {
   sites: Array<{ id: string; name: string; code?: string }>;
   locations: Array<{ id: string; name: string; siteId: string; code?: string }>;
@@ -30,10 +31,12 @@ export function AssetDialog({
   /** Si viene, el dialogo edita ese activo en vez de crear uno nuevo. */
   activo?: ActivoEditable;
   puedeGestionarCatalogos?: boolean;
+  /** La acción rápida «Crear activo» llega con el formulario abierto. */
+  abrirAlInicio?: boolean;
 }) {
   const router = useRouter();
   const editando = Boolean(activo);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(abrirAlInicio);
 
   // Las listas viven en estado para que el alta rapida desde el "+" las refresque.
   const [opcionesSitios, setOpcionesSitios] = useState<OpcionCatalogo[]>(
@@ -269,11 +272,11 @@ export function AssetDialog({
           </div>
           <div>
             <label className="label">Costo de adquisición</label>
-            <input type="number" min="0" className="field" value={form.purchaseCost} onChange={(e) => set("purchaseCost", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" className="field" value={form.purchaseCost} onChange={(e) => set("purchaseCost", e.target.value)} />
           </div>
           <div>
             <label className="label">Costo de reposición</label>
-            <input type="number" min="0" className="field" value={form.replacementCost} onChange={(e) => set("replacementCost", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" className="field" value={form.replacementCost} onChange={(e) => set("replacementCost", e.target.value)} />
           </div>
         </div>
 

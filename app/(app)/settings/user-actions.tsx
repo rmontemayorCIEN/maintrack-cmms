@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Link2, Loader2 } from "lucide-react";
-import { ROLE_LABELS } from "@/lib/constants";
+import { ROLE_LABELS, ROLES_ASIGNABLES } from "@/lib/constants";
 
 export function UserRowActions({
   userId,
@@ -86,7 +86,7 @@ export function UserRowActions({
         onChange={(e) => patch({ role: e.target.value })}
         className="field max-w-32 px-1.5 py-1 text-[0.6875rem]"
       >
-        {["ADMIN", "SUPERVISOR", "TECHNICIAN", "REQUESTER", "VIEWER"].map((option) => (
+        {ROLES_ASIGNABLES.map((option) => (
           <option key={option} value={option}>{ROLE_LABELS[option]}</option>
         ))}
       </select>

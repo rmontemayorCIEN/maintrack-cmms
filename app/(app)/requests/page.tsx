@@ -14,17 +14,23 @@ import {
 import { formatDateTime } from "@/lib/utils";
 import { RequestDialog } from "./request-dialog";
 import { ReviewActions } from "./review-actions";
+import { puedeVerRuta, veTodasLasSolicitudes } from "@/lib/pantallas";
 
 export const metadata = { title: "Solicitudes de servicio" };
 export const dynamic = "force-dynamic";
 
-export default async function RequestsPage() {
+export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ nueva?: string; activo?: string }> }) {
   const user = await requireUser();
   const canReview = can(user.role, "request:review");
+  const todas = veTodasLasSolicitudes(user.role);
+  // El solicitante no conoce el CMMS: la pantalla le habla de «sus reportes».
+  const soloMias = !todas;
+  const veOrdenes = puedeVerRuta(user.role, "/work-orders");
+  const { nueva, activo } = await searchParams;
 
   const [requests, assets, technicians] = await Promise.all([
     prisma.workRequest.findMany({
-      where: { organizationId: user.organizationId },
+      where: { organizationId: user.organizationId, ...(todas ? {} : { requestedById: user.id }) },
       include: {
         asset: { select: { code: true, name: true } },
         requestedBy: { select: { name: true, color: true } },
@@ -53,24 +59,68 @@ export default async function RequestsPage() {
   return (
     <>
       <PageHeader
-        title="Solicitudes de servicio"
-        description="Reportes de falla levantados por producción u operaciones. Al aprobarse se convierten en orden de trabajo correctiva."
-        actions={<RequestDialog assets={assets} />}
+        title={soloMias ? "Mis reportes" : "Solicitudes de servicio"}
+        description={soloMias
+          ? "Lo que usted ha reportado y en qué va. Cuando se atiende, aquí lo verá."
+          : "Reportes de falla levantados por producción u operaciones. Al aprobarse se convierten en orden de trabajo correctiva."}
+        actions={can(user.role, "request:create")
+          ? <RequestDialog assets={assets} abrirAlInicio={nueva === "1"} activoInicial={activo} textoBoton={soloMias ? "Reportar un problema" : "Reportar falla"} />
+          : undefined}
       />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <Stat label="Pendientes de revisión" value={pending.length} tone={pending.length ? "warn" : "good"} />
-        <Stat label="Convertidas en OT" value={converted} />
-        <Stat label="Total histórico" value={requests.length} />
-      </div>
+      {soloMias ? null : (
+        <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-4">
+          <Stat label="Pendientes de revisión" value={pending.length} tone={pending.length ? "warn" : "good"} />
+          <Stat label="Convertidas en OT" value={converted} />
+          <Stat label="Total histórico" value={requests.length} />
+        </div>
+      )}
 
       {requests.length === 0 ? (
         <EmptyState
-          title="Sin solicitudes"
-          description="Cualquier usuario con rol de solicitante puede reportar una falla desde aquí."
+          title={soloMias ? "Todavía no ha reportado nada" : "Sin solicitudes"}
+          description={soloMias
+            ? "Cuando algo falle, tóquele a «Reportar un problema»: se avisa a quien lo revisa."
+            : "Cualquier usuario con rol de solicitante puede reportar una falla desde aquí."}
         />
       ) : (
-        <Card padded={false}>
+        <>
+        {/* Teléfono: una tarjeta por reporte, con lo que importa arriba. */}
+        <ul className="grid gap-2 md:hidden">
+          {requests.map((r) => {
+            const sinOt = motivoSinOtActiva(r.status, r.workOrder);
+            return (
+              <li key={r.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                <Link href={`/requests/${r.id}`} className="block">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-semibold text-brand-700">{r.number}</span>
+                    <Badge className={REQUEST_STATUS_COLORS[r.status]}>{REQUEST_STATUS_LABELS[r.status]}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{r.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {r.asset ? `${r.asset.code} · ${r.asset.name} · ` : ""}{formatDateTime(r.createdAt)}
+                    {r._count.attachments ? ` · ${r._count.attachments} foto(s)` : ""}
+                  </p>
+                </Link>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <Badge className={PRIORITY_COLORS[r.priority]}>{PRIORITY_LABELS[r.priority]}</Badge>
+                  {r.workOrder ? (
+                    veOrdenes
+                      ? <Link href={`/work-orders/${r.workOrder.id}`} className="font-medium text-brand-700">Orden {r.workOrder.number}</Link>
+                      : <span className="text-slate-600">Se atiende con la orden {r.workOrder.number}</span>
+                  ) : sinOt ? <span className="text-amber-700">{sinOt.corto}</span> : null}
+                  {soloMias ? null : r.requestedBy ? <span className="text-slate-500">· {r.requestedBy.name}</span> : null}
+                </div>
+                {canReview && r.status === "PENDING" ? (
+                  <div className="mt-2 border-t border-slate-100 pt-2">
+                    <ReviewActions requestId={r.id} technicians={technicians} assets={assets} assetActual={r.assetId} tipoActual={r.tipo} tipoSugerido={r.iaTipo} />
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+        <Card padded={false} className="hidden md:block">
           <div className="table-wrap">
             <table className="data">
               <thead>
@@ -134,9 +184,11 @@ export default async function RequestsPage() {
                     <td className="text-xs text-slate-500">{formatDateTime(request.createdAt)}</td>
                     <td className="text-xs">
                       {request.workOrder ? (
-                        <Link href={`/work-orders/${request.workOrder.id}`} className="text-brand-600 hover:underline">
-                          {request.workOrder.number}
-                        </Link>
+                        veOrdenes ? (
+                          <Link href={`/work-orders/${request.workOrder.id}`} className="text-brand-600 hover:underline">
+                            {request.workOrder.number}
+                          </Link>
+                        ) : <span className="text-slate-600">{request.workOrder.number}</span>
                       ) : null}
                       {(() => {
                         const sinOt = motivoSinOtActiva(request.status, request.workOrder);
@@ -160,6 +212,7 @@ export default async function RequestsPage() {
             </table>
           </div>
         </Card>
+        </>
       )}
     </>
   );

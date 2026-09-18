@@ -71,11 +71,29 @@ export default async function SettingsPage({
   const params = await searchParams;
   const canManage = can(user.role, "user:manage");
 
-  const activa: Seccion = SECCIONES.includes(params.s as Seccion)
+  /**
+   * Qué pestañas ve cada rol. Las personales (su cuenta, apariencia, sus
+   * avisos, sus sesiones) son de todos; las de la empresa, de quien las
+   * administra. Antes todas cargaban para cualquier rol y solo se escondían
+   * los botones: la lista de usuarios con sus roles, el estado de cuenta y la
+   * auditoría quedaban a la vista de un solicitante.
+   */
+  const MANDO = can(user.role, "workorder:write");
+  const PERMITIDAS: Record<Seccion, boolean> = {
+    cuenta: true, apariencia: true, avisos: true, seguridad: true,
+    organizacion: can(user.role, "settings:write"),
+    jornada: MANDO, ordenes: MANDO,
+    suscripcion: can(user.role, "settings:write"),
+    cobranza: can(user.role, "billing:manage"),
+    usuarios: canManage,
+    integracion: can(user.role, "settings:write"),
+    auditoria: can(user.role, "settings:write"),
+  } as Record<Seccion, boolean>;
+  const activa: Seccion = SECCIONES.includes(params.s as Seccion) && PERMITIDAS[params.s as Seccion]
     ? (params.s as Seccion)
     : "cuenta";
 
-  const pestanas: Pestana[] = [
+  const todas: Pestana[] = [
     { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
@@ -89,6 +107,7 @@ export default async function SettingsPage({
     { clave: "integracion", titulo: "Integración", icono: <Plug className="h-4 w-4" /> },
     { clave: "auditoria", titulo: "Auditoría", icono: <History className="h-4 w-4" /> },
   ];
+  const pestanas = todas.filter((p) => PERMITIDAS[p.clave as Seccion]);
 
   // Cada pestaña consulta solo lo suyo. Antes la pantalla lanzaba ocho
   // consultas en cada visita aunque se mirara una sola tarjeta.

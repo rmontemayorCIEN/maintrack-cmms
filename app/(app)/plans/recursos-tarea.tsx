@@ -84,12 +84,12 @@ export function RecursosTarea({
                 ))}
               </select>
               <input
-                className="field" type="number" min="1" step="1" title="Personas"
+                className="field" type="number" inputMode="decimal" min="1" step="1" title="Personas"
                 value={linea.personas}
                 onChange={(e) => onLabor(labor.map((l, j) => (j === i ? { ...l, personas: e.target.value } : l)))}
               />
               <input
-                className="field" type="number" min="0" step="0.5" title="Horas por persona"
+                className="field" type="number" inputMode="decimal" min="0" step="0.5" title="Horas por persona"
                 value={linea.hours}
                 onChange={(e) => onLabor(labor.map((l, j) => (j === i ? { ...l, hours: e.target.value } : l)))}
               />
@@ -126,7 +126,7 @@ export function RecursosTarea({
                 opciones={refacciones.map((o) => ({ id: o.id, etiqueta: o.etiqueta }))}
               />
               <input
-                className="field" type="number" min="0" step="0.5" title="Cantidad"
+                className="field" type="number" inputMode="decimal" min="0" step="0.5" title="Cantidad"
                 value={linea.quantity}
                 onChange={(e) => onParts(parts.map((p, j) => (j === i ? { ...p, quantity: e.target.value } : p)))}
               />
@@ -181,7 +181,7 @@ export function RecursosTarea({
                 ))}
               </select>
               <input
-                className="field" type="number" min="0" step="0.5" title="Cantidad"
+                className="field" type="number" inputMode="decimal" min="0" step="0.5" title="Cantidad"
                 value={linea.quantity}
                 onChange={(e) => onServices(services.map((s, j) => (j === i ? { ...s, quantity: e.target.value } : s)))}
               />

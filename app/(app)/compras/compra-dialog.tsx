@@ -187,10 +187,10 @@ export function CompraDialog({
                         className="w-full rounded-lg border border-dashed border-slate-300 px-2 py-1.5 text-xs" />
                     ) : null}
                   </div>
-                  <input type="number" min="0" step="any" value={r.cantidad}
+                  <input type="number" inputMode="decimal" min="0" step="any" value={r.cantidad}
                     onChange={(e) => actualizar(i, { cantidad: e.target.value })} placeholder="cant."
                     className="h-fit w-24 rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums" />
-                  <input type="number" min="0" step="any" value={r.costo}
+                  <input type="number" inputMode="decimal" min="0" step="any" value={r.costo}
                     onChange={(e) => actualizar(i, { costo: e.target.value })} placeholder="costo est."
                     className="h-fit w-28 rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums" />
                   <button type="button"

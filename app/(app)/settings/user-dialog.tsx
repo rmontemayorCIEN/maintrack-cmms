@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui";
-import { ROLE_LABELS } from "@/lib/constants";
+import { ROLE_LABELS, ROLES_ASIGNABLES } from "@/lib/constants";
 
 export function UserDialog() {
   const router = useRouter();
@@ -84,7 +84,7 @@ export function UserDialog() {
           <div>
             <label className="label">Rol</label>
             <select className="field" value={form.role} onChange={(e) => set("role", e.target.value)}>
-              {["ADMIN", "SUPERVISOR", "TECHNICIAN", "REQUESTER", "VIEWER"].map((role) => (
+              {ROLES_ASIGNABLES.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
               ))}
             </select>
@@ -95,7 +95,7 @@ export function UserDialog() {
           </div>
           <div>
             <label className="label">Tarifa por hora</label>
-            <input type="number" min="0" className="field" value={form.hourlyRate} onChange={(e) => set("hourlyRate", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" className="field" value={form.hourlyRate} onChange={(e) => set("hourlyRate", e.target.value)} />
           </div>
           <div>
             <label className="label">Telefono</label>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { veTodasLasSolicitudes } from "@/lib/pantallas";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { can } from "@/lib/rbac";
@@ -44,6 +45,16 @@ function contextoDe(d: z.infer<typeof destino>) {
 }
 
 /**
+ * Quien solo ve sus propias solicitudes (solicitante, técnico) solo les cuelga
+ * archivos a ellas. Sin esto, con el identificador de una solicitud ajena
+ * se podía agregarle fotos.
+ */
+async function puedeAdjuntarA(user: { id: string; role: string }, orgId: string, d: z.infer<typeof destino>) {
+  if (!d.workRequestId || veTodasLasSolicitudes(user.role)) return true;
+  return (await prisma.workRequest.count({ where: { id: d.workRequestId, organizationId: orgId, requestedById: user.id } })) > 0;
+}
+
+/**
  * Paso 1: pide permiso para subir.
  * Devuelve una URL firmada contra la que el navegador sube DIRECTO al almacen,
  * sin que el archivo pase por el servidor.
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
       select: { id: true },
     });
     if (!existe) return fail("El registro al que quiere adjuntar no existe", 404);
+    if (!(await puedeAdjuntarA(user, orgId, input))) return fail("El registro al que quiere adjuntar no existe", 404);
 
     const storagePath = construirRuta(orgId, ctx.carpeta, input.name);
     const subida = await urlDeSubida(storagePath, input.mimeType);
@@ -111,6 +123,7 @@ export async function PUT(request: Request) {
 
     const ctx = contextoDe(input);
     if (!ctx) return fail("Falta indicar a que registro se adjunta", 422);
+    if (!(await puedeAdjuntarA(user, orgId, input))) return fail("El registro al que quiere adjuntar no existe", 404);
 
     const adjunto = await prisma.attachment.create({
       data: {

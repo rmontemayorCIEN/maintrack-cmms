@@ -159,7 +159,7 @@ function Accion({ lectura, tipo, unit, onCerrar }: { lectura: LecturaVista; tipo
         {tipo === "corregir" ? (
           <div>
             <label className="label">{esEvento ? "Valor de arranque correcto" : "Valor correcto"} ({unit})</label>
-            <input type="number" step="any" min={0} className="field" value={valor} onChange={(e) => { setValor(e.target.value); setAviso(null); }} />
+            <input type="number" inputMode="decimal" step="any" min={0} className="field" value={valor} onChange={(e) => { setValor(e.target.value); setAviso(null); }} />
           </div>
         ) : null}
         <div>

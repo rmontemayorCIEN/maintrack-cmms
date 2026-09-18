@@ -12,11 +12,19 @@ export const ROLES = {
 } as const;
 export type Role = keyof typeof ROLES;
 
+/**
+ * Los roles que la administración puede dar (el de propietario no se asigna:
+ * es de quien abrió la cuenta). Una sola lista para el alta, el cambio de rol
+ * y la validación de la API: antes «Compras» existía en permisos pero no se
+ * podía elegir al crear un usuario.
+ */
+export const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "TECHNICIAN", "COMPRAS", "REQUESTER", "VIEWER"] as const;
+
 export const ROLE_LABELS: Record<string, string> = {
   OWNER: "Propietario",
   ADMIN: "Administrador",
   SUPERVISOR: "Supervisor",
-  TECHNICIAN: "Tecnico",
+  TECHNICIAN: "Técnico",
   REQUESTER: "Solicitante",
   COMPRAS: "Compras",
   VIEWER: "Consulta",
@@ -105,7 +113,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
   LOW: "Baja",
   MEDIUM: "Media",
   HIGH: "Alta",
-  CRITICAL: "Critica",
+  CRITICAL: "Crítica",
 };
 export const PRIORITY_COLORS: Record<string, string> = {
   LOW: "bg-slate-100 text-slate-600 border-slate-200",

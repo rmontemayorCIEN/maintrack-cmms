@@ -1,153 +1,74 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
-import {
-  ASSET_STATUS_COLORS,
-  ASSET_STATUS_LABELS,
-  MAINTENANCE_TYPE_LABELS,
-  WO_STATUS_COLORS,
-  WO_STATUS_LABELS,
-} from "@/lib/constants";
-import { formatNumber } from "@/lib/utils";
+import { buscar } from "@/lib/busqueda";
+import { Badge, EmptyState } from "@/components/ui";
+import { ASSET_STATUS_COLORS, ASSET_STATUS_LABELS, REQUEST_STATUS_COLORS, REQUEST_STATUS_LABELS, WO_STATUS_COLORS, WO_STATUS_LABELS } from "@/lib/constants";
 
-export const metadata = { title: "Busqueda" };
+export const metadata = { title: "Búsqueda" };
 export const dynamic = "force-dynamic";
 
-export default async function SearchPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+const ESTADOS: Record<string, { etiquetas: Record<string, string>; colores: Record<string, string> }> = {
+  orden: { etiquetas: WO_STATUS_LABELS, colores: WO_STATUS_COLORS },
+  activo: { etiquetas: ASSET_STATUS_LABELS, colores: ASSET_STATUS_COLORS },
+  solicitud: { etiquetas: REQUEST_STATUS_LABELS, colores: REQUEST_STATUS_COLORS },
+};
+
+/**
+ * Buscar. En el teléfono es su propia pantalla con el campo arriba y el
+ * teclado listo; «atrás» regresa a donde se estaba. Lo que se encuentra
+ * respeta la empresa y lo que el rol puede ver (lib/busqueda.ts).
+ */
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const user = await requireUser();
-  const { q } = await searchParams;
-  const orgId = user.organizationId;
-
-  if (!q) {
-    return (
-      <>
-        <PageHeader title="Busqueda" />
-        <EmptyState title="Escriba un termino" description="Busque órdenes de trabajo, activos o refacciones." />
-      </>
-    );
-  }
-
-  const [workOrders, assets, parts] = await Promise.all([
-    prisma.workOrder.findMany({
-      where: {
-        organizationId: orgId,
-        OR: [{ number: { contains: q } }, { title: { contains: q } }, { description: { contains: q } }],
-      },
-      include: { asset: { select: { code: true } } },
-      take: 20,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.asset.findMany({
-      where: {
-        organizationId: orgId,
-        active: true,
-        OR: [
-          { code: { contains: q } },
-          { name: { contains: q } },
-          { serialNumber: { contains: q } },
-          { manufacturer: { contains: q } },
-          { model: { contains: q } },
-        ],
-      },
-      take: 20,
-      orderBy: { code: "asc" },
-    }),
-    prisma.part.findMany({
-      where: {
-        organizationId: orgId,
-        active: true,
-        OR: [{ code: { contains: q } }, { name: { contains: q } }, { description: { contains: q } }],
-      },
-      take: 20,
-      orderBy: { code: "asc" },
-    }),
-  ]);
-
-  const total = workOrders.length + assets.length + parts.length;
+  const { q = "" } = await searchParams;
+  const grupos = q.trim() ? await buscar(user, q) : [];
+  const total = grupos.reduce((s, g) => s + g.resultados.length, 0);
 
   return (
     <>
-      <PageHeader title={`Resultados para "${q}"`} description={`${total} coincidencias`} />
+      <form action="/search" role="search" className="relative mb-4">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <label htmlFor="busqueda" className="sr-only">Buscar</label>
+        <input
+          id="busqueda" name="q" type="search" enterKeyHint="search" defaultValue={q} autoFocus={!q}
+          placeholder="Folio, código de equipo, serie, refacción…"
+          className="field con-icono"
+          autoComplete="off"
+        />
+      </form>
 
-      {total === 0 ? (
-        <EmptyState title="Sin resultados" description="Pruebe con otro código, nombre o folio." />
+      {!q.trim() ? (
+        <EmptyState title="¿Qué busca?" description="Escriba un folio de OT, el código o nombre de un equipo, su número de serie o una refacción." />
+      ) : total === 0 ? (
+        <EmptyState title={`Nada para «${q}»`} description="Pruebe con parte del código o del nombre. No importan acentos ni mayúsculas." />
       ) : (
-        <div className="grid gap-4">
-          {workOrders.length ? (
-            <Card>
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Ordenes de trabajo ({workOrders.length})</h3>
-              <ul className="grid gap-2">
-                {workOrders.map((wo) => (
-                  <li key={wo.id}>
-                    <Link href={`/work-orders/${wo.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-800">
-                          <span className="text-brand-600">{wo.number}</span> · {wo.title}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {MAINTENANCE_TYPE_LABELS[wo.maintenanceType]}
-                          {wo.asset ? ` · ${wo.asset.code}` : ""}
-                        </p>
-                      </div>
-                      <Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-
-          {assets.length ? (
-            <Card>
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Activos ({assets.length})</h3>
-              <ul className="grid gap-2">
-                {assets.map((asset) => (
-                  <li key={asset.id}>
-                    <Link href={`/assets/${asset.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-800">
-                          <span className="text-brand-600">{asset.code}</span> · {asset.name}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">
-                          {[asset.manufacturer, asset.model, asset.serialNumber].filter(Boolean).join(" · ") || "—"}
-                        </p>
-                      </div>
-                      <Badge className={ASSET_STATUS_COLORS[asset.status]}>{ASSET_STATUS_LABELS[asset.status]}</Badge>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-
-          {parts.length ? (
-            <Card>
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Refacciones ({parts.length})</h3>
-              <ul className="grid gap-2">
-                {parts.map((part) => (
-                  <li key={part.id}>
-                    <Link href="/inventory" className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-800">
-                          <span className="text-brand-600">{part.code}</span> · {part.name}
-                        </p>
-                        <p className="text-xs text-slate-500">{part.category ?? "Sin categoría"}</p>
-                      </div>
-                      <Badge tone={part.quantityOnHand <= part.minQuantity ? "danger" : "muted"}>
-                        {formatNumber(part.quantityOnHand, 0)} {part.unit}
-                      </Badge>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-        </div>
+        <>
+          <p className="mb-3 text-sm text-slate-600" role="status">{total} {total === 1 ? "resultado" : "resultados"} para «{q}»</p>
+          <div className="grid gap-4">
+            {grupos.map((g) => (
+              <section key={g.tipo} aria-labelledby={`g-${g.tipo}`}>
+                <h2 id={`g-${g.tipo}`} className="mb-2 text-sm font-semibold text-slate-900">{g.etiqueta} ({g.resultados.length})</h2>
+                <ul className="grid gap-2">
+                  {g.resultados.map((r) => {
+                    const est = r.estado && ESTADOS[r.tipo];
+                    return (
+                      <li key={r.id}>
+                        <Link href={r.enlace} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-medium text-slate-800">{r.titulo}</p>
+                            <p className="break-words text-xs text-slate-500">{r.contexto}</p>
+                          </div>
+                          {est ? <Badge className={est.colores[r.estado!]}>{est.etiquetas[r.estado!] ?? r.estado}</Badge> : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

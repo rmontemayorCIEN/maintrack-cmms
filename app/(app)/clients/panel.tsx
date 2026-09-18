@@ -236,7 +236,7 @@ export function PanelClientes({
               </div>
               <div>
                 <label className="label">Días de prueba</label>
-                <input type="number" min="0" max="365" className="field" value={form.trialDays} onChange={(e) => set("trialDays", e.target.value)} />
+                <input type="number" inputMode="decimal" min="0" max="365" className="field" value={form.trialDays} onChange={(e) => set("trialDays", e.target.value)} />
                 <p className="mt-1 text-[0.6875rem] text-slate-500">0 = activa de inmediato</p>
               </div>
             </div>

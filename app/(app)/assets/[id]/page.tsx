@@ -31,6 +31,8 @@ import {
   WO_STATUS_LABELS,
 } from "@/lib/constants";
 import { formatCurrency, formatDate, formatDia, formatNumber } from "@/lib/utils";
+import { verCostos } from "@/lib/pantallas";
+import { MeterReadingForm } from "../../meters/reading-form";
 import { can } from "@/lib/rbac";
 import { AssetDialog } from "../asset-dialog";
 import { Adjuntos } from "@/components/adjuntos";
@@ -176,6 +178,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     : null;
   const health = healthScore(asset.sensors);
   const totalCost = costs._sum.totalCost ?? 0;
+  // Costos de mantenimiento y del equipo, solo a quien los ve (lib/pantallas.ts).
+  const conCostos = verCostos(user.role);
   const ratio = asset.replacementCost ? (totalCost / asset.replacementCost) * 100 : 0;
 
   // Los mapas donde aparece este equipo (un equipo puede estar en varios).
@@ -269,12 +273,14 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
               : `${conHoras.length} reparaciones con horas${reparaciones.length > conHoras.length ? ` · ${reparaciones.length - conHoras.length} sin horas` : ""}`
           }
         />
-        <Stat
-          label="Costo acumulado"
-          value={formatCurrency(totalCost, currency)}
-          hint={asset.replacementCost ? `${formatNumber(ratio, 0)}% del valor de reposicion` : "Sin valor de reposición"}
-          tone={ratio > 60 ? "bad" : ratio > 30 ? "warn" : "default"}
-        />
+        {conCostos ? (
+          <Stat
+            label="Costo acumulado"
+            value={formatCurrency(totalCost, currency)}
+            hint={asset.replacementCost ? `${formatNumber(ratio, 0)}% del valor de reposicion` : "Sin valor de reposición"}
+            tone={ratio > 60 ? "bad" : ratio > 30 ? "warn" : "default"}
+          />
+        ) : null}
       </div>
 
       {expediente && expediente.fallas > 0 ? (
@@ -294,7 +300,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             }}
             analisis={analisisRecurrencia}
             analizadoEl={asset.iaRecurrenciaEl?.toISOString() ?? null}
-            moneda={currency}
+            moneda={conCostos ? currency : ""}
             disponible={recurrenciaDisponible}
           />
         </div>
@@ -347,8 +353,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
             <Row label="Modelo">{asset.model ?? "—"}</Row>
             <Row label="Número de serie">{asset.serialNumber ?? "—"}</Row>
             <Row label="Fecha de compra">{formatDia(asset.purchaseDate)}</Row>
-            <Row label="Costo de adquisición">{formatCurrency(asset.purchaseCost, currency)}</Row>
-            <Row label="Costo de reposición">{formatCurrency(asset.replacementCost, currency)}</Row>
+            {conCostos ? <Row label="Costo de adquisición">{formatCurrency(asset.purchaseCost, currency)}</Row> : null}
+            {conCostos ? <Row label="Costo de reposición">{formatCurrency(asset.replacementCost, currency)}</Row> : null}
             <Row label="Garantia">
               {asset.warrantyExpiry
                 ? asset.warrantyExpiry > new Date()
@@ -370,7 +376,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           />
         ) : null}
 
-        <Card>
+        <Card id="medidores">
           <CardHeader title="Medidores" subtitle="Base de los planes por uso" />
           {asset.meters.length === 0 ? (
             <p className="py-6 text-center text-xs text-slate-400">Sin medidores registrados</p>
@@ -399,6 +405,10 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                       ? `Promedio ${formatNumber(meter.dailyAverage, 1)} ${meter.unit}/día · última lectura ${formatDate(meter.lastReadingAt, zona)}`
                       : "Todas sus lecturas están anuladas: requiere una lectura nueva."}
                   </p>
+                  {/* Desde el QR del equipo: registrar la lectura aquí mismo, sin ir a Medidores. */}
+                  {can(user.role, "workorder:execute") ? (
+                    <div className="mt-2"><MeterReadingForm meterId={meter.id} unit={meter.unit} current={meter.lecturaVigente ? meter.currentValue : null} /></div>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -539,7 +549,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   <th>Fecha</th>
                   <th>Vencimiento</th>
                   <th className="text-right">Horas</th>
-                  <th className="text-right">Costo</th>
+                  {conCostos ? <th className="text-right">Costo</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -566,7 +576,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                       })()}
                     </td>
                     <td className="text-right tabular-nums text-xs">{formatNumber(wo.actualHours, 1)}</td>
-                    <td className="text-right tabular-nums text-xs">{formatCurrency(wo.totalCost, currency)}</td>
+                    {conCostos ? <td className="text-right tabular-nums text-xs">{formatCurrency(wo.totalCost, currency)}</td> : null}
                   </tr>
                 ))}
               </tbody>

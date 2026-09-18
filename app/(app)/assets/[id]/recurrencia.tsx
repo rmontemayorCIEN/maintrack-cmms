@@ -96,6 +96,8 @@ export function Recurrencia({
             {cifras.diasEntreFallas !== null ? `${cifras.diasEntreFallas} días` : "—"}
           </dd>
         </div>
+        {/* Sin moneda (quien no ve costos): el costo no se muestra. */}
+        {moneda ? (<>
         <div>
           <dt className="text-[0.625rem] uppercase tracking-wide text-slate-400">Costo del periodo</dt>
           <dd className="text-sm font-semibold tabular-nums text-slate-900">{formatCurrency(cifras.costoTotal, moneda)}</dd>
@@ -111,6 +113,7 @@ export function Recurrencia({
             ) : null}
           </dd>
         </div>
+        </>) : null}
         <div>
           <dt className="text-[0.625rem] uppercase tracking-wide text-slate-400">Paro acumulado</dt>
           <dd className="text-sm font-semibold tabular-nums text-slate-900">{formatNumber(cifras.paroHoras, 0)} h</dd>

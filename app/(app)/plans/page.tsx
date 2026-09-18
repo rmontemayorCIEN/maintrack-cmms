@@ -1,3 +1,4 @@
+import { verCostos } from "@/lib/pantallas";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -297,6 +298,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
         />
       ) : (
         <TablaPlanes
+          conCostos={verCostos(user.role)}
           planes={filas}
           vistaInicial={vista}
           busquedaInicial={busquedaInicial}

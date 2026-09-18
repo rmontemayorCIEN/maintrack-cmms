@@ -37,7 +37,7 @@ export async function MaterialPorActividad({
                 <Badge tone="muted">Sin tipo: material de la orden completa</Badge>
               )}
               <span className="ml-auto text-xs font-medium tabular-nums text-slate-700">
-                {formatCurrency(g.costoNeto, moneda)}
+                {moneda ? formatCurrency(g.costoNeto, moneda) : null}
               </span>
             </div>
             <ul className="mt-1.5 grid gap-1">

@@ -71,7 +71,7 @@ export function ConfigMedidor({
             </div>
             <div>
               <label className="label">Uso máximo por día ({unit}) — vacío: sin límite</label>
-              <input type="number" step="any" min={0} className="field" value={max} onChange={(e) => setMax(e.target.value)} />
+              <input type="number" inputMode="decimal" step="any" min={0} className="field" value={max} onChange={(e) => setMax(e.target.value)} />
             </div>
             {error ? <p className="text-xs text-red-600">{error}</p> : null}
             <div className="flex justify-end gap-2">

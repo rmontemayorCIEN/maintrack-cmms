@@ -95,20 +95,20 @@ async function main() {
 
     console.log("\n1. La sesión de alguien desactivado deja de servir");
     const cookieTecnico = await sesion(tecnico, 120);
-    revisar("con la sesión abierta, entra", (await pedir("GET", "/api/users", cookieTecnico)).status === 200);
+    revisar("con la sesión abierta, entra", (await pedir("GET", "/api/notifications", cookieTecnico)).status === 200);
     await pedir("PATCH", `/api/users/${tecnico.id}`, await sesion(dueño), { active: false });
     revisar("desactivado por administración, la MISMA sesión ya no sirve",
-      (await pedir("GET", "/api/users", cookieTecnico)).status === 401);
+      (await pedir("GET", "/api/notifications", cookieTecnico)).status === 401);
     // Se reactiva y se limpia el corte: la seccion siguiente parte de una
     // persona normal, con sesiones validas, como cualquier dia.
     await prisma.user.update({ where: { id: tecnico.id }, data: { active: true, sessionsValidFrom: null } });
 
     console.log("\n2. Cambiar el rol o la contraseña cierra las sesiones abiertas");
     const cookieVieja = await sesion(tecnico, 120);
-    revisar("la sesión funciona antes del cambio", (await pedir("GET", "/api/users", cookieVieja)).status === 200);
+    revisar("la sesión funciona antes del cambio", (await pedir("GET", "/api/notifications", cookieVieja)).status === 200);
     await pedir("PATCH", `/api/users/${tecnico.id}`, await sesion(dueño), { role: "SUPERVISOR" });
     revisar("tras el cambio de rol, la sesión vieja queda invalidada",
-      (await pedir("GET", "/api/users", cookieVieja)).status === 401);
+      (await pedir("GET", "/api/notifications", cookieVieja)).status === 401);
 
     const cookiePropia = await sesion(dueño, 120);
     const rClave = await pedir("POST", "/api/account/password", cookiePropia, {
@@ -116,7 +116,7 @@ async function main() {
     });
     revisar("el dueño cambia su contraseña", rClave.status === 200, rClave.status);
     revisar("y su sesión anterior deja de servir",
-      (await pedir("GET", "/api/users", cookiePropia)).status === 401);
+      (await pedir("GET", "/api/notifications", cookiePropia)).status === 401);
 
     console.log("\n3. Ligas de restablecimiento: una sola vez y con vencimiento");
     const cookieDueño = await sesion(dueño);

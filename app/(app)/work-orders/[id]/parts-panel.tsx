@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { pedir } from "@/lib/cliente/pedir";
 import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
 
 export function PartsPanel({
@@ -20,6 +21,7 @@ export function PartsPanel({
   actividades: ActividadCargable[];
   used: Array<{ id: string; code: string; name: string; unit: string; quantity: number; cost: number }>;
   catalog: Array<{ id: string; code: string; name: string; unit: string; unitCost: number; quantityOnHand: number }>;
+  /** Vacía para quien no ve costos (lib/pantallas.ts verCostos): no se pintan importes. */
   currency: string;
   editable: boolean;
 }) {
@@ -31,19 +33,15 @@ export function PartsPanel({
   const [error, setError] = useState<string | null>(null);
 
   async function add() {
+    if (loading) return; // un doble toque no saca dos veces del almacén
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/work-orders/${workOrderId}/parts`, {
+    const r = await pedir(`/api/work-orders/${workOrderId}/parts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ partId, quantity: Number(quantity), taskId: taskId || null }),
+      json: { partId, quantity: Number(quantity), taskId: taskId || null },
     });
     setLoading(false);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "No fue posible cargar la refacción");
-      return;
-    }
+    if (!r.ok) { setError(r.error); return; }
     setQuantity("1");
     router.refresh();
   }
@@ -66,7 +64,7 @@ export function PartsPanel({
                 <p className="text-xs font-medium tabular-nums text-slate-700">
                   {formatNumber(item.quantity, 2)} {item.unit}
                 </p>
-                <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p>
+                {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p> : null}
               </div>
             </li>
           ))}
@@ -87,7 +85,7 @@ export function PartsPanel({
             </select>
             <div className="flex gap-2">
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.5"
                 min="0.5"
                 className="field max-w-24"

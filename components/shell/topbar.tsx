@@ -16,8 +16,11 @@ type Notification = AvisoVista;
 
 export function Topbar({
   user,
+  empresa,
 }: {
   user: { name: string; email: string; role: string; color: string };
+  /** La empresa activa: en el teléfono el menú lateral no se ve y hay que decirla aquí. */
+  empresa: string;
 }) {
   const zona = useZona();
   const router = useRouter();
@@ -92,24 +95,32 @@ export function Topbar({
 
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur no-print lg:px-6">
-      <div className="w-9 lg:hidden" />
-      <form onSubmit={search} className="relative hidden max-w-sm flex-1 md:block">
+      <div className="w-10 shrink-0 lg:hidden" />
+      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 md:hidden" title={empresa}>{empresa}</p>
+      <form onSubmit={search} role="search" className="relative hidden max-w-sm flex-1 md:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar OT, activos, refacciones…"
+          aria-label="Buscar"
+          type="search"
+          enterKeyHint="search"
           className="field con-icono"
         />
       </form>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+        {/* En el teléfono la búsqueda es su propia pantalla, con el teclado listo. */}
+        <Link href="/search" aria-label="Buscar" className="grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100 md:hidden">
+          <Search className="h-4 w-4 text-slate-600" />
+        </Link>
         {/* Solo a quien puede crear ordenes: al solicitante o al tecnico el boton
             los llevaba a un formulario que el servidor les rechaza al guardar. */}
         {can(user.role, "workorder:write") ? (
           <Link
             href="/work-orders/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+            className="hidden items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 sm:inline-flex"
           >
             <Plus className="h-3.5 w-3.5" /> Nueva OT
           </Link>
@@ -121,8 +132,9 @@ export function Topbar({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="relative grid h-9 w-9 place-items-center rounded-lg hover:bg-slate-100"
-            aria-label="Notificaciones"
+            className="relative grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100"
+            aria-label={unread ? `Avisos, ${unread} sin leer` : "Avisos"}
+            aria-expanded={open}
           >
             <Bell className="h-4 w-4 text-slate-600" />
             {unread ? (
@@ -177,8 +189,8 @@ export function Topbar({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-          <Avatar name={user.name} color={user.color} />
+        <div className="flex items-center gap-1 border-l border-slate-200 pl-2 sm:gap-2 sm:pl-3">
+          <span className="hidden sm:inline-flex"><Avatar name={user.name} color={user.color} /></span>
           <div className="hidden leading-tight sm:block">
             <p className="text-xs font-medium text-slate-800">{user.name}</p>
             <p className="text-[0.625rem] text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</p>
@@ -186,8 +198,9 @@ export function Topbar({
           <button
             type="button"
             onClick={logout}
-            className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100"
+            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100"
             title="Cerrar sesión"
+            aria-label="Cerrar sesión"
           >
             <LogOut className="h-4 w-4 text-slate-500" />
           </button>

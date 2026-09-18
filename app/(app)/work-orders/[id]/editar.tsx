@@ -2,7 +2,7 @@
 
 import { AdvertenciasProgramacion, type RevisionProgramacion } from "@/components/advertencias-programacion";
 import { useZona } from "@/components/zona-empresa";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui";
@@ -30,6 +30,25 @@ export type OrdenEditable = {
 // El dia que representa, no el recorte UTC del texto (ver claveDia).
 const fecha = (iso: string | null, zona: string) => (iso ? claveDia(iso, zona) : "");
 
+/** Los valores del formulario, tal como se capturan (texto, fecha del día, sí/no). */
+function valoresDe(orden: OrdenEditable, zona: string) {
+  return {
+    title: orden.title,
+    description: orden.description ?? "",
+    maintenanceType: orden.maintenanceType,
+    priority: orden.priority,
+    assignedToId: orden.assignedToId ?? "",
+    teamId: orden.teamId ?? "",
+    assetId: orden.assetId ?? "",
+    dueDate: fecha(orden.dueDate, zona),
+    scheduledStart: fecha(orden.scheduledStart, zona),
+    estimatedHours: String(orden.estimatedHours),
+    requiresShutdown: orden.requiresShutdown,
+    procedure: orden.procedure ?? "",
+    safetyNotes: orden.safetyNotes ?? "",
+  };
+}
+
 /**
  * Edicion de la orden.
  *
@@ -48,21 +67,29 @@ export function EditarOrden({
   const zona = useZona();
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
-  const [v, setV] = useState({
-    title: orden.title,
-    description: orden.description ?? "",
-    maintenanceType: orden.maintenanceType,
-    priority: orden.priority,
-    assignedToId: orden.assignedToId ?? "",
-    teamId: orden.teamId ?? "",
-    assetId: orden.assetId ?? "",
-    dueDate: fecha(orden.dueDate, zona),
-    scheduledStart: fecha(orden.scheduledStart, zona),
-    estimatedHours: String(orden.estimatedHours),
-    requiresShutdown: orden.requiresShutdown,
-    procedure: orden.procedure ?? "",
-    safetyNotes: orden.safetyNotes ?? "",
-  });
+  const [v, setV] = useState(() => valoresDe(orden, zona));
+  /**
+   * Lo que había cuando la persona empezó a editar. Se manda solo lo que ella
+   * cambió, junto con este valor de partida: si otra persona lo cambió en el
+   * inter, el servidor responde 409 en vez de pisarlo en silencio.
+   */
+  const inicial = useRef(valoresDe(orden, zona));
+  const [conflicto, setConflicto] = useState<string | null>(null);
+
+  // Tras un conflicto la página recarga la orden: lo que la persona no tocó
+  // toma el valor nuevo; lo que sí tocó se conserva para que lo revise.
+  useEffect(() => {
+    const nuevo = valoresDe(orden, zona);
+    setV((prev) => {
+      const r = { ...prev } as Record<string, unknown>;
+      for (const k of Object.keys(nuevo) as Array<keyof typeof nuevo>) {
+        if (prev[k] === inicial.current[k]) r[k] = nuevo[k];
+      }
+      return r as typeof prev;
+    });
+    inicial.current = nuevo;
+  }, [orden, zona]);
+
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState<RevisionProgramacion | null>(null);
@@ -76,33 +103,61 @@ export function EditarOrden({
 
   if (!editable) return null;
 
+  function abrir() {
+    const actual = valoresDe(orden, zona);
+    inicial.current = actual;
+    setV(actual);
+    setConflicto(null);
+    setError(null);
+    setAbierto(true);
+  }
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
-    setGuardando(true); setError(null);
-    const res = await fetch(`/api/work-orders/${orden.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: v.title,
-        description: v.description || null,
-        maintenanceType: v.maintenanceType,
-        priority: v.priority,
-        assignedToId: v.assignedToId || null,
-        teamId: v.teamId || null,
-        assetId: v.assetId || null,
-        dueDate: v.dueDate || null,
-        scheduledStart: v.scheduledStart || null,
-        estimatedHours: Number(v.estimatedHours) || 0,
-        requiresShutdown: v.requiresShutdown,
-        procedure: v.procedure || null,
-        safetyNotes: v.safetyNotes || null,
-        motivoReprogramacion: reprograma ? motivoReprogramacion : null,
-        aceptarAdvertencias: aceptar,
-      }),
-    });
+    if (guardando) return;
+    const cambiados = (Object.keys(v) as Array<keyof typeof v>).filter((k) => v[k] !== inicial.current[k]);
+    if (!cambiados.length) { setAbierto(false); return; }
+    const aApi: Record<string, unknown> = {
+      title: v.title,
+      description: v.description || null,
+      maintenanceType: v.maintenanceType,
+      priority: v.priority,
+      assignedToId: v.assignedToId || null,
+      teamId: v.teamId || null,
+      assetId: v.assetId || null,
+      dueDate: v.dueDate || null,
+      scheduledStart: v.scheduledStart || null,
+      estimatedHours: Number(v.estimatedHours) || 0,
+      requiresShutdown: v.requiresShutdown,
+      procedure: v.procedure || null,
+      safetyNotes: v.safetyNotes || null,
+    };
+    setGuardando(true); setError(null); setConflicto(null);
+    let res: Response;
+    try {
+      res = await fetch(`/api/work-orders/${orden.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...Object.fromEntries(cambiados.map((k) => [k, aApi[k]])),
+          base: Object.fromEntries(cambiados.map((k) => [k, inicial.current[k]])),
+          motivoReprogramacion: reprograma ? motivoReprogramacion : null,
+          aceptarAdvertencias: aceptar,
+        }),
+      });
+    } catch {
+      setGuardando(false);
+      setError("No hay conexión. No se guardó; sus cambios siguen en el formulario.");
+      return;
+    }
     const data = await res.json().catch(() => ({}));
     setGuardando(false);
     if (!res.ok) {
       if (data.details?.programacion) { setRevision(data.details.programacion); setAceptar(false); return; }
+      if (data.details?.conflicto) {
+        setConflicto(data.error);
+        router.refresh(); // trae lo vigente; lo que usted cambió se queda en el formulario
+        return;
+      }
       setError(data.error ?? "No fue posible guardar");
       return;
     }
@@ -112,7 +167,7 @@ export function EditarOrden({
 
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" onClick={() => setAbierto(true)}>
+      <Button type="button" size="sm" variant="secondary" onClick={abrir}>
         <Pencil className="h-3.5 w-3.5" /> Editar
       </Button>
 
@@ -194,7 +249,7 @@ export function EditarOrden({
 
               <div>
                 <label className="text-[0.6875rem] font-medium text-slate-600">Horas estimadas</label>
-                <input type="number" min="0" step="any" value={v.estimatedHours}
+                <input type="number" inputMode="decimal" min="0" step="any" value={v.estimatedHours}
                   onChange={(e) => set({ estimatedHours: e.target.value })}
                   className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums" />
               </div>
@@ -246,7 +301,12 @@ export function EditarOrden({
                 />
               </div>
             ) : null}
-            {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p> : null}
+            {conflicto ? (
+              <p role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {conflicto} Ya se cargó lo vigente; lo que usted cambió sigue en el formulario. Revíselo y guarde otra vez.
+              </p>
+            ) : null}
+            {error ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p> : null}
 
             <div className="mt-4 flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setAbierto(false)}>Cancelar</Button>

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, sinCostos, withAuth, withVista } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { avisarCambiosDeOrden } from "@/lib/avisos/ordenes";
 import { recalcWorkOrder } from "@/lib/workorders";
 import { esReprogramacion, revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
 import { OPEN_STATUSES } from "@/lib/constants";
+import { claveDia } from "@/lib/utils";
 import { motivoValido } from "@/lib/reglas-ot";
 
 const patchSchema = z.object({
@@ -32,28 +33,55 @@ const patchSchema = z.object({
   motivoReprogramacion: z.string().trim().max(500).nullable().optional(),
   /** Quien programa acepta programar en dia no laborable o sobre la capacidad. */
   aceptarAdvertencias: z.boolean().optional(),
+  /**
+   * El valor que tenía cada campo cuando la persona empezó a editar (como se
+   * captura: texto, fecha del día, sí/no). Si ya no coincide con lo guardado,
+   * otra persona lo cambió en el inter: 409, en vez de pisarlo en silencio.
+   */
+  base: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/work-orders", async ({ orgId, user }) => {
+    // Las personas, solo con lo que se muestra: el registro completo traía
+    // correo y hash de contraseña de quien estuviera ligado a la orden.
+    const persona = { select: { id: true, name: true, color: true } } as const;
     const workOrder = await prisma.workOrder.findFirst({
       where: { id, organizationId: orgId },
       include: {
         asset: true,
-        assignedTo: true,
+        assignedTo: persona,
         tasks: { orderBy: { position: "asc" } },
-        labor: { include: { user: true } },
+        labor: { include: { user: persona } },
         partsUsed: { include: { part: true } },
         servicesUsed: { include: { service: true, supplier: true } },
-        comments: { include: { user: true }, orderBy: { createdAt: "asc" } },
+        comments: { include: { user: persona }, orderBy: { createdAt: "asc" } },
       },
     });
     if (!workOrder) return fail("Orden de trabajo no encontrada", 404);
-    return ok({ workOrder });
+    return ok({ workOrder: sinCostos(workOrder, user.role) });
   });
+}
+
+const ETIQUETA_CAMPO: Record<string, string> = {
+  title: "el título", description: "la descripción", maintenanceType: "el tipo", priority: "la prioridad",
+  assignedToId: "el responsable", teamId: "la cuadrilla", assetId: "el equipo", dueDate: "la fecha compromiso",
+  scheduledStart: "el inicio programado", estimatedHours: "las horas estimadas", requiresShutdown: "si requiere paro",
+  procedure: "el procedimiento", safetyNotes: "las notas de seguridad",
+};
+
+/** Los campos cuyo valor guardado ya no es el que la persona vio al empezar. */
+function camposEnConflicto(actual: Record<string, unknown>, base: Record<string, string | number | boolean | null>, zona: string) {
+  const comoSeCaptura = (k: string, v: unknown) => {
+    if (v === null || v === undefined) return "";
+    if (v instanceof Date) return claveDia(v, zona);
+    if (k === "estimatedHours") return String(Number(v));
+    return String(v);
+  };
+  return Object.keys(base).filter((k) => k in ETIQUETA_CAMPO && comoSeCaptura(k, actual[k]) !== comoSeCaptura(k, base[k]));
 }
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -67,7 +95,17 @@ export async function PATCH(request: Request, { params }: Params) {
       return fail("Una orden cerrada o cancelada ya no se edita. Su historial es el respaldo de lo que costo.", 409);
     }
 
-    const { motivoReprogramacion, aceptarAdvertencias, ...campos } = input;
+    const { motivoReprogramacion, aceptarAdvertencias, base, ...campos } = input;
+
+    if (base) {
+      const choques = camposEnConflicto(existing, base, user.organization.timezone || "America/Mexico_City");
+      if (choques.length) {
+        return fail(
+          `Otra persona cambió ${choques.map((c) => ETIQUETA_CAMPO[c] ?? c).join(", ")} de esta orden mientras usted la editaba.`,
+          409, { conflicto: choques },
+        );
+      }
+    }
     const data: Record<string, unknown> = { ...campos };
 
     // Cambiar de activo arrastra su sitio y su ubicacion: son del equipo, no de

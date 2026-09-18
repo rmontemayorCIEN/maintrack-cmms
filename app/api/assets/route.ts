@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, withAuth, withVista } from "@/lib/api";
 import { verificarCupo } from "@/lib/planes";
 import { validarFechasDeActivo } from "@/lib/calidad-datos";
 import { logAudit } from "@/lib/audit";
@@ -28,7 +28,7 @@ const schema = z.object({
 });
 
 export async function GET(request: Request) {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/assets", async ({ orgId }) => {
     const url = new URL(request.url);
     const q = url.searchParams.get("q");
     const assets = await prisma.asset.findMany({

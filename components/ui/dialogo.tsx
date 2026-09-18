@@ -66,7 +66,7 @@ export function Dialogo({
           type="button"
           onClick={onCerrar}
           aria-label="Cerrar"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
         >
           <X className="h-4 w-4" />
         </button>
@@ -76,25 +76,25 @@ export function Dialogo({
 
   const cuerpo = pie ? (
     <>
-      <div className="shrink-0 border-b border-slate-100 px-6 pb-4 pt-6">{encabezado}</div>
+      <div className="shrink-0 border-b border-slate-100 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">{encabezado}</div>
       {/* min-h-0: sin esto el hijo de un flex no se encoge y el deslizamiento nunca ocurre. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-      <div className="shrink-0 border-t border-slate-100 px-6 py-4">{pie}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{children}</div>
+      <div className="shrink-0 border-t border-slate-100 px-4 py-3 sm:px-6 sm:py-4">{pie}</div>
     </>
   ) : (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mb-5">{encabezado}</div>
       {children}
     </div>
   );
 
   const clases = `w-full ${ANCHOS[ancho]} rounded-2xl bg-white shadow-xl${
-    pie ? " flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden" : ""
+    pie ? " flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-h-[calc(100dvh-2rem)]" : ""
   }`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40">
-      <div className="flex min-h-full items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-slate-900/40" role="dialog" aria-modal="true">
+      <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
         {onSubmit ? (
           <form onSubmit={onSubmit} className={clases}>
             {cuerpo}

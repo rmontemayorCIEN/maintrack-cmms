@@ -7,7 +7,8 @@ import { NewWorkOrderForm } from "./form";
 export const metadata = { title: "Nueva orden de trabajo" };
 export const dynamic = "force-dynamic";
 
-export default async function NewWorkOrderPage() {
+export default async function NewWorkOrderPage({ searchParams }: { searchParams: Promise<{ activo?: string }> }) {
+  const { activo } = await searchParams;
   const user = await requireUser();
   if (!can(user.role, "workorder:write")) {
     return (
@@ -50,6 +51,7 @@ export default async function NewWorkOrderPage() {
         technicians={technicians}
         teams={teams}
         puedeGestionarCatalogos={can(user.role, "settings:write")}
+        activoInicial={activo}
       />
     </>
   );

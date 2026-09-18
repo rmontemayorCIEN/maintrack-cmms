@@ -6,11 +6,16 @@ import { formatCurrency } from "@/lib/utils";
 import { vistaGuardada } from "@/lib/vistas";
 import { TablaCompras, type FilaCompra } from "./tabla-compras";
 import { CompraDialog } from "./compra-dialog";
+import Link from "next/link";
+import { ESTADOS_COMPRA } from "@/lib/estados-compra";
 
 export const metadata = { title: "Requisiciones de compra" };
 export const dynamic = "force-dynamic";
 
-export default async function ComprasPage() {
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ estado?: string }> }) {
+  // Los accesos del inicio de Compras llegan con el estado ya elegido.
+  const { estado } = await searchParams;
+  const filtro = estado && estado in ESTADOS_COMPRA ? estado : null;
   const user = await requireUser();
   const orgId = user.organizationId;
   const moneda = user.organization.currency;
@@ -70,6 +75,7 @@ export default async function ComprasPage() {
     moneda,
   }));
 
+  const listadas = filtro ? filas.filter((f) => f.estado === filtro) : filas;
   const porAutorizar = filas.filter((f) => f.estado === "SOLICITADA");
   const porLlegar = filas.filter((f) => ["AUTORIZADA", "EN_COMPRA", "RECIBIDA_PARCIAL"].includes(f.estado));
 
@@ -109,7 +115,15 @@ export default async function ComprasPage() {
           description="Cuando el almacén no pueda surtir algo, aquí queda registrado lo que hay que comprar y quién lo autorizó."
         />
       ) : (
-        <TablaCompras compras={filas} vistaInicial={vistaGuardada(user.vistasTabla, "compras")} />
+        <>
+          {filtro ? (
+            <p className="mb-2 flex flex-wrap items-center gap-2 text-sm text-slate-700" role="status">
+              Mostrando: <strong>{ESTADOS_COMPRA[filtro as keyof typeof ESTADOS_COMPRA]}</strong> ({listadas.length})
+              <Link href="/compras" className="inline-flex min-h-9 items-center text-brand-700 underline">Ver todas</Link>
+            </p>
+          ) : null}
+          <TablaCompras compras={listadas} vistaInicial={vistaGuardada(user.vistasTabla, "compras")} />
+        </>
       )}
     </>
   );

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { Avatar, Button } from "@/components/ui";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { pedir } from "@/lib/cliente/pedir";
 import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
 
 export function LaborPanel({
@@ -23,6 +24,7 @@ export function LaborPanel({
   entries: Array<{ id: string; name: string; color: string; hours: number; cost: number; workedAt: string; notes: string | null }>;
   technicians: Array<{ id: string; name: string; hourlyRate: number }>;
   currentUserId: string;
+  /** Vacía para quien no ve costos (lib/pantallas.ts verCostos): no se pintan importes. */
   currency: string;
   editable: boolean;
 }) {
@@ -36,19 +38,15 @@ export function LaborPanel({
   const [error, setError] = useState<string | null>(null);
 
   async function add() {
+    if (loading) return; // un doble toque no registra la jornada dos veces
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/work-orders/${workOrderId}/labor`, {
+    const r = await pedir(`/api/work-orders/${workOrderId}/labor`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, hours: Number(hours), notes: notes || undefined, taskId: taskId || null }),
+      json: { userId, hours: Number(hours), notes: notes || undefined, taskId: taskId || null },
     });
     setLoading(false);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "No fue posible registrar la mano de obra");
-      return;
-    }
+    if (!r.ok) { setError(r.error); return; }
     setHours("1");
     setNotes("");
     router.refresh();
@@ -74,7 +72,7 @@ export function LaborPanel({
               </div>
               <div className="text-right">
                 <p className="text-xs font-medium tabular-nums text-slate-700">{formatNumber(entry.hours, 1)} h</p>
-                <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(entry.cost, currency)}</p>
+                {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(entry.cost, currency)}</p> : null}
               </div>
             </li>
           ))}
@@ -86,13 +84,13 @@ export function LaborPanel({
           <select className="field" value={userId} onChange={(e) => setUserId(e.target.value)}>
             {technicians.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} — {formatCurrency(t.hourlyRate, currency)}/h
+                {t.name}{currency ? ` — ${formatCurrency(t.hourlyRate, currency)}/h` : ""}
               </option>
             ))}
           </select>
           <div className="flex gap-2">
             <input
-              type="number"
+              type="number" inputMode="decimal"
               step="0.25"
               min="0.25"
               className="field max-w-24"

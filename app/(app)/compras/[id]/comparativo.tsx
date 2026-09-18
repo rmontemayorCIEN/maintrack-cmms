@@ -265,7 +265,7 @@ export function Comparativo({
             </div>
             <div>
               <label className="text-[0.625rem] font-medium text-slate-600">Días de entrega</label>
-              <input type="number" min="0" value={diasEntrega} onChange={(e) => setDias(e.target.value)}
+              <input type="number" inputMode="decimal" min="0" value={diasEntrega} onChange={(e) => setDias(e.target.value)}
                 className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums" />
             </div>
             <div>
@@ -294,9 +294,9 @@ export function Comparativo({
                   </label>
                   <input value={v.marca} onChange={(e) => set({ marca: e.target.value })} disabled={!v.disponible}
                     placeholder="marca" className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-xs disabled:bg-slate-50" />
-                  <input type="number" min="0" step="any" value={v.cantidad} onChange={(e) => set({ cantidad: e.target.value })}
+                  <input type="number" inputMode="decimal" min="0" step="any" value={v.cantidad} onChange={(e) => set({ cantidad: e.target.value })}
                     disabled={!v.disponible} className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-xs tabular-nums disabled:bg-slate-50" />
-                  <input type="number" min="0" step="any" value={v.costo} onChange={(e) => set({ costo: e.target.value })}
+                  <input type="number" inputMode="decimal" min="0" step="any" value={v.costo} onChange={(e) => set({ costo: e.target.value })}
                     disabled={!v.disponible} placeholder="costo"
                     className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-xs tabular-nums disabled:bg-slate-50" />
                 </div>

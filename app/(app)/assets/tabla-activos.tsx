@@ -85,14 +85,16 @@ const crearColumnas = (zona: string): Columna<FilaActivo>[] => [
 const DE_FABRICA = ["ubicacion", "criticidad", "estado", "otAbiertas", "planes", "garantia"];
 
 export function TablaActivos({
-  activos, vistaInicial, puedeEditar,
+  activos, vistaInicial, puedeEditar, conCostos = true,
 }: {
   activos: FilaActivo[];
   vistaInicial: Vista;
   puedeEditar: boolean;
+  /** Sin costos (técnico): las columnas de valor del equipo no se ofrecen. */
+  conCostos?: boolean;
 }) {
   const zona = useZona();
-  const columnas = useMemo(() => crearColumnas(zona), [zona]);
+  const columnas = useMemo(() => crearColumnas(zona).filter((c) => conCostos || !["costoReemplazo", "costoCompra"].includes(c.id)), [zona, conCostos]);
   const router = useRouter();
   const [borrando, setBorrando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

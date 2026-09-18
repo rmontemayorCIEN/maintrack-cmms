@@ -255,12 +255,19 @@ export function WorkOrderActions({
     if (loading) return;
     setLoading(next);
     setError(null);
-    const res = await fetch(`/api/work-orders/${workOrderId}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next, ...extra }),
-    });
-    const data = await res.json();
+    let res: Response;
+    try {
+      res = await fetch(`/api/work-orders/${workOrderId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next, ...extra }),
+      });
+    } catch {
+      setLoading(null);
+      setError("No hay conexión. El cambio no se guardó; intente de nuevo cuando tenga señal.");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
     setLoading(null);
     if (!res.ok) {
       setError(data.error ?? "No fue posible cambiar el estado");
@@ -537,7 +544,7 @@ export function WorkOrderActions({
                       <div>
                         <label className="label">Tiempo de paro del equipo (minutos)</label>
                         <input
-                          type="number"
+                          type="number" inputMode="decimal"
                           min="0"
                           className="field"
                           value={valor.downtimeMinutes}
@@ -552,7 +559,7 @@ export function WorkOrderActions({
               {!pideFallas && requiereParo ? (
                 <div>
                   <label className="label">Tiempo de paro del equipo (minutos)</label>
-                  <input type="number" min="0" className="field" value={paroGeneral} onChange={(e) => setParoGeneral(e.target.value)} />
+                  <input type="number" inputMode="decimal" min="0" className="field" value={paroGeneral} onChange={(e) => setParoGeneral(e.target.value)} />
                 </div>
               ) : null}
 

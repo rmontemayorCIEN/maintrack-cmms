@@ -18,6 +18,7 @@ import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { WorkOrderFilters } from "./filters";
 import { TablaOrdenes, type FilaOrden } from "./tabla-ordenes";
 import { vistaGuardada } from "@/lib/vistas";
+import { verCostos } from "@/lib/pantallas";
 
 export const metadata = { title: "Órdenes de trabajo" };
 export const dynamic = "force-dynamic";
@@ -33,15 +34,24 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
   // zona de la empresa. Se acota en la base a compromisos anteriores a manana y
   // se decide el dia exacto con la misma regla que pinta la etiqueta.
   const soloVencidas = params.vencidas === "1";
+  // Los accesos del inicio y de la barra del teléfono llegan con nombres en
+  // español; se aceptan junto con los de siempre.
+  const estado = params.estado ?? params.status;
+  const prioridad = params.prioridad ?? params.priority;
+  const mias = params.mias === "1";
+  const sinResponsable = params.sinResponsable === "1";
+  const conCostos = verCostos(user.role);
 
   const where = {
     organizationId: orgId,
-    ...(params.status ? { status: params.status } : {}),
-    ...(params.scope === "open" || soloVencidas ? { status: { in: OPEN_STATUSES } } : {}),
+    ...(estado ? { status: estado } : {}),
+    ...(params.scope === "open" || soloVencidas || sinResponsable || (mias && !estado) ? { status: { in: OPEN_STATUSES } } : {}),
     ...(soloVencidas ? { dueDate: { lt: new Date(Date.now() + 86_400_000) } } : {}),
     ...(params.type ? { maintenanceType: params.type } : {}),
-    ...(params.priority ? { priority: params.priority } : {}),
+    ...(prioridad ? { priority: prioridad } : {}),
     ...(params.assignedToId ? { assignedToId: params.assignedToId } : {}),
+    ...(mias ? { assignedToId: user.id } : {}),
+    ...(sinResponsable ? { assignedToId: null } : {}),
     ...(params.q
       ? { OR: [{ number: { contains: params.q } }, { title: { contains: params.q } }] }
       : {}),
@@ -115,27 +125,28 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
     createdAt: w.createdAt.toISOString(),
     estimatedHours: w.estimatedHours,
     actualHours: w.actualHours,
-    laborCost: w.laborCost,
-    partsCost: w.partsCost,
-    serviceCost: w.serviceCost,
-    otherCost: w.otherCost,
-    totalCost: w.totalCost,
+    // Sin costos, los importes ni viajan al navegador.
+    laborCost: conCostos ? w.laborCost : 0,
+    partsCost: conCostos ? w.partsCost : 0,
+    serviceCost: conCostos ? w.serviceCost : 0,
+    otherCost: conCostos ? w.otherCost : 0,
+    totalCost: conCostos ? w.totalCost : 0,
     moneda,
   }));
 
   return (
     <>
       <PageHeader
-        title="Órdenes de trabajo"
-        description={`${soloVencidas ? "Vencidas: " : ""}${workOrders.length} resultados · ${openCount} abiertas en total · costo listado ${formatCurrency(totalCost, user.organization.currency)}`}
-        actions={
+        title={mias ? "Mis órdenes" : sinResponsable ? "Órdenes sin responsable" : "Órdenes de trabajo"}
+        description={`${soloVencidas ? "Vencidas: " : ""}${workOrders.length} resultados · ${openCount} abiertas en total${conCostos ? ` · costo listado ${formatCurrency(totalCost, user.organization.currency)}` : ""}`}
+        actions={can(user.role, "workorder:write") ? (
           <div className="flex gap-2">
             {/* Armar junta trabajo de varios origenes en una sola orden; Nueva
                 sigue siendo la captura suelta de un correctivo. */}
             <LinkButton href="/work-orders/armar" size="sm" variant="secondary">Armar orden</LinkButton>
             <LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton>
           </div>
-        }
+        ) : undefined}
       />
 
       <WorkOrderFilters technicians={technicians} puedeExportar={can(user.role, "data:export")} />
@@ -144,10 +155,10 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
         <EmptyState
           title="Sin resultados"
           description="Ajuste los filtros o cree una nueva orden de trabajo."
-          action={<LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton>}
+          action={can(user.role, "workorder:write") ? <LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton> : undefined}
         />
       ) : (
-        <TablaOrdenes ordenes={filas} vistaInicial={vista} />
+        <TablaOrdenes ordenes={filas} vistaInicial={vista} conCostos={conCostos} />
       )}
     </>
   );

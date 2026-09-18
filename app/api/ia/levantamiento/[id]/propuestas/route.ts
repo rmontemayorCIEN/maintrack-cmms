@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 
 /** Propuestas de un levantamiento, para la pantalla de revision. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/assets/levantamiento", async ({ orgId }) => {
     const intake = await prisma.assetIntake.findFirst({
       where: { id, organizationId: orgId },
       select: {

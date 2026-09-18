@@ -8,6 +8,7 @@ import { ArrowLeftRight, BookOpen, Repeat, ClipboardCheck, Gauge, LineChart, Mer
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { PartDialog } from "./part-dialog";
 import { TablaRefacciones, type FilaRefaccion } from "./tabla-refacciones";
+import { verCostosDeAlmacen } from "@/lib/pantallas";
 import { vistaGuardada } from "@/lib/vistas";
 import { MovementForm } from "./movement-form";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
@@ -240,7 +241,7 @@ export default async function InventoryPage({
           hint={lowCount && lowCount !== bajoMinimoSinPedir ? `${lowCount - bajoMinimoSinPedir} ya vienen en camino` : undefined}
         />
         <Stat label="Sin existencia" value={outOfStock} tone={outOfStock ? "bad" : "good"} />
-        <Stat label="Valor del inventario" value={formatCurrency(inventoryValue, currency)} />
+        {verCostosDeAlmacen(user.role) ? <Stat label="Valor del inventario" value={formatCurrency(inventoryValue, currency)} /> : null}
       </div>
 
       <form className="mb-4 flex flex-wrap items-center gap-2">
@@ -271,6 +272,7 @@ export default async function InventoryPage({
           unidades={unidades}
           puedeGestionarCatalogos={can(user.role, "settings:write")}
           warehouseId={almacenActivo?.id ?? null}
+          conCostos={verCostosDeAlmacen(user.role)}
         />
       )}
 

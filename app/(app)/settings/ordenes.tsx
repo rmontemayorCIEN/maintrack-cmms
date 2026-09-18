@@ -157,7 +157,7 @@ export function ConfiguracionOrdenes({
         <div>
           <label className="label">Cuanto se puede adelantar un preventivo (días)</label>
           <input
-            type="number"
+            type="number" inputMode="decimal"
             min="0"
             max="365"
             className="field max-w-32"

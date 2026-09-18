@@ -104,8 +104,9 @@ export function accionesDisponibles(
       agregar("ON_HOLD", "Poner en espera", "secondary", "¿Qué se está esperando?");
       break;
     case "IN_PROGRESS":
-      agregar("ON_HOLD", "Pausar", "secondary", "¿Por qué se pausa?");
-      agregar("COMPLETED", "Completar", "success");
+      // «Bloqueo» dicho en voz alta: es lo que el técnico busca cuando algo le impide seguir.
+      agregar("ON_HOLD", "Pausar o reportar bloqueo", "secondary", "¿Por qué se pausa, o qué impide seguir?");
+      agregar("COMPLETED", "Terminar y enviar a revisión", "success");
       break;
     case "ON_HOLD":
       agregar(orden.iniciada ? "IN_PROGRESS" : orden.conResponsable ? "ASSIGNED" : "OPEN", "Reanudar", "primary");

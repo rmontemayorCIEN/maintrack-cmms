@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { diaLocal } from "@/lib/utils";
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { ErrorDeAsignacion, asignarPlan, quitarAsignacion } from "@/lib/asignaciones";
 import { logAudit } from "@/lib/audit";
 
 /** Los equipos a los que se aplica un plan, con la fecha de cada uno. */
 export async function GET(request: Request) {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/plans", async ({ orgId }) => {
     const planId = new URL(request.url).searchParams.get("planId");
     if (!planId) return fail("Falta el plan", 400);
     const asignaciones = await prisma.planAsset.findMany({

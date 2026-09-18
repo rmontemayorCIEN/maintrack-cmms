@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import {
   ErrorDeEquivalencia, equivalentesDe, esTipoValido,
   quitarEquivalencia, registrarEquivalencia,
@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/audit";
 
 /** Las equivalentes de una refaccion, con su existencia de hoy. */
 export async function GET(request: Request) {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/inventory", async ({ orgId }) => {
     const partId = new URL(request.url).searchParams.get("partId");
     if (!partId) return fail("Falta la refacción", 400);
     return ok({ equivalencias: await equivalentesDe(orgId, partId) });

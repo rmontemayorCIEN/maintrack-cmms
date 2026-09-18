@@ -1,10 +1,12 @@
 "use client";
 
 import { useZona } from "@/components/zona-empresa";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, FileText, Film, Image as ImgIcon, Loader2, Trash2, Upload } from "lucide-react";
+import { FileText, Film, Image as ImgIcon, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import type { Destino } from "@/lib/cliente/subida";
+import { BotonSubir, FotosPorSubir, subirPendientes, type PorSubir } from "@/components/fotos-por-subir";
 
 export type Adjunto = {
   id: string;
@@ -15,10 +17,6 @@ export type Adjunto = {
   createdAt: string;
   subidoPor: string | null;
 };
-
-type Destino =
-  | { workOrderId: string } | { assetId: string }
-  | { workRequestId: string } | { partId: string };
 
 const MB = 1_048_576;
 
@@ -37,9 +35,9 @@ function Icono({ kind }: { kind: string }) {
 /**
  * Adjuntos de un registro: fotos, videos y documentos.
  *
- * La subida va DIRECTA al almacen con una URL firmada que pide el servidor.
- * El archivo no pasa por la aplicacion, asi que un video de 150 MB no topa
- * con los limites de tamaño de peticion.
+ * Se eligen primero (con vista previa, quitando lo que salió mal) y se suben
+ * al confirmar: nada se sube solo. La subida va DIRECTA al almacén con una URL
+ * firmada (lib/cliente/subida.ts); las fotos se orientan y se reducen antes.
  */
 export function Adjuntos({
   destino,
@@ -56,78 +54,34 @@ export function Adjuntos({
 }) {
   const zona = useZona();
   const router = useRouter();
-  const archivo = useRef<HTMLInputElement>(null);
-  const camara = useRef<HTMLInputElement>(null);
-  const [subiendo, setSubiendo] = useState<string | null>(null);
-  const [progreso, setProgreso] = useState(0);
+  const [porSubir, setPorSubir] = useState<PorSubir[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function subir(files: FileList | null) {
-    if (!files?.length) return;
+  async function subir() {
+    setSubiendo(true);
     setError(null);
-
-    for (const file of Array.from(files)) {
-      setSubiendo(file.name);
-      setProgreso(0);
-      try {
-        const base = {
-          ...destino,
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          size: file.size,
-        };
-
-        // 1. Permiso y destino de subida.
-        const permiso = await fetch("/api/attachments", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(base),
-        });
-        const datos = await permiso.json();
-        if (!permiso.ok) throw new Error(datos.error ?? "No fue posible preparar la subida");
-
-        // 2. Subida directa, con progreso real.
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open(datos.metodo, datos.url, true);
-          xhr.setRequestHeader("Content-Type", base.mimeType);
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) setProgreso(Math.round((e.loaded / e.total) * 100));
-          };
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300
-            ? resolve()
-            : reject(new Error(`El almacen rechazo el archivo (${xhr.status})`)));
-          xhr.onerror = () => reject(new Error("Se interrumpio la conexion durante la subida"));
-          xhr.send(file);
-        });
-
-        // 3. Confirmacion: el servidor verifica que el archivo llego.
-        const alta = await fetch("/api/attachments", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...base, storagePath: datos.storagePath }),
-        });
-        const resultado = await alta.json();
-        if (!alta.ok) throw new Error(resultado.error ?? "No fue posible registrar el archivo");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error al subir");
-        break;
-      }
+    const fallidos = await subirPendientes(destino as Destino, porSubir, setPorSubir);
+    setSubiendo(false);
+    if (fallidos) {
+      setError(`${fallidos} ${fallidos === 1 ? "archivo no se subió" : "archivos no se subieron"}. Los demás ya quedaron guardados; puede reintentar.`);
+    } else {
+      setPorSubir([]);
     }
-
-    setSubiendo(null);
-    setProgreso(0);
-    if (archivo.current) archivo.current.value = "";
-    if (camara.current) camara.current.value = "";
     router.refresh();
   }
 
   async function borrar(a: Adjunto) {
-    if (!confirm(`¿Eliminar "${a.name}"? No se puede deshacer.`)) return;
-    const res = await fetch(`/api/attachments/${a.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const d = await res.json();
-      setError(d.error ?? "No fue posible eliminar");
+    if (!confirm(`¿Eliminar «${a.name}»?\n\nSe quita de este registro para todos y no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`/api/attachments/${a.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "No fue posible eliminar el archivo.");
+        return;
+      }
+    } catch {
+      setError("No hay conexión. El archivo no se eliminó.");
       return;
     }
     router.refresh();
@@ -145,51 +99,23 @@ export function Adjuntos({
             {ayuda ?? "Fotos, videos y documentos. Máximo 200 MB por archivo."}
           </p>
         </div>
-        {editable ? (
-          <div className="flex gap-1.5">
-            {/* capture="environment" abre la camara trasera en el celular */}
-            <input
-              ref={camara} type="file" accept="image/*" capture="environment"
-              className="hidden" onChange={(e) => subir(e.target.files)}
-            />
-            <button
-              type="button" onClick={() => camara.current?.click()} disabled={subiendo !== null}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50 sm:hidden"
-            >
-              <Camera className="h-3.5 w-3.5" /> Foto
-            </button>
-            <input
-              ref={archivo} type="file" multiple className="hidden"
-              onChange={(e) => subir(e.target.files)}
-            />
-            <button
-              type="button" onClick={() => archivo.current?.click()} disabled={subiendo !== null}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-            >
-              {subiendo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              Subir
-            </button>
-          </div>
-        ) : null}
       </div>
 
-      {subiendo ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-          <div className="flex justify-between text-[0.6875rem] text-slate-600">
-            <span className="truncate">{subiendo}</span>
-            <span className="tabular-nums">{progreso}%</span>
-          </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
-            <div className="h-full bg-brand-500 transition-all" style={{ width: `${progreso}%` }} />
-          </div>
+      {editable ? (
+        <div className="grid gap-2">
+          <FotosPorSubir
+            archivos={porSubir} onCambio={setPorSubir} deshabilitado={subiendo}
+            yaSubidos={adjuntos.map((a) => ({ name: a.name, size: a.size }))}
+          />
+          <div><BotonSubir archivos={porSubir} subiendo={subiendo} onSubir={subir} /></div>
         </div>
       ) : null}
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
       ) : null}
 
-      {adjuntos.length === 0 && !subiendo ? (
+      {adjuntos.length === 0 && !porSubir.length ? (
         <p className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
           Sin archivos adjuntos
         </p>
@@ -207,11 +133,12 @@ export function Adjuntos({
                 />
               </a>
               {editable ? (
+                // Visible siempre en pantallas táctiles (no hay «pasar el cursor»); en computadora, al pasar.
                 <button
                   type="button" onClick={() => borrar(a)} aria-label={`Eliminar ${a.name}`}
-                  className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-lg bg-white/90 text-slate-500 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                  className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-lg bg-white/90 text-slate-500 transition-opacity hover:text-red-600 focus:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               ) : null}
             </figure>
@@ -239,7 +166,7 @@ export function Adjuntos({
               {editable ? (
                 <button
                   type="button" onClick={() => borrar(a)} aria-label={`Eliminar ${a.name}`}
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

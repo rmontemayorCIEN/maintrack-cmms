@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROLES_ASIGNABLES } from "@/lib/constants";
 import { avisarAltaDeUsuario } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
@@ -10,14 +11,19 @@ const schema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(["ADMIN", "SUPERVISOR", "TECHNICIAN", "REQUESTER", "VIEWER"]),
+  role: z.enum(ROLES_ASIGNABLES),
   jobTitle: z.string().optional().nullable(),
   hourlyRate: z.coerce.number().min(0).default(0),
   phone: z.string().optional().nullable(),
 });
 
+/**
+ * La lista de personas con correo, rol y tarifa es administración de
+ * usuarios. Las pantallas que necesitan elegir a alguien reciben la lista
+ * desde el servidor, solo con nombre.
+ */
 export async function GET() {
-  return withAuth(null, async ({ orgId }) => {
+  return withAuth("user:manage", async ({ orgId }) => {
     const users = await prisma.user.findMany({
       where: { organizationId: orgId },
       select: {
@@ -27,7 +33,7 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
     return ok({ users });
-  });
+  }, { esLectura: true });
 }
 
 export async function POST(request: Request) {

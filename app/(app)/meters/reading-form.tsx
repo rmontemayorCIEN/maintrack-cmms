@@ -117,7 +117,7 @@ export function MeterReadingForm({
     >
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
-          type="number"
+          type="number" inputMode="decimal"
           step="any"
           min={0}
           className="field"

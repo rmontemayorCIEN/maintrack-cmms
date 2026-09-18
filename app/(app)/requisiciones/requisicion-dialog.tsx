@@ -341,7 +341,7 @@ export function RequisicionDialog({
                       ) : null}
                     </div>
                     <input
-                      type="number" min="0" step="any" value={r.cantidad}
+                      type="number" inputMode="decimal" min="0" step="any" value={r.cantidad}
                       onChange={(e) => actualizar(i, { cantidad: e.target.value })}
                       placeholder={ref ? `hay ${disponible}` : "cantidad"}
                       className="h-fit w-28 rounded-lg border border-slate-300 px-2 py-1.5 text-xs tabular-nums"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "./auth";
 import { can, type Permission } from "./rbac";
+import { puedeVerRuta, verCostos } from "./pantallas";
 import { estadoSuscripcion } from "./planes";
 import { diaLocal } from "./utils";
 
@@ -62,6 +63,45 @@ export async function withAuth<T>(
     console.error("[api]", message);
     return fail(message, 500);
   }
+}
+
+/**
+ * Una consulta que alimenta una pantalla: la responde a quien ve esa pantalla
+ * (lib/pantallas.ts). Sin esto, esconder la pantalla no servía de nada: la
+ * API seguía contestando a cualquiera con sesión.
+ */
+export async function withVista<T>(
+  ruta: string,
+  handler: Parameters<typeof withAuth<T>>[1],
+) {
+  return withAuth<T>(null, async (ctx) => {
+    if (!puedeVerRuta(ctx.user.role, ruta, { esSuperAdmin: ctx.user.isSuperAdmin })) {
+      return fail("Sin permisos suficientes", 403) as unknown as T;
+    }
+    return handler(ctx);
+  });
+}
+
+const CAMPOS_DE_COSTO = new Set([
+  "laborCost", "partsCost", "serviceCost", "otherCost", "totalCost", "unitCost", "hourlyRate", "rate", "cost",
+  "costoEstimado", "purchaseCost", "replacementCost", "costoUnitario",
+]);
+
+/**
+ * Quita los importes de una respuesta para quien no ve costos (verCostos). Se
+ * aplica al salir, sobre el mismo objeto que ve quien sí los ve: no hay una
+ * segunda consulta que se desincronice.
+ */
+export function sinCostos<T>(dato: T, rol: string | undefined): T {
+  if (verCostos(rol)) return dato;
+  const limpiar = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(limpiar);
+    if (v && typeof v === "object" && !(v instanceof Date)) {
+      return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => !CAMPOS_DE_COSTO.has(k)).map(([k, x]) => [k, limpiar(x)]));
+    }
+    return v;
+  };
+  return limpiar(dato) as T;
 }
 
 /** Etiquetas legibles para los campos que el usuario ve. */

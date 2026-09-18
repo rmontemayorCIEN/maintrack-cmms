@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { diaLocal } from "@/lib/utils";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { ErrorDeFechas, corregirFechas, fechasDeAsignacion } from "@/lib/calendario-actividad";
 
 type Params = { params: Promise<{ id: string }> };
@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 /** Las actividades del plan en ESTE equipo, cada una con su fecha. */
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/plans", async ({ orgId }) => {
     const r = await fechasDeAsignacion(orgId, id);
     if (!r) return fail("Asignación no encontrada", 404);
     return ok(r);

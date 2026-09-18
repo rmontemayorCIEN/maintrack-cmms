@@ -123,6 +123,11 @@ export const EVENTOS = {
     modulo: "ORDENES", prioridad: "ALTA", categoria: "OPERATIVO", requiereAccion: true,
     destinatarios: [["RESPONSABLE"]], quien: "El responsable de la orden.", webhook: true,
   }),
+  OT_APOYO_SOLICITADO: d({
+    titulo: "Piden apoyo en una OT", descripcion: "Quien ejecuta una orden pide ayuda desde campo: otra persona, una decisión o material.",
+    modulo: "ORDENES", prioridad: "ALTA", categoria: "OPERATIVO", requiereAccion: false,
+    destinatarios: [["SUPERVISORES"], ["ADMINISTRADORES"]], quien: "Los supervisores; si no hay, la administración.", webhook: false,
+  }),
   OT_CERRADA: d({
     titulo: "OT cerrada", descripcion: "Una orden que usted creó o pidió quedó cerrada.",
     modulo: "ORDENES", prioridad: "INFORMATIVA", categoria: "INFORMATIVO", requiereAccion: false,

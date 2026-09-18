@@ -123,7 +123,7 @@ export function CapturaConteo({
                     <td className="text-right">
                       {abierto && editable ? (
                         <input
-                          type="number" min="0" step="any"
+                          type="number" inputMode="decimal" min="0" step="any"
                           value={valores[r.id] ?? ""}
                           onChange={(e) => setValores((p) => ({ ...p, [r.id]: e.target.value }))}
                           placeholder={r.unidad}

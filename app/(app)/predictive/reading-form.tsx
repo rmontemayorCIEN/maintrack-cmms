@@ -42,7 +42,7 @@ export function ReadingForm({ sensorId, unit }: { sensorId: string; unit: string
     <form onSubmit={submit} className="grid gap-1.5">
       <div className="flex gap-2">
         <input
-          type="number"
+          type="number" inputMode="decimal"
           step="0.01"
           className="field"
           placeholder={`Nueva lectura (${unit})`}

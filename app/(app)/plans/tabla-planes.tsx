@@ -40,8 +40,10 @@ const TRIGGER: Record<string, string> = { CALENDAR: "Calendario", METER: "Medido
 
 export function TablaPlanes({
   planes, vistaInicial, editable, assets, meters, technicians,
-  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos, busquedaInicial,
+  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos, busquedaInicial, conCostos = true,
 }: {
+  /** Sin costos (técnico): el costo estimado del plan no se ofrece. */
+  conCostos?: boolean;
   planes: FilaPlan[];
   vistaInicial: Vista;
   busquedaInicial?: string;
@@ -189,7 +191,7 @@ export function TablaPlanes({
     <TablaConfigurable
       filas={planes}
       fijas={FIJAS}
-      columnas={COLUMNAS}
+      columnas={conCostos ? COLUMNAS : COLUMNAS.filter((c) => c.id !== "costo")}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       busquedaInicial={busquedaInicial}

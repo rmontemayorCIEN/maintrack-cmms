@@ -113,15 +113,21 @@ const crearColumnas = (zona: string): Columna<FilaOrden>[] => [
 /** La vista de fabrica: lo que se necesita para repartir el trabajo del dia. */
 const DE_FABRICA = ["tipo", "prioridad", "estado", "responsable", "vencimiento", "horas", "costo"];
 
-export function TablaOrdenes({ ordenes, vistaInicial }: { ordenes: FilaOrden[]; vistaInicial: Vista }) {
+const COLUMNAS_DE_COSTO = new Set(["costoMo", "costoRef", "costoServ", "costoOtros", "costo"]);
+
+export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true }: {
+  ordenes: FilaOrden[]; vistaInicial: Vista;
+  /** Sin costos (técnico): las columnas de dinero ni se ofrecen (lib/pantallas.ts verCostos). */
+  conCostos?: boolean;
+}) {
   const zona = useZona();
-  const columnas = useMemo(() => crearColumnas(zona), [zona]);
+  const columnas = useMemo(() => crearColumnas(zona).filter((c) => conCostos || !COLUMNAS_DE_COSTO.has(c.id)), [zona, conCostos]);
   return (
     <TablaConfigurable
       filas={ordenes}
       fijas={FIJAS}
       columnas={columnas}
-      deFabrica={DE_FABRICA}
+      deFabrica={conCostos ? DE_FABRICA : DE_FABRICA.filter((c) => !COLUMNAS_DE_COSTO.has(c))}
       vistaInicial={vistaInicial}
       clave="ordenes"
       sustantivo="ordenes"

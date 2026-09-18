@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { actividadValida, asegurarEditable, recalcWorkOrder } from "@/lib/workorders";
+import { enFila, hace } from "@/lib/repeticion";
 
 const schema = z.object({
   userId: z.string().optional(),
@@ -29,6 +30,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     if (!technician) return fail("Técnico no encontrado", 404);
 
+    // El doble toque no registra la jornada dos veces (lib/repeticion.ts).
+    return enFila(`horas:${technician.id}:${id}:${input.hours}`, async () => {
+    const repetido = await prisma.workOrderLabor.count({
+      where: { workOrderId: id, userId: technician.id, hours: input.hours, workedAt: { gte: hace() } },
+    });
+    if (repetido) return fail("Esas horas ya se registraron hace un momento. No se volvieron a sumar.", 409);
+
     await prisma.workOrderLabor.create({
       data: {
         workOrderId: id,
@@ -43,5 +51,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const workOrder = await recalcWorkOrder(id);
     return ok({ workOrder }, 201);
+    });
   });
 }

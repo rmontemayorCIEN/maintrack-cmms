@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { verificarCupo } from "@/lib/planes";
 
 const schema = z.object({
@@ -15,7 +15,7 @@ const schema = z.object({
 });
 
 export async function GET() {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/predictive", async ({ orgId }) => {
     const sensors = await prisma.sensor.findMany({
       where: { organizationId: orgId, active: true },
       include: { asset: { select: { code: true, name: true, criticality: true } } },

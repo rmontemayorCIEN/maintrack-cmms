@@ -195,13 +195,13 @@ export function AccionesCompra({
                     </div>
                     <label className="text-[0.625rem] text-slate-500">
                       Cantidad
-                      <input type="number" min="0" step="any" value={v.cantidad}
+                      <input type="number" inputMode="decimal" min="0" step="any" value={v.cantidad}
                         onChange={(e) => set({ cantidad: e.target.value })}
                         className="mt-0.5 block w-24 rounded-lg border border-slate-300 px-2 py-1 text-xs tabular-nums" />
                     </label>
                     <label className="text-[0.625rem] text-slate-500">
                       Costo unit.
-                      <input type="number" min="0" step="any" value={v.costo}
+                      <input type="number" inputMode="decimal" min="0" step="any" value={v.costo}
                         onChange={(e) => set({ costo: e.target.value })}
                         className="mt-0.5 block w-24 rounded-lg border border-slate-300 px-2 py-1 text-xs tabular-nums" />
                     </label>

@@ -469,7 +469,7 @@ export function PlanDialog({
           {form.triggerType === "CALENDAR" ? (
             <div>
               <label className="label">Cada cuantos días</label>
-              <input type="number" min="1" className="field" value={form.intervalDays} onChange={(e) => set("intervalDays", e.target.value)} required />
+              <input type="number" inputMode="decimal" min="1" className="field" value={form.intervalDays} onChange={(e) => set("intervalDays", e.target.value)} required />
             </div>
           ) : (
             <>
@@ -484,13 +484,13 @@ export function PlanDialog({
               </p>
               <div>
                 <label className="label">Intervalo del medidor</label>
-                <input type="number" min="1" className="field" value={form.intervalMeter} onChange={(e) => set("intervalMeter", e.target.value)} required />
+                <input type="number" inputMode="decimal" min="1" className="field" value={form.intervalMeter} onChange={(e) => set("intervalMeter", e.target.value)} required />
               </div>
             </>
           )}
           <div>
             <label className="label">Anticipación (días)</label>
-            <input type="number" min="0" className="field" value={form.leadTimeDays} onChange={(e) => set("leadTimeDays", e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" className="field" value={form.leadTimeDays} onChange={(e) => set("leadTimeDays", e.target.value)} />
           </div>
           <div>
             <label className="label">Prioridad</label>
@@ -502,7 +502,7 @@ export function PlanDialog({
           </div>
           <div>
             <label className="label">Horas estimadas</label>
-            <input type="number" step="0.5" min="0" className="field" value={form.estimatedHours} onChange={(e) => set("estimatedHours", e.target.value)} />
+            <input type="number" inputMode="decimal" step="0.5" min="0" className="field" value={form.estimatedHours} onChange={(e) => set("estimatedHours", e.target.value)} />
             {estimado.horas > 0 ? (
               <button
                 type="button"

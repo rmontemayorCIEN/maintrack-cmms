@@ -1,5 +1,6 @@
 "use client";
 
+import { pedir } from "@/lib/cliente/pedir";
 import { useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -153,11 +154,9 @@ export function TaskList({
   );
 
   async function update(task: Task, payload: Record<string, unknown>) {
-    await fetch(`/api/work-orders/${workOrderId}/tasks`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, ...payload }),
-    });
+    const r = await pedir(`/api/work-orders/${workOrderId}/tasks`, { method: "PATCH", json: { taskId: task.id, ...payload } });
+    if (!r.ok) { setError(r.error); return; }
+    setError(null);
     startTransition(() => router.refresh());
   }
 
@@ -171,6 +170,7 @@ export function TaskList({
 
   return (
     <>
+      {error && !liberando ? <p role="alert" className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
       {(agrupar ? grupos : [{ clave: "TODO" as const, id: "TODO", etiqueta: "", ayuda: "", tono: "gris", items: tasks.map((task, indice) => ({ task, indice })) }]).map((g) => {
         const tono = TONOS[g.tono];
         const abierto = !plegados[g.id];
@@ -211,15 +211,17 @@ export function TaskList({
             disabled={!editable || !!task.liberadaAt}
             onClick={() => update(task, { done: !task.done })}
             className={cn(
-              "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors",
+              // En el teléfono, un cuadro de 40 px: se atina con el dedo (o con guante).
+              "casilla mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-md border-2 transition-colors md:h-5 md:w-5 md:rounded md:border",
               task.done
                 ? "border-emerald-500 bg-emerald-500 text-white"
                 : "border-slate-300 bg-white hover:border-brand-500",
               (!editable || task.liberadaAt) && "cursor-not-allowed opacity-60",
             )}
             aria-label={task.done ? "Marcar pendiente" : "Marcar completada"}
+            aria-pressed={task.done}
           >
-            {task.done ? <Check className="h-3.5 w-3.5" /> : null}
+            {task.done ? <Check className="h-5 w-5 md:h-3.5 md:w-3.5" /> : null}
           </button>
 
           {/* Reordenar: el plan y la IA proponen, el gestor decide. Se ocultan
@@ -287,7 +289,7 @@ export function TaskList({
             {task.taskType === "MEASURE" ? (
               <div className="mt-2 flex items-center gap-2">
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="0.01"
                   disabled={!editable}
                   className="field max-w-32"

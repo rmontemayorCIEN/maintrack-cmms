@@ -112,7 +112,7 @@ export function ConfiguracionJornada({
           <div>
             <label className="label">Horas de trabajo al día</label>
             <input
-              type="number" step="0.5" min="1" max="24"
+              type="number" inputMode="decimal" step="0.5" min="1" max="24"
               className="field max-w-28"
               disabled={!editable}
               value={horas}
@@ -175,7 +175,7 @@ export function ConfiguracionJornada({
               <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{p.name}</span>
               <span className="hidden text-xs text-slate-400 sm:block">{p.role}</span>
               <input
-                type="number" step="0.5" min="0" max="24"
+                type="number" inputMode="decimal" step="0.5" min="0" max="24"
                 className="field h-8 w-24 py-0 text-xs"
                 disabled={!editable}
                 placeholder={`${horasJornada} h`}

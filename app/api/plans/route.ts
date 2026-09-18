@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, withAuth, withVista } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { diariasSinConfirmar, esquemaTarea } from "@/lib/plan-tasks";
 import { altaDePlan } from "@/lib/alta-de-plan";
@@ -42,7 +42,7 @@ const schema = z.object({
 });
 
 export async function GET() {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/plans", async ({ orgId }) => {
     const plans = await prisma.maintenancePlan.findMany({
       where: { organizationId: orgId },
       include: {

@@ -119,11 +119,11 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
           </div>
           <div>
             <label className="label">Umbral de alerta</label>
-            <input type="number" step="0.01" className="field" value={form.warningThreshold} onChange={(e) => set("warningThreshold", e.target.value)} />
+            <input type="number" inputMode="decimal" step="0.01" className="field" value={form.warningThreshold} onChange={(e) => set("warningThreshold", e.target.value)} />
           </div>
           <div>
             <label className="label">Umbral crítico</label>
-            <input type="number" step="0.01" className="field" value={form.criticalThreshold} onChange={(e) => set("criticalThreshold", e.target.value)} />
+            <input type="number" inputMode="decimal" step="0.01" className="field" value={form.criticalThreshold} onChange={(e) => set("criticalThreshold", e.target.value)} />
           </div>
           <div>
             <label className="label">Dirección de la falla</label>
@@ -134,7 +134,7 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
           </div>
           <div>
             <label className="label">Frecuencia de muestreo (h)</label>
-            <input type="number" min="1" className="field" value={form.samplingHours} onChange={(e) => set("samplingHours", e.target.value)} />
+            <input type="number" inputMode="decimal" min="1" className="field" value={form.samplingHours} onChange={(e) => set("samplingHours", e.target.value)} />
           </div>
         </div>
 

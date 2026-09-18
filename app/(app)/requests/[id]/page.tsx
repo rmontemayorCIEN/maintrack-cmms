@@ -3,6 +3,15 @@ import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { veTodasLasSolicitudes } from "@/lib/pantallas";
+
+/**
+ * Quien no revisa solicitudes ve las que levantó y, si es técnico, las que
+ * dieron origen a una orden suya. Una ajena responde «no encontrada».
+ */
+function visibles(user: { id: string; role: string }) {
+  return veTodasLasSolicitudes(user.role) ? {} : { OR: [{ requestedById: user.id }, { workOrder: { assignedToId: user.id } }] };
+}
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Avatar, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
@@ -26,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // Acotado a la organizacion, igual que la pagina.
   const user = await requireUser();
   const r = await prisma.workRequest.findFirst({
-    where: { id, organizationId: user.organizationId },
+    where: { id, organizationId: user.organizationId, ...visibles(user) },
     select: { number: true },
   });
   return { title: r ? r.number : "Solicitud" };
@@ -37,7 +46,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const user = await requireUser();
 
   const solicitud = await prisma.workRequest.findFirst({
-    where: { id, organizationId: user.organizationId },
+    where: { id, organizationId: user.organizationId, ...visibles(user) },
     include: {
       asset: { select: { id: true, code: true, name: true } },
       site: { select: { name: true } },

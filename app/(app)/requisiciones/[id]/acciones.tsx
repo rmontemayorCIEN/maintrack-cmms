@@ -139,7 +139,7 @@ export function AccionesRequisicion({
                     </p>
                   </div>
                   <input
-                    type="number" min="0" step="any"
+                    type="number" inputMode="decimal" min="0" step="any"
                     value={cantidades[r.id] ?? ""}
                     onChange={(e) => setCantidades((prev) => ({ ...prev, [r.id]: e.target.value }))}
                     disabled={sinExistencia || r.disponible === null}

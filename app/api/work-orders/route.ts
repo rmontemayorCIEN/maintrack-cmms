@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, parseDate, withAuth } from "@/lib/api";
+import { fail, ok, parseDate, sinCostos, withAuth, withVista } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
@@ -27,7 +27,7 @@ const createSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  return withAuth(null, async ({ orgId }) => {
+  return withVista("/work-orders", async ({ orgId, user }) => {
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
     const type = url.searchParams.get("type");
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
       take,
     });
-    return ok({ workOrders });
+    return ok({ workOrders: sinCostos(workOrders, user.role) });
   });
 }
 

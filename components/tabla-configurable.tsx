@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Columns3, Loader2,
@@ -31,6 +31,11 @@ export type Columna<T> = {
 };
 
 export type Vista = { columnas?: string[]; grupos?: string[] };
+
+const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** En el teléfono se muestran de a poco: doscientas tarjetas de golpe se sienten. */
+const TARJETAS_POR_TANDA = 40;
 
 export function TablaConfigurable<T extends { id: string }>({
   filas, fijas, columnas, deFabrica, vistaInicial, clave,
@@ -65,18 +70,42 @@ export function TablaConfigurable<T extends { id: string }>({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cerrados, setCerrados] = useState<Set<string>>(new Set());
+  const [mostradas, setMostradas] = useState(TARJETAS_POR_TANDA);
+
+  /**
+   * El filtro vive también en la dirección (?f=), sin navegar: al abrir un
+   * registro y regresar con «atrás», la lista vuelve filtrada como estaba.
+   */
+  const leido = useRef(false);
+  useEffect(() => {
+    if (leido.current) return;
+    leido.current = true;
+    if (busquedaInicial) return;
+    const f = new URLSearchParams(window.location.search).get("f");
+    if (f) setBusqueda(f);
+  }, [busquedaInicial]);
+  useEffect(() => {
+    if (!leido.current) return;
+    const t = setTimeout(() => {
+      const url = new URL(window.location.href);
+      if (busqueda.trim()) url.searchParams.set("f", busqueda.trim()); else url.searchParams.delete("f");
+      if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url.href);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [busqueda]);
 
   const visibles = seleccion.map((id) => porId.get(id)!).filter(Boolean);
   const agrupables = columnas.filter((c) => c.agrupable);
 
   // ── Filtro ────────────────────────────────────────────────────────────
   const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = sinAcentos(busqueda.trim());
     if (!q) return filas;
     // Se busca sobre TODAS las columnas, no solo las visibles: esconder una
     // columna es una decision de presentacion, no de que se puede encontrar.
+    // Sin acentos ni mayúsculas: «bomba» encuentra «Bomba», «valvula» encuentra «válvula».
     return filas.filter((f) =>
-      [...fijas, ...columnas].map((c) => c.texto(f)).join(" ").toLowerCase().includes(q),
+      sinAcentos([...fijas, ...columnas].map((c) => c.texto(f)).join(" ")).includes(q),
     );
   }, [filas, busqueda, columnas, fijas]);
 
@@ -207,6 +236,54 @@ export function TablaConfigurable<T extends { id: string }>({
     );
   }
 
+  /**
+   * La misma fila, como tarjeta, para pantallas angostas: el identificador y la
+   * descripción arriba, luego las primeras columnas de la vista con su
+   * etiqueta, y el resto en «Más datos». Nada se pierde; solo se acomoda.
+   */
+  function Tarjeta({ f }: { f: T }) {
+    const principales = visibles.slice(0, 4);
+    const resto = visibles.slice(4);
+    const dato = (c: Columna<T>) => (
+      <div key={c.id} className="min-w-0">
+        <dt className="text-[0.625rem] font-semibold uppercase tracking-wide text-slate-400">{c.etiqueta}</dt>
+        <dd className="mt-0.5 break-words text-xs text-slate-700">{c.pinta ? c.pinta(f) : c.texto(f)}</dd>
+      </div>
+    );
+    return (
+      <li className="tarjeta-tabla rounded-xl border border-slate-200 bg-white p-3">
+        <div className="grid gap-0.5 text-sm">
+          {fijas.map((c) => <div key={c.id} className="min-w-0 break-words">{c.pinta ? c.pinta(f) : c.texto(f)}</div>)}
+        </div>
+        {principales.length ? <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">{principales.map(dato)}</dl> : null}
+        {resto.length ? (
+          <details className="mt-2">
+            <summary className="min-h-9 cursor-pointer py-2 text-xs font-medium text-brand-700">Más datos ({resto.length})</summary>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2">{resto.map(dato)}</dl>
+          </details>
+        ) : null}
+        {acciones ? <div className="mt-2 flex justify-end border-t border-slate-100 pt-2">{acciones(f)}</div> : null}
+      </li>
+    );
+  }
+
+  function GruposEnTarjetas({ nodos }: { nodos: Nodo[] }) {
+    return (
+      <>
+        {nodos.map((n) => (
+          <li key={n.clave} className="grid gap-2">
+            <p className="px-1 pt-1 text-xs font-semibold text-slate-700" style={{ paddingLeft: `${4 + n.nivel * 12}px` }}>
+              {n.etiqueta} <span className="font-normal text-slate-400">({n.filas.length})</span>
+            </p>
+            <ul className="grid gap-2">
+              {n.hijos.length ? <GruposEnTarjetas nodos={n.hijos} /> : n.filas.map((f) => <Tarjeta key={f.id} f={f} />)}
+            </ul>
+          </li>
+        ))}
+      </>
+    );
+  }
+
   return (
     /*
       `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
@@ -227,13 +304,15 @@ export function TablaConfigurable<T extends { id: string }>({
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       {/* ── Barra de control ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
+        <div className="relative min-w-0 flex-1 basis-full sm:min-w-56 sm:basis-auto">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder={ejemploFiltro ?? "Filtrar…"}
-            className="w-full rounded-lg border border-slate-300 py-1.5 pl-8 pr-8 text-xs"
+            aria-label="Filtrar la lista"
+            type="search"
+            className="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-8 text-sm md:py-1.5 md:text-xs"
           />
           {busqueda ? (
             <button type="button" onClick={() => setBusqueda("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -257,7 +336,8 @@ export function TablaConfigurable<T extends { id: string }>({
               });
             }}
             disabled={n > grupos.length}
-            className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700 disabled:bg-slate-50 disabled:text-slate-400"
+            aria-label={n === 0 ? "Agrupar por" : `Agrupar, nivel ${n + 1}`}
+            className="hidden rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-700 disabled:bg-slate-50 disabled:text-slate-400 md:block"
           >
             <option value="">{n === 0 ? "Agrupar por…" : `+ nivel ${n + 1}`}</option>
             {agrupables.filter((c) => !grupos.includes(c.id) || grupos[n] === c.id).map((c) => (
@@ -278,9 +358,12 @@ export function TablaConfigurable<T extends { id: string }>({
           </Button>
         ) : null}
 
-        <Button type="button" variant="secondary" onClick={() => setPanel((v) => !v)}>
-          <Columns3 className="h-3.5 w-3.5" /> Columnas ({visibles.length})
-        </Button>
+        {/* Elegir columnas es de computadora: en el teléfono la tarjeta ya acomoda la vista. */}
+        <span className="hidden md:inline-flex">
+          <Button type="button" variant="secondary" onClick={() => setPanel((v) => !v)}>
+            <Columns3 className="h-3.5 w-3.5" /> Columnas ({visibles.length})
+          </Button>
+        </span>
       </div>
 
       {/* ── Panel de columnas ────────────────────────────────────────── */}
@@ -338,8 +421,24 @@ export function TablaConfigurable<T extends { id: string }>({
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{error}</p>
       ) : null}
 
+      {/* ── Teléfono: tarjetas ───────────────────────────────────────── */}
+      <div className="md:hidden">
+        {filtrados.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">Ningún registro coincide con «{busqueda}».</p>
+        ) : (
+          <ul className="grid gap-2">
+            {grupos.length ? <GruposEnTarjetas nodos={arbol} /> : filtrados.slice(0, mostradas).map((f) => <Tarjeta key={f.id} f={f} />)}
+          </ul>
+        )}
+        {!grupos.length && filtrados.length > mostradas ? (
+          <button type="button" onClick={() => setMostradas((m) => m + TARJETAS_POR_TANDA)} className="mt-2 min-h-11 w-full rounded-lg border border-slate-200 bg-white text-sm font-medium text-brand-700">
+            Mostrar más ({filtrados.length - mostradas} restantes)
+          </button>
+        ) : null}
+      </div>
+
       {/* ── Tabla ────────────────────────────────────────────────────── */}
-      <Card padded={false}>
+      <Card padded={false} className="hidden md:block">
         <div className="table-wrap">
           <table className="data">
             <thead>
