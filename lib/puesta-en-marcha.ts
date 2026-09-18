@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { ESTADOS_CON_REGISTROS } from "./estados-lote";
 import { saludDeDatos } from "./salud-datos";
 import { claveComparable, serieComparable, rfc as validarRfc } from "./normalizar";
 
@@ -56,7 +57,16 @@ export type Paso = {
   peso: number;
   /** Si el paso depende de un módulo que la empresa puede declarar que no usa. */
   modulo?: ModuloOpcional;
+  /**
+   * Cuántos de los que deberían tenerlo lo tienen. Distinto de `progreso`,
+   * que dice cuántos de los registros que hay están bien: en planes, «6 de 6
+   * planes correctos» y «5 de 6 equipos críticos cubiertos» son dos cosas.
+   */
+  cobertura?: { hecho: number; meta: number; texto: string };
 };
+
+export { ESTADO_OPERATIVO, type EstadoOperativo } from "./estado-operativo";
+import type { EstadoOperativo } from "./estado-operativo";
 
 export type Pendiente = {
   prioridad: number;
@@ -79,9 +89,14 @@ export type PuestaEnMarcha = {
   pendientes: Pendiente[];
   /** Si ya se declaró en operación, y desde cuándo. */
   operandoDesde: Date | null;
+  /** Quién lo declaró. */
+  operandoPor: string | null;
+  estadoOperativo: EstadoOperativo;
   hayDemo: boolean;
-  /** Lo que impide declararse en operación, si algo. */
+  /** Los bloqueos críticos: lo que impide declararse en operación. */
   impideOperar: string[];
+  /** Lo que conviene resolver pero no impide operar. */
+  advertenciasOperar: string[];
   modulos: Partial<Record<ModuloOpcional, boolean>>;
   /** Calidad de captura: la fase que sigue cuando la puesta en marcha termina. */
   saludDatos: number;
@@ -145,7 +160,7 @@ export async function puestaEnMarcha(
     where: { id: organizationId },
     select: {
       name: true, tipoInstalacion: true, timezone: true, currency: true, horasJornada: true, diasHabiles: true,
-      comprasInternas: true, operandoDesde: true, modulosPuesta: true,
+      comprasInternas: true, operandoDesde: true, modulosPuesta: true, operandoPorId: true,
     },
   });
   const modulos = leerModulos(org.modulosPuesta);
@@ -186,7 +201,7 @@ export async function puestaEnMarcha(
     () => prisma.partStock.groupBy({ by: ["partId"], where: { part: { organizationId } }, _sum: { quantity: true }, _min: { quantity: true } }),
     () => prisma.partUnit.findMany({ where: { organizationId }, select: { code: true } }),
     () => prisma.supplier.findMany({ where: { organizationId }, select: { id: true, name: true, rfc: true } }),
-    () => prisma.importBatch.count({ where: { organizationId, tipo: "DEMO", estado: { in: ["IMPORTADO", "REVERSION_PARCIAL"] } } }),
+    () => prisma.importBatch.count({ where: { organizationId, tipo: "DEMO", estado: { in: ESTADOS_CON_REGISTROS } } }),
   ]) as [
     Array<{ id: string; code: string; name: string }>,
     Array<{ id: string; code: string; name: string; siteId: string; _count: { assets: number } }>,
@@ -213,7 +228,7 @@ export async function puestaEnMarcha(
    */
   const deDemo = new Set(
     (await prisma.importRecord.findMany({
-      where: { batch: { organizationId, tipo: "DEMO", estado: { in: ["IMPORTADO", "REVERSION_PARCIAL"] } } },
+      where: { batch: { organizationId, tipo: "DEMO", estado: { in: ESTADOS_CON_REGISTROS } } },
       select: { entityId: true },
     })).map((r) => r.entityId),
   );
@@ -356,7 +371,8 @@ export async function puestaEnMarcha(
   const planesSinEquipo = planes.filter((p) => !p.asignaciones.length);
   const planesSinActividades = planes.filter((p) => p._count.tasks === 0);
   const planesSinFrecuencia = planes.filter((p) => planProblemas(p).includes("sin frecuencia"));
-  const criticosSinPlan = activos.filter((a) => a.criticality === "A" && !a.planesAsignados.length);
+  const criticos = activos.filter((a) => a.criticality === "A");
+  const criticosSinPlan = criticos.filter((a) => !a.planesAsignados.length);
   pendiente({
     prioridad: PRIORIDAD.PROGRAMA, problema: "Planes sin equipo asignado", modulo: "Planes",
     consecuencia: "Se ven bien en la lista pero el programador no los lee: nunca generan una orden.",
@@ -547,16 +563,29 @@ export async function puestaEnMarcha(
       clave: "planes", numero: 8, titulo: "Planes preventivos",
       que: "Planes asignados a equipos, con frecuencia, actividades y próxima fecha.",
       porQue: "Es lo que convierte el sistema en preventivo. Un plan incompleto se ve en la lista y no genera órdenes.",
-      estado: estadoDe({ total: planes.length, validos: planes.length - planesInvalidos.length, problemas: planesInvalidos.length + criticosSinPlan.length }),
+      // «Por corregir» es para planes que están mal. Si todos están bien y lo
+      // que falta es cubrir equipos críticos, el paso sigue en proceso: no hay
+      // nada que corregir, hay algo que agregar. El avance es el mismo en
+      // los dos casos (ninguno pasa de 90%).
+      estado: (() => {
+        const e = estadoDe({ total: planes.length, validos: planes.length - planesInvalidos.length, problemas: planesInvalidos.length });
+        return e === "COMPLETO" && criticosSinPlan.length ? "EN_PROCESO" : e;
+      })(),
       progreso: planes.length ? { hecho: planes.length - planesInvalidos.length, meta: planes.length } : null,
+      cobertura: criticos.length ? {
+        hecho: criticos.length - criticosSinPlan.length, meta: criticos.length,
+        texto: criticosSinPlan.length
+          ? `Sin plan: ${criticosSinPlan.slice(0, 3).map((a) => a.code).join(", ")}${criticosSinPlan.length > 3 ? ` y ${criticosSinPlan.length - 3} más` : ""}`
+          : "Todos los equipos críticos tienen plan",
+      } : undefined,
       falta: planes.length === 0
         ? "Ningún equipo tiene plan preventivo."
-        : planesInvalidos.length ? `${planesInvalidos.length} de ${planes.length} planes no generarían órdenes.` : criticosSinPlan.length ? `${criticosSinPlan.length} equipo(s) crítico(s) sin plan.` : "",
+        : planesInvalidos.length ? `${planesInvalidos.length} de ${planes.length} planes no generarían órdenes.`
+        : criticosSinPlan.length ? `Falta plan para ${criticosSinPlan.length === 1 ? `el equipo crítico ${criticosSinPlan[0].code} · ${criticosSinPlan[0].name}` : `${criticosSinPlan.length} equipos críticos`}.` : "",
       problemas: [
         ...(planesSinEquipo.length ? [`${planesSinEquipo.length} sin equipo`] : []),
         ...(planesSinFrecuencia.length ? [`${planesSinFrecuencia.length} sin frecuencia`] : []),
         ...(planesSinActividades.length ? [`${planesSinActividades.length} sin actividades`] : []),
-        ...(criticosSinPlan.length ? [`${criticosSinPlan.length} equipos A sin plan`] : []),
       ],
       enlace: "/plans", textoEnlace: planes.length === 0 ? "Crear el primer plan" : "Planes", peso: 3,
     },
@@ -598,9 +627,36 @@ export async function puestaEnMarcha(
 
   // ───────────────────────────────────────────── 12. Validación final
   const obligatoriosIncompletos = pasos.filter((p) => p.estado === "EN_PROCESO" || p.estado === "CORREGIR");
+
+  // Lo que de verdad impide operar: sin esto no se puede crear, asignar ni
+  // programar una orden. Todo lo demás —almacén, proveedores, medidores,
+  // tarifas, duplicados, planes con defectos— se avisa pero no detiene.
   const impideOperar = [
-    ...obligatoriosIncompletos.map((p) => `${p.titulo}: ${p.falta || p.problemas.join(", ")}`),
+    ...(!empresaBien ? ["Datos de la empresa: falta la zona horaria o la moneda."] : []),
+    ...(!conTipo ? ["Tipo de instalación: indique qué tipo de instalación es."] : []),
+    ...(sitios.length === 0 ? ["Sitios: dé de alta al menos un sitio."] : []),
+    ...(ubicacionesAplican && ubicaciones.length === 0 ? ["Áreas y ubicaciones: dé de alta al menos una ubicación."] : []),
+    ...(ejecutores.length === 0 ? ["Equipo de trabajo: falta al menos un técnico o supervisor activo."] : []),
+    ...(activos.length === 0 ? ["Activos: dé de alta al menos un equipo."] : []),
+    ...(activosIncompletos.length ? [`Activos: ${activosIncompletos.length} sin código, nombre, estado, sitio o ubicación.`] : []),
+    ...(activos.length && planes.length === 0 ? ["Planes preventivos: ningún equipo tiene plan."] : []),
+    ...(criticosSinPlan.length ? [`Planes preventivos: ${criticosSinPlan.length} equipo(s) crítico(s) sin plan (${criticosSinPlan.slice(0, 3).map((a) => a.code).join(", ")}).`] : []),
+    ...(!reglasBien ? ["Reglas operativas: revise la jornada y los días laborables."] : []),
     ...(demo > 0 ? ["Hay datos de demostración cargados: quítelos antes de operar, para que no entren a los indicadores."] : []),
+  ];
+  const incompleto = (clave: string) => {
+    const p = pasos.find((x) => x.clave === clave)!;
+    return p.estado === "EN_PROCESO" || p.estado === "CORREGIR" ? [`${p.titulo}: ${p.falta || p.problemas.join(", ")}`] : [];
+  };
+  const advertenciasOperar = [
+    ...(sitiosRepetidos.length ? [`Sitios: ${sitiosRepetidos.length} con nombre repetido.`] : []),
+    ...(ubicacionesRepetidas.length ? [`Áreas y ubicaciones: ${ubicacionesRepetidas.length} repetidas.`] : []),
+    ...(sinTarifa.length ? [`Equipo de trabajo: ${sinTarifa.length} técnico(s) sin tarifa por hora.`] : []),
+    ...(activosRepetidos.length + serieRepetida.length ? [`Activos: ${activosRepetidos.length + serieRepetida.length} posibles duplicados.`] : []),
+    ...(planesInvalidos.length ? [`Planes preventivos: ${planesInvalidos.length} de ${planes.length} no generarían órdenes.`] : []),
+    ...incompleto("medidores"),
+    ...incompleto("almacen"),
+    ...incompleto("proveedores"),
   ];
   pasos.push({
     clave: "validacion", numero: 12, titulo: "Validación final: comenzar a operar",
@@ -632,6 +688,10 @@ export async function puestaEnMarcha(
   const salud = opciones.conSalud ? await saludDeDatos(organizationId) : { indice: 0 };
   const siguiente = pasos.find((p) => p.estado === "EN_PROCESO" || p.estado === "CORREGIR") ?? null;
 
+  const operandoPor = org.operandoPorId
+    ? (await prisma.user.findUnique({ where: { id: org.operandoPorId }, select: { name: true } }))?.name ?? null
+    : null;
+
   return {
     porcentaje,
     completa: obligatoriosIncompletos.length === 0,
@@ -639,8 +699,11 @@ export async function puestaEnMarcha(
     siguiente,
     pendientes,
     operandoDesde: org.operandoDesde,
+    operandoPor,
+    estadoOperativo: org.operandoDesde ? "OPERANDO" : impideOperar.length ? "CONFIGURACION" : "LISTA",
     hayDemo: demo > 0,
     impideOperar,
+    advertenciasOperar,
     modulos,
     saludDatos: salud.indice,
   };
@@ -649,5 +712,8 @@ export async function puestaEnMarcha(
 /** Solo el avance, para listados. La misma cuenta que la pantalla completa. */
 export async function avancePuestaEnMarcha(organizationId: string) {
   const r = await puestaEnMarcha(organizationId);
-  return { porcentaje: r.porcentaje, completa: r.completa, siguiente: r.siguiente?.titulo ?? null };
+  return {
+    porcentaje: r.porcentaje, completa: r.completa, siguiente: r.siguiente?.titulo ?? null,
+    estadoOperativo: r.estadoOperativo, operandoDesde: r.operandoDesde,
+  };
 }

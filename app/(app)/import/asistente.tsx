@@ -9,13 +9,14 @@ import { Badge, Button, Card, CardHeader } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useZona } from "@/components/zona-empresa";
+import { ESTADOS_CON_REGISTROS, ESTADO_LOTE, type EstadoLote } from "@/lib/estados-lote";
 
 type Columna = { nombre: string; requerido?: boolean; ayuda?: string; ejemplo: string };
 type Tipo = {
   clave: string; titulo: string; descripcion: string;
   requisitos: string | null; erroresComunes: string[]; columnas: Columna[]; actualizable: boolean;
 };
-type Falla = { columna?: string; motivo: string };
+type Falla = { columna?: string; motivo: string; valor?: string; solucion?: string };
 type Fila = {
   fila: number;
   estado: "nuevo" | "actualizar" | "exacto" | "posible" | "error";
@@ -26,20 +27,33 @@ type Fila = {
   coincide?: { id: string | null; resumen: string; motivo: string };
 };
 type Analisis = {
+  formato: "csv" | "xlsx";
   filas: Fila[];
-  totales: { leidos: number; nuevos: number; actualizar: number; exactos: number; posibles: number; errores: number; advertencias: number };
+  totales: {
+    leidos: number; validos: number; conAdvertencias: number; rechazados: number;
+    nuevos: number; actualizar: number; exactos: number; posibles: number;
+  };
   columnasDesconocidas: string[];
+  columnasFaltantes: string[];
+  avisosArchivo: string[];
   puedeImportar: boolean;
+  politica: string;
+  despues?: string;
 };
+type Resultado = { estado: EstadoLote; creados: number; actualizados: number; omitidos: number; despues?: string };
 type Lote = {
   id: string; tipo: string; archivoNombre: string | null; estado: string; leidos: number; creados: number;
   actualizados: number; omitidos: number; rechazados: number; createdAt: string; revertidoAt: string | null; detalle: string;
 };
 type Diagnostico = {
-  aBorrar: Array<{ entidad: string; id: string; nombre: string }>;
+  aBorrar: Array<{ entidad: string; id: string; nombre: string; accion: "ELIMINAR" | "ANULAR" | "COMPENSAR" }>;
   bloqueados: Array<{ entidad: string; id: string; nombre: string; motivos: string[] }>;
   actualizados: Array<{ entidad: string; id: string; nombre: string; antes: Record<string, unknown> }>;
+  estadoEsperado: EstadoLote;
+  resultado: string;
 };
+
+const ACCION_REVERSION = { ELIMINAR: "Se elimina", ANULAR: "Se anula (queda en el historial)", COMPENSAR: "Salida que regresa la existencia" };
 
 const ESTADO_FILA: Record<Fila["estado"], { texto: string; tono: "success" | "info" | "warning" | "danger" | "muted" }> = {
   nuevo: { texto: "Nuevo", tono: "success" },
@@ -49,28 +63,37 @@ const ESTADO_FILA: Record<Fila["estado"], { texto: string; tono: "success" | "in
   error: { texto: "Error", tono: "danger" },
 };
 
-const ESTADO_LOTE: Record<string, { texto: string; tono: "success" | "info" | "warning" | "danger" | "muted" }> = {
-  IMPORTADO: { texto: "Importado", tono: "success" },
-  FALLIDO: { texto: "Falló, sin cambios", tono: "danger" },
-  REVERTIDO: { texto: "Revertido", tono: "muted" },
-  REVERSION_PARCIAL: { texto: "Revertido en parte", tono: "warning" },
+const tonoLote = (e: string) => {
+  const t = ESTADO_LOTE[e as EstadoLote]?.tono ?? "neutral";
+  return t === "neutral" ? "muted" : t;
 };
 
 /** El detalle de errores y advertencias como CSV, para corregir en Excel. */
 function descargarDetalle(filas: Fila[], nombre: string) {
-  const renglones = [["fila", "estado", "columna", "problema"]];
+  const renglones = [["fila", "estado", "columna", "valor recibido", "problema", "cómo corregirlo"]];
   for (const f of filas) {
-    for (const x of f.fallas) renglones.push([String(f.fila), "error", x.columna ?? "", x.motivo]);
-    for (const x of f.advertencias) renglones.push([String(f.fila), "advertencia", x.columna ?? "", x.motivo]);
-    if (f.estado === "posible" && f.coincide) renglones.push([String(f.fila), "posible duplicado", "", `${f.coincide.motivo}: ${f.coincide.resumen}`]);
+    for (const x of f.fallas) renglones.push([String(f.fila), "error", x.columna ?? "", x.valor ?? "", x.motivo, x.solucion ?? ""]);
+    for (const x of f.advertencias) renglones.push([String(f.fila), "advertencia", x.columna ?? "", x.valor ?? "", x.motivo, x.solucion ?? ""]);
+    if (f.estado === "posible" && f.coincide) renglones.push([String(f.fila), "posible duplicado", "", "", `${f.coincide.motivo}: ${f.coincide.resumen}`, "Omítalo, o márquelo como distinto para crearlo"]);
   }
   const csv = renglones.map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `revision-${nombre.replace(/\.csv$/i, "")}.csv`;
+  a.download = `revision-${nombre.replace(/\.(csv|xlsx)$/i, "")}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Qué pasó con un lote, en una línea. */
+function resumenLote(l: Lote) {
+  const d = (() => { try { return JSON.parse(l.detalle || "{}"); } catch { return {}; } })();
+  if (l.estado === "FALLIDA") return d.motivo ?? "No se completó: no se guardó nada";
+  if (l.estado === "VALIDADA" || l.estado === "CONFIRMADA") {
+    return `Solo validada: ${l.leidos} renglones${l.rechazados ? `, ${l.rechazados} rechazados` : ""}. No se guardó nada.`;
+  }
+  const base = `${l.creados} creados${l.actualizados ? `, ${l.actualizados} actualizados` : ""}${l.omitidos ? `, ${l.omitidos} duplicados omitidos` : ""}`;
+  return d.resultado ? `${base}. ${d.resultado}` : base;
 }
 
 /**
@@ -89,14 +112,15 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
   const archivo = useRef<HTMLInputElement>(null);
 
   const [activo, setActivo] = useState(tipos[0]);
-  const [contenido, setContenido] = useState<string | null>(null);
+  // El archivo tal como se manda: texto si es CSV, base64 si es Excel.
+  const [contenido, setContenido] = useState<{ texto: string; formato: "csv" | "xlsx" } | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
   const [analisis, setAnalisis] = useState<Analisis | null>(null);
   const [exactos, setExactos] = useState<"omitir" | "actualizar">("omitir");
   const [crearPosibles, setCrearPosibles] = useState<number[]>([]);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ creados: number; actualizados: number; omitidos: number } | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
   const [lotes, setLotes] = useState<Lote[] | null>(null);
   const [revirtiendo, setRevirtiendo] = useState<{ lote: Lote; diag: Diagnostico } | null>(null);
 
@@ -112,13 +136,13 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
     if (archivo.current) archivo.current.value = "";
   }
 
-  async function validar(texto: string, nombre: string | null, decisiones = { exactos, crearPosibles }) {
+  async function validar(archivoLeido: { texto: string; formato: "csv" | "xlsx" }, nombre: string | null, decisiones = { exactos, crearPosibles }) {
     setOcupado("validando"); setError(null);
     try {
       const res = await fetch(`/api/import/${activo.clave}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contenido: texto, archivoNombre: nombre, decisiones }),
+        body: JSON.stringify({ contenido: archivoLeido.texto, formato: archivoLeido.formato, archivoNombre: nombre, decisiones }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? "No fue posible leer el archivo"); setAnalisis(null); return; }
@@ -134,10 +158,25 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
     const file = files?.[0];
     if (!file) return;
     setResultado(null); setCrearPosibles([]); setExactos("omitir");
-    const texto = await file.text();
-    setContenido(texto);
+    // Excel viaja en base64 y se lee en el servidor con las mismas reglas que
+    // un CSV. Un .xls viejo no es un .xlsx: se pide guardarlo de nuevo.
+    if (/\.xls$/i.test(file.name)) {
+      setError("Ese es el formato de Excel anterior (.xls). Ábralo y guárdelo como «Libro de Excel (.xlsx)», o expórtelo a CSV.");
+      return;
+    }
+    const esExcel = /\.xlsx$/i.test(file.name);
+    let leido: { texto: string; formato: "csv" | "xlsx" };
+    if (esExcel) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binario = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      leido = { texto: btoa(binario), formato: "xlsx" };
+    } else {
+      leido = { texto: await file.text(), formato: "csv" };
+    }
+    setContenido(leido);
     setNombreArchivo(file.name);
-    await validar(texto, file.name, { exactos: "omitir", crearPosibles: [] });
+    await validar(leido, file.name, { exactos: "omitir", crearPosibles: [] });
   }
 
   function cambiarDecision(nuevas: { exactos?: "omitir" | "actualizar"; crearPosibles?: number[] }) {
@@ -153,10 +192,14 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
       const res = await fetch(`/api/import/${activo.clave}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contenido, archivoNombre: nombreArchivo, decisiones: { exactos, crearPosibles } }),
+        body: JSON.stringify({ contenido: contenido.texto, formato: contenido.formato, archivoNombre: nombreArchivo, decisiones: { exactos, crearPosibles } }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No fue posible importar"); return; }
+      if (!res.ok) {
+        setError(data.error ?? "No fue posible importar");
+        void cargarLotes();
+        return;
+      }
       setResultado(data);
       setAnalisis(null); setContenido(null);
       if (archivo.current) archivo.current.value = "";
@@ -187,8 +230,8 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
     try {
       const res = await fetch(`/api/import/lotes/${revirtiendo.lote.id}/revertir`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error ?? "No se pudo revertir"); return; }
       setRevirtiendo(null);
+      if (!res.ok) { setError(data.error ?? "No se pudo revertir"); void cargarLotes(); return; }
       void cargarLotes();
       router.refresh();
     } finally {
@@ -197,7 +240,9 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
   }
 
   const t = analisis?.totales;
-  const conProblema = analisis?.filas.filter((f) => f.estado !== "nuevo" || f.advertencias.length) ?? [];
+  const conError = analisis?.filas.filter((f) => f.estado === "error") ?? [];
+  const conProblema = analisis?.filas.filter((f) => f.estado !== "error" && (f.estado !== "nuevo" || f.advertencias.length || f.coincide)) ?? [];
+  const errores = conError.flatMap((f) => f.fallas.map((x) => ({ fila: f.fila, ...x })));
 
   return (
     <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -219,7 +264,7 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
         ))}
       </nav>
 
-      <div className="grid content-start gap-4">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
         <Card>
           <h2 className="text-sm font-semibold text-slate-900">{activo.titulo}</h2>
           <p className="mt-1 text-sm text-slate-600">{activo.descripcion}</p>
@@ -231,15 +276,24 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
 
           <div className="mt-4 flex flex-wrap gap-2">
             <a
+              href={`/api/import/${activo.clave}/template?formato=xlsx`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" /> Plantilla Excel
+            </a>
+            <a
               href={`/api/import/${activo.clave}/template`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
-              <Download className="h-3.5 w-3.5" /> Descargar plantilla
+              <Download className="h-3.5 w-3.5" /> Plantilla CSV
             </a>
-            <input ref={archivo} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => elegirArchivo(e.target.files)} />
+            <input
+              ref={archivo} type="file" className="hidden" onChange={(e) => elegirArchivo(e.target.files)}
+              accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            />
             <Button size="sm" onClick={() => archivo.current?.click()} disabled={ocupado !== null}>
               {ocupado === "validando" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              {contenido ? "Elegir otro archivo" : "Elegir archivo CSV"}
+              {contenido ? "Elegir otro archivo" : "Elegir archivo (Excel o CSV)"}
             </Button>
             {nombreArchivo ? (
               <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
@@ -271,6 +325,7 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
               </table>
             </div>
             <ul className="mt-2 grid gap-0.5 text-[0.6875rem] text-slate-600">
+              <li>• Excel (.xlsx) o CSV, con las mismas reglas. De un Excel se lee la primera hoja; el renglón 1 son los nombres de columna.</li>
               <li>• Fechas en <strong>dd/mm/aaaa</strong> (15/09/2026). Una fecha que no existe se rechaza, no se ajusta.</li>
               <li>• Números con punto decimal (1.5). La coma solo como separador de miles (1,250.50).</li>
               <li>• Si omite un dato opcional, el registro se crea sin él; si el dato está mal escrito, se avisa y se deja vacío.</li>
@@ -291,12 +346,13 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div>
                 <p className="text-sm font-semibold text-emerald-900">
-                  Importación completa: {resultado.creados} creados{resultado.actualizados ? `, ${resultado.actualizados} actualizados` : ""}
+                  {ESTADO_LOTE[resultado.estado]?.texto ?? "Completada"}: {resultado.creados} creados{resultado.actualizados ? `, ${resultado.actualizados} actualizados` : ""}
                 </p>
                 <p className="mt-0.5 text-xs text-emerald-800">
-                  {resultado.omitidos ? `${resultado.omitidos} se omitieron por duplicados. ` : ""}
+                  {resultado.omitidos ? `${resultado.omitidos} duplicado(s) omitidos. ` : ""}
                   Quedó en el historial de abajo, desde donde se puede revertir.
                 </p>
+                {resultado.despues ? <p className="mt-1 text-xs font-medium text-emerald-900">{resultado.despues}</p> : null}
               </div>
             </div>
           </Card>
@@ -308,21 +364,39 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
               title="Vista previa: esto es lo que pasaría"
               subtitle="Todavía no se guardó nada. Revise, decida los duplicados y confirme."
             />
-            <div className="flex flex-wrap gap-2 text-xs">
-              <Badge tone="success">{t.nuevos} nuevos</Badge>
-              {t.actualizar ? <Badge tone="info">{t.actualizar} actualizan</Badge> : null}
-              {t.exactos ? <Badge tone="muted">{t.exactos} ya existen</Badge> : null}
-              {t.posibles ? <Badge tone="warning">{t.posibles} posibles duplicados</Badge> : null}
-              {t.errores ? <Badge tone="danger">{t.errores} con error</Badge> : null}
-              {t.advertencias ? <Badge tone="warning">{t.advertencias} con advertencia</Badge> : null}
-              <span className="text-slate-400">de {t.leidos} renglones</span>
-            </div>
+            <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 xl:grid-cols-5" data-totales>
+              {([
+                ["Total de filas", t.leidos, "text-slate-800"],
+                ["Válidas", t.validos, "text-emerald-700"],
+                ["Con advertencia", t.conAdvertencias, t.conAdvertencias ? "text-amber-700" : "text-slate-400"],
+                ["Rechazadas", t.rechazados, t.rechazados ? "text-red-700" : "text-slate-400"],
+                ["Nuevas", t.nuevos, "text-emerald-700"],
+                ["Actualizarán", t.actualizar, t.actualizar ? "text-sky-700" : "text-slate-400"],
+                ["Ya existen (exactos)", t.exactos, t.exactos ? "text-slate-700" : "text-slate-400"],
+                ["Posibles duplicados", t.posibles, t.posibles ? "text-amber-700" : "text-slate-400"],
+                ["Columnas no reconocidas", analisis.columnasDesconocidas.length, analisis.columnasDesconocidas.length ? "text-amber-700" : "text-slate-400"],
+                ["Obligatorias faltantes", analisis.columnasFaltantes.length, analisis.columnasFaltantes.length ? "text-red-700" : "text-slate-400"],
+              ] as const).map(([k, v, c]) => (
+                <div key={k} className="rounded-lg border border-slate-200 px-2.5 py-1.5">
+                  <dt className="text-[0.625rem] uppercase tracking-wide text-slate-500">{k}</dt>
+                  <dd className={cn("text-base font-semibold tabular-nums", c)}>{v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {analisis.columnasFaltantes.length ? (
+              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                Al archivo le faltan columnas obligatorias: <strong>{analisis.columnasFaltantes.join(", ")}</strong>. Agréguelas
+                con ese nombre exacto en el primer renglón —la plantilla ya las trae— y vuelva a elegir el archivo.
+              </p>
+            ) : null}
 
             {analisis.columnasDesconocidas.length ? (
               <p className="mt-2 text-xs text-amber-800">
                 Columnas que no se reconocen y se ignorarán: <strong>{analisis.columnasDesconocidas.join(", ")}</strong>. Si alguna era un dato que quería importar, revise el nombre contra la plantilla.
               </p>
             ) : null}
+            {analisis.avisosArchivo.map((x) => <p key={x} className="mt-1 text-xs text-amber-800">{x}</p>)}
 
             {(t.exactos || t.actualizar) && activo.actualizable ? (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 p-2 text-xs text-slate-700">
@@ -332,11 +406,30 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
               </div>
             ) : null}
 
-            {t.errores ? (
-              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-                Hay renglones con error, así que no se puede importar todavía. Descargue el detalle —trae fila y
-                columna de cada problema—, corrija el archivo y elíjalo de nuevo para volver a validar.
-              </p>
+            {errores.length ? (
+              <>
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  {t.rechazados} renglón(es) rechazados, así que no se puede importar todavía. Corrija el archivo
+                  —abajo, o en el detalle descargable, está cada problema con su fila, columna y cómo arreglarlo— y
+                  elíjalo de nuevo para volver a validar.
+                </p>
+                <div className="table-wrap mt-2 max-h-80 overflow-auto rounded-lg border border-red-200">
+                  <table className="data">
+                    <thead><tr><th>Fila</th><th>Columna</th><th>Valor recibido</th><th>Problema</th><th>Cómo corregirlo</th></tr></thead>
+                    <tbody>
+                      {errores.slice(0, 300).map((x, i) => (
+                        <tr key={`${x.fila}-${i}`}>
+                          <td className="text-xs tabular-nums text-slate-500">{x.fila}</td>
+                          <td className="font-mono text-xs">{x.columna ?? "—"}</td>
+                          <td className="max-w-40 truncate text-xs text-slate-600" title={x.valor}>{x.valor ? `«${x.valor}»` : <span className="text-slate-400">vacío</span>}</td>
+                          <td className="text-xs text-red-700">{x.motivo}</td>
+                          <td className="text-xs text-slate-600">{x.solucion ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : null}
 
             {conProblema.length ? (
@@ -350,8 +443,12 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
                         <td className="text-xs">{f.resumen || "—"}</td>
                         <td><Badge tone={ESTADO_FILA[f.estado].tono}>{ESTADO_FILA[f.estado].texto}</Badge></td>
                         <td className="text-xs text-slate-600">
-                          {f.fallas.map((x, i) => <p key={`f${i}`} className="text-red-700">{x.columna ? <span className="font-mono">{x.columna}: </span> : null}{x.motivo}</p>)}
-                          {f.advertencias.map((x, i) => <p key={`a${i}`} className="text-amber-700">{x.columna ? <span className="font-mono">{x.columna}: </span> : null}{x.motivo}</p>)}
+                          {f.advertencias.map((x, i) => (
+                            <p key={`a${i}`} className="text-amber-700">
+                              {x.columna ? <span className="font-mono">{x.columna}: </span> : null}{x.motivo}
+                              {x.solucion ? <span className="text-slate-500"> — {x.solucion}</span> : null}
+                            </p>
+                          ))}
                           {f.coincide && f.estado !== "error" ? (
                             <p>{f.coincide.motivo} que <strong>{f.coincide.resumen}</strong></p>
                           ) : null}
@@ -375,17 +472,22 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
               </div>
             ) : null}
 
+            <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <strong>Antes de confirmar:</strong> {analisis.politica} Se guarda todo o nada: si algo falla a la mitad, no queda
+              ningún registro a medias y la importación queda como fallida en el historial.
+            </p>
+            {analisis.despues ? <p className="mt-2 text-xs text-slate-600">{analisis.despues}</p> : null}
+
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={importar} disabled={!analisis.puedeImportar || ocupado !== null}>
                 {ocupado === "importando" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                 Importar {t.nuevos + t.actualizar} registros
               </Button>
-              {conProblema.length ? (
+              {conProblema.length || errores.length ? (
                 <Button variant="secondary" size="sm" onClick={() => descargarDetalle(analisis.filas, nombreArchivo ?? "archivo")}>
                   <Download className="h-3.5 w-3.5" /> Descargar detalle
                 </Button>
               ) : null}
-              <span className="text-[0.6875rem] text-slate-500">Se guarda todo o nada: si algo falla a la mitad, no queda ningún registro a medias.</span>
             </div>
           </Card>
         ) : null}
@@ -393,7 +495,7 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
         <Card>
           <CardHeader
             title={<span className="flex items-center gap-1.5"><History className="h-4 w-4 text-slate-400" /> Importaciones anteriores</span>}
-            subtitle="Cada una se puede revertir: se borra solo lo que creó y nadie usó después."
+            subtitle="Validadas, confirmadas, completadas o fallidas. Las completadas se pueden revertir: se deshace solo lo que creó y nadie usó después."
           />
           {!lotes ? (
             <p className="text-xs text-slate-400">Cargando…</p>
@@ -410,13 +512,11 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
                       <td className="text-xs">{tipos.find((x) => x.clave === l.tipo)?.titulo ?? (l.tipo === "DEMO" ? "Datos de demostración" : l.tipo)}</td>
                       <td className="text-xs text-slate-600">{l.archivoNombre ?? "—"}</td>
                       <td className="text-xs text-slate-600">
-                        {l.estado === "FALLIDO"
-                          ? (JSON.parse(l.detalle || "{}").motivo ?? "No se completó")
-                          : `${l.creados} creados${l.actualizados ? `, ${l.actualizados} actualizados` : ""}${l.omitidos ? `, ${l.omitidos} omitidos` : ""}`}
+                        {resumenLote(l)}
                       </td>
-                      <td><Badge tone={ESTADO_LOTE[l.estado]?.tono ?? "muted"}>{ESTADO_LOTE[l.estado]?.texto ?? l.estado}</Badge></td>
+                      <td><Badge tone={tonoLote(l.estado)}>{ESTADO_LOTE[l.estado as EstadoLote]?.texto ?? l.estado}</Badge></td>
                       <td className="text-right">
-                        {l.estado === "IMPORTADO" && l.tipo !== "DEMO" ? (
+                        {(ESTADOS_CON_REGISTROS as string[]).includes(l.estado) && l.tipo !== "DEMO" ? (
                           <button
                             type="button"
                             disabled={ocupado !== null}
@@ -440,30 +540,32 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
       {revirtiendo ? (
         <Dialogo
           titulo="Revertir la importación"
-          descripcion="Esto es lo que va a pasar. Revíselo antes de confirmar."
+          descripcion={revirtiendo.diag.resultado}
           onCerrar={() => setRevirtiendo(null)}
           pie={
             <div className="flex justify-end gap-2">
               <Button variant="secondary" size="sm" onClick={() => setRevirtiendo(null)}>Cancelar</Button>
               <Button size="sm" onClick={revertir} disabled={ocupado !== null || revirtiendo.diag.aBorrar.length === 0}>
                 {ocupado === "revirtiendo" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Eliminar {revirtiendo.diag.aBorrar.length} registros
+                Revertir {revirtiendo.diag.aBorrar.length} registro(s)
               </Button>
             </div>
           }
         >
           <div className="grid gap-3 text-xs">
             <div>
-              <p className="font-semibold text-slate-800">Se eliminarán ({revirtiendo.diag.aBorrar.length})</p>
+              <p className="font-semibold text-slate-800">Se pueden revertir ({revirtiendo.diag.aBorrar.length})</p>
               {revirtiendo.diag.aBorrar.length ? (
                 <ul className="mt-1 max-h-40 overflow-auto rounded-lg border border-slate-200 p-2 text-slate-600">
-                  {revirtiendo.diag.aBorrar.map((r) => <li key={r.id}>{r.nombre}</li>)}
+                  {revirtiendo.diag.aBorrar.map((r) => (
+                    <li key={r.id}>{r.nombre} <span className="text-slate-400">· {ACCION_REVERSION[r.accion]}</span></li>
+                  ))}
                 </ul>
               ) : <p className="mt-1 text-slate-500">Nada: todos los registros ya se usaron.</p>}
             </div>
             {revirtiendo.diag.bloqueados.length ? (
               <div>
-                <p className="font-semibold text-rose-700">No se tocan porque ya se usaron ({revirtiendo.diag.bloqueados.length})</p>
+                <p className="font-semibold text-rose-700">No se pueden revertir: ya se usaron ({revirtiendo.diag.bloqueados.length})</p>
                 <ul className="mt-1 grid max-h-40 gap-1 overflow-auto rounded-lg border border-rose-200 bg-rose-50/50 p-2 text-rose-900">
                   {revirtiendo.diag.bloqueados.map((b) => <li key={b.id}><strong>{b.nombre}</strong> — {b.motivos.join(", ")}</li>)}
                 </ul>
@@ -475,6 +577,9 @@ export function AsistenteImportacion({ tipos }: { tipos: Tipo[] }) {
                 estaban: pudieron cambiar después. Si hace falta, corríjalos a mano.
               </p>
             ) : null}
+            <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-slate-700">
+              Resultado esperado: <strong>{ESTADO_LOTE[revirtiendo.diag.estadoEsperado]?.texto}</strong>. Queda en la bitácora con su nombre.
+            </p>
           </div>
         </Dialogo>
       ) : null}

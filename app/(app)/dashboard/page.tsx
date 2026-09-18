@@ -28,7 +28,7 @@ import {
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { ArrowRight, ListChecks } from "lucide-react";
-import { puestaEnMarcha } from "@/lib/puesta-en-marcha";
+import { ESTADO_OPERATIVO, puestaEnMarcha } from "@/lib/puesta-en-marcha";
 import { evaluarPuntos } from "@/lib/predictive";
 
 export const metadata = { title: "Panel de control" };
@@ -130,6 +130,9 @@ export default async function DashboardPage() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-brand-900" data-porcentaje={marcha.porcentaje}>
               Puesta en marcha al {marcha.porcentaje}%
+              <span className="ml-2 text-xs font-medium text-brand-800/80" data-estado-operativo={marcha.estadoOperativo}>
+                · {ESTADO_OPERATIVO[marcha.estadoOperativo].texto}
+              </span>
             </p>
             <p className="text-xs text-brand-800/80">
               {marcha.siguiente

@@ -208,6 +208,11 @@ model Organization {
   /// ningun dato de demostracion vivo: asi los ejemplos nunca se cuelan en los
   /// indicadores de una empresa que ya opera. Nula = todavia no arranca.
   operandoDesde      DateTime?
+  /// Quién declaró que la empresa empieza a operar. Junto con la fecha, es lo
+  /// que distingue el estado OPERATIVO (en configuración, lista, operando) del
+  /// COMERCIAL (prueba, activa, suspendida): una empresa puede estar pagando y
+  /// todavía sin configurar.
+  operandoPorId      String?
   /// Los modulos que la empresa dijo que NO usara, en JSON: {"almacen":false}.
   /// Un paso de la puesta en marcha que la empresa no va a usar se muestra
   /// como «no aplica» y no le baja el avance. Sin decidir = se espera.

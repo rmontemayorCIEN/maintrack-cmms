@@ -200,6 +200,18 @@ export function catalogosPara(tipo: string | null | undefined): CatalogosDeInsta
   };
 }
 
+/**
+ * Lo mínimo para operar, sea cual sea el giro: sin unidades no se da de alta
+ * una refacción y sin códigos de falla no se cierra un correctivo. Es lo que
+ * recibe una empresa que elige empezar vacía.
+ */
+export function catalogosIndispensables(): CatalogosDeInstalacion {
+  return {
+    categorias: [], familias: [], servicios: [],
+    unidades: UNIDADES, codigosFalla: FALLAS_BASE, causas: CAUSAS_BASE, especialidades: ESPECIALIDADES_BASE,
+  };
+}
+
 export function sitioInicialPara(tipo: string | null | undefined) {
   return SITIO_INICIAL[claveDe(tipo)];
 }
@@ -210,17 +222,19 @@ type Db = Prisma.TransactionClient | typeof prisma;
 
 /**
  * Siembra lo que falte del tipo de instalación. Devuelve cuántos creó de cada
- * catálogo. Si no se indica el tipo, se toma el de la empresa.
+ * catálogo. Si no se indica el tipo, se toma el de la empresa. Con alcance
+ * «INDISPENSABLES» siembra solo lo común a cualquier giro.
  */
 export async function sembrarCatalogosEstandar(
   organizationId: string,
   tipo?: string | null,
   db: Db = prisma,
+  alcance: "INDISPENSABLES" | "RECOMENDADOS" = "RECOMENDADOS",
 ): Promise<ResultadoSiembra> {
   const tipoReal = tipo !== undefined
     ? tipo
     : (await db.organization.findUnique({ where: { id: organizationId }, select: { tipoInstalacion: true } }))?.tipoInstalacion;
-  const c = catalogosPara(tipoReal);
+  const c = alcance === "INDISPENSABLES" ? catalogosIndispensables() : catalogosPara(tipoReal);
   const nuevos = {} as ResultadoSiembra;
 
   const conCodigo = async <T extends [string, ...string[]]>(

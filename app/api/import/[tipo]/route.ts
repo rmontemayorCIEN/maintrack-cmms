@@ -1,17 +1,26 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { esImportacionValida } from "@/lib/importacion";
-import { ErrorDeImportacion, ejecutarImportacion, validarImportacion } from "@/lib/importacion-motor";
+import { ErrorDeImportacion, ejecutarImportacion, formatoDe, validarImportacion } from "@/lib/importacion-motor";
 
 type Params = { params: Promise<{ tipo: string }> };
 
 const cuerpo = z.object({
-  contenido: z.string().min(1).max(8_000_000),
+  // CSV: el texto. Excel: el archivo en base64, que ocupa un tercio más.
+  contenido: z.string().min(1).max(11_000_000),
+  formato: z.enum(["csv", "xlsx"]).optional(),
   archivoNombre: z.string().trim().max(200).optional().nullable(),
   decisiones: z.object({
     exactos: z.enum(["omitir", "actualizar"]).default("omitir"),
     crearPosibles: z.array(z.number().int().positive()).max(5000).default([]),
   }).optional(),
+});
+
+/** Excel o CSV: lo dice el formato, o si no, la extensión del nombre. */
+const archivoDe = (input: z.infer<typeof cuerpo>) => ({
+  formato: input.formato ?? formatoDe(input.archivoNombre),
+  contenido: input.contenido,
+  nombre: input.archivoNombre ?? null,
 });
 
 /**
@@ -34,8 +43,7 @@ export async function POST(request: Request, { params }: Params) {
   return withAuth("settings:write", async ({ user, orgId }) => {
     const input = cuerpo.parse(await request.json());
     return conError(() => validarImportacion({
-      tipo, contenido: input.contenido, organizationId: orgId, userId: user.id,
-      archivoNombre: input.archivoNombre, decisiones: input.decisiones,
+      tipo, archivo: archivoDe(input), organizationId: orgId, userId: user.id, decisiones: input.decisiones,
     }));
   });
 }
@@ -47,8 +55,8 @@ export async function PUT(request: Request, { params }: Params) {
   return withAuth("settings:write", async ({ user, orgId }) => {
     const input = cuerpo.parse(await request.json());
     return conError(() => ejecutarImportacion({
-      tipo, contenido: input.contenido, organizationId: orgId, userId: user.id,
-      plan: user.organization.plan, archivoNombre: input.archivoNombre, decisiones: input.decisiones,
+      tipo, archivo: archivoDe(input), organizationId: orgId, userId: user.id,
+      plan: user.organization.plan, decisiones: input.decisiones,
     }));
   });
 }

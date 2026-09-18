@@ -56,9 +56,10 @@ export async function cambiarTipoInstalacion(p: { organizationId: string; userId
 /**
  * Declara que la empresa empieza a operar.
  *
- * Usa la misma revisión que la pantalla: si ahí aparece algo que impide operar
- * —un paso obligatorio incompleto, datos de demostración cargados—, aquí se
- * rechaza con esa misma lista. No hay una segunda opinión.
+ * Usa la misma revisión que la pantalla: si ahí aparece un bloqueo crítico
+ * —sin sitio, sin técnicos, sin activos válidos, equipos críticos sin plan,
+ * datos de demostración cargados—, aquí se rechaza con esa misma lista. No hay
+ * una segunda opinión. Las advertencias no detienen: quedan en la bitácora.
  */
 export async function comenzarAOperar(p: { organizationId: string; userId: string }) {
   const marcha = await puestaEnMarcha(p.organizationId);
@@ -67,11 +68,18 @@ export async function comenzarAOperar(p: { organizationId: string; userId: strin
     throw new ErrorDePuesta(`Todavía no se puede: ${marcha.impideOperar.join(" · ")}`, 409);
   }
   const ahora = new Date();
-  await prisma.organization.update({ where: { id: p.organizationId }, data: { operandoDesde: ahora } });
+  // Solo el estado operativo. El comercial (prueba, activa, suspendida) es del
+  // operador y no cambia por esto.
+  await prisma.organization.update({
+    where: { id: p.organizationId },
+    data: { operandoDesde: ahora, operandoPorId: p.userId },
+  });
   await logAudit({
     organizationId: p.organizationId, userId: p.userId,
     entity: "Organization", entityId: p.organizationId, action: "OPERATION_STARTED",
-    summary: `La empresa comenzó a operar con la puesta en marcha al ${marcha.porcentaje}%`,
+    summary: `La empresa se declaró lista y comenzó a operar (puesta en marcha al ${marcha.porcentaje}%` +
+      (marcha.advertenciasOperar.length ? `, con ${marcha.advertenciasOperar.length} advertencia(s) sin resolver)` : ")"),
+    changes: { estadoAnterior: marcha.estadoOperativo, estadoNuevo: "OPERANDO", advertencias: marcha.advertenciasOperar },
   });
-  return { operandoDesde: ahora };
+  return { operandoDesde: ahora, advertencias: marcha.advertenciasOperar };
 }

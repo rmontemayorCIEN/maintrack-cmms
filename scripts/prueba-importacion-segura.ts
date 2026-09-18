@@ -95,15 +95,19 @@ async function main() {
     revisar("el lote registra empresa, usuario, tipo, archivo, huella y conteos",
       loteSitios.organizationId === org.id && loteSitios.userId === admin.id && loteSitios.tipo === "sitios" &&
       loteSitios.archivoNombre === "sitios.csv" && loteSitios.archivoHuella?.length === 64 && loteSitios.creados === 2 &&
-      loteSitios.registros.length === 2 && loteSitios.estado === "IMPORTADO");
+      loteSitios.registros.length === 2 && loteSitios.estado === "COMPLETADA");
     revisar("y no guarda el contenido del archivo", !JSON.stringify(loteSitios).includes("Planta Norte"));
 
     const ubic = csv([["sitio", "codigo", "nombre"], ["P01", "NAV-1", "Nave 1"], ["P01", "NAV-2", "Nave 2"]]);
     await ejecutarImportacion({ tipo: "ubicaciones", contenido: ubic, ...ctx });
 
     console.log("\n6. Archivo con columnas faltantes");
-    await rechaza("sin la columna obligatoria «sitio» se rechaza el archivo completo, con el nombre de la columna",
-      () => validarImportacion({ tipo: "activos", contenido: csv([["codigo", "nombre"], ["B-1", "Bomba"]]), ...ctx }), /sitio/);
+    const sinSitio = csv([["codigo", "nombre"], ["B-1", "Bomba"]]);
+    const vSinSitio = await validarImportacion({ tipo: "activos", contenido: sinSitio, ...ctx });
+    revisar("sin la columna obligatoria «sitio» la vista previa la nombra y no deja importar",
+      vSinSitio.columnasFaltantes.includes("sitio") && !vSinSitio.puedeImportar && vSinSitio.totales.rechazados === 1, vSinSitio.columnasFaltantes);
+    await rechaza("y confirmar de todos modos se rechaza, con el nombre de la columna",
+      () => ejecutarImportacion({ tipo: "activos", contenido: sinSitio, ...ctx }), /columnas obligatorias: sitio/);
     const conExtra = await validarImportacion({
       tipo: "sitios", contenido: csv([["codigo", "nombre", "gerente"], ["P09", "Planta X", "Juan"]]), ...ctx,
     });
@@ -185,7 +189,7 @@ async function main() {
     await rechaza("una falla en la fila 3 detiene todo",
       () => ejecutarImportacion({ tipo: "sitios", contenido: tres, ...ctx, fallarEnFila: 3 }), /no se guardó ningún renglón/i);
     revisar("ni la fila 2, que ya se había guardado, quedó", (await prisma.site.count({ where: { organizationId: org.id, code: { in: ["P10", "P11", "P12"] } } })) === 0);
-    revisar("y queda un lote FALLIDO con el motivo", Boolean(await prisma.importBatch.findFirst({ where: { organizationId: org.id, estado: "FALLIDO", detalle: { contains: "Falla provocada" } } })));
+    revisar("y queda un lote FALLIDA con el motivo", Boolean(await prisma.importBatch.findFirst({ where: { organizationId: org.id, estado: "FALLIDA", detalle: { contains: "Falla provocada" } } })));
 
     // Plan importado: el plan y su asignación, en la misma transacción.
     const plan = csv([["nombre", "activo", "cada_dias", "primer_vencimiento"], ["Lubricación", "BOM-101", "30", "15/10/2026"]]);
@@ -205,7 +209,7 @@ async function main() {
     revisar("el diagnóstico dice qué se borraría, antes de borrar", diag.aBorrar.length === 2 && diag.bloqueados.length === 0);
     const rev = await revertirLote({ organizationId: org.id, loteId: rNuevos.loteId, userId: admin.id });
     revisar("la reversión los borra", rev.borrados === 2 && (await prisma.site.count({ where: { organizationId: org.id, code: { in: ["P20", "P21"] } } })) === 0);
-    revisar("y el lote queda REVERTIDO", (await prisma.importBatch.findUniqueOrThrow({ where: { id: rNuevos.loteId } })).estado === "REVERTIDO");
+    revisar("y el lote queda REVERTIDA", (await prisma.importBatch.findUniqueOrThrow({ where: { id: rNuevos.loteId } })).estado === "REVERTIDA");
     await rechaza("no se puede revertir dos veces", () => revertirLote({ organizationId: org.id, loteId: rNuevos.loteId, userId: admin.id }), /ya se revirtió/);
 
     // Refacciones con existencia inicial: se revierten con su movimiento.
@@ -297,7 +301,7 @@ async function main() {
 
     console.log("\n20. La bitácora tiene todo el proceso, sin contenido del archivo");
     const acciones = new Set((await prisma.auditLog.findMany({ where: { organizationId: org.id }, select: { action: true } })).map((a) => a.action));
-    for (const a of ["IMPORT_VALIDATED", "IMPORT_STARTED", "IMPORTED", "IMPORT_FAILED", "IMPORT_REVERT_REQUESTED", "IMPORT_REVERTED"]) {
+    for (const a of ["IMPORT_VALIDATED", "IMPORT_CONFIRMED", "IMPORT_COMPLETED", "IMPORT_FAILED", "IMPORT_REVERT_REQUESTED", "IMPORT_REVERT_PARTIAL", "IMPORT_REVERTED"]) {
       revisar(`queda registrado: ${a}`, acciones.has(a));
     }
     const textoBitacora = JSON.stringify(await prisma.auditLog.findMany({ where: { organizationId: org.id }, select: { summary: true, changes: true } }));

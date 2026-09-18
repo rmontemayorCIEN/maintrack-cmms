@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { sembrarCatalogosEstandar } from "@/lib/catalogos-estandar";
+import { iniciarEmpresa } from "@/lib/demo";
+import { MODOS_DE_INICIO } from "@/lib/modos-inicio";
 import { fail, ok } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
 import { requireSuperAdmin } from "@/lib/superadmin";
@@ -32,6 +33,9 @@ const schema = z.object({
   ownerName: z.string().trim().min(2, "El nombre del responsable es obligatorio"),
   ownerEmail: z.string().email("Correo invalido"),
   ownerPassword: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  // Sin valor por omisión: quien da de alta tiene que elegir, habiendo leído
+  // qué trae cada opción.
+  modo: z.enum(["VACIA", "RECOMENDADA", "DEMO"], { required_error: "Elija cómo empieza la empresa" }),
 });
 
 /** Alta de una empresa cliente con su usuario propietario y catalogos base. */
@@ -74,12 +78,7 @@ export async function POST(request: Request) {
     },
   });
 
-  // Los catálogos base del tipo de instalación —categorías, códigos de falla,
-  // unidades— y nada más. La estructura (sitio, almacén) y los datos de ejemplo
-  // los elige la empresa en la puesta en marcha: empezar vacía también vale.
-  await sembrarCatalogosEstandar(org.id, input.tipoInstalacion || null);
-
-  await prisma.user.create({
+  const owner = await prisma.user.create({
     data: {
       organizationId: org.id,
       email,
@@ -88,6 +87,18 @@ export async function POST(request: Request) {
       role: "OWNER",
       jobTitle: "Direccion",
     },
+    select: { id: true },
+  });
+
+  // Lo que recibe según lo elegido: indispensables, recomendada o demostración.
+  // Solo para esta empresa nueva; las que ya existen no se tocan.
+  await iniciarEmpresa({ organizationId: org.id, userId: user.id, modo: input.modo });
+  const elegido = MODOS_DE_INICIO.find((m) => m.modo === input.modo)!;
+  await logAudit({
+    organizationId: org.id, userId: user.id,
+    entity: "Organization", entityId: org.id, action: "ORG_CREATED",
+    summary: `Empresa creada: ${elegido.titulo.toLowerCase()}`,
+    changes: { modo: input.modo, responsable: owner.id },
   });
 
   await logAudit({
@@ -96,7 +107,7 @@ export async function POST(request: Request) {
     entity: "Organization",
     entityId: org.id,
     action: "CLIENT_CREATED",
-    summary: `Alta de empresa cliente: ${org.name}`,
+    summary: `Alta de empresa cliente: ${org.name} (${elegido.titulo.toLowerCase()})`,
   });
 
   return ok({ organization: { id: org.id, name: org.name, slug: org.slug } }, 201);

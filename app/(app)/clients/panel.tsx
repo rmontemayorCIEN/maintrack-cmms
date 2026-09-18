@@ -8,6 +8,8 @@ import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { CLAVES_INSTALACION, INSTALACIONES } from "@/lib/instalaciones";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { ORDEN_PLANES } from "@/lib/planes";
+import { ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/estado-operativo";
+import { MODOS_DE_INICIO, type ModoDeInicio } from "@/lib/modos-inicio";
 
 type Org = {
   id: string; name: string; slug: string; plan: string; status: string;
@@ -16,7 +18,11 @@ type Org = {
   /// Consumo de IA del mes en curso: operaciones y costo real en dolares.
   ia: { operaciones: number; incluidas: number; costoUsd: number } | null;
   /// Avance de puesta en marcha: predice que cuentas se van a caer.
-  avance: { porcentaje: number; completa: boolean; siguiente: string | null };
+  avance: {
+    porcentaje: number; completa: boolean; siguiente: string | null;
+    /** El estado operativo: se deriva de la puesta en marcha, no del estado comercial. */
+    estadoOperativo: EstadoOperativo; operandoDesde: string | null;
+  };
   _count: { users: number; assets: number; workOrders: number };
 };
 
@@ -53,6 +59,8 @@ export function PanelClientes({
   const [form, setForm] = useState({
     name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30",
     ownerName: "", ownerEmail: "", ownerPassword: "",
+    // Sin opción marcada: hay que elegir cómo empieza, después de leer qué trae.
+    modo: "" as ModoDeInicio | "",
   });
 
   function set(k: keyof typeof form, v: string) {
@@ -61,6 +69,7 @@ export function PanelClientes({
 
   async function crear(event: React.FormEvent) {
     event.preventDefault();
+    if (!form.modo) { setError("Elija cómo empieza la empresa."); return; }
     setOcupado("crear");
     setError(null);
     const res = await fetch("/api/admin/organizations", {
@@ -72,7 +81,7 @@ export function PanelClientes({
     setOcupado(null);
     if (!res.ok) { setError(data.error ?? "No fue posible crear la empresa"); return; }
     setAviso(`Empresa "${data.organization.name}" creada. Ya puede entregar el acceso a su responsable.`);
-    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30", ownerName: "", ownerEmail: "", ownerPassword: "" });
+    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30", ownerName: "", ownerEmail: "", ownerPassword: "", modo: "" });
     setCreando(false);
     router.refresh();
   }
@@ -248,8 +257,26 @@ export function PanelClientes({
               </div>
             </div>
 
+            <p className="mb-2 mt-4 text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">Cómo empieza</p>
+            <div className="grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Cómo empieza la empresa">
+              {MODOS_DE_INICIO.map((o) => (
+                <label
+                  key={o.modo}
+                  className={`grid cursor-pointer content-start gap-1 rounded-lg border p-3 text-left ${form.modo === o.modo ? "border-brand-400 bg-brand-50/50" : "border-slate-200 hover:border-slate-300"}`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <input type="radio" name="modo" value={o.modo} checked={form.modo === o.modo} onChange={() => set("modo", o.modo)} />
+                    {o.titulo}
+                  </span>
+                  <span className="text-[0.6875rem] leading-relaxed text-slate-600">{o.texto}</span>
+                  <span className="text-[0.6875rem] text-slate-500">Incluye: {o.incluye.join("; ")}.</span>
+                  <span className="text-[0.6875rem] text-slate-400">No incluye: {o.noIncluye.join("; ")}.</span>
+                </label>
+              ))}
+            </div>
+
             <div className="mt-4 flex gap-2">
-              <Button type="submit" size="sm" disabled={ocupado === "crear"}>
+              <Button type="submit" size="sm" disabled={ocupado === "crear" || !form.modo}>
                 {ocupado === "crear" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Crear empresa
               </Button>
@@ -269,8 +296,8 @@ export function PanelClientes({
                 <tr>
                   <th>Empresa</th>
                   <th>Plan</th>
-                  <th>Estado</th>
-                  <th>Puesta en marcha</th>
+                  <th title="Comercial: prueba, activa o suspendida. Lo maneja el operador.">Estado comercial</th>
+                  <th title="Operativo: en configuración, lista para operar u operando. Sale de la puesta en marcha.">Puesta en marcha</th>
                   <th>IA</th>
                   <th className="text-right">Usuarios</th>
                   <th className="text-right">Activos</th>
@@ -327,7 +354,10 @@ export function PanelClientes({
                         </div>
                       </td>
                       <td>
-                        <div className="flex items-center gap-1.5" title={org.avance.siguiente ? `Sigue: ${org.avance.siguiente}` : "Completa"}>
+                        <Badge tone={ESTADO_OPERATIVO[org.avance.estadoOperativo].tono}>
+                          <span data-estado-operativo={org.avance.estadoOperativo}>{ESTADO_OPERATIVO[org.avance.estadoOperativo].texto}</span>
+                        </Badge>
+                        <div className="mt-0.5 flex items-center gap-1.5" title={org.avance.siguiente ? `Sigue: ${org.avance.siguiente}` : "Completa"}>
                           <span className={`text-xs font-medium tabular-nums ${
                             org.avance.completa ? "text-emerald-600"
                               : org.avance.porcentaje >= 50 ? "text-amber-600"

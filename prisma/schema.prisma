@@ -208,6 +208,11 @@ model Organization {
   /// ningun dato de demostracion vivo: asi los ejemplos nunca se cuelan en los
   /// indicadores de una empresa que ya opera. Nula = todavia no arranca.
   operandoDesde      DateTime?
+  /// Quién declaró que la empresa empieza a operar. Junto con la fecha, es lo
+  /// que distingue el estado OPERATIVO (en configuración, lista, operando) del
+  /// COMERCIAL (prueba, activa, suspendida): una empresa puede estar pagando y
+  /// todavía sin configurar.
+  operandoPorId      String?
   /// Los modulos que la empresa dijo que NO usara, en JSON: {"almacen":false}.
   /// Un paso de la puesta en marcha que la empresa no va a usar se muestra
   /// como «no aplica» y no le baja el avance. Sin decidir = se espera.
@@ -385,7 +390,7 @@ model ImportBatch {
   archivoNombre  String?
   /// SHA-256 del archivo. Identifica cual fue sin guardar su contenido.
   archivoHuella  String?
-  /// IMPORTADO | FALLIDO | REVERTIDO | REVERSION_PARCIAL
+  /// VALIDADA | CONFIRMADA | COMPLETADA | COMPLETADA_CON_ADVERTENCIAS | FALLIDA | REVERTIDA | REVERSION_PARCIAL | REVERSION_BLOQUEADA
   estado         String
   leidos         Int       @default(0)
   creados        Int       @default(0)
@@ -411,7 +416,7 @@ model ImportRecord {
   /// Site | Location | Asset | Part | Supplier | MaintenancePlan | ...
   entity   String
   entityId String
-  /// CREATED | UPDATED
+  /// CREATED | UPDATED | REVERTED (anulado o compensado por una reversion)
   accion   String
   /// Los valores anteriores de un registro actualizado, para poder revisarlo.
   antes    String?

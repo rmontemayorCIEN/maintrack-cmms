@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { sembrarCatalogosEstandar } from "@/lib/catalogos-estandar";
+import { iniciarEmpresa } from "@/lib/demo";
 import { createSession, hashPassword } from "@/lib/auth";
 import { fail, ok } from "@/lib/api";
 import { slugify } from "@/lib/utils";
@@ -55,11 +55,6 @@ export async function POST(request: Request) {
     },
   });
 
-  // Los catálogos base del tipo de instalación —categorías, códigos de falla,
-  // unidades— y nada más. La estructura (sitio, almacén) y los datos de ejemplo
-  // los elige la empresa en la puesta en marcha: empezar vacía también vale.
-  await sembrarCatalogosEstandar(organization.id, input.tipoInstalacion ?? null);
-
   const user = await prisma.user.create({
     data: {
       organizationId: organization.id,
@@ -70,6 +65,11 @@ export async function POST(request: Request) {
       jobTitle: "Direccion",
     },
   });
+
+  // Empieza vacía: solo los catálogos técnicos indispensables. La
+  // configuración recomendada o la demostración las elige después, en la
+  // puesta en marcha, donde se explica qué trae cada una.
+  await iniciarEmpresa({ organizationId: organization.id, userId: user.id, modo: "VACIA" });
 
   await createSession({
     userId: user.id,

@@ -104,7 +104,12 @@ export default async function ClientsPage() {
             ...o,
             trialEndsAt: o.trialEndsAt?.toISOString() ?? null,
             createdAt: o.createdAt.toISOString(),
-            avance: avances.get(o.id) ?? { porcentaje: 0, completa: false, siguiente: null },
+            avance: (() => {
+              const a = avances.get(o.id);
+              return a
+                ? { ...a, operandoDesde: a.operandoDesde ? a.operandoDesde.toISOString() : null }
+                : { porcentaje: 0, completa: false, siguiente: null, estadoOperativo: "CONFIGURACION" as const, operandoDesde: null };
+            })(),
             ia: {
               operaciones: consumo?.operaciones ?? 0,
               incluidas: iaDeLaOrganizacion(o).operaciones,

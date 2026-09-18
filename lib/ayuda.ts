@@ -178,21 +178,24 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/import": {
     titulo: "Importar datos",
-    que: "Cargar sitios, activos, refacciones, planes, proveedores y catálogos desde una hoja de cálculo, con vista previa y reversión.",
+    que: "Cargar sitios, activos, usuarios, almacenes, medidores y lecturas, refacciones y existencias, planes, proveedores y catálogos desde Excel (.xlsx) o CSV, con vista previa y reversión.",
     hacer: [
-      "Bajar la plantilla, llenarla y subirla",
+      "Bajar la plantilla en Excel o en CSV, llenarla y subirla: las dos se leen con las mismas reglas",
       "Revisar la vista previa: qué es nuevo, qué ya existe, qué parece duplicado y qué tiene error",
       "Decidir los duplicados: omitirlos, actualizar los existentes o crear uno que se parece pero es distinto",
-      "Descargar el detalle de errores con fila y columna, corregir y volver a validar",
+      "Ver cada error con su fila, columna, el valor que traía, el problema y cómo corregirlo; descargar ese detalle, corregir y volver a validar",
       "Revertir una importación desde el historial",
     ],
     flujo: [
-      "Validar no guarda nada. Se puede elegir el mismo archivo las veces que haga falta.",
-      "Con un solo renglón con error no se importa: se corrige el archivo y se vuelve a subir. Así nunca queda una carga a medias.",
+      "Validar no guarda ningún dato: solo deja la entrada «validada» en el historial. Se puede elegir el mismo archivo las veces que haga falta.",
+      "La política es una y se dice antes de confirmar: con un solo renglón rechazado no se importa nada. Se corrige el archivo y se vuelve a subir. Así nunca queda una carga a medias.",
+      "El historial dice en qué quedó cada archivo: validada, confirmada, completada, completada con advertencias, fallida, revertida, reversión parcial o reversión bloqueada.",
+      "Usuarios: nunca se importan contraseñas —la columna se ignora—. Después de importarlos, genere a cada persona su liga de acceso en Configuración → Usuarios.",
+      "Lecturas y existencias iniciales pasan por las mismas reglas que la captura: una lectura menor que la anterior o imposible se rechaza, y cada existencia entra al kardex como movimiento con su costo.",
       "Se guarda todo o nada. Si algo falla a la mitad —un corte, un registro que alguien creó al mismo tiempo—, no queda ningún renglón.",
       "Duplicado exacto: la misma clave (el mismo TAG, el mismo código). Posible duplicado: otra clave, pero el mismo nombre en la misma ubicación, el mismo número de serie, el mismo RFC o, en planes, el mismo equipo con la misma frecuencia. Los posibles se omiten salvo que usted marque «crearlo de todos modos». Nada se combina solo.",
       "Hay orden: los activos necesitan sus sitios, las refacciones sus unidades, y los planes sus activos.",
-      "Revertir borra solo lo que la importación creó y nadie ha usado. Un equipo con órdenes o una refacción con movimientos se queda, y se le dice por qué. Lo que la importación actualizó no se regresa: se le muestra para que lo revise.",
+      "Revertir deshace solo lo que la importación creó y nadie ha usado. Un equipo con órdenes, una refacción con movimientos o un usuario que ya entró se queda, y se le dice por qué. Una lectura no se borra, se anula; una existencia no se borra del kardex, se compensa con una salida. Lo que la importación actualizó no se regresa: se le muestra para que lo revise.",
     ],
     campos: [
       { nombre: "Fechas", explica: "dd/mm/aaaa, por ejemplo 15/09/2026. Una fecha que no existe —30 de febrero— se rechaza en lugar de moverse al día siguiente." },
@@ -212,8 +215,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/clients": {
     titulo: "Empresas cliente",
     que: "Las cuentas que opera desde esta plataforma. Solo para el operador.",
-    hacer: ["Dar de alta una empresa", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance de puesta en marcha"],
+    hacer: ["Dar de alta una empresa eligiendo cómo empieza: vacía, con configuración recomendada o con datos de demostración", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance y su estado operativo"],
     flujo: [
+      "Estado comercial y estado operativo son dos cosas. El comercial —en prueba, activa, suspendida— lo decide usted. El operativo —en configuración, lista para operar, operando— sale de la puesta en marcha y nunca cambia el comercial.",
+      "Al dar de alta se explica qué trae cada opción antes de crear. Vacía: la empresa, su responsable y los catálogos técnicos indispensables. Recomendada: además, los catálogos de su giro, su primer sitio y el almacén. Demostración: además, un juego chico marcado «[DEMO]». Ninguna inventa órdenes ni indicadores.",
       "Al entrar a una cuenta se ve un aviso permanente arriba, y todo lo que haga queda en la bitácora de esa empresa.",
       "El acceso se revalida en cada petición: si se retira el privilegio, la sesión deja de servir de inmediato.",
     ],
@@ -1371,11 +1376,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Puesta en marcha",
     que: "Los doce pasos para dejar la empresa operando, con lo que ya está bien, lo que falta y lo que hay que corregir.",
     hacer: [
-      "Elegir cómo empezar: vacía, con la estructura recomendada o con datos de demostración",
+      "Elegir cómo empezar: vacía, con la configuración recomendada o con datos de demostración",
       "Ver los pendientes en orden de importancia, con los registros concretos y cómo resolverlos",
       "Declarar que un módulo no se usará —almacén, compras, medidores— para que no se exija",
-      "Quitar los datos de demostración",
-      "Comenzar a operar cuando todo lo obligatorio esté en regla",
+      "Quitar los datos de demostración, después de ver cuántos activos, órdenes, planes, refacciones, movimientos y proveedores se van y qué indicadores cambian",
+      "Comenzar a operar cuando no haya bloqueos críticos",
     ],
     flujo: [
       "El avance cuenta solo lo que ya sirve. Un activo sin ubicación, un plan sin actividades o sin equipo asignado, un técnico desactivado o una refacción cuya existencia no cuadra NO suman, aunque existan.",
@@ -1383,7 +1388,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El porcentaje es el mismo aquí, en el panel principal y en la consola del operador: sale de un solo cálculo.",
       "Lo que captura en cada pantalla se guarda ahí mismo. Puede ir y volver entre pasos, o dejarlo a medias, sin perder nada.",
       "Los datos de demostración llevan «[DEMO]» en el nombre. Mientras existan no se puede comenzar a operar, para que no se cuelen en los indicadores. Quitarlos borra solo lo que nadie usó.",
-      "Comenzar a operar pasa por la misma revisión que muestra la pantalla, y queda en la bitácora.",
+      "En planes se ven dos cosas: «Planes existentes: 6 de 6 correctos» dice si los que hay generarán órdenes; «Cobertura crítica: 5 de 6» dice cuántos equipos críticos tienen plan, y nombra los que faltan.",
+      "Estado operativo: en configuración mientras haya bloqueos críticos, lista para operar cuando no los haya, y operando cuando alguien lo declare. Bloquean: datos generales, sitio, ubicación (si aplica), un técnico o supervisor, activos válidos, plan en los equipos críticos, reglas operativas y datos de demostración. Almacén, proveedores, medidores, tarifas y duplicados se avisan pero no bloquean.",
+      "Comenzar a operar pasa por la misma revisión que muestra la pantalla, y queda en la bitácora con quién lo declaró y cuándo. No cambia el estado comercial de la cuenta.",
     ],
   },
 };

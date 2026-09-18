@@ -40,6 +40,9 @@ export default async function PuestaEnMarchaPage() {
         operandoDesde={marcha.operandoDesde ? formatDate(marcha.operandoDesde, zona) : null}
         hayDemo={marcha.hayDemo}
         impideOperar={marcha.impideOperar}
+        advertenciasOperar={marcha.advertenciasOperar}
+        estadoOperativo={marcha.estadoOperativo}
+        operandoPor={marcha.operandoPor}
         // Se ofrece cómo empezar mientras no haya estructura ni equipos.
         empezando={sitios === 0 && activos === 0 && !marcha.hayDemo}
         tipoInstalacion={user.organization.tipoInstalacion}

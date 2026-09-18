@@ -177,7 +177,7 @@ async function main() {
     // navegador: la demo subía el avance de 20% a 88%.
     const soloEstructura = await nuevaEmpresa("estructura", "PLANTA");
     const otraDueña = await prisma.user.create({ data: { organizationId: soloEstructura.id, email: `e-${sello}@t.mx`, name: "Dueña", role: "OWNER", passwordHash: "x" } });
-    await iniciarEmpresa({ organizationId: soloEstructura.id, userId: otraDueña.id, modo: "ESTRUCTURA" });
+    await iniciarEmpresa({ organizationId: soloEstructura.id, userId: otraDueña.id, modo: "RECOMENDADA" });
     const conDemo = (await puestaEnMarcha(demoOrg.id)).porcentaje;
     const sinDemo = (await puestaEnMarcha(soloEstructura.id)).porcentaje;
     revisar("los datos de demostración no suben el avance: igual que sin ellos", conDemo === sinDemo, { conDemo, sinDemo });
@@ -191,7 +191,7 @@ async function main() {
     await prisma.workOrder.create({ data: { organizationId: demoOrg.id, number: "OT-1", title: "Orden real sobre un equipo demo", assetId: bomba.id } });
     const vista = await vistaPreviaQuitarDemo(demoOrg.id);
     revisar("antes de quitarla se ve qué se borra y qué no", vista.aBorrar.length > 0 && vista.bloqueados.some((b) => b.id === bomba.id), { aBorrar: vista.aBorrar.length, bloqueados: vista.bloqueados.map((b) => b.nombre) });
-    const quitado = await quitarDemo({ organizationId: demoOrg.id, userId: dueño.id });
+    const quitado = await quitarDemo({ organizationId: demoOrg.id, userId: dueño.id, confirmado: true });
     revisar("al quitarla se borra lo que nadie usó", quitado.borrados > 0 && (await prisma.asset.count({ where: { organizationId: demoOrg.id, id: { not: bomba.id } } })) === 0, quitado.borrados);
     revisar("el equipo demo con una orden real se queda, y se dice por qué",
       Boolean(await prisma.asset.findUnique({ where: { id: bomba.id } })) && quitado.bloqueados.some((b) => b.id === bomba.id && b.motivos.some((m) => /órdenes/.test(m))));
@@ -203,7 +203,7 @@ async function main() {
     console.log("\n   Comenzar a operar: solo cuando todo lo obligatorio está en regla");
     const lista = await nuevaEmpresa("lista", "EDIFICIO");
     const jefa = await prisma.user.create({ data: { organizationId: lista.id, email: `j-${sello}@t.mx`, name: "Jefa", role: "OWNER", passwordHash: "x" } });
-    await iniciarEmpresa({ organizationId: lista.id, userId: jefa.id, modo: "ESTRUCTURA" });
+    await iniciarEmpresa({ organizationId: lista.id, userId: jefa.id, modo: "RECOMENDADA" });
     const s = await prisma.site.findFirstOrThrow({ where: { organizationId: lista.id } });
     revisar("la estructura recomendada nombra el sitio como se usa en el giro", s.name === "Edificio principal", s.name);
     const piso = await prisma.location.create({ data: { organizationId: lista.id, siteId: s.id, code: "PB", name: "Planta baja" } });

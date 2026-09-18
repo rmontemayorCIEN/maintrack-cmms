@@ -21,6 +21,10 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { logAudit } from "./audit";
+import { aplicarMovimiento } from "./almacen";
+import { recalcularEn } from "./medidores";
+import { ESTADOS_CON_REGISTROS, type EstadoLote } from "./estados-lote";
+import { REFERENCIA_EXISTENCIA_INICIAL } from "./importacion";
 
 type Db = Prisma.TransactionClient;
 
@@ -35,6 +39,12 @@ export class ErrorDeLote extends Error {
  * refacciones. Esos movimientos son del lote, no uso real: se borran con él.
  */
 export const REFERENCIAS_PROPIAS = ["Importación inicial", "Datos de demostración"];
+
+/** Con qué referencia queda en el kardex la salida que compensa una existencia importada. */
+export const REFERENCIA_REVERSION = "Reversión de importación de existencias";
+
+/** Con qué motivo se anula una lectura importada al revertir. Una lectura nunca se borra. */
+export const MOTIVO_REVERSION_LECTURA = "Reversión de la importación que la registró";
 
 /** Quién puede estar apuntando a un registro de cada tipo. Sale del esquema. */
 const REFERENCIAS: Record<string, Array<{ modelo: string; campo: string; que: string }>> = {
@@ -111,6 +121,40 @@ const REFERENCIAS: Record<string, Array<{ modelo: string; campo: string; que: st
   ],
   PartCategory: [],
   PartUnit: [],
+  User: [
+    { modelo: "workOrder", campo: "assignedToId", que: "órdenes asignadas" },
+    { modelo: "workOrderLabor", campo: "userId", que: "horas registradas" },
+    { modelo: "workOrderComment", campo: "userId", que: "comentarios" },
+    { modelo: "workRequest", campo: "requestedById", que: "solicitudes" },
+    { modelo: "maintenancePlan", campo: "assignedToId", que: "planes asignados" },
+    { modelo: "stockMovement", campo: "userId", que: "movimientos de almacén" },
+    { modelo: "meterReading", campo: "userId", que: "lecturas" },
+    { modelo: "materialRequest", campo: "solicitanteId", que: "requisiciones" },
+    { modelo: "purchaseRequest", campo: "solicitanteId", que: "compras" },
+    { modelo: "warehouse", campo: "responsableId", que: "almacenes a su cargo" },
+    { modelo: "teamMember", campo: "userId", que: "equipos de trabajo" },
+    { modelo: "passwordReset", campo: "userId", que: "enlaces de acceso generados" },
+    { modelo: "auditLog", campo: "userId", que: "acciones en la bitácora" },
+  ],
+  Warehouse: [
+    { modelo: "partStock", campo: "warehouseId", que: "existencias" },
+    { modelo: "stockMovement", campo: "warehouseId", que: "movimientos" },
+    { modelo: "materialRequest", campo: "warehouseId", que: "requisiciones" },
+    { modelo: "purchaseRequest", campo: "warehouseId", que: "compras" },
+    { modelo: "purchaseOrder", campo: "warehouseId", que: "órdenes de compra" },
+    { modelo: "goodsReceipt", campo: "warehouseId", que: "recepciones" },
+    { modelo: "inventoryCount", campo: "warehouseId", que: "conteos" },
+    { modelo: "stockTransfer", campo: "origenId", que: "traspasos de salida" },
+    { modelo: "stockTransfer", campo: "destinoId", que: "traspasos de entrada" },
+  ],
+  Meter: [
+    { modelo: "planAsset", campo: "meterId", que: "planes por uso" },
+    { modelo: "maintenancePlan", campo: "meterId", que: "planes por uso" },
+  ],
+  // Lecturas y existencias no se borran: se anulan o se compensan. Lo que las
+  // bloquea no es una referencia sino lo que pasó después (ver abajo).
+  MeterReading: [],
+  StockMovement: [],
 };
 
 /** Entidad → modelo de Prisma. */
@@ -118,7 +162,8 @@ const MODELO: Record<string, string> = {
   Site: "site", Location: "location", Asset: "asset", Part: "part", Supplier: "supplier",
   MaintenancePlan: "maintenancePlan", AssetCategory: "assetCategory", PartCategory: "partCategory",
   PartUnit: "partUnit", FailureCode: "failureCode", RootCause: "rootCause", Specialty: "specialty",
-  ExternalService: "externalService", Warehouse: "warehouse",
+  ExternalService: "externalService", Warehouse: "warehouse", User: "user", Meter: "meter",
+  MeterReading: "meterReading", StockMovement: "stockMovement",
 };
 
 /**
@@ -126,8 +171,8 @@ const MODELO: Record<string, string> = {
  * depende. Un plan antes que su equipo, un equipo antes que su ubicación.
  */
 const ORDEN_DE_BORRADO = [
-  "MaintenancePlan", "Part", "ExternalService", "Supplier", "Asset", "Location",
-  "Warehouse", "Site", "AssetCategory", "PartCategory", "PartUnit", "FailureCode", "RootCause", "Specialty",
+  "StockMovement", "MeterReading", "MaintenancePlan", "Meter", "Part", "ExternalService", "Supplier", "Asset", "Location",
+  "Warehouse", "User", "Site", "AssetCategory", "PartCategory", "PartUnit", "FailureCode", "RootCause", "Specialty",
 ];
 
 type Delegado = {
@@ -139,15 +184,71 @@ const delegado = (db: Db | typeof prisma, modelo: string) => (db as unknown as R
 
 export type Bloqueado = { entidad: string; id: string; nombre: string; motivos: string[] };
 
+/**
+ * Qué se hace con cada registro que sí se puede revertir. Casi todo se borra;
+ * una lectura se anula —nunca se borra una lectura— y una existencia se
+ * compensa con una salida: el kardex no se reescribe.
+ */
+export type AccionReversion = "ELIMINAR" | "ANULAR" | "COMPENSAR";
+
 export type DiagnosticoReversion = {
-  aBorrar: Array<{ entidad: string; id: string; nombre: string }>;
+  aBorrar: Array<{ entidad: string; id: string; nombre: string; accion: AccionReversion }>;
   bloqueados: Bloqueado[];
   actualizados: Array<{ entidad: string; id: string; nombre: string; antes: Record<string, unknown> }>;
+  /** En qué estado quedaría el lote y, en palabras, qué va a pasar. */
+  estadoEsperado: EstadoLote;
+  resultado: string;
 };
 
 const nombreDe = (r: Record<string, unknown> | null) =>
-  String(r?.code ?? r?.name ?? r?.description ?? r?.id ?? "—") +
+  String(r?.code ?? r?.name ?? r?.email ?? r?.description ?? r?.id ?? "—") +
   (r?.code && r?.name ? ` · ${r.name}` : "");
+
+/** El registro con los datos que hacen falta para nombrarlo y revisarlo. */
+async function buscar(entidad: string, id: string): Promise<Record<string, unknown> | null> {
+  if (entidad === "StockMovement") {
+    const m = await prisma.stockMovement.findUnique({
+      where: { id },
+      include: { part: { select: { code: true } }, warehouse: { select: { code: true } } },
+    });
+    if (m) return { ...m, name: `${m.part.code} en ${m.warehouse?.code ?? "—"}: ${m.quantity}` };
+    // Un lote que AJUSTÓ una existencia apunta a la existencia, no a un movimiento.
+    const e = await prisma.partStock.findUnique({
+      where: { id },
+      include: { part: { select: { code: true } }, warehouse: { select: { code: true } } },
+    });
+    return e ? { ...e, name: `${e.part.code} en ${e.warehouse.code}` } : null;
+  }
+  if (entidad === "MeterReading") {
+    const l = await prisma.meterReading.findUnique({ where: { id }, include: { meter: { select: { name: true, asset: { select: { code: true } } } } } });
+    return l ? { ...l, name: `${l.meter.asset.code} · ${l.meter.name}: ${l.value}` } : null;
+  }
+  const d = MODELO[entidad] ? delegado(prisma, MODELO[entidad]) : null;
+  return d ? d.findUnique({ where: { id } }) : null;
+}
+
+/** Un registro que ya no está vivo no tiene nada que revertir. */
+function vivo(entidad: string, r: Record<string, unknown> | null) {
+  if (!r) return false;
+  if (entidad === "MeterReading") return r.estado !== "ANULADA";
+  return true;
+}
+
+const ACCION_DE: Record<string, AccionReversion> = { MeterReading: "ANULAR", StockMovement: "COMPENSAR" };
+
+function describir(aBorrar: DiagnosticoReversion["aBorrar"], bloqueados: number, actualizados: number) {
+  const n = (a: AccionReversion) => aBorrar.filter((x) => x.accion === a).length;
+  const partes = [
+    n("ELIMINAR") && `se eliminarán ${n("ELIMINAR")} registro(s)`,
+    n("ANULAR") && `se anularán ${n("ANULAR")} lectura(s), que quedan en el historial del medidor`,
+    n("COMPENSAR") && `se registrarán ${n("COMPENSAR")} salida(s) de almacén que regresan la existencia a como estaba`,
+    bloqueados && `${bloqueados} se quedan porque ya se usaron`,
+    actualizados && `${actualizados} actualizado(s) no se regresan: revíselos a mano`,
+  ].filter(Boolean);
+  if (!aBorrar.length) return `No se puede revertir nada: ${partes.join("; ") || "no queda ningún registro del lote"}.`;
+  const t = partes.join("; ");
+  return t.charAt(0).toUpperCase() + t.slice(1) + ".";
+}
 
 /**
  * Qué pasaría si se revierte el lote. No escribe nada: es lo que se muestra
@@ -159,18 +260,22 @@ export async function diagnosticarReversion(organizationId: string, loteId: stri
     include: { registros: true },
   });
   if (!lote) throw new ErrorDeLote("Importación no encontrada", 404);
-  if (lote.estado === "REVERTIDO") throw new ErrorDeLote("Esta importación ya se revirtió");
-  if (lote.estado === "FALLIDO") throw new ErrorDeLote("Esta importación falló y no creó nada: no hay qué revertir");
+  if (lote.estado === "REVERTIDA") throw new ErrorDeLote("Esta importación ya se revirtió");
+  if (lote.estado === "FALLIDA") throw new ErrorDeLote("Esta importación falló y no creó nada: no hay qué revertir");
+  if (lote.estado === "VALIDADA" || lote.estado === "CONFIRMADA") {
+    throw new ErrorDeLote("Este archivo solo se validó: no creó nada, no hay qué revertir");
+  }
+  if (!(ESTADOS_CON_REGISTROS as string[]).includes(lote.estado)) {
+    throw new ErrorDeLote("Esta importación no se puede revertir en su estado actual");
+  }
 
   const creados = lote.registros.filter((r) => r.accion === "CREATED");
   const registro = new Map<string, Record<string, unknown> | null>();
-  for (const c of creados) {
-    const d = delegado(prisma, MODELO[c.entity]);
-    registro.set(c.entityId, d ? await d.findUnique({ where: { id: c.entityId } }) : null);
-  }
+  for (const c of creados) registro.set(c.entityId, await buscar(c.entity, c.entityId));
 
-  // Lo que ya no existe —se borró a mano— no se cuenta: no hay nada que revertir ahí.
-  const vivos = creados.filter((c) => registro.get(c.entityId));
+  // Lo que ya no existe —se borró o se anuló a mano, o una reversión parcial
+  // anterior ya lo quitó— no se cuenta: ahí no hay nada que revertir.
+  const vivos = creados.filter((c) => vivo(c.entity, registro.get(c.entityId) ?? null));
   const candidatos = new Set(vivos.map((c) => c.entityId));
   const motivos = new Map<string, string[]>();
 
@@ -216,11 +321,17 @@ export async function diagnosticarReversion(organizationId: string, loteId: stri
       // Casos que no son una simple referencia.
       if (c.entity === "Part") {
         // Su propia existencia inicial viene de la importación; cualquier otro
-        // movimiento es uso real.
+        // movimiento es uso real. Una existencia importada y ya compensada por
+        // su reversión tampoco es uso, si la refacción quedó en cero.
+        const propias = [...REFERENCIAS_PROPIAS];
+        if (Number(reg.quantityOnHand ?? 0) === 0) propias.push(REFERENCIA_EXISTENCIA_INICIAL, REFERENCIA_REVERSION);
         const otros = await prisma.stockMovement.count({
-          where: { partId: c.entityId, NOT: { reference: { in: REFERENCIAS_PROPIAS } } },
+          where: { partId: c.entityId, NOT: { reference: { in: propias } } },
         });
         if (otros > 0) lista.push(`${otros} movimientos de almacén`);
+        else if (Number(reg.quantityOnHand ?? 0) !== 0 && await prisma.stockMovement.count({ where: { partId: c.entityId, reference: REFERENCIA_EXISTENCIA_INICIAL } })) {
+          lista.push("tiene existencia importada: revierta primero esa importación de existencias");
+        }
       }
       if (c.entity === "MaintenancePlan") {
         const [actividades, generado] = await Promise.all([
@@ -244,6 +355,38 @@ export async function diagnosticarReversion(organizationId: string, loteId: stri
         });
         if (n > 0) lista.push(`${n} refacciones`);
       }
+      if (c.entity === "User") {
+        if (reg.lastLoginAt) lista.push("ya entró al sistema");
+      }
+      if (c.entity === "Meter") {
+        // La lectura inicial va en el propio medidor; cualquier lectura
+        // vigente es de alguien más.
+        const lecturas = await prisma.meterReading.count({ where: { meterId: c.entityId, estado: { not: "ANULADA" } } });
+        if (lecturas > 0) lista.push(`${lecturas} lecturas registradas`);
+      }
+      if (c.entity === "MeterReading") {
+        // Anular una lectura con otras posteriores cambia los incrementos de
+        // esas: ya no es deshacer la importación, es reescribir la historia.
+        const despues = await prisma.meterReading.count({
+          where: {
+            meterId: String(reg.meterId), estado: { not: "ANULADA" }, readingAt: { gt: reg.readingAt as Date },
+            id: { notIn: vivos.filter((v) => v.entity === "MeterReading" && candidatos.has(v.entityId)).map((v) => v.entityId) },
+          },
+        });
+        if (despues > 0) lista.push(`${despues} lecturas posteriores en el mismo medidor`);
+        if (reg.estado === "CORREGIDA") lista.push("se corrigió después de importarse");
+      }
+      if (c.entity === "StockMovement") {
+        // La existencia importada ya se movió: una salida, un traspaso, un
+        // conteo. Compensarla ahora dejaría el saldo mal.
+        const despues = await prisma.stockMovement.count({
+          where: {
+            organizationId, partId: String(reg.partId), warehouseId: reg.warehouseId as string | null,
+            createdAt: { gt: reg.createdAt as Date }, NOT: { id: c.entityId },
+          },
+        });
+        if (despues > 0) lista.push(`${despues} movimientos posteriores de esa refacción en ese almacén`);
+      }
 
       if (lista.length) {
         candidatos.delete(c.entityId);
@@ -257,24 +400,51 @@ export async function diagnosticarReversion(organizationId: string, loteId: stri
     lote.registros.filter((r) => r.accion === "UPDATED").map(async (r) => ({
       entidad: r.entity,
       id: r.entityId,
-      nombre: nombreDe(await delegado(prisma, MODELO[r.entity])?.findUnique({ where: { id: r.entityId } }) ?? null),
+      nombre: nombreDe(await buscar(r.entity, r.entityId)),
       antes: JSON.parse(r.antes ?? "{}") as Record<string, unknown>,
     })),
   );
 
+  const aBorrar = vivos.filter((c) => candidatos.has(c.entityId)).map((c) => ({
+    entidad: c.entity, id: c.entityId, nombre: nombreDe(registro.get(c.entityId) ?? null),
+    accion: ACCION_DE[c.entity] ?? ("ELIMINAR" as AccionReversion),
+  }));
+  const bloqueados = vivos.filter((c) => !candidatos.has(c.entityId))
+    .map((c) => ({ entidad: c.entity, id: c.entityId, nombre: nombreDe(registro.get(c.entityId) ?? null), motivos: motivos.get(c.entityId) ?? [] }));
+
+  const estadoEsperado: EstadoLote = !aBorrar.length
+    ? (lote.estado === "REVERSION_PARCIAL" ? "REVERSION_PARCIAL" : "REVERSION_BLOQUEADA")
+    : bloqueados.length ? "REVERSION_PARCIAL" : "REVERTIDA";
+
   return {
-    aBorrar: vivos.filter((c) => candidatos.has(c.entityId))
-      .map((c) => ({ entidad: c.entity, id: c.entityId, nombre: nombreDe(registro.get(c.entityId) ?? null) })),
-    bloqueados: vivos.filter((c) => !candidatos.has(c.entityId))
-      .map((c) => ({ entidad: c.entity, id: c.entityId, nombre: nombreDe(registro.get(c.entityId) ?? null), motivos: motivos.get(c.entityId) ?? [] })),
-    actualizados,
+    aBorrar, bloqueados, actualizados, estadoEsperado,
+    resultado: describir(aBorrar, bloqueados.length, actualizados.length),
   };
 }
 
-/** Borra un registro con lo que la importación le creó alrededor. */
-async function borrar(db: Db, organizationId: string, entidad: string, id: string) {
+/** Deshace un registro con lo que la importación le creó alrededor. */
+async function deshacer(db: Db, organizationId: string, entidad: string, id: string, userId: string) {
+  if (entidad === "MeterReading") {
+    const l = await db.meterReading.update({
+      where: { id, organizationId },
+      data: { estado: "ANULADA", correccionPorId: userId, correccionEl: new Date(), correccionMotivo: MOTIVO_REVERSION_LECTURA },
+      select: { meterId: true },
+    });
+    await recalcularEn(db, organizationId, l.meterId);
+    return;
+  }
+  if (entidad === "StockMovement") {
+    const m = await db.stockMovement.findFirstOrThrow({ where: { id, organizationId } });
+    await aplicarMovimiento({
+      organizationId, partId: m.partId, warehouseId: m.warehouseId!, tipo: "OUT",
+      cantidad: m.quantity, referencia: REFERENCIA_REVERSION, userId,
+    }, db);
+    return;
+  }
   if (entidad === "Part") {
-    await db.stockMovement.deleteMany({ where: { partId: id, organizationId, reference: { in: REFERENCIAS_PROPIAS } } });
+    await db.stockMovement.deleteMany({
+      where: { partId: id, organizationId, reference: { in: [...REFERENCIAS_PROPIAS, REFERENCIA_EXISTENCIA_INICIAL, REFERENCIA_REVERSION] } },
+    });
     await db.partStock.deleteMany({ where: { partId: id } });
   }
   if (entidad === "MaintenancePlan") {
@@ -293,13 +463,17 @@ async function borrar(db: Db, organizationId: string, entidad: string, id: strin
     // El QR que se genera solo al abrir la ficha, sin reportes: nace con el equipo.
     await db.reportPoint.deleteMany({ where: { assetId: id, organizationId, solicitudes: { none: {} } } });
   }
+  if (entidad === "Meter") {
+    // Solo pueden quedar lecturas anuladas: las vigentes lo bloquean.
+    await db.meterReading.deleteMany({ where: { meterId: id, organizationId, estado: "ANULADA" } });
+  }
   await delegado(db, MODELO[entidad]).deleteMany({ where: { id, organizationId } });
 }
 
 /**
- * Revierte el lote: borra lo que se puede, deja lo que no, y dice qué quedó.
+ * Revierte el lote: deshace lo que se puede, deja lo que no, y dice qué quedó.
  *
- * Todo en una transacción: o se borra el conjunto que el diagnóstico dijo, o
+ * Todo en una transacción: o se deshace el conjunto que el diagnóstico dijo, o
  * nada.
  */
 export async function revertirLote(p: { organizationId: string; loteId: string; userId: string }) {
@@ -324,9 +498,21 @@ export async function revertirLote(p: { organizationId: string; loteId: string; 
   }
 
   if (!diag.aBorrar.length) {
+    // Queda asentado en el lote, no solo en la respuesta: el historial dice
+    // que se intentó y por qué no se pudo.
+    await prisma.importBatch.update({
+      where: { id: p.loteId },
+      data: {
+        estado: diag.estadoEsperado,
+        detalle: JSON.stringify({
+          resultado: diag.resultado,
+          bloqueados: diag.bloqueados.map((b) => ({ entidad: b.entidad, nombre: b.nombre, motivos: b.motivos })),
+        }),
+      },
+    });
     await logAudit({
       organizationId: p.organizationId, userId: p.userId,
-      entity: "ImportBatch", entityId: p.loteId, action: "IMPORT_REVERT_REJECTED",
+      entity: "ImportBatch", entityId: p.loteId, action: "IMPORT_REVERT_BLOCKED",
       summary: `No se revirtió nada: los ${diag.bloqueados.length} registros ya se usaron`,
       changes: { bloqueados: diag.bloqueados.length },
     });
@@ -340,18 +526,30 @@ export async function revertirLote(p: { organizationId: string; loteId: string; 
     const i = ORDEN_DE_BORRADO.indexOf(e);
     return i === -1 ? ORDEN_DE_BORRADO.length : i;
   };
-  const aBorrar = [...diag.aBorrar].sort((a, b) => orden(a.entidad) - orden(b.entidad));
+  const aDeshacer = [...diag.aBorrar].sort((a, b) => orden(a.entidad) - orden(b.entidad));
 
   await prisma.$transaction(async (tx) => {
-    for (const r of aBorrar) await borrar(tx, p.organizationId, r.entidad, r.id);
+    for (const r of aDeshacer) await deshacer(tx, p.organizationId, r.entidad, r.id, p.userId);
+    // Lo que se anuló o compensó sigue existiendo: se marca en el lote para
+    // que una segunda reversión no lo vuelva a compensar.
+    const persisten = aDeshacer.filter((r) => r.accion !== "ELIMINAR").map((r) => r.id);
+    if (persisten.length) {
+      await tx.importRecord.updateMany({
+        where: { batchId: p.loteId, entityId: { in: persisten } },
+        data: { accion: "REVERTED" },
+      });
+    }
     await tx.importBatch.update({
       where: { id: p.loteId },
       data: {
-        estado: diag.bloqueados.length ? "REVERSION_PARCIAL" : "REVERTIDO",
+        estado: diag.estadoEsperado,
         revertidoAt: new Date(),
         revertidoPorId: p.userId,
         detalle: JSON.stringify({
-          borrados: aBorrar.length,
+          resultado: diag.resultado,
+          borrados: aDeshacer.filter((r) => r.accion === "ELIMINAR").length,
+          anuladas: aDeshacer.filter((r) => r.accion === "ANULAR").length,
+          compensados: aDeshacer.filter((r) => r.accion === "COMPENSAR").length,
           bloqueados: diag.bloqueados.map((b) => ({ entidad: b.entidad, nombre: b.nombre, motivos: b.motivos })),
           actualizadosSinRevertir: diag.actualizados.length,
         }),
@@ -361,13 +559,16 @@ export async function revertirLote(p: { organizationId: string; loteId: string; 
 
   await logAudit({
     organizationId: p.organizationId, userId: p.userId,
-    entity: "ImportBatch", entityId: p.loteId, action: "IMPORT_REVERTED",
-    summary: `Reversión: ${aBorrar.length} registros eliminados` +
-      (diag.bloqueados.length ? `, ${diag.bloqueados.length} se quedaron porque ya se usaron` : "") +
-      (diag.actualizados.length ? `, ${diag.actualizados.length} actualizados sin revertir` : ""),
+    entity: "ImportBatch", entityId: p.loteId,
+    action: diag.bloqueados.length ? "IMPORT_REVERT_PARTIAL" : "IMPORT_REVERTED",
+    summary: `Reversión${diag.bloqueados.length ? " parcial" : ""}: ${diag.resultado}`,
+    changes: { deshechos: aDeshacer.length, bloqueados: diag.bloqueados.length, actualizados: diag.actualizados.length },
   });
 
-  return { borrados: aBorrar.length, bloqueados: diag.bloqueados, actualizados: diag.actualizados };
+  return {
+    borrados: aDeshacer.length, bloqueados: diag.bloqueados, actualizados: diag.actualizados,
+    estado: diag.estadoEsperado, resultado: diag.resultado,
+  };
 }
 
 /** Las importaciones de la empresa, más recientes primero. */

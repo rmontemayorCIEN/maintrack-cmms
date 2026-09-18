@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { puestaEnMarcha } from "@/lib/puesta-en-marcha";
+import { modoDeInicio } from "@/lib/modos-inicio";
 import { ErrorDeInicio, iniciarEmpresa, quitarDemo, vistaPreviaQuitarDemo } from "@/lib/demo";
 import {
   ErrorDePuesta, cambiarTipoInstalacion, comenzarAOperar, declararModulo,
@@ -14,8 +15,9 @@ import {
  * La lógica vive en lib/, que es lo que prueban las pruebas.
  */
 const accion = z.discriminatedUnion("accion", [
-  z.object({ accion: z.literal("INICIAR"), modo: z.enum(["VACIA", "ESTRUCTURA", "DEMO"]) }),
-  z.object({ accion: z.literal("QUITAR_DEMO") }),
+  // «ESTRUCTURA» es el nombre anterior de la configuración recomendada.
+  z.object({ accion: z.literal("INICIAR"), modo: z.enum(["VACIA", "RECOMENDADA", "ESTRUCTURA", "DEMO"]) }),
+  z.object({ accion: z.literal("QUITAR_DEMO"), confirmado: z.boolean().default(false) }),
   z.object({ accion: z.literal("MODULO"), modulo: z.enum(["almacen", "compras", "medidores"]), usa: z.boolean().nullable() }),
   z.object({ accion: z.literal("TIPO"), tipo: z.string().trim().min(2).max(20) }),
   z.object({ accion: z.literal("OPERAR") }),
@@ -35,9 +37,9 @@ export async function POST(request: Request) {
     try {
       switch (input.accion) {
         case "INICIAR":
-          return ok(await iniciarEmpresa({ organizationId: orgId, userId: user.id, modo: input.modo }), 201);
+          return ok(await iniciarEmpresa({ organizationId: orgId, userId: user.id, modo: modoDeInicio(input.modo)! }), 201);
         case "QUITAR_DEMO":
-          return ok(await quitarDemo({ organizationId: orgId, userId: user.id }));
+          return ok(await quitarDemo({ organizationId: orgId, userId: user.id, confirmado: input.confirmado }));
         case "MODULO":
           return ok(await declararModulo({ organizationId: orgId, userId: user.id, modulo: input.modulo, usa: input.usa }));
         case "TIPO":

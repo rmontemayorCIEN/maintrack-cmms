@@ -10,6 +10,9 @@ import {
 import { Badge, Button, Card, CardHeader, Progress } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import type { EstadoPaso, Paso, Pendiente, ModuloOpcional } from "@/lib/puesta-en-marcha";
+import { ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/estado-operativo";
+import { MODOS_DE_INICIO } from "@/lib/modos-inicio";
+import { formatCurrency } from "@/lib/utils";
 
 type Revision = {
   veredicto: "LISTA" | "CASI" | "FALTA_BASE";
@@ -21,6 +24,12 @@ type Revision = {
 type VistaDemo = {
   aBorrar: Array<{ entidad: string; id: string; nombre: string }>;
   bloqueados: Array<{ entidad: string; id: string; nombre: string; motivos: string[] }>;
+  conteos: {
+    activos: number; ordenes: number; planes: number; refacciones: number; valorInventario: number;
+    movimientos: number; proveedores: number; usuarios: number;
+  };
+  indicadores: string[];
+  resultado: string;
 };
 
 const TONO_SEVERIDAD = { ALTA: "danger", MEDIA: "warning", BAJA: "muted" } as const;
@@ -51,8 +60,8 @@ function IconoEstado({ estado }: { estado: EstadoPaso }) {
  * nada: el estado se vuelve a calcular sobre la base cada vez que se abre.
  */
 export function PanelPuestaEnMarcha({
-  pasos, porcentaje, completa, pendientes, saludDatos, operandoDesde, hayDemo, impideOperar,
-  empezando, tipoInstalacion, tipos, puedeConfigurar, iaDisponible,
+  pasos, porcentaje, pendientes, saludDatos, operandoDesde, hayDemo, impideOperar,
+  advertenciasOperar, estadoOperativo, operandoPor, empezando, tipoInstalacion, tipos, puedeConfigurar, iaDisponible,
 }: {
   pasos: Paso[];
   porcentaje: number;
@@ -62,6 +71,9 @@ export function PanelPuestaEnMarcha({
   operandoDesde: string | null;
   hayDemo: boolean;
   impideOperar: string[];
+  advertenciasOperar: string[];
+  estadoOperativo: EstadoOperativo;
+  operandoPor: string | null;
   /** La empresa todavía no tiene estructura: se le ofrece cómo empezar. */
   empezando: boolean;
   tipoInstalacion: string | null;
@@ -76,6 +88,7 @@ export function PanelPuestaEnMarcha({
   const [revision, setRevision] = useState<Revision | null>(null);
   const [vistaDemo, setVistaDemo] = useState<VistaDemo | null>(null);
   const [confirmarOperar, setConfirmarOperar] = useState(false);
+  const [revisoDemo, setRevisoDemo] = useState(false);
 
   async function accion(clave: string, cuerpo: Record<string, unknown>, exito?: (datos: Record<string, unknown>) => string | null) {
     setOcupado(clave); setError(null); setAviso(null);
@@ -108,7 +121,8 @@ export function PanelPuestaEnMarcha({
       const res = await fetch("/api/puesta-en-marcha");
       const datos = await res.json();
       if (!res.ok) { setError(datos.error ?? "No se pudo revisar la demostración"); return; }
-      setVistaDemo(datos.demo ?? { aBorrar: [], bloqueados: [] });
+      setRevisoDemo(false);
+      setVistaDemo(datos.demo);
     } finally {
       setOcupado(null);
     }
@@ -131,9 +145,12 @@ export function PanelPuestaEnMarcha({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-2xl font-semibold tabular-nums text-slate-900" data-porcentaje={porcentaje}>{porcentaje}%</p>
-              {operandoDesde ? <Badge tone="success">Operando desde {operandoDesde}</Badge>
-                : completa ? <Badge tone="success">Lista para operar</Badge>
-                : <Badge tone="info">En puesta en marcha</Badge>}
+              <Badge tone={ESTADO_OPERATIVO[estadoOperativo].tono}>
+                <span data-estado-operativo={estadoOperativo}>
+                  {ESTADO_OPERATIVO[estadoOperativo].texto}
+                  {operandoDesde ? ` desde ${operandoDesde}${operandoPor ? ` · lo declaró ${operandoPor}` : ""}` : ""}
+                </span>
+              </Badge>
               {hayDemo ? <Badge tone="warning">Con datos de demostración</Badge> : null}
             </div>
             <p className="mt-1 max-w-2xl text-xs text-slate-600">
@@ -179,26 +196,30 @@ export function PanelPuestaEnMarcha({
       {/* ── Cómo empezar ──────────────────────────────────────────── */}
       {empezando && puedeConfigurar && !operandoDesde ? (
         <Card>
-          <CardHeader title="¿Cómo quiere empezar?" subtitle="Puede cambiar de idea después: nada de esto borra información." />
+          <CardHeader title="¿Cómo quiere empezar?" subtitle="Lea qué trae cada opción antes de elegir. Ninguna borra información." />
           <div className="grid gap-2 md:grid-cols-3">
-            {[
-              { modo: "VACIA", titulo: "Empezar vacía", texto: "Solo los catálogos de su tipo de instalación, que ya tiene. Usted captura o importa todo lo demás.", icono: <Circle className="h-4 w-4" /> },
-              { modo: "ESTRUCTURA", titulo: "Estructura recomendada", texto: "Además, su primer sitio con el nombre que se usa en su giro y el almacén general.", icono: <Wrench className="h-4 w-4" /> },
-              { modo: "DEMO", titulo: "Ver una demostración", texto: "La estructura y un juego chico de equipos, un plan y refacciones marcados [DEMO]. Se quitan con un botón antes de operar.", icono: <FlaskConical className="h-4 w-4" /> },
-            ].map((o) => (
-              <button
-                key={o.modo}
-                type="button"
-                disabled={ocupado !== null}
-                onClick={() => accion(`iniciar-${o.modo}`, { accion: "INICIAR", modo: o.modo }, () =>
-                  o.modo === "DEMO" ? "Datos de demostración cargados. Recuerde quitarlos antes de comenzar a operar." : "Listo. Siga con los pasos de abajo.")}
-                className="grid gap-1 rounded-lg border border-slate-200 bg-white p-3 text-left hover:border-brand-300 hover:bg-brand-50/40 disabled:opacity-50"
-              >
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-                  {ocupado === `iniciar-${o.modo}` ? <Loader2 className="h-4 w-4 animate-spin" /> : o.icono} {o.titulo}
-                </span>
-                <span className="text-[0.6875rem] leading-relaxed text-slate-500">{o.texto}</span>
-              </button>
+            {MODOS_DE_INICIO.map((o) => (
+              <div key={o.modo} className="grid content-between gap-2 rounded-lg border border-slate-200 bg-white p-3">
+                <div>
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    {o.modo === "VACIA" ? <Circle className="h-4 w-4" /> : o.modo === "RECOMENDADA" ? <Wrench className="h-4 w-4" /> : <FlaskConical className="h-4 w-4" />}
+                    {o.titulo}
+                  </p>
+                  <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-600">{o.texto}</p>
+                  <ul className="mt-1.5 grid gap-0.5 text-[0.6875rem] text-slate-600">
+                    {o.incluye.map((x) => <li key={x} className="flex gap-1"><Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-600" />{x}</li>)}
+                    {o.noIncluye.map((x) => <li key={x} className="flex gap-1 text-slate-400"><MinusCircle className="mt-0.5 h-3 w-3 shrink-0" />{x}</li>)}
+                  </ul>
+                </div>
+                <Button
+                  size="sm" variant="secondary" disabled={ocupado !== null}
+                  onClick={() => accion(`iniciar-${o.modo}`, { accion: "INICIAR", modo: o.modo }, () =>
+                    o.modo === "DEMO" ? "Datos de demostración cargados. Recuerde quitarlos antes de comenzar a operar." : "Listo. Siga con los pasos de abajo.")}
+                >
+                  {ocupado === `iniciar-${o.modo}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Elegir esta opción
+                </Button>
+              </div>
             ))}
           </div>
         </Card>
@@ -233,9 +254,9 @@ export function PanelPuestaEnMarcha({
               <Button variant="secondary" size="sm" onClick={() => setVistaDemo(null)}>Cancelar</Button>
               <Button
                 size="sm"
-                disabled={ocupado !== null || vistaDemo.aBorrar.length === 0}
+                disabled={ocupado !== null || vistaDemo.aBorrar.length === 0 || !revisoDemo}
                 onClick={async () => {
-                  const listo = await accion("quitar-demo", { accion: "QUITAR_DEMO" }, (d) =>
+                  const listo = await accion("quitar-demo", { accion: "QUITAR_DEMO", confirmado: true }, (d) =>
                     `Se quitaron ${d.borrados} registros de demostración${(d.bloqueados as unknown[])?.length ? `; ${(d.bloqueados as unknown[]).length} se quedaron porque ya se usaron` : ""}.`);
                   if (listo) setVistaDemo(null);
                 }}
@@ -247,6 +268,30 @@ export function PanelPuestaEnMarcha({
           }
         >
           <div className="grid gap-3 text-xs">
+            <p className="text-slate-700">{vistaDemo.resultado} Solo se toca lo que se registró como demostración al cargarla; nada se reconoce por su nombre.</p>
+            <dl className="grid grid-cols-2 gap-1.5 sm:grid-cols-4" data-conteos-demo>
+              {([
+                ["Activos demo", vistaDemo.conteos.activos],
+                ["OT relacionadas", vistaDemo.conteos.ordenes],
+                ["Planes", vistaDemo.conteos.planes],
+                ["Refacciones", vistaDemo.conteos.refacciones],
+                ["Valor de inventario", formatCurrency(vistaDemo.conteos.valorInventario)],
+                ["Movimientos", vistaDemo.conteos.movimientos],
+                ["Proveedores", vistaDemo.conteos.proveedores],
+                ["Usuarios demo", vistaDemo.conteos.usuarios],
+              ] as const).map(([k, v]) => (
+                <div key={k} className="rounded-lg border border-slate-200 px-2 py-1">
+                  <dt className="text-[0.625rem] uppercase tracking-wide text-slate-500">{k}</dt>
+                  <dd className="font-semibold tabular-nums text-slate-800">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <div>
+              <p className="font-semibold text-slate-800">Indicadores que cambian</p>
+              {vistaDemo.indicadores.length ? (
+                <ul className="mt-0.5 grid gap-0.5 text-slate-600">{vistaDemo.indicadores.map((x) => <li key={x}>• {x}</li>)}</ul>
+              ) : <p className="mt-0.5 text-slate-500">Ninguno.</p>}
+            </div>
             <div>
               <p className="font-semibold text-slate-800">Se eliminarán ({vistaDemo.aBorrar.length})</p>
               <ul className="mt-1 max-h-40 overflow-auto rounded-lg border border-slate-200 p-2 text-slate-600">
@@ -259,9 +304,13 @@ export function PanelPuestaEnMarcha({
                 <ul className="mt-1 grid gap-1 rounded-lg border border-rose-200 bg-rose-50/50 p-2 text-rose-900">
                   {vistaDemo.bloqueados.map((b) => <li key={b.id}><strong>{b.nombre}</strong> — {b.motivos.join(", ")}</li>)}
                 </ul>
-                <p className="mt-1 text-slate-500">Si ya no los necesita, bórrelos a mano cuando deje de usarlos.</p>
+                <p className="mt-1 text-slate-500">Están ligados a datos reales, así que no se tocan. Si ya no los necesita, bórrelos a mano cuando deje de usarlos.</p>
               </div>
             ) : null}
+            <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-2 text-slate-700">
+              <input type="checkbox" className="mt-0.5" checked={revisoDemo} onChange={(e) => setRevisoDemo(e.target.checked)} />
+              Revisé la lista y entiendo que estos registros de demostración se eliminan definitivamente.
+            </label>
           </div>
         </Dialogo>
       ) : null}
@@ -338,7 +387,16 @@ export function PanelPuestaEnMarcha({
                     <span className="text-slate-400">{p.numero}.</span> {p.titulo}
                   </p>
                   <div className="flex items-center gap-2">
-                    {p.progreso ? <span className="text-[0.6875rem] tabular-nums text-slate-500">{p.progreso.hecho} de {p.progreso.meta} correctos</span> : null}
+                    {p.progreso ? (
+                      <span className="text-[0.6875rem] tabular-nums text-slate-500">
+                        {p.clave === "planes" ? "Planes existentes: " : ""}{p.progreso.hecho} de {p.progreso.meta} correctos
+                      </span>
+                    ) : null}
+                    {p.cobertura ? (
+                      <span className="text-[0.6875rem] tabular-nums text-slate-500" data-cobertura={`${p.cobertura.hecho}/${p.cobertura.meta}`}>
+                        · Cobertura crítica: {p.cobertura.hecho} de {p.cobertura.meta}
+                      </span>
+                    ) : null}
                     <Badge tone={ESTADO[p.estado].tono}>{ESTADO[p.estado].texto}</Badge>
                   </div>
                 </div>
@@ -351,6 +409,9 @@ export function PanelPuestaEnMarcha({
                   </div>
                 ) : null}
                 {p.falta ? <p className="mt-1.5 text-xs text-slate-700">{p.falta}</p> : null}
+                {p.cobertura && p.cobertura.hecho < p.cobertura.meta ? (
+                  <p className="mt-0.5 text-[0.6875rem] text-amber-800">{p.cobertura.texto}</p>
+                ) : null}
                 {p.problemas.length ? (
                   <p className="mt-1 flex flex-wrap gap-1">
                     {p.problemas.map((x) => <Badge key={x} tone="warning">{x}</Badge>)}
@@ -401,9 +462,20 @@ export function PanelPuestaEnMarcha({
                 {p.clave === "validacion" && !operandoDesde ? (
                   <div className="mt-2">
                     {impideOperar.length ? (
-                      <ul className="grid gap-0.5 text-[0.6875rem] text-slate-600">
-                        {impideOperar.map((x) => <li key={x}>• {x}</li>)}
-                      </ul>
+                      <>
+                        <p className="text-[0.6875rem] font-semibold text-rose-700">Bloquean el arranque ({impideOperar.length})</p>
+                        <ul className="grid gap-0.5 text-[0.6875rem] text-slate-700" data-bloqueos>
+                          {impideOperar.map((x) => <li key={x}>• {x}</li>)}
+                        </ul>
+                      </>
+                    ) : <p className="text-[0.6875rem] font-medium text-emerald-700">Sin bloqueos críticos.</p>}
+                    {advertenciasOperar.length ? (
+                      <>
+                        <p className="mt-1.5 text-[0.6875rem] font-semibold text-amber-800">Conviene resolver, pero no impiden operar ({advertenciasOperar.length})</p>
+                        <ul className="grid gap-0.5 text-[0.6875rem] text-slate-600" data-advertencias>
+                          {advertenciasOperar.map((x) => <li key={x}>• {x}</li>)}
+                        </ul>
+                      </>
                     ) : null}
                     {puedeConfigurar ? (
                       <Button size="sm" className="mt-2" disabled={impideOperar.length > 0 || ocupado !== null} onClick={() => setConfirmarOperar(true)}>
@@ -436,7 +508,12 @@ export function PanelPuestaEnMarcha({
             </div>
           }
         >
-          <p className="text-xs text-slate-600">Queda registrado en la bitácora quién lo declaró y cuándo.</p>
+          <div className="grid gap-2 text-xs text-slate-600">
+            {advertenciasOperar.length ? (
+              <p>Quedan {advertenciasOperar.length} advertencia(s) sin resolver; no impiden operar y seguirán en la lista de pendientes.</p>
+            ) : null}
+            <p>Queda registrado en la bitácora quién lo declaró y cuándo. El estado comercial de la cuenta (prueba o activa) no cambia.</p>
+          </div>
         </Dialogo>
       ) : null}
     </div>

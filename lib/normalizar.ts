@@ -21,10 +21,15 @@
  */
 import { textoDeFuera } from "./texto-publico";
 
-export type Veredicto<T> = { ok: true; valor: T } | { ok: false; motivo: string };
+/**
+ * Lo que dice cada normalizador: el valor limpio, o por qué no sirve y CÓMO
+ * corregirlo. La solución no es adorno: quien corrige el archivo necesita saber
+ * qué escribir, no solo que está mal.
+ */
+export type Veredicto<T> = { ok: true; valor: T } | { ok: false; motivo: string; solucion?: string };
 
 const bien = <T>(valor: T): Veredicto<T> => ({ ok: true, valor });
-const mal = <T>(motivo: string): Veredicto<T> => ({ ok: false, motivo });
+const mal = <T>(motivo: string, solucion?: string): Veredicto<T> => ({ ok: false, motivo, ...(solucion ? { solucion } : {}) });
 
 /** Texto como se guarda: sin invisibles ni espacios de más. Conserva acentos y mayúsculas. */
 export function texto(v: string | null | undefined, limite = 500): string {
@@ -67,7 +72,9 @@ export function serieComparable(v: string | null | undefined): string {
 export function correo(v: string | null | undefined): Veredicto<string | null> {
   const c = texto(v, 160).toLowerCase();
   if (!c) return bien(null);
-  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(c) ? bien(c) : mal(`El correo «${c}» no tiene un formato válido`);
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(c)
+    ? bien(c)
+    : mal(`El correo «${c}» no tiene un formato válido`, "Escriba un correo completo, como nombre@empresa.mx");
 }
 
 /** Teléfono: solo dígitos. En México son 10; se aceptan de 7 a 15 por extranjeros y extensiones. */
@@ -77,7 +84,7 @@ export function telefono(v: string | null | undefined): Veredicto<string | null>
   const mas = bruto.startsWith("+") ? "+" : "";
   const digitos = bruto.replace(/\D/g, "");
   if (digitos.length < 7 || digitos.length > 15) {
-    return mal(`El teléfono «${bruto}» debe tener entre 7 y 15 dígitos`);
+    return mal(`El teléfono «${bruto}» debe tener entre 7 y 15 dígitos`, "Escriba solo el número, con lada: 10 dígitos en México");
   }
   return bien(mas + digitos);
 }
@@ -94,7 +101,7 @@ export function rfc(v: string | null | undefined): Veredicto<string | null> {
   if (!r) return bien(null);
   return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(r)
     ? bien(r)
-    : mal(`El RFC «${r}» no tiene la estructura de un RFC (3 o 4 letras, 6 dígitos de fecha y 3 de homoclave)`);
+    : mal(`El RFC «${r}» no tiene la estructura de un RFC`, "12 caracteres para empresa o 13 para persona: 3 o 4 letras, 6 dígitos de fecha y 3 de homoclave. Déjelo vacío si no lo tiene");
 }
 
 /**
@@ -114,15 +121,15 @@ export function numero(
   let limpio = s;
   if (s.includes(",")) {
     if (!/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
-      return mal(`${campo} «${s}» usa coma: escriba el decimal con punto (1.5, no 1,5)`);
+      return mal(`${campo} «${s}» usa coma como decimal`, "Escriba el decimal con punto: 1.5, no 1,5. La coma solo separa miles: 1,250.50");
     }
     limpio = s.replace(/,/g, "");
   }
   const n = Number(limpio);
-  if (!Number.isFinite(n)) return mal(`${campo} «${s}» no es un número`);
-  if (opciones.entero && !Number.isInteger(n)) return mal(`${campo} «${s}» debe ser un número entero`);
+  if (!Number.isFinite(n)) return mal(`${campo} «${s}» no es un número`, "Escriba solo cifras, sin letras ni unidades: 1250.50");
+  if (opciones.entero && !Number.isInteger(n)) return mal(`${campo} «${s}» debe ser un número entero`, "Escriba un número sin decimales");
   if (opciones.minimo !== undefined && n < opciones.minimo) {
-    return mal(`${campo} «${s}» no puede ser menor a ${opciones.minimo}`);
+    return mal(`${campo} «${s}» no puede ser menor a ${opciones.minimo}`, `Escriba un valor de ${opciones.minimo} o más`);
   }
   return bien(n);
 }
@@ -147,13 +154,13 @@ export function fecha(v: string | null | undefined, campo = "La fecha"): Veredic
   const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (dmy) partes = [Number(dmy[3]), Number(dmy[2]), Number(dmy[1])];
   else if (ymd) partes = [Number(ymd[1]), Number(ymd[2]), Number(ymd[3])];
-  if (!partes) return mal(`${campo} «${s}» no se entiende: use dd/mm/aaaa, por ejemplo 15/09/2026`);
+  if (!partes) return mal(`${campo} «${s}» no se entiende`, "Escriba la fecha como dd/mm/aaaa, por ejemplo 15/09/2026");
   const [anio, mes, dia] = partes;
   const prueba = new Date(Date.UTC(anio, mes - 1, dia));
   if (prueba.getUTCFullYear() !== anio || prueba.getUTCMonth() !== mes - 1 || prueba.getUTCDate() !== dia) {
-    return mal(`${campo} «${s}» no existe en el calendario`);
+    return mal(`${campo} «${s}» no existe en el calendario`, "Revise el día y el mes: se lee como dd/mm/aaaa");
   }
-  if (anio < 1950 || anio > 2100) return mal(`${campo} «${s}» está fuera de un rango razonable`);
+  if (anio < 1950 || anio > 2100) return mal(`${campo} «${s}» está fuera de un rango razonable`, "Revise el año: se esperan cuatro dígitos, como 2026");
   return bien({ anio, mes, dia });
 }
 
@@ -188,7 +195,7 @@ export function moneda(v: string | null | undefined): Veredicto<string | null> {
   if (!m) return bien(null);
   const equivalencias: Record<string, string> = { PESOS: "MXN", MN: "MXN", DOLARES: "USD", DLLS: "USD", USD: "USD", MXN: "MXN", EUR: "EUR" };
   const r = equivalencias[m];
-  return r ? bien(r) : mal(`La moneda «${m}» no se reconoce: use MXN, USD o EUR`);
+  return r ? bien(r) : mal(`La moneda «${m}» no se reconoce`, "Use MXN, USD o EUR");
 }
 
 /** SI/NO de una hoja: «sí», «si», «1», «x», «verdadero» cuentan como sí. */

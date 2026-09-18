@@ -57,15 +57,50 @@ compras → identificar equipos y lugares.
 
 ## Importación segura
 
-**Tipos disponibles:** sitios, ubicaciones, categorías de activo, activos,
-proveedores, familias de refacción, unidades, refacciones, especialidades,
-servicios externos, planes, códigos de falla y causas raíz.
+**Formatos:** Excel (`.xlsx`) y CSV, por **las mismas reglas**. Los dos se leen
+a la misma tabla de texto y de ahí en adelante no hay dos caminos. De un Excel
+se toma la primera hoja (en el orden del libro); las celdas de fecha se leen
+como dd/mm/aaaa, los números con su punto decimal, los verdaderos como SI/NO.
+Se lee sin dependencias nuevas (`lib/xlsx.ts`, con `node:zlib`), con tope de
+descompresión y sin expandir entidades XML. Un `.xls` antiguo se rechaza
+diciendo cómo guardarlo. Las plantillas se descargan en los dos formatos.
 
-1. **Validar** — no escribe nada. Por renglón: nuevo, ya existe, posible
-   duplicado, actualiza, o error con **fila y columna**. Reporta columnas no
-   reconocidas y obligatorias faltantes. El detalle se descarga en CSV.
-2. **Confirmar** — vuelve a validar sobre la base de ese momento. **Con un solo
-   error no importa.** Guarda **todo o nada** en una transacción.
+**Tipos disponibles (18):** sitios, ubicaciones, **usuarios y responsables**,
+**almacenes**, categorías de activo, activos, **medidores** (con lectura
+inicial), **lecturas**, proveedores, familias de refacción, unidades,
+refacciones, **existencias iniciales por almacén**, especialidades, servicios
+externos, planes (ahora con tipo: preventivo, inspección, predictivo), códigos
+de falla y causas raíz.
+
+La relación refacción–almacén vive en **existencias iniciales**: cada renglón
+es refacción + almacén + cantidad + costo, y entra por `aplicarMovimiento()`
+como entrada al kardex. No hizo falta un importador aparte.
+
+1. **Validar** — no escribe ningún dato. Deja la entrada **validada** en el
+   historial (la misma si se vuelve a validar el mismo archivo). Totales:
+   filas, válidas, con advertencia, rechazadas, nuevas, actualizarán, exactos,
+   posibles, columnas no reconocidas y obligatorias faltantes. Cada error
+   trae **fila, columna, valor recibido, problema y cómo corregirlo**, en
+   pantalla y en el detalle descargable.
+2. **Confirmar** — vuelve a validar sobre la base de ese momento. La política
+   se dice antes de confirmar: **con un solo renglón rechazado no se importa
+   nada**. Guarda **todo o nada** en una transacción; ningún importador
+   consume folios consecutivos, así que una falla no deja huecos.
+
+Estados del lote: **Validada → Confirmada → Completada / Completada con
+advertencias / Fallida**, y después **Revertida / Reversión parcial /
+Reversión bloqueada**. Una fallida guarda el motivo y los primeros errores
+(fila y columna), nunca el archivo.
+
+### Importadores nuevos
+
+| Tipo | Valida | Notas |
+|---|---|---|
+| Usuarios | nombre, correo, rol (técnico, supervisor, administrador, solicitante, compras, consulta), puesto, tarifa, teléfono, estado | **Sin contraseñas**: una columna contrasena/password/clave se avisa y se ignora. Se guarda el hash de un valor aleatorio; la persona entra con la liga de un solo uso que ya existe (Configuración → Usuarios). El propietario no se importa. Un correo de otra empresa se rechaza sin decir cuál. Actualizar solo toca nombre, puesto, tarifa y teléfono. |
+| Almacenes | código, nombre, sitio, responsable (por correo), estado, general | Solo un almacén general. |
+| Medidores | activo, nombre, unidad, tipo, lectura inicial (no negativa), fecha, máximo por día (horómetro ≤ 24) | La lectura inicial queda como valor inicial formal del medidor. |
+| Lecturas | activo, medidor, valor, fecha (obligatoria) | Las mismas reglas que la captura (`validarLectura`): menor que la anterior o físicamente imposible se rechaza, también contra renglones anteriores del mismo archivo. Se registran con `registrarLectura` dentro de la transacción. |
+| Existencias iniciales | refacción, almacén, cantidad (> 0), costo (por omisión el de la refacción), unidad (debe coincidir) | Movimiento de entrada en el kardex con su costo y quién lo importó. Si ya hay existencia: omitir o ajustar (queda como ajuste). |
 
 Validaciones: fechas estrictas (dd/mm/aaaa; las imposibles se rechazan),
 números (la coma solo como miles), correos, teléfonos, RFC, unidades con
@@ -91,13 +126,21 @@ Cada importación es un **lote** (`ImportBatch`): empresa, usuario, fecha, tipo,
 nombre y **huella SHA-256** del archivo —no su contenido—, creados,
 actualizados, omitidos y resultado.
 
-Revertir **borra solo lo que el lote creó y nadie usó después**. Se considera
+Revertir **deshace solo lo que el lote creó y nadie usó después**. Casi todo se
+borra; una **lectura se anula** con motivo (nunca se borra una lectura) y una
+**existencia se compensa** con una salida al kardex (el kardex no se reescribe). Se considera
 usado: cualquier referencia desde fuera del lote (órdenes, movimientos,
 consumos, asignaciones, activos en esa ubicación…) o haberlo editado después.
-Lo usado se queda y se lista con su motivo. Lo que el lote **actualizó** no se
+Lo usado se queda y se lista con su motivo. Usuarios: bloquea haber entrado,
+tener ligas, órdenes, horas, lecturas, almacenes a su cargo o acciones en la
+bitácora. Almacenes: existencias, movimientos, compras, traspasos. Medidores:
+lecturas vigentes o planes por uso. Lecturas y existencias: cualquier lectura
+o movimiento posterior en el mismo medidor o almacén. Lo que el lote **actualizó** no se
 regresa: se muestra para revisarlo a mano. Antes de confirmar se ve exactamente
-qué se borra y qué no. Todo en una transacción, y solo dentro de la empresa de
-la sesión.
+qué se deshace y cómo, qué no y por qué, y el **resultado esperado**. Todo en
+una transacción, y solo dentro de la empresa de la sesión. Lo anulado o
+compensado se marca en el lote (`REVERTED`) para que una segunda reversión no
+lo repita.
 
 ## Catálogos por tipo de instalación
 
@@ -114,18 +157,55 @@ tipos de mantenimiento: constantes del código), **catálogos de la empresa**
 
 ## Cómo arranca una empresa
 
-Al darse de alta recibe **solo sus catálogos**. En la puesta en marcha elige:
+Tres niveles de datos que no se mezclan (`lib/modos-inicio.ts`):
 
-- **Vacía** — nada más.
-- **Estructura recomendada** — su primer sitio, con el nombre de su giro, y el
-  almacén general.
-- **Demostración** — la estructura más tres equipos, un plan con actividades,
-  dos refacciones y un proveedor, todos con «[DEMO]» y registrados como un lote
-  DEMO. Se quitan con la misma reversión segura. **Mientras existan no se puede
-  comenzar a operar**, y no cuentan en el avance.
+- **Catálogos técnicos indispensables** — unidades, códigos de falla y causas
+  genéricos, dos especialidades. Iguales para todos los giros.
+- **Configuración recomendada** — los catálogos del tipo de instalación, su
+  primer sitio con el nombre del giro y el almacén general. Ni activos, ni
+  órdenes, ni movimientos, ni indicadores.
+- **Datos de demostración** — tres equipos, un plan con actividades, dos
+  refacciones con existencia y un proveedor, con «[DEMO]», como lote DEMO.
+  Sin usuarios de ejemplo.
 
-**Comenzar a operar** usa la misma revisión que muestra la pantalla y queda en
-la bitácora (`operandoDesde`).
+En el **alta del operador** se elige una de las tres (**Comenzar vacía**,
+**Cargar configuración recomendada**, **Crear datos de demostración**), con lo
+que incluye y lo que no a la vista antes de crear; sin elegir no se crea. El
+registro público arranca vacía y ofrece las otras dos en la puesta en marcha.
+Las empresas que ya existían no cambian.
+
+**Eliminar datos de demostración** muestra antes: activos, OT relacionadas,
+planes, refacciones y valor del inventario, movimientos, proveedores, usuarios
+demo (siempre 0) e indicadores afectados. Pide una casilla de confirmación
+explícita. Solo toca lo registrado en el lote DEMO —**nunca por nombre, fecha
+ni parecido**: un activo real con «[DEMO]» en el nombre no se toca—; lo ligado
+a datos reales se queda y se lista.
+
+## Estado operativo
+
+Aparte del **estado comercial** (prueba, activa, suspendida), que es del
+operador y **nunca cambia solo**:
+
+| Estado | Cuándo |
+|---|---|
+| En configuración | hay bloqueos críticos |
+| Lista para operar | sin bloqueos críticos, falta declararlo |
+| Operando | alguien lo declaró (`operandoDesde`, `operandoPorId`) |
+
+**Bloquean:** datos generales (zona, moneda, tipo de instalación), sitio,
+ubicación (si aplica), un técnico o supervisor activo, al menos un activo y
+ninguno incompleto, planes (al menos uno, y en todos los equipos críticos),
+reglas operativas y datos de demostración. **Solo avisan:** tarifas, almacén,
+proveedores, medidores, duplicados y planes con defectos.
+
+Es informativo: no apaga ninguna función, así que ninguna empresa que ya
+operaba se detiene. Se ve en la consola del operador (junto al comercial), en
+la puesta en marcha y en el panel. El porcentaje no cambió.
+
+**Planes:** «Planes existentes: X de Y correctos» y «Cobertura crítica: A de
+B», por separado, con el código del equipo que falta. Si todos los planes están
+bien y falta cobertura, el paso queda **en proceso**, no «requiere corrección»
+(el avance es el mismo: ninguno pasa de 90%).
 
 ## Permisos, aislamiento y bitácora
 
@@ -133,10 +213,13 @@ Importar, validar, revertir, configurar la empresa, administrar catálogos y
 quitar la demo piden `settings:write` (propietario y administrador). Todo
 trabaja sobre la organización de la sesión; un lote de otra empresa da 404.
 
-Bitácora: `IMPORT_VALIDATED`, `IMPORT_STARTED`, `IMPORTED`, `IMPORT_FAILED`,
-`IMPORT_REVERT_REQUESTED`, `IMPORT_REVERTED`, `IMPORT_REVERT_REJECTED`,
-`SETUP_STARTED`, `SETUP_CHANGED`, `DEMO_CREATED`, `DEMO_REMOVED`,
-`OPERATION_STARTED`, `CATALOGS_SEEDED`. Sin contenido de archivos.
+Bitácora: `IMPORT_VALIDATED`, `IMPORT_CONFIRMED`, `IMPORT_COMPLETED` (creados,
+actualizados, duplicados omitidos), `IMPORT_FAILED`, `IMPORT_REVERT_REQUESTED`,
+`IMPORT_REVERTED`, `IMPORT_REVERT_PARTIAL`, `IMPORT_REVERT_BLOCKED`,
+`IMPORT_REVERT_REJECTED`, `ORG_CREATED` (con su modo), `SETUP_STARTED` (con su
+modo), `SETUP_CHANGED`, `DEMO_CREATED`, `DEMO_REMOVED` (con los conteos),
+`DEMO_REMOVAL_BLOCKED`, `OPERATION_STARTED` (estado anterior y advertencias),
+`CATALOGS_SEEDED`. Sin contenido de archivos, contraseñas ni ligas.
 
 ## Pruebas
 
@@ -144,17 +227,29 @@ Bitácora: `IMPORT_VALIDATED`, `IMPORT_STARTED`, `IMPORTED`, `IMPORT_FAILED`,
 |---|---|
 | `prueba-importacion-segura.ts` | 5–14, 19, 20: válida, columnas faltantes, fechas y números, duplicados, actualización, falla a media carga, reversión completa y bloqueada, otra empresa, rol sin permiso, 2,000 renglones, límite del plan, bitácora |
 | `prueba-puesta-en-marcha.ts` | 1–4, 15–18: vacía, parcial, avance con incompletos, mismo porcentaje en tres pantallas, demo separada y removible, catálogos por tipo, pendientes concretos, comenzar a operar |
+| `prueba-cierre-bloque-4.ts` | Cierre, las 27 obligatorias: CSV y Excel iguales, Excel real, errores con valor y solución, falla sin datos parciales, usuarios sin contraseñas, almacenes y existencias, lecturas válidas e inválidas, reversión completa/parcial/bloqueada, otra empresa, permisos por HTTP (validar, confirmar, revertir), tres modalidades de alta, demo controlada, catálogos por tipo, estado operativo, cobertura y bitácora. Al final comprueba que las demás empresas quedaron idénticas. |
 
 ## Migración
 
 `20260917223341_lotes_de_importacion` — aditiva: `ImportBatch`, `ImportRecord`,
 `Supplier.rfc`, `Organization.operandoDesde` y `Organization.modulosPuesta`.
 
+`20260918070947_estado_operativo` — aditiva: `Organization.operandoPorId`.
+Los estados de lote son texto: no hizo falta migrarlos.
+
 ## Pendientes reales
 
 - Las empresas **que ya existen** no cambian: sus sitios «Planta principal» y
   sus catálogos viejos se quedan. No se tocó ningún dato.
 - La reversión no regresa los registros **actualizados**; los lista.
+- Una fecha inválida en una columna **opcional** (fecha de compra, garantía) se
+  avisa y el campo queda vacío; en una obligatoria (fecha de lectura) se
+  rechaza. Es la regla previa del bloque y se mantuvo.
+- Las empresas existentes aparecen «en configuración» hasta que alguien
+  declare que operan: el estado es nuevo y no se infiere de su historia.
+- El «Comenzar vacía» del registro público recibe menos catálogos que antes
+  (solo los indispensables); los del giro se cargan en un clic desde la puesta
+  en marcha.
 - El proveedor se reconoce por nombre; los que ya existían no tienen RFC hasta
   que se capture o se importe.
 - La detección de posibles duplicados es exacta sobre la clave normalizada: no

@@ -288,15 +288,15 @@ export function problemasDeCadena(
   return problemas;
 }
 
-async function vecinas(meterId: string, readingAt: Date, excluirId?: string) {
+async function vecinas(meterId: string, readingAt: Date, excluirId?: string, db: Cliente = prisma) {
   const base = { meterId, estado: { not: "ANULADA" }, ...(excluirId ? { id: { not: excluirId } } : {}) };
   const [anterior, siguiente] = await Promise.all([
-    prisma.meterReading.findFirst({
+    db.meterReading.findFirst({
       where: { ...base, readingAt: { lte: readingAt } },
       orderBy: [{ readingAt: "desc" }, { id: "desc" }],
       select: { value: true, readingAt: true, tipo: true },
     }),
-    prisma.meterReading.findFirst({
+    db.meterReading.findFirst({
       where: { ...base, readingAt: { gt: readingAt } },
       orderBy: [{ readingAt: "asc" }, { id: "asc" }],
       select: { value: true, readingAt: true, tipo: true },
@@ -306,7 +306,7 @@ async function vecinas(meterId: string, readingAt: Date, excluirId?: string) {
 }
 
 /** El punto de partida cuando no hay lectura anterior: el valor inicial formal. */
-function referenciaInicial(medidor: { currentValue: number; lastReadingAt: Date | null; createdAt: Date; valorInicial: number | null; valorInicialEl: Date | null; lecturaVigente: boolean }) {
+export function referenciaInicial(medidor: { currentValue: number; lastReadingAt: Date | null; createdAt: Date; valorInicial: number | null; valorInicialEl: Date | null; lecturaVigente: boolean }) {
   if (medidor.valorInicial !== null) {
     return { value: medidor.valorInicial, readingAt: medidor.valorInicialEl ?? medidor.createdAt, tipo: "LECTURA" };
   }
@@ -353,15 +353,22 @@ export async function registrarLectura(params: {
   confirmar?: boolean;
   justificacion?: string | null;
   ahora?: Date;
+  /**
+   * La transacción en curso. La importación registra lecturas iniciales
+   * dentro de la suya —todo o nada— y tiene que pasar por esta misma
+   * validación, no por una copia.
+   */
+  db?: Prisma.TransactionClient;
 }): Promise<ResultadoRegistro> {
-  const medidor = await prisma.meter.findFirst({
+  const leer = params.db ?? prisma;
+  const medidor = await leer.meter.findFirst({
     where: { id: params.meterId, organizationId: params.organizationId },
   });
   if (!medidor) throw new Error("Medidor no encontrado");
 
   const tipo = params.tipo ?? "LECTURA";
   const readingAt = params.readingAt ?? params.ahora ?? new Date();
-  const { anterior, siguiente } = await vecinas(medidor.id, readingAt);
+  const { anterior, siguiente } = await vecinas(medidor.id, readingAt, undefined, leer);
   const referencia = anterior ?? referenciaInicial(medidor);
 
   const validacion = validarLectura({
@@ -381,7 +388,7 @@ export async function registrarLectura(params: {
   // antes se guarda en el evento para poder deshacerlo.
   const valorAntes = referencia?.value ?? 0;
 
-  const { lecturaId, recalculo } = await prisma.$transaction(async (tx) => {
+  const escribir = async (tx: Prisma.TransactionClient) => {
     const lectura = await tx.meterReading.create({
       data: {
         organizationId: params.organizationId,
@@ -400,7 +407,8 @@ export async function registrarLectura(params: {
     });
     if (tipo !== "LECTURA") await recorrerMetas(tx, params.organizationId, medidor.id, params.value - valorAntes);
     return { lecturaId: lectura.id, recalculo: await recalcularEn(tx, params.organizationId, medidor.id, params.ahora) };
-  });
+  };
+  const { lecturaId, recalculo } = params.db ? await escribir(params.db) : await prisma.$transaction(escribir);
 
   if (tipo !== "LECTURA" || validacion.nivel === "ADVERTENCIA") {
     await logAudit({
@@ -867,7 +875,7 @@ export async function aplicarRecalculo(tx: Cliente, plan: PlanDeRecalculo) {
   }
 }
 
-async function recalcularEn(tx: Cliente, organizationId: string, meterId: string, ahora = new Date()): Promise<Recalculo> {
+export async function recalcularEn(tx: Cliente, organizationId: string, meterId: string, ahora = new Date()): Promise<Recalculo> {
   const plan = await planearRecalculo(tx, organizationId, meterId, ahora);
   await aplicarRecalculo(tx, plan);
   const vigentes = await tx.meterReading.count({ where: { meterId, organizationId, estado: { not: "ANULADA" } } });
