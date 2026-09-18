@@ -16,7 +16,7 @@
  *   npx tsx scripts/prueba-conjuntos.ts
  */
 import { prisma } from "../lib/db";
-import { conjuntosDe, residualDe, estadoDe, claveSugerida, loQueImpideBorrar, referenciasInvalidas, clasificacionLimpia } from "../lib/conjuntos";
+import { conjuntosDe, residualDe, estadoDe, claveSugerida, loQueImpideBorrar, referenciasInvalidas, clasificacionLimpia, soloCategoria } from "../lib/conjuntos";
 import { nombreDelMapa } from "../lib/instalaciones";
 import { terminoConjunto } from "../lib/instalaciones";
 
@@ -179,6 +179,17 @@ async function main() {
   const conPendiente = (await conjuntosDe(org.id)).find((c) => c.code === "L4")!;
   revisar("«lo que trae pendiente» cuenta las órdenes abiertas por equipo, igual que el mapa",
     conPendiente.ordenesAbiertas === 1 && conPendiente.plano.find((p) => p.ordenesAbiertas === 1) !== undefined);
+  const cat = await prisma.assetCategory.create({ data: { organizationId: org.id, code: "CMP", name: "Compresores" } });
+  await prisma.asset.update({ where: { id: vivoL4 }, data: { categoryId: cat.id } });
+  const conCat = (await conjuntosDe(org.id)).find((c) => c.code === "L4")!;
+  revisar("cada equipo trae su categoría, en el detalle y en el mapa",
+    conCat.detalle.some((d) => d.categoriaId === cat.id) && conCat.plano.some((p) => p.categoriaId === cat.id));
+  const soloCompresores = soloCategoria(conCat, cat.id);
+  const otraCategoria = soloCategoria(conCat, "no-existe");
+  revisar("con una categoría, los números de la línea son solo de esa categoría",
+    soloCompresores.equipos === 1 && soloCompresores.ordenesAbiertas === 1 && otraCategoria.equipos === 0 && otraCategoria.ordenesAbiertas === 0,
+    `${soloCompresores.equipos}/${soloCompresores.ordenesAbiertas} y ${otraCategoria.equipos}/${otraCategoria.ordenesAbiertas}`);
+  revisar("el dictamen de la línea no cambia por el filtro", soloCompresores.estado === conCat.estado);
   const personaVecina = await prisma.user.create({ data: { organizationId: vecino.id, email: `v-${sello}@t.mx`, name: "V", role: "OWNER", passwordHash: "x" } });
   const sitioVecino = await prisma.site.create({ data: { organizationId: vecino.id, code: "VX", name: "De otro" } });
   revisar("un responsable de otra empresa se rechaza", Boolean(await referenciasInvalidas(org.id, { responsableId: personaVecina.id })));
@@ -186,6 +197,8 @@ async function main() {
   revisar("los propios pasan", (await referenciasInvalidas(org.id, { siteId: planta2.id })) === null);
   await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
   await prisma.user.deleteMany({ where: { organizationId: vecino.id } });
+  await prisma.asset.updateMany({ where: { organizationId: org.id }, data: { categoryId: null } });
+  await prisma.assetCategory.deleteMany({ where: { organizationId: org.id } });
 
   revisar("el vecino no ve mis conjuntos", (await conjuntosDe(vecino.id)).length === 0);
   revisar("ni mis equipos sueltos", (await residualDe(vecino.id)).total === 0);

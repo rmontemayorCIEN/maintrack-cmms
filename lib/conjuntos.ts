@@ -51,12 +51,18 @@ export type ConjuntoEnLista = {
   perdida: number;
   planesVencidos: number;
   ordenesAbiertas: number;
+  /**
+   * Cada equipo vivo con su categoría y sus números, para que la lista pueda
+   * filtrar por categoría y recalcular los totales solo con esa categoría.
+   */
+  detalle: Array<{ categoriaId: string | null; status: string; detieneLinea: boolean | null; horas: number; perdida: number; planesVencidos: number; ordenesAbiertas: number }>;
 };
 
 /** Un equipo colocado en el mapa, con lo que hace falta para pintarlo en cualquiera de las tres vistas. */
 export type EquipoEnPlano = {
   x: number; y: number; w: number; h: number;
   status: string; horas: number; planesVencidos: number; ordenesAbiertas: number;
+  categoriaId: string | null;
 };
 
 /**
@@ -96,7 +102,7 @@ export async function conjuntosDe(
       equipos: {
         select: {
           planoX: true, planoY: true, planoAncho: true, planoAlto: true,
-          asset: { select: { id: true, status: true, detieneLinea: true, active: true, siteId: true } },
+          asset: { select: { id: true, status: true, detieneLinea: true, active: true, siteId: true, categoryId: true } },
         },
       },
     },
@@ -149,7 +155,7 @@ export async function conjuntosDe(
       plano: vivos
         .filter((e) => e.planoX !== null && e.planoY !== null)
         .map((e) => ({
-          x: e.planoX!, y: e.planoY!, w: e.planoAncho, h: e.planoAlto, status: e.asset.status,
+          x: e.planoX!, y: e.planoY!, w: e.planoAncho, h: e.planoAlto, status: e.asset.status, categoriaId: e.asset.categoryId,
           horas: paro.get(e.asset.id)?.horas ?? 0,
           planesVencidos: vencidos.get(e.asset.id) ?? 0, ordenesAbiertas: abiertas.get(e.asset.id) ?? 0,
         })),
@@ -159,8 +165,33 @@ export async function conjuntosDe(
       perdida: vivos.reduce((a, e) => a + (paro.get(e.asset.id)?.perdida ?? 0), 0),
       planesVencidos: vivos.reduce((a, e) => a + (vencidos.get(e.asset.id) ?? 0), 0),
       ordenesAbiertas: vivos.reduce((a, e) => a + (abiertas.get(e.asset.id) ?? 0), 0),
+      detalle: vivos.map((e) => ({
+        categoriaId: e.asset.categoryId, status: e.asset.status, detieneLinea: e.asset.detieneLinea,
+        horas: paro.get(e.asset.id)?.horas ?? 0, perdida: paro.get(e.asset.id)?.perdida ?? 0,
+        planesVencidos: vencidos.get(e.asset.id) ?? 0, ordenesAbiertas: abiertas.get(e.asset.id) ?? 0,
+      })),
     };
   });
+}
+
+/**
+ * La línea vista solo con una categoría de equipos: sus números se cuentan
+ * únicamente con los equipos de esa categoría. El dictamen de la línea no
+ * cambia —si está detenida, está detenida—, lo que cambia es de quién se habla.
+ */
+export function soloCategoria<T extends ConjuntoEnLista>(c: T, categoria: string): T {
+  const d = c.detalle.filter((x) => x.categoriaId === categoria);
+  return {
+    ...c,
+    equipos: d.length,
+    abajo: d.filter((x) => x.status === "DOWN").length,
+    abajoQueDetienen: d.filter((x) => x.status === "DOWN" && x.detieneLinea === true).length,
+    aMedias: d.filter((x) => x.status === "DEGRADED").length,
+    horasParo: d.reduce((a, x) => a + x.horas, 0),
+    perdida: d.reduce((a, x) => a + x.perdida, 0),
+    planesVencidos: d.reduce((a, x) => a + x.planesVencidos, 0),
+    ordenesAbiertas: d.reduce((a, x) => a + x.ordenesAbiertas, 0),
+  };
 }
 
 export type Residual = {

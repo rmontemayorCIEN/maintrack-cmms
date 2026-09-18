@@ -28,7 +28,7 @@ export async function generateMetadata() {
 export default async function ConjuntosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lente?: string; p?: string; sitio?: string; clase?: string }>;
+  searchParams: Promise<{ lente?: string; p?: string; sitio?: string; clase?: string; cat?: string }>;
 }) {
   const user = await requireUser();
   const orgId = user.organizationId;
@@ -65,7 +65,10 @@ export default async function ConjuntosPage({
     }),
   ]);
 
-  const sitios = await prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const [sitios, categorias] = await Promise.all([
+    prisma.site.findMany({ where: { organizationId: orgId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.assetCategory.findMany({ where: { organizationId: orgId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
 
   // Que equipos trae cada conjunto, para poder editarlos sin ir al servidor de
   // nuevo. Con este volumen —decenas de conjuntos, cientos de equipos— sale
@@ -103,6 +106,8 @@ export default async function ConjuntosPage({
         filtroSitio={q.sitio && sitios.some((x) => x.id === q.sitio) ? q.sitio : null}
         filtroClase={q.clase || null}
         moneda={user.organization.currency}
+        categorias={categorias}
+        filtroCategoria={q.cat && categorias.some((x) => x.id === q.cat) ? q.cat : null}
       />
     </div>
   );

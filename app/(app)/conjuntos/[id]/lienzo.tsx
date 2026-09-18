@@ -68,7 +68,8 @@ export function Lienzo({
   const params = useSearchParams();
   // La vista con que se abre viene de la lista (?lente=): quien miraba «lo que costó» sigue viendo eso.
   const [lente, setLente] = useState<Lente>(() => { const l = params.get("lente"); return esLente(l) ? l : "AHORA"; });
-  const [categoria, setCategoria] = useState<string | null>(null);
+  // Si se llegó desde la lista filtrada por categoría, el mapa abre con ese filtro.
+  const [categoria, setCategoria] = useState<string | null>(() => params.get("categoria"));
   const [viendo, setViendo] = useState<string | null>(null);
 
   const categorias = useMemo(() => {
@@ -158,7 +159,7 @@ export function Lienzo({
         ) : null}
       </div>
 
-      {categorias.length > 1 ? (
+      {categorias.length > 1 || categoria ? (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[0.6875rem] uppercase tracking-wide text-slate-400">Ver solo</span>
           <button

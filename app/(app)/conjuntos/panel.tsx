@@ -8,7 +8,7 @@ import { Badge, Button, EmptyState } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectorMultiple } from "@/components/selector-multiple";
-import { claveSugerida, type ConjuntoEnLista, type EstadoConjunto, type Residual } from "@/lib/conjuntos";
+import { claveSugerida, soloCategoria, type ConjuntoEnLista, type EstadoConjunto, type Residual } from "@/lib/conjuntos";
 import { LENTES, rampa, tonoEstado, tonoPendiente, type Lente } from "@/lib/mapa-lentes";
 import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
 import { formatCurrency } from "@/lib/utils";
@@ -26,7 +26,7 @@ type Fila = ConjuntoEnLista & { assetIds: string[] };
  * estado de cada equipo. Es la invitación a entrar: antes el mapa —lo que más
  * vale de esta pantalla— solo se encontraba tocando el nombre.
  */
-function MiniMapa({ plano, sinColocar, lente, maxHoras }: { plano: Fila["plano"]; sinColocar: number; lente: Lente; maxHoras: number }) {
+function MiniMapa({ plano, sinColocar, lente, maxHoras, categoria }: { plano: Fila["plano"]; sinColocar: number; lente: Lente; maxHoras: number; categoria: string | null }) {
   if (!plano.length) {
     return (
       <div className="grid h-24 place-items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center text-[0.6875rem] text-slate-500">
@@ -41,8 +41,10 @@ function MiniMapa({ plano, sinColocar, lente, maxHoras }: { plano: Fila["plano"]
   // Los mismos colores que el mapa de la línea. En «lo que costó» la escala es
   // contra el equipo con más paro de TODAS las líneas a la vista: así se
   // comparan entre sí, que es la pregunta de esta pantalla.
+  // Con una categoría elegida, lo demás se apaga pero no se quita: igual que
+  // en el mapa, quitarlo destruiría la geografía.
   const color = (p: Fila["plano"][number]) =>
-    lente === "AHORA" ? tonoEstado(p.status) : lente === "COSTO" ? rampa(p.horas / maxHoras) : tonoPendiente(p.planesVencidos, p.ordenesAbiertas);
+    categoria && p.categoriaId !== categoria ? "#dfe4ea" : lente === "AHORA" ? tonoEstado(p.status) : lente === "COSTO" ? rampa(p.horas / maxHoras) : tonoPendiente(p.planesVencidos, p.ordenesAbiertas);
   return (
     <svg viewBox={`${minX - 0.5} ${minY - 0.5} ${ancho + 1} ${alto + 1}`} preserveAspectRatio="xMidYMid meet"
       className="h-24 w-full rounded-lg bg-slate-50" role="img" aria-label="Miniatura del mapa">
@@ -92,7 +94,7 @@ const SELLOS: Record<
 
 export function Panel({
   termino, conjuntos, residual, equipos, personas, clasificados, editable,
-  lente, periodo, sitios, filtroSitio, filtroClase, moneda,
+  lente, periodo, sitios, filtroSitio, filtroClase, moneda, categorias, filtroCategoria,
 }: {
   termino: TerminoConjunto;
   conjuntos: Fila[];
@@ -102,6 +104,8 @@ export function Panel({
   filtroSitio: string | null;
   filtroClase: string | null;
   moneda: string;
+  categorias: { id: string; name: string }[];
+  filtroCategoria: string | null;
   residual: Residual;
   equipos: Equipo[];
   personas: { id: string; name: string }[];
@@ -115,19 +119,35 @@ export function Panel({
   // Vista, periodo y filtros viven en la URL: se comparten y sobreviven a recargar.
   const ir = (cambios: Record<string, string | null>) => {
     const q = new URLSearchParams();
-    const actual = { lente, p: periodo, sitio: filtroSitio, clase: filtroClase, ...cambios };
+    const actual = { lente, p: periodo, sitio: filtroSitio, clase: filtroClase, cat: filtroCategoria, ...cambios };
     if (actual.lente && actual.lente !== "AHORA") q.set("lente", actual.lente);
     if (actual.lente === "COSTO" && actual.p && actual.p !== "TRIMESTRE") q.set("p", actual.p);
     if (actual.sitio) q.set("sitio", actual.sitio);
     if (actual.clase) q.set("clase", actual.clase);
+    if (actual.cat) q.set("cat", actual.cat);
     router.push(`/conjuntos${q.size ? `?${q}` : ""}`);
   };
   const clases = useMemo(() => [...new Set(conjuntos.map((c) => c.clasificacion).filter((x): x is string => Boolean(x)))].sort(), [conjuntos]);
-  const visibles = conjuntos.filter((c) =>
-    (!filtroSitio || c.sitio?.id === filtroSitio) &&
-    (!filtroClase || (filtroClase === "__sin" ? !c.clasificacion : c.clasificacion === filtroClase)));
-  const maxHoras = Math.max(1, ...visibles.flatMap((c) => c.plano.map((p) => p.horas)));
-  const enlaceMapa = (id: string) => `/conjuntos/${id}${lente !== "AHORA" ? `?lente=${lente}${lente === "COSTO" ? `&p=${periodo}` : ""}` : ""}`;
+  // Solo las categorías que de verdad aparecen en alguna línea.
+  const categoriasEnUso = useMemo(() => {
+    const usadas = new Set(conjuntos.flatMap((c) => c.detalle.map((d) => d.categoriaId).filter(Boolean)));
+    return categorias.filter((c) => usadas.has(c.id));
+  }, [conjuntos, categorias]);
+  const visibles = conjuntos
+    .filter((c) =>
+      (!filtroSitio || c.sitio?.id === filtroSitio) &&
+      (!filtroClase || (filtroClase === "__sin" ? !c.clasificacion : c.clasificacion === filtroClase)) &&
+      (!filtroCategoria || c.detalle.some((d) => d.categoriaId === filtroCategoria)))
+    // Con una categoría elegida, los números de la tarjeta son solo de esa categoría.
+    .map((c) => (filtroCategoria ? soloCategoria(c, filtroCategoria) : c));
+  const maxHoras = Math.max(1, ...visibles.flatMap((c) => c.plano.filter((p) => !filtroCategoria || p.categoriaId === filtroCategoria).map((p) => p.horas)));
+  const enlaceMapa = (id: string) => {
+    const q = new URLSearchParams();
+    if (lente !== "AHORA") q.set("lente", lente);
+    if (lente === "COSTO") q.set("p", periodo);
+    if (filtroCategoria) q.set("categoria", filtroCategoria);
+    return `/conjuntos/${id}${q.size ? `?${q}` : ""}`;
+  };
   const [error, setError] = useState<string | null>(null);
   const [borrando, setBorrando] = useState<string | null>(null);
 
@@ -188,7 +208,7 @@ export function Panel({
             ) : null}
           </div>
           <p className="text-[0.6875rem] text-slate-500">{LENTES[lente].ayuda}</p>
-          {sitios.length > 1 || clases.length ? (
+          {sitios.length > 1 || clases.length || categoriasEnUso.length > 1 ? (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 text-xs">
               {sitios.length > 1 ? (
                 <label className="flex items-center gap-1.5 text-slate-600">
@@ -196,6 +216,15 @@ export function Panel({
                   <select className="field w-auto py-1 text-xs" value={filtroSitio ?? ""} onChange={(e) => ir({ sitio: e.target.value || null })}>
                     <option value="">Todos</option>
                     {sitios.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {categoriasEnUso.length > 1 ? (
+                <label className="flex items-center gap-1.5 text-slate-600">
+                  Categoría
+                  <select className="field w-auto py-1 text-xs" value={filtroCategoria ?? ""} onChange={(e) => ir({ cat: e.target.value || null })}>
+                    <option value="">Todas</option>
+                    {categoriasEnUso.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select>
                 </label>
               ) : null}
@@ -210,7 +239,7 @@ export function Panel({
                   ))}
                 </div>
               ) : null}
-              {filtroSitio || filtroClase ? (
+              {filtroSitio || filtroClase || filtroCategoria ? (
                 <span className="text-slate-500">{visibles.length} de {conjuntos.length} {termino.plural.toLowerCase()}</span>
               ) : null}
             </div>
@@ -305,7 +334,7 @@ export function Panel({
                 )}
 
                 <Link href={enlaceMapa(f.id)} className="block rounded-lg ring-brand-300 transition hover:ring-2" title="Abrir el mapa">
-                  <MiniMapa plano={f.plano} sinColocar={f.sinColocar} lente={lente} maxHoras={maxHoras} />
+                  <MiniMapa plano={f.plano} sinColocar={f.sinColocar} lente={lente} maxHoras={maxHoras} categoria={filtroCategoria} />
                 </Link>
 
                 <p className="text-[0.6875rem] text-slate-500">
