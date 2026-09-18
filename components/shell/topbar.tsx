@@ -23,6 +23,7 @@ export function Topbar({
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [cuentas, setCuentas] = useState({ noLeidas: 0, pendientes: 0 });
+  const [avisosEn, setAvisosEn] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -43,6 +44,7 @@ export function Topbar({
         if (!cancelled) {
           setItems(data.notifications ?? []);
           setCuentas({ noLeidas: data.noLeidas ?? 0, pendientes: data.pendientes ?? 0 });
+          setAvisosEn(data.avisosEn ?? null);
         }
       } catch { /* sin red: se reintenta en el siguiente minuto */ }
     }
@@ -140,6 +142,11 @@ export function Topbar({
                 ) : null}
               </div>
               <div className="max-h-80 overflow-y-auto">
+                {avisosEn ? (
+                  <p className="border-b border-slate-100 bg-amber-50 px-3 py-2 text-[0.6875rem] text-amber-800">
+                    Está dentro de una empresa cliente. Sus avisos de {avisosEn} aparecen al volver a su empresa.
+                  </p>
+                ) : null}
                 {items.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-slate-400">Sin notificaciones</p>
                 ) : (

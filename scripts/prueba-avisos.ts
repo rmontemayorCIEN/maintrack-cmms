@@ -469,6 +469,18 @@ async function main() {
     revisar("43. aviso, credencial, webhook y entrega de otra empresa: 404, aunque se manipule la URL",
       intentos.every((r) => r.status === 404) && (entregasB.json.entregas as Array<{ id: string }>).every((e) => e.id !== entregaA.id) &&
       (await prisma.credencialApi.findUniqueOrThrow({ where: { id: credBId } })).estado === "ACTIVA", intentos.map((r) => r.status));
+    // El operador dentro de un cliente: su campana no muestra los avisos de su
+    // propia empresa (sus ligas darían «no encontrado» dentro del cliente).
+    const operador = await prisma.user.create({ data: { organizationId: A.id, email: `op-${sello}@t.mx`, name: "Operador", role: "OWNER", isSuperAdmin: true, passwordHash: "x" } });
+    await prisma.notification.create({ data: { organizationId: A.id, userId: operador.id, title: "Aviso de su empresa", link: `/work-orders/${otC.id}` } });
+    const cOperadorEnB = { Cookie: `mt_session=${await new SignJWT({ userId: operador.id, organizationId: A.id, actingOrganizationId: B.id, email: operador.email, name: operador.name, role: "OWNER" })
+      .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(secreto)}` };
+    const enB = await pedir("GET", "/api/notifications", cOperadorEnB);
+    const enA = await pedir("GET", "/api/notifications", { Cookie: `mt_session=${await new SignJWT({ userId: operador.id, organizationId: A.id, email: operador.email, name: operador.name, role: "OWNER" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(secreto)}` });
+    revisar("el operador dentro de un cliente no ve en la campana los avisos de su empresa, y se le dice dónde están",
+      enB.status === 200 && (enB.json.notifications as unknown[]).length === 0 && enB.json.avisosEn === A.name &&
+      (enA.json.notifications as unknown[]).length === 1 && enA.json.avisosEn === null, { enB: (enB.json.notifications as unknown[])?.length, enA: (enA.json.notifications as unknown[])?.length, avisosEn: enB.json.avisosEn });
+
     const tecConfig = await pedir("PUT", "/api/avisos/configuracion", cTec, { horaInicio: "07:00" });
     const tecCred = await pedir("POST", "/api/integraciones/credenciales", cTec, { nombre: "x", alcances: ["activos:leer"] });
     revisar("   un técnico no configura canales ni crea credenciales (403)", tecConfig.status === 403 && tecCred.status === 403);

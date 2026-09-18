@@ -22,6 +22,7 @@ export function CentroDeAvisos() {
   const [avisos, setAvisos] = useState<AvisoVista[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [cuentas, setCuentas] = useState({ noLeidas: 0, pendientes: 0 });
+  const [avisosEn, setAvisosEn] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,7 @@ export function CentroDeAvisos() {
       setAvisos((prev) => (mas ? [...prev, ...d.notifications] : d.notifications));
       setCursor(d.siguienteCursor);
       setCuentas({ noLeidas: d.noLeidas, pendientes: d.pendientes });
+      setAvisosEn(d.avisosEn ?? null);
     } catch {
       setError("Sin conexión. Intente de nuevo.");
     } finally {
@@ -101,6 +103,11 @@ export function CentroDeAvisos() {
       </Card>
 
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p> : null}
+      {avisosEn ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Está dentro de una empresa cliente: aquí solo aparecen avisos de esta empresa. Sus avisos de {avisosEn} los ve al volver a su empresa.
+        </p>
+      ) : null}
 
       <Card padded={false}>
         {avisos.length === 0 && !cargando ? (

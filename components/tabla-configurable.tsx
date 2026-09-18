@@ -34,7 +34,7 @@ export type Vista = { columnas?: string[]; grupos?: string[] };
 
 export function TablaConfigurable<T extends { id: string }>({
   filas, fijas, columnas, deFabrica, vistaInicial, clave,
-  ejemploFiltro, acciones, sustantivo = "registros",
+  ejemploFiltro, acciones, sustantivo = "registros", busquedaInicial = "",
 }: {
   filas: T[];
   /** Columnas que siempre van al frente. Sin ellas la tabla deja de identificar de que habla. */
@@ -48,6 +48,8 @@ export function TablaConfigurable<T extends { id: string }>({
   ejemploFiltro?: string;
   acciones?: (f: T) => React.ReactNode;
   sustantivo?: string;
+  /** Texto con que arranca el filtro: el que trae una liga (un aviso, un pendiente). */
+  busquedaInicial?: string;
 }) {
   const router = useRouter();
   const porId = useMemo(() => new Map(columnas.map((c) => [c.id, c])), [columnas]);
@@ -58,7 +60,7 @@ export function TablaConfigurable<T extends { id: string }>({
   const [grupos, setGrupos] = useState<string[]>(
     (vistaInicial.grupos ?? []).filter((id) => porId.get(id)?.agrupable).slice(0, 3),
   );
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda, setBusqueda] = useState(busquedaInicial);
   const [panel, setPanel] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);

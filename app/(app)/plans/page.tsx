@@ -28,8 +28,10 @@ import { AlertTriangle, Network } from "lucide-react";
 export const metadata = { title: "Planes preventivos" };
 export const dynamic = "force-dynamic";
 
-export default async function PlansPage() {
+export default async function PlansPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const user = await requireUser();
+  // Una liga a un plan concreto (un aviso, un pendiente) llega como ?q=<nombre>.
+  const busquedaInicial = (await searchParams).q?.slice(0, 120) ?? "";
   const editable = can(user.role, "plan:write");
   const puedeCrearCatalogos = can(user.role, "settings:write");
   const currency = user.organization.currency;
@@ -297,6 +299,7 @@ export default async function PlansPage() {
         <TablaPlanes
           planes={filas}
           vistaInicial={vista}
+          busquedaInicial={busquedaInicial}
           editable={editable}
           assets={assets}
           meters={meters}

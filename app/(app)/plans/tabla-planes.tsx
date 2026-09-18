@@ -40,10 +40,11 @@ const TRIGGER: Record<string, string> = { CALENDAR: "Calendario", METER: "Medido
 
 export function TablaPlanes({
   planes, vistaInicial, editable, assets, meters, technicians,
-  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos,
+  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos, busquedaInicial,
 }: {
   planes: FilaPlan[];
   vistaInicial: Vista;
+  busquedaInicial?: string;
   editable: boolean;
   assets: React.ComponentProps<typeof PlanDialog>["assets"];
   meters: React.ComponentProps<typeof PlanDialog>["meters"];
@@ -191,6 +192,7 @@ export function TablaPlanes({
       columnas={COLUMNAS}
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
+      busquedaInicial={busquedaInicial}
       clave="planes"
       sustantivo="planes"
       ejemploFiltro='Filtrar: "bomba", "mensual", "pausado"…'
