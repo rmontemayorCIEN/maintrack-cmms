@@ -529,6 +529,8 @@ model Site {
   warehouses   Warehouse[]
   reportPoints ReportPoint[]
 
+  conjuntos Conjunto[]
+
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -3011,11 +3013,21 @@ model Conjunto {
   /// despues sin adivinar.
   origen String @default("MANUAL")
 
+  /// Bloque de mapas: a qué sitio (planta) pertenece la línea, para filtrar
+  /// el mapa de una planta grande. Nulo: se toma el sitio de la mayoría de
+  /// sus equipos, así las líneas que ya existían se filtran sin capturar nada.
+  siteId        String?
+  /// Clasificación libre para enfocarse dentro de un sitio: «Producción»,
+  /// «Servicios auxiliares», «Utilidades»… Libre porque cada giro clasifica
+  /// distinto; la pantalla sugiere las que ya se usan.
+  clasificacion String?
+
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site?           @relation(fields: [siteId], references: [id])
   responsable  User?           @relation("ConjuntoResponsable", fields: [responsableId], references: [id])
   equipos      ConjuntoAsset[]
 

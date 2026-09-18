@@ -2,12 +2,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
-import { loQueImpideBorrar } from "@/lib/conjuntos";
+import { clasificacionLimpia, loQueImpideBorrar, referenciasInvalidas } from "@/lib/conjuntos";
 
 const schema = z.object({
   name: z.string().min(2).max(120).optional(),
   descripcion: z.string().max(2000).nullable().optional(),
   responsableId: z.string().nullable().optional(),
+  siteId: z.string().nullable().optional(),
+  clasificacion: z.string().max(80).nullable().optional(),
   active: z.boolean().optional(),
 });
 
@@ -23,7 +25,16 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!existe) return fail("No encontrado", 404);
 
     const input = schema.parse(await request.json());
-    await prisma.conjunto.update({ where: { id }, data: input });
+    const invalida = await referenciasInvalidas(orgId, input);
+    if (invalida) return fail(invalida, 422);
+    await prisma.conjunto.update({
+      where: { id },
+      data: {
+        ...input,
+        ...(input.siteId !== undefined ? { siteId: input.siteId || null } : {}),
+        ...(input.clasificacion !== undefined ? { clasificacion: clasificacionLimpia(input.clasificacion) } : {}),
+      },
+    });
 
     await logAudit({
       organizationId: orgId,

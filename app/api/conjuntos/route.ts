@@ -2,13 +2,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
-import { claveSugerida } from "@/lib/conjuntos";
+import { claveSugerida, clasificacionLimpia, referenciasInvalidas } from "@/lib/conjuntos";
 
 const schema = z.object({
   name: z.string().min(2).max(120),
   code: z.string().max(20).optional(),
   descripcion: z.string().max(2000).nullable().optional(),
   responsableId: z.string().nullable().optional(),
+  siteId: z.string().nullable().optional(),
+  clasificacion: z.string().max(80).nullable().optional(),
   assetIds: z.array(z.string()).max(500).optional(),
 });
 
@@ -16,6 +18,8 @@ export async function POST(request: Request) {
   return withAuth("asset:write", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
     const code = (input.code?.trim() || claveSugerida(input.name)) || "CONJUNTO";
+    const invalida = await referenciasInvalidas(orgId, input);
+    if (invalida) return fail(invalida, 422);
 
     const repetida = await prisma.conjunto.findFirst({
       where: { organizationId: orgId, code },
@@ -39,6 +43,8 @@ export async function POST(request: Request) {
         name: input.name.trim(),
         descripcion: input.descripcion?.trim() || null,
         responsableId: input.responsableId || null,
+        siteId: input.siteId || null,
+        clasificacion: clasificacionLimpia(input.clasificacion),
         origen: "MANUAL",
         equipos: {
           create: propios.map((a) => ({ organizationId: orgId, assetId: a.id })),

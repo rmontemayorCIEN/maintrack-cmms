@@ -16,7 +16,8 @@
  *   npx tsx scripts/prueba-conjuntos.ts
  */
 import { prisma } from "../lib/db";
-import { conjuntosDe, residualDe, estadoDe, claveSugerida, loQueImpideBorrar } from "../lib/conjuntos";
+import { conjuntosDe, residualDe, estadoDe, claveSugerida, loQueImpideBorrar, referenciasInvalidas, clasificacionLimpia } from "../lib/conjuntos";
+import { nombreDelMapa } from "../lib/instalaciones";
 import { terminoConjunto } from "../lib/instalaciones";
 
 let fallos = 0;
@@ -160,6 +161,31 @@ async function main() {
 
   revisar("no deja borrar un conjunto con equipos, y dice cuántos",
     (await loQueImpideBorrar(org.id, linea.id))?.includes("1 equipo") === true);
+
+  console.log("\nMapa de líneas: nombre, sitio, clasificación y vistas");
+  revisar("el mapa se nombra según el giro", nombreDelMapa(terminoConjunto({ tipoInstalacion: "PLANTA" })) === "Mapa de líneas" &&
+    nombreDelMapa(terminoConjunto({ tipoInstalacion: "FLOTILLA" })) === "Mapa de rutas");
+  revisar("la clasificación se limpia (espacios y mayúscula inicial); vacía es sin clasificar",
+    clasificacionLimpia("  servicios   auxiliares ") === "Servicios auxiliares" && clasificacionLimpia("   ") === null);
+  const planta2 = await prisma.site.create({ data: { organizationId: org.id, code: "PL2", name: "Planta 2" } });
+  const deduce = (await conjuntosDe(org.id)).find((c) => c.code === "L4")!;
+  revisar("sin sitio asignado, se deduce del de sus equipos y se marca como deducido",
+    deduce.sitio?.id === sitio.id && deduce.sitio.asignado === false, JSON.stringify(deduce.sitio));
+  await prisma.conjunto.update({ where: { id: linea.id }, data: { siteId: planta2.id, clasificacion: "Servicios auxiliares" } });
+  const asignado = (await conjuntosDe(org.id)).find((c) => c.code === "L4")!;
+  revisar("con sitio asignado, manda el asignado", asignado.sitio?.id === planta2.id && asignado.sitio.asignado && asignado.clasificacion === "Servicios auxiliares");
+  const vivoL4 = (await prisma.conjuntoAsset.findFirstOrThrow({ where: { conjuntoId: linea.id, asset: { active: true } } })).assetId;
+  await prisma.workOrder.create({ data: { organizationId: org.id, number: `OT-${sello}`, title: "Abierta", maintenanceType: "CORRECTIVE", status: "OPEN", assetId: vivoL4 } });
+  const conPendiente = (await conjuntosDe(org.id)).find((c) => c.code === "L4")!;
+  revisar("«lo que trae pendiente» cuenta las órdenes abiertas por equipo, igual que el mapa",
+    conPendiente.ordenesAbiertas === 1 && conPendiente.plano.find((p) => p.ordenesAbiertas === 1) !== undefined);
+  const personaVecina = await prisma.user.create({ data: { organizationId: vecino.id, email: `v-${sello}@t.mx`, name: "V", role: "OWNER", passwordHash: "x" } });
+  const sitioVecino = await prisma.site.create({ data: { organizationId: vecino.id, code: "VX", name: "De otro" } });
+  revisar("un responsable de otra empresa se rechaza", Boolean(await referenciasInvalidas(org.id, { responsableId: personaVecina.id })));
+  revisar("un sitio de otra empresa se rechaza", Boolean(await referenciasInvalidas(org.id, { siteId: sitioVecino.id })));
+  revisar("los propios pasan", (await referenciasInvalidas(org.id, { siteId: planta2.id })) === null);
+  await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
+  await prisma.user.deleteMany({ where: { organizationId: vecino.id } });
 
   revisar("el vecino no ve mis conjuntos", (await conjuntosDe(vecino.id)).length === 0);
   revisar("ni mis equipos sueltos", (await residualDe(vecino.id)).total === 0);

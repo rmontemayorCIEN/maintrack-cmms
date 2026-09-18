@@ -42,7 +42,21 @@ export type ConjuntoEnLista = {
    * El acomodo del mapa, para la miniatura de la lista: celdas y estado de
    * los equipos ya colocados. Sin nombres: solo forma y color.
    */
-  plano: Array<{ x: number; y: number; w: number; h: number; estado: "OPERA" | "MEDIAS" | "ABAJO" }>;
+  plano: EquipoEnPlano[];
+  /** Sitio asignado, o el de la mayoría de sus equipos si no se asignó. */
+  sitio: { id: string; name: string; asignado: boolean } | null;
+  clasificacion: string | null;
+  /** Totales para las tres vistas de la lista. */
+  horasParo: number;
+  perdida: number;
+  planesVencidos: number;
+  ordenesAbiertas: number;
+};
+
+/** Un equipo colocado en el mapa, con lo que hace falta para pintarlo en cualquiera de las tres vistas. */
+export type EquipoEnPlano = {
+  x: number; y: number; w: number; h: number;
+  status: string; horas: number; planesVencidos: number; ordenesAbiertas: number;
 };
 
 /**
@@ -61,21 +75,51 @@ export function estadoDe(c: { equipos: number; abajo: number; aMedias: number })
   return "COMPLETO";
 }
 
-export async function conjuntosDe(organizationId: string): Promise<ConjuntoEnLista[]> {
+/**
+ * Las líneas con su mapa en miniatura y los datos de las tres vistas.
+ *
+ * El costo usa el MISMO cálculo que el mapa de cada línea (`costoDeParar`,
+ * que solo cobra el paro de lo que detiene la producción), y los pendientes
+ * la misma regla: planes vencidos y órdenes abiertas por equipo. Así la
+ * miniatura y el mapa nunca dicen cosas distintas.
+ */
+export async function conjuntosDe(
+  organizationId: string,
+  opciones: { costo?: { desde: Date; hasta: Date } } = {},
+): Promise<ConjuntoEnLista[]> {
   const filas = await prisma.conjunto.findMany({
     where: { organizationId, active: true },
     select: {
-      id: true, code: true, name: true, descripcion: true, origen: true,
+      id: true, code: true, name: true, descripcion: true, origen: true, clasificacion: true,
       responsable: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true } },
       equipos: {
         select: {
           planoX: true, planoY: true, planoAncho: true, planoAlto: true,
-          asset: { select: { status: true, detieneLinea: true, active: true } },
+          asset: { select: { id: true, status: true, detieneLinea: true, active: true, siteId: true } },
         },
       },
     },
     orderBy: { name: "asc" },
   });
+
+  const ids = [...new Set(filas.flatMap((c) => c.equipos.map((e) => e.asset.id)))];
+  const ahora = new Date();
+  const [planes, ordenes, sitios, costo] = await Promise.all([
+    ids.length ? prisma.planAsset.findMany({ where: { organizationId, assetId: { in: ids }, active: true, nextDueDate: { lt: ahora } }, select: { assetId: true } }) : [],
+    ids.length ? prisma.workOrder.findMany({ where: { organizationId, assetId: { in: ids }, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } }, select: { assetId: true } }) : [],
+    prisma.site.findMany({ where: { organizationId }, select: { id: true, name: true } }),
+    opciones.costo && ids.length ? (await import("./costo-de-parar")).costoDeParar(organizationId, opciones.costo) : null,
+  ]);
+  const cuenta = (xs: Array<{ assetId: string | null }>) => {
+    const m = new Map<string, number>();
+    for (const x of xs) if (x.assetId) m.set(x.assetId, (m.get(x.assetId) ?? 0) + 1);
+    return m;
+  };
+  const vencidos = cuenta(planes);
+  const abiertas = cuenta(ordenes);
+  const paro = new Map((costo?.areas ?? []).flatMap((a) => a.equipos).map((e) => [e.assetId, e]));
+  const nombreSitio = new Map(sitios.map((x) => [x.id, x.name]));
 
   return filas.map((c) => {
     // Un equipo retirado no se borra de su conjunto —su historia sigue
@@ -84,6 +128,17 @@ export async function conjuntosDe(organizationId: string): Promise<ConjuntoEnLis
     const abajo = vivos.filter((e) => e.asset.status === ABAJO);
     const aMedias = vivos.filter((e) => e.asset.status === A_MEDIAS).length;
     const base = { equipos: vivos.length, abajo: abajo.length, aMedias };
+
+    // Sin sitio asignado, el de la mayoría de sus equipos: las líneas que ya
+    // existían se filtran por planta sin que nadie capture nada.
+    let sitio: ConjuntoEnLista["sitio"] = c.site ? { ...c.site, asignado: true } : null;
+    if (!sitio) {
+      const votos = new Map<string, number>();
+      for (const e of vivos) if (e.asset.siteId) votos.set(e.asset.siteId, (votos.get(e.asset.siteId) ?? 0) + 1);
+      const [ganador] = [...votos.entries()].sort((a, b) => b[1] - a[1]);
+      if (ganador) sitio = { id: ganador[0], name: nombreSitio.get(ganador[0]) ?? "—", asignado: false };
+    }
+
     return {
       id: c.id, code: c.code, name: c.name, descripcion: c.descripcion,
       responsable: c.responsable, origen: c.origen,
@@ -94,9 +149,16 @@ export async function conjuntosDe(organizationId: string): Promise<ConjuntoEnLis
       plano: vivos
         .filter((e) => e.planoX !== null && e.planoY !== null)
         .map((e) => ({
-          x: e.planoX!, y: e.planoY!, w: e.planoAncho, h: e.planoAlto,
-          estado: e.asset.status === ABAJO ? "ABAJO" as const : e.asset.status === A_MEDIAS ? "MEDIAS" as const : "OPERA" as const,
+          x: e.planoX!, y: e.planoY!, w: e.planoAncho, h: e.planoAlto, status: e.asset.status,
+          horas: paro.get(e.asset.id)?.horas ?? 0,
+          planesVencidos: vencidos.get(e.asset.id) ?? 0, ordenesAbiertas: abiertas.get(e.asset.id) ?? 0,
         })),
+      sitio,
+      clasificacion: c.clasificacion,
+      horasParo: vivos.reduce((a, e) => a + (paro.get(e.asset.id)?.horas ?? 0), 0),
+      perdida: vivos.reduce((a, e) => a + (paro.get(e.asset.id)?.perdida ?? 0), 0),
+      planesVencidos: vivos.reduce((a, e) => a + (vencidos.get(e.asset.id) ?? 0), 0),
+      ordenesAbiertas: vivos.reduce((a, e) => a + (abiertas.get(e.asset.id) ?? 0), 0),
     };
   });
 }
@@ -204,4 +266,30 @@ export async function loQueImpideBorrar(
     return `Tiene ${equipos} equipo${equipos === 1 ? "" : "s"} adentro. Quítelos primero, o desactívelo para conservarlo sin que aparezca.`;
   }
   return null;
+}
+
+/**
+ * El responsable y el sitio de una línea tienen que ser de la misma empresa.
+ * Sin esto, conociendo un identificador se podía poner como responsable a una
+ * persona de otra empresa. Devuelve el motivo si algo no es válido.
+ */
+export async function referenciasInvalidas(
+  organizationId: string,
+  r: { responsableId?: string | null; siteId?: string | null },
+): Promise<string | null> {
+  if (r.responsableId) {
+    const u = await prisma.user.count({ where: { id: r.responsableId, organizationId, active: true } });
+    if (!u) return "El responsable no existe o no está activo";
+  }
+  if (r.siteId) {
+    const s = await prisma.site.count({ where: { id: r.siteId, organizationId } });
+    if (!s) return "El sitio no existe";
+  }
+  return null;
+}
+
+/** La clasificación, limpia: sin espacios de más y con mayúscula inicial. Vacía = sin clasificar. */
+export function clasificacionLimpia(t?: string | null): string | null {
+  const v = (t ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+  return v ? v.charAt(0).toUpperCase() + v.slice(1) : null;
 }

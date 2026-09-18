@@ -8,7 +8,10 @@ import { Badge, Button, EmptyState } from "@/components/ui";
 import { Dialogo } from "@/components/ui/dialogo";
 import { SelectorBuscable } from "@/components/selector-buscable";
 import { SelectorMultiple } from "@/components/selector-multiple";
-import { claveSugerida, type EstadoConjunto, type Residual } from "@/lib/conjuntos";
+import { claveSugerida, type ConjuntoEnLista, type EstadoConjunto, type Residual } from "@/lib/conjuntos";
+import { LENTES, rampa, tonoEstado, tonoPendiente, type Lente } from "@/lib/mapa-lentes";
+import { PERIODOS, type ClavePeriodo } from "@/lib/costo-de-parar";
+import { formatCurrency } from "@/lib/utils";
 import { CLAVE_ULTIMO_MAPA, type TerminoConjunto } from "@/lib/instalaciones";
 
 type Equipo = {
@@ -16,24 +19,14 @@ type Equipo = {
   area: string | null; categoria: string | null;
 };
 
-type Fila = {
-  id: string; code: string; name: string; descripcion: string | null;
-  responsable: { id: string; name: string } | null;
-  origen: string;
-  equipos: number; abajo: number; abajoQueDetienen: number; aMedias: number;
-  estado: EstadoConjunto; sinColocar: number;
-  assetIds: string[];
-  plano: Array<{ x: number; y: number; w: number; h: number; estado: "OPERA" | "MEDIAS" | "ABAJO" }>;
-};
-
-const COLOR_EQUIPO = { OPERA: "fill-emerald-400", MEDIAS: "fill-amber-400", ABAJO: "fill-red-500" } as const;
+type Fila = ConjuntoEnLista & { assetIds: string[] };
 
 /**
  * La miniatura del mapa: el mismo acomodo, sin nombres, con el color del
  * estado de cada equipo. Es la invitación a entrar: antes el mapa —lo que más
  * vale de esta pantalla— solo se encontraba tocando el nombre.
  */
-function MiniMapa({ plano, sinColocar }: { plano: Fila["plano"]; sinColocar: number }) {
+function MiniMapa({ plano, sinColocar, lente, maxHoras }: { plano: Fila["plano"]; sinColocar: number; lente: Lente; maxHoras: number }) {
   if (!plano.length) {
     return (
       <div className="grid h-24 place-items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center text-[0.6875rem] text-slate-500">
@@ -45,17 +38,22 @@ function MiniMapa({ plano, sinColocar }: { plano: Fila["plano"]; sinColocar: num
   const minY = Math.min(...plano.map((p) => p.y));
   const ancho = Math.max(...plano.map((p) => p.x + p.w)) - minX;
   const alto = Math.max(...plano.map((p) => p.y + p.h)) - minY;
+  // Los mismos colores que el mapa de la línea. En «lo que costó» la escala es
+  // contra el equipo con más paro de TODAS las líneas a la vista: así se
+  // comparan entre sí, que es la pregunta de esta pantalla.
+  const color = (p: Fila["plano"][number]) =>
+    lente === "AHORA" ? tonoEstado(p.status) : lente === "COSTO" ? rampa(p.horas / maxHoras) : tonoPendiente(p.planesVencidos, p.ordenesAbiertas);
   return (
     <svg viewBox={`${minX - 0.5} ${minY - 0.5} ${ancho + 1} ${alto + 1}`} preserveAspectRatio="xMidYMid meet"
       className="h-24 w-full rounded-lg bg-slate-50" role="img" aria-label="Miniatura del mapa">
       {plano.map((p, i) => (
-        <rect key={i} x={p.x + 0.1} y={p.y + 0.1} width={p.w - 0.2} height={p.h - 0.2} rx={0.3} className={COLOR_EQUIPO[p.estado]} />
+        <rect key={i} x={p.x + 0.1} y={p.y + 0.1} width={p.w - 0.2} height={p.h - 0.2} rx={0.3} fill={color(p)} />
       ))}
     </svg>
   );
 }
 
-/** «Volver al mapa de…»: el último que abrió esta persona, en este navegador. */
+/** «Volver al mapa: …»: el último que abrió esta persona, en este navegador. */
 function UltimoMapa({ conjuntos }: { conjuntos: Fila[] }) {
   const [ultimo, setUltimo] = useState<{ id: string; nombre: string } | null>(null);
   useEffect(() => {
@@ -94,9 +92,16 @@ const SELLOS: Record<
 
 export function Panel({
   termino, conjuntos, residual, equipos, personas, clasificados, editable,
+  lente, periodo, sitios, filtroSitio, filtroClase, moneda,
 }: {
   termino: TerminoConjunto;
   conjuntos: Fila[];
+  lente: Lente;
+  periodo: ClavePeriodo;
+  sitios: { id: string; name: string }[];
+  filtroSitio: string | null;
+  filtroClase: string | null;
+  moneda: string;
   residual: Residual;
   equipos: Equipo[];
   personas: { id: string; name: string }[];
@@ -106,6 +111,23 @@ export function Panel({
 }) {
   const router = useRouter();
   const [editando, setEditando] = useState<Fila | "nuevo" | null>(null);
+
+  // Vista, periodo y filtros viven en la URL: se comparten y sobreviven a recargar.
+  const ir = (cambios: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const actual = { lente, p: periodo, sitio: filtroSitio, clase: filtroClase, ...cambios };
+    if (actual.lente && actual.lente !== "AHORA") q.set("lente", actual.lente);
+    if (actual.lente === "COSTO" && actual.p && actual.p !== "TRIMESTRE") q.set("p", actual.p);
+    if (actual.sitio) q.set("sitio", actual.sitio);
+    if (actual.clase) q.set("clase", actual.clase);
+    router.push(`/conjuntos${q.size ? `?${q}` : ""}`);
+  };
+  const clases = useMemo(() => [...new Set(conjuntos.map((c) => c.clasificacion).filter((x): x is string => Boolean(x)))].sort(), [conjuntos]);
+  const visibles = conjuntos.filter((c) =>
+    (!filtroSitio || c.sitio?.id === filtroSitio) &&
+    (!filtroClase || (filtroClase === "__sin" ? !c.clasificacion : c.clasificacion === filtroClase)));
+  const maxHoras = Math.max(1, ...visibles.flatMap((c) => c.plano.map((p) => p.horas)));
+  const enlaceMapa = (id: string) => `/conjuntos/${id}${lente !== "AHORA" ? `?lente=${lente}${lente === "COSTO" ? `&p=${periodo}` : ""}` : ""}`;
   const [error, setError] = useState<string | null>(null);
   const [borrando, setBorrando] = useState<string | null>(null);
 
@@ -145,6 +167,57 @@ export function Panel({
 
       <UltimoMapa conjuntos={conjuntos} />
 
+      {conjuntos.length ? (
+        <div className="card grid gap-3 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {(Object.keys(LENTES) as Lente[]).map((l) => (
+              <button key={l} type="button" onClick={() => ir({ lente: l })} aria-pressed={lente === l}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${lente === l ? "bg-brand-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                {LENTES[l].etiqueta}
+              </button>
+            ))}
+            {lente === "COSTO" ? (
+              <div className="flex flex-wrap gap-1">
+                {(Object.keys(PERIODOS) as ClavePeriodo[]).map((p) => (
+                  <button key={p} type="button" onClick={() => ir({ p })} aria-pressed={periodo === p}
+                    className={`rounded-lg px-2 py-1 text-[0.6875rem] transition ${periodo === p ? "bg-slate-800 text-white" : "text-slate-500 hover:bg-slate-100"}`}>
+                    {PERIODOS[p].etiqueta}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <p className="text-[0.6875rem] text-slate-500">{LENTES[lente].ayuda}</p>
+          {sitios.length > 1 || clases.length ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 text-xs">
+              {sitios.length > 1 ? (
+                <label className="flex items-center gap-1.5 text-slate-600">
+                  Sitio
+                  <select className="field w-auto py-1 text-xs" value={filtroSitio ?? ""} onChange={(e) => ir({ sitio: e.target.value || null })}>
+                    <option value="">Todos</option>
+                    {sitios.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {clases.length ? (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-slate-600">Clasificación</span>
+                  {[{ v: null, t: "Todas" }, ...clases.map((c) => ({ v: c, t: c })), { v: "__sin", t: "Sin clasificar" }].map((o) => (
+                    <button key={o.t} type="button" onClick={() => ir({ clase: o.v })} aria-pressed={filtroClase === o.v}
+                      className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] transition ${filtroClase === o.v ? "bg-brand-100 font-medium text-brand-800" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      {o.t}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {filtroSitio || filtroClase ? (
+                <span className="text-slate-500">{visibles.length} de {conjuntos.length} {termino.plural.toLowerCase()}</span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
           {residual.total > 0 ? (
@@ -172,7 +245,12 @@ export function Panel({
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {conjuntos.map((f) => {
+          {visibles.length === 0 ? (
+            <p className="col-span-full rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-xs text-slate-500">
+              Nada coincide con estos filtros.
+            </p>
+          ) : null}
+          {visibles.map((f) => {
             const sello = SELLOS[f.estado];
             return (
               <div key={f.id} className="card grid gap-2 p-4">
@@ -184,7 +262,11 @@ export function Panel({
                     >
                       {f.name}
                     </Link>
-                    <p className="truncate font-mono text-[0.6875rem] text-slate-400">{f.code}</p>
+                    <p className="truncate text-[0.6875rem] text-slate-400">
+                      <span className="font-mono">{f.code}</span>
+                      {f.sitio ? <span title={f.sitio.asignado ? undefined : "Según la mayoría de sus equipos"}> · {f.sitio.name}{f.sitio.asignado ? "" : "*"}</span> : null}
+                      {f.clasificacion ? <span> · {f.clasificacion}</span> : null}
+                    </p>
                   </div>
                   <Badge tone={sello.tono}>
                     <sello.Icono className="mr-1 inline h-3 w-3" />
@@ -192,6 +274,7 @@ export function Panel({
                   </Badge>
                 </div>
 
+                {lente === "AHORA" ? (
                 <p className="text-xs text-slate-600">
                   <span className="tabular-nums font-medium">{f.equipos}</span> equipo
                   {f.equipos === 1 ? "" : "s"}
@@ -208,9 +291,21 @@ export function Panel({
                   ) : null}
                   {f.aMedias > 0 ? ` · ${f.aMedias} degradado${f.aMedias === 1 ? "" : "s"}` : ""}
                 </p>
+                ) : lente === "COSTO" ? (
+                  <p className="text-xs text-slate-600">
+                    <span className="font-medium tabular-nums">{Math.round(f.horasParo * 10) / 10} h</span> de paro
+                    {f.perdida > 0 ? <> · <span className="font-medium tabular-nums text-red-700">{formatCurrency(f.perdida, moneda)}</span> perdidos</> : null}
+                    <span className="text-slate-400"> · {PERIODOS[periodo].etiqueta.toLowerCase()}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-600">
+                    <span className={`font-medium tabular-nums ${f.planesVencidos ? "text-red-700" : ""}`}>{f.planesVencidos}</span> plan{f.planesVencidos === 1 ? "" : "es"} vencido{f.planesVencidos === 1 ? "" : "s"}
+                    {" · "}<span className="font-medium tabular-nums">{f.ordenesAbiertas}</span> orden{f.ordenesAbiertas === 1 ? "" : "es"} abierta{f.ordenesAbiertas === 1 ? "" : "s"}
+                  </p>
+                )}
 
-                <Link href={`/conjuntos/${f.id}`} className="block rounded-lg ring-brand-300 transition hover:ring-2" title="Abrir el mapa">
-                  <MiniMapa plano={f.plano} sinColocar={f.sinColocar} />
+                <Link href={enlaceMapa(f.id)} className="block rounded-lg ring-brand-300 transition hover:ring-2" title="Abrir el mapa">
+                  <MiniMapa plano={f.plano} sinColocar={f.sinColocar} lente={lente} maxHoras={maxHoras} />
                 </Link>
 
                 <p className="text-[0.6875rem] text-slate-500">
@@ -234,7 +329,7 @@ export function Panel({
                 */}
                 <div className="mt-1 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
                   <Link
-                    href={`/conjuntos/${f.id}`}
+                    href={enlaceMapa(f.id)}
                     className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-[0.6875rem] font-medium text-white hover:bg-brand-700"
                   >
                     <LayoutGrid className="h-3 w-3" /> Ver mapa
@@ -296,6 +391,8 @@ export function Panel({
           fila={editando === "nuevo" ? null : editando}
           opcionesEquipo={opcionesEquipo}
           personas={personas}
+          sitios={sitios}
+          clases={clases}
           onCerrar={() => setEditando(null)}
         />
       ) : null}
@@ -429,12 +526,14 @@ function Residuo({
 }
 
 function FichaConjunto({
-  termino, fila, opcionesEquipo, personas, onCerrar,
+  termino, fila, opcionesEquipo, personas, sitios, clases, onCerrar,
 }: {
   termino: TerminoConjunto;
   fila: Fila | null;
   opcionesEquipo: { id: string; etiqueta: string; detalle: string | null }[];
   personas: { id: string; name: string }[];
+  sitios: { id: string; name: string }[];
+  clases: string[];
   onCerrar: () => void;
 }) {
   const router = useRouter();
@@ -446,6 +545,9 @@ function FichaConjunto({
   const claveEfectiva = claveTocada ? code : claveSugerida(name);
   const [descripcion, setDescripcion] = useState(fila?.descripcion ?? "");
   const [responsableId, setResponsableId] = useState(fila?.responsable?.id ?? "");
+  // Solo el sitio ASIGNADO se edita; el deducido de sus equipos se muestra como sugerencia.
+  const [siteId, setSiteId] = useState(fila?.sitio?.asignado ? fila.sitio.id : "");
+  const [clasificacion, setClasificacion] = useState(fila?.clasificacion ?? "");
   const [assetIds, setAssetIds] = useState<string[]>(fila?.assetIds ?? []);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -463,6 +565,8 @@ function FichaConjunto({
       code: claveEfectiva.trim() || undefined,
       descripcion: descripcion.trim() || null,
       responsableId: responsableId || null,
+      siteId: siteId || null,
+      clasificacion: clasificacion.trim() || null,
     };
 
     const res = fila
@@ -553,6 +657,26 @@ function FichaConjunto({
             </p>
           </div>
         ) : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">Sitio</label>
+            <select className="field" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+              <option value="">{fila?.sitio && !fila.sitio.asignado ? `Según sus equipos (${fila.sitio.name})` : "Según sus equipos"}</option>
+              {sitios.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <p className="mt-1 text-[0.6875rem] text-slate-500">La planta o sede. Sirve para ver solo los mapas de un sitio.</p>
+          </div>
+          <div>
+            <label className="label">Clasificación</label>
+            <input className="field" list="clases-de-linea" value={clasificacion} onChange={(e) => setClasificacion(e.target.value)}
+              placeholder="Producción · Servicios auxiliares · Utilidades" maxLength={60} />
+            <datalist id="clases-de-linea">
+              {[...new Set([...clases, "Producción", "Servicios auxiliares", "Utilidades", "Empaque"])].map((c) => <option key={c} value={c} />)}
+            </datalist>
+            <p className="mt-1 text-[0.6875rem] text-slate-500">Para enfocarse dentro de un sitio. Opcional.</p>
+          </div>
+        </div>
 
         <div>
           <label className="label">Responsable</label>
