@@ -15,16 +15,17 @@ const schema = z.object({ todas: z.boolean().optional() });
  */
 export async function POST(request: Request) {
   const { todas } = schema.parse(await request.json().catch(() => ({})));
-  if (todas) {
-    const user = await getCurrentUser();
-    if (user) {
-      await revocarSesiones(user.id);
-      await logAudit({
-        organizationId: user.organizacionPropia.id, userId: user.id,
-        entity: "User", entityId: user.id, action: "SESSIONS_REVOKED",
-        summary: `${user.name} cerró sesión en todos sus dispositivos`,
-      });
-    }
+  const user = await getCurrentUser();
+  if (user) {
+    if (todas) await revocarSesiones(user.id);
+    await logAudit({
+      organizationId: user.organizacionPropia.id, userId: user.id,
+      entity: "User", entityId: user.id,
+      action: todas ? "SESSIONS_REVOKED" : "LOGOUT",
+      summary: todas
+        ? `${user.name} cerró sesión en todos sus dispositivos`
+        : `${user.name} cerró sesión`,
+    });
   }
   await destroySession();
   return ok({ success: true });

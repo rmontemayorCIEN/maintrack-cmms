@@ -64,6 +64,9 @@ export async function POST(request: Request) {
       celular: input.celular,
       correo: input.correo,
       foto: input.foto ?? null,
+      // El origen lo pone Cloud Run en la cabecera; no se confia en nada que
+      // mande el navegador, que podria decir lo que quiera.
+      origen: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     });
     await recordarReportante(input.celular);
     return ok(reportado, 201);

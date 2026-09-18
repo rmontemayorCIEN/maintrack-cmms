@@ -18,7 +18,8 @@ export function FormularioReporte({
   token, empresa, lugar,
 }: {
   token: string;
-  empresa: string;
+  /** Nulo cuando el punto no muestra el nombre de la empresa. */
+  empresa: string | null;
   lugar: string | null;
 }) {
   const archivo = useRef<HTMLInputElement>(null);
@@ -30,7 +31,7 @@ export function FormularioReporte({
   const [foto, setFoto] = useState<{ base64: string; tipo: string; vista: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listo, setListo] = useState<{ numero: string; seguimiento: string } | null>(null);
+  const [listo, setListo] = useState<{ numero: string; seguimiento: string; fotoGuardada: boolean | null } | null>(null);
 
   async function tomarFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -63,7 +64,7 @@ export function FormularioReporte({
     const data = await res.json().catch(() => ({}));
     setEnviando(false);
     if (!res.ok) { setError(data.error ?? "No fue posible enviar el reporte"); return; }
-    setListo({ numero: data.numero, seguimiento: data.seguimiento });
+    setListo({ numero: data.numero, seguimiento: data.seguimiento, fotoGuardada: data.fotoGuardada ?? null });
   }
 
   if (listo) {
@@ -77,6 +78,13 @@ export function FormularioReporte({
           Mantenimiento ya fue notificado. Su folio es:
         </p>
         <p className="mt-2 font-mono text-2xl font-bold tracking-wide text-emerald-900">{listo.numero}</p>
+
+        {listo.fotoGuardada === false ? (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Su reporte sí quedó registrado, pero <strong>la foto no se pudo adjuntar</strong>. Si es
+            importante, vuelva a intentarlo desde «Ver cómo va mi reporte».
+          </p>
+        ) : null}
 
         <div className="mt-4 grid gap-2">
           <Link
@@ -188,7 +196,7 @@ export function FormularioReporte({
       </button>
 
       <p className="text-center text-[0.6875rem] text-slate-400">
-        Su reporte llega a mantenimiento de {empresa}. No se crea ninguna cuenta.
+        Su reporte llega a mantenimiento{empresa ? ` de ${empresa}` : " de esta instalación"}. No se crea ninguna cuenta.
       </p>
     </form>
   );

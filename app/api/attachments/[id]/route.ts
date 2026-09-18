@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 /** Redirige a un enlace firmado y temporal. Nunca se expone una URL fija. */
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  return withAuth(null, async ({ orgId }) => {
+  return withAuth(null, async ({ orgId, user }) => {
     const adjunto = await prisma.attachment.findFirst({
       where: { id, organizationId: orgId },
       select: { storagePath: true, name: true },
@@ -18,6 +18,20 @@ export async function GET(_request: Request, { params }: Params) {
     if (!adjunto) return fail("Archivo no encontrado", 404);
 
     const url = await urlDeLectura(adjunto.storagePath, adjunto.name);
+
+    /**
+     * Abrir un archivo queda registrado.
+     *
+     * Una evidencia puede ser la foto de un accidente o el documento de una
+     * garantia. Saber quien la abrio es parte de poder responder despues; y
+     * como lo que se entrega es una liga firmada que caduca, este es el unico
+     * momento en que se puede saber.
+     */
+    await logAudit({
+      organizationId: orgId, userId: user.id,
+      entity: "Attachment", entityId: id, action: "FILE_ACCESSED",
+      summary: `${user.name} abrió ${adjunto.name}`,
+    });
     return NextResponse.redirect(url.startsWith("http") ? url : new URL(url, _request.url));
   });
 }

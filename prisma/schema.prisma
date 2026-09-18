@@ -192,13 +192,17 @@ model Organization {
   /// Apagarlo no borra las suscripciones: se dejan de usar y vuelven a servir
   /// si se enciende otra vez. Quien se dio de baja no tiene por que volver a
   /// hacer el tramite en el telefono por una decision de la empresa.
-  avisosPush    Boolean  @default(false)
+  avisosPush         Boolean  @default(false)
   /// Complemento "IA Avanzada" contratado sobre el plan.
-  iaComplemento Boolean  @default(false)
+  iaComplemento      Boolean  @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
-  iaExtra       Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  iaExtra            Int      @default(0)
+  /// Direccion del aviso de privacidad de la empresa, si tiene uno propio.
+  /// Se enlaza desde el formulario publico del QR. Vacio: se enlaza el aviso
+  /// del sistema, que explica que se hace con los datos de quien reporta.
+  avisoPrivacidadUrl String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   users             User[]
   sites             Site[]
@@ -1736,6 +1740,16 @@ model ReportPoint {
   assetId        String?
   activo         Boolean  @default(true)
   nota           String?
+  /// Que se le enseña a quien escanea el codigo, que es cualquiera que pase.
+  ///
+  /// Por omision, lo MINIMO para que el reporte se pueda ubicar: el nombre del
+  /// punto y la clave del equipo. El nombre de la empresa, el de la planta y el
+  /// del equipo completo se muestran solo si alguien lo decide a proposito. Un
+  /// QR pegado en un pasillo lo lee cualquiera; no tiene por que anunciar quien
+  /// es el dueño de la instalacion ni como se llama internamente cada area.
+  mostrarEmpresa Boolean  @default(false)
+  mostrarPlanta  Boolean  @default(false)
+  mostrarEquipo  Boolean  @default(false)
   createdById    String?
   createdAt      DateTime @default(now())
 

@@ -34,6 +34,14 @@ De las 116 rutas, 12 no usan `withAuth`, y cada una por una razón:
 | 8 | El almacén local de desarrollo aceptaba rutas con `..`, que salen del prefijo de la organización | Baja (solo desarrollo) | Corregido |
 | 9 | Recuperar una solicitud del portal (folio + celular) no tenía freno de intentos | Baja | Corregido |
 | 10 | La interfaz ofrecía «Exportar CSV» a roles que el servidor iba a rechazar | Baja | Corregido |
+| 11 | **El QR público anunciaba la empresa, la planta, el área y el equipo completo** a cualquiera que lo escaneara | Alta | Corregido: por omisión solo el punto y la clave |
+| 12 | **Un texto del portal podía volverse fórmula de Excel** al exportarlo (`=HYPERLINK(...)`) | Media | Corregido: `seguroParaHoja()` en todo el CSV |
+| 13 | El freno del portal era por punto: cambiar de código lo evadía | Media | Corregido: también por origen |
+| 14 | Un archivo que decía ser imagen podía ser cualquier cosa | Media | Corregido: se revisan los primeros bytes |
+| 15 | La foto que no se podía guardar se perdía **en silencio** | Media | Corregido: la respuesta y la pantalla lo dicen |
+| 16 | No había aviso de datos ni aviso de privacidad en el formulario público | Media | Corregido |
+| 17 | La bitácora no se podía filtrar: 60 renglones para mirar, no para investigar | Media | Corregido: fecha, usuario, módulo y acción |
+| 18 | Cerrar sesión y abrir un archivo no quedaban registrados | Baja | Corregido: `LOGOUT` y `FILE_ACCESSED` |
 
 **Lo que se revisó y ya estaba bien:** el filtro por organización en las rutas
 con identificador (24 intentos de cruce, todos rechazados), los archivos
@@ -70,6 +78,11 @@ que un cambio de matriz no pase inadvertido.
 **Consulta (VIEWER) no tiene ningún permiso**: es de solo lectura por
 construcción, no por revisar pantalla por pantalla.
 
+Esta misma tabla está **dentro del sistema**, en Configuración → Usuarios →
+«Qué puede hacer cada rol». Se arma desde `lib/matriz-roles.ts`, que pregunta
+por los mismos permisos que aplica el servidor: si mañana cambia uno, la tabla
+cambia con él y una prueba lo verifica.
+
 ## Sesiones, contraseñas y recuperación
 
 - La sesión es un JWT propio (HS256, 7 días) en cookie `httpOnly`, `sameSite:
@@ -96,10 +109,37 @@ construcción, no por revisar pantalla por pantalla.
   en 15 minutos. El nombre en el almacén es un UUID bajo `org-<id>/…`, así que
   ni revela el nombre original ni permite adivinar el de otra empresa.
 - Pedir un adjunto de otra organización da 404; sin sesión, 401.
-- El **QR público** muestra la empresa, el lugar y el equipo, y nada más: no da
-  historial, costos, personal, órdenes internas ni documentos. Tiene freno de
-  10 reportes por punto cada 10 minutos, y recuperar una solicitud por folio
-  también tiene freno.
+### El QR público
+
+Un código pegado en un pasillo lo escanea cualquiera: el repartidor, la visita,
+quien pase por la banqueta. Por eso **muestra lo mínimo por omisión**:
+
+| Se muestra siempre | Solo si se enciende a propósito |
+|---|---|
+| La clave del equipo (`CMP-301`) o el nombre del punto de lugar | El nombre de la empresa |
+| | La planta y la ubicación interna |
+| | El nombre completo del equipo |
+
+Las tres opciones viven en cada punto (Solicitudes → Puntos de reporte → «Qué
+muestra al escanear») y cambiarlas queda en la bitácora. Apagadas, **el reporte
+sigue llegando con su equipo, su área y su planta**: eso se guarda igual; lo que
+cambia es lo que se le enseña a quien escanea.
+
+Nunca se muestra —ni con opciones— historial, costos, personal, órdenes internas
+ni documentos.
+
+Además:
+
+- **Aviso de datos** en el formulario, con enlace al aviso de privacidad de la
+  empresa si lo configuró, o al del sistema (`/privacidad`) si no.
+- **Freno doble**: 10 reportes por punto cada 10 minutos y 10 envíos por origen
+  cada 15. Cambiar de código no evade el segundo. Sin CAPTCHA: la frecuencia
+  basta y un CAPTCHA estorba a quien de verdad quiere reportar.
+- **Texto saneado** al entrar: sin caracteres invisibles, con largo acotado, y
+  blindado contra fórmulas al exportarse.
+- **La foto se verifica de verdad**: se revisan los primeros bytes. Lo que no sea
+  la imagen que dice ser no entra al almacén, y quien reportó se entera.
+- **Respuesta idéntica** para un código inventado, uno vencido y uno desactivado.
 
 ## Límites de plan
 
@@ -114,11 +154,18 @@ exportar su información**: sus datos son suyos.
 
 ## Auditoría
 
+La bitácora se **filtra por fecha, usuario, módulo y acción** (Configuración →
+Auditoría), y los filtros viven en la URL: un hallazgo se comparte pegando la
+dirección. Trae hasta 200 renglones por consulta; para ir más atrás se acotan
+las fechas.
+
 `logAudit()` escribe organización, usuario, entidad, identificador, acción,
-resumen y cambios. Nunca contraseñas, hashes ni tokens. Acciones registradas de
+resumen y cambios. Nunca contraseñas, hashes ni tokens. **No existe en todo el
+sistema una función que edite o borre un registro de la bitácora**, y hay una
+prueba que lo verifica sobre el código. Acciones registradas de
 este bloque: `LOGIN`, `LOGIN_FAILED`, `USER_CREATED`, `USER_ROLE_CHANGED`,
 `USER_DEACTIVATED`, `PASSWORD_CHANGED`, `PASSWORD_RESET_ISSUED`,
-`PASSWORD_RESET_USED`, `SESSIONS_REVOKED`, `EXPORTED`. Se suman a las que ya
+`PASSWORD_RESET_USED`, `SESSIONS_REVOKED`, `LOGOUT`, `EXPORTED`, `FILE_ACCESSED`. Se suman a las que ya
 existían: ajustes de inventario, autorizaciones, cancelaciones y cambios de
 configuración. Se ven en Configuración → Auditoría.
 
@@ -163,6 +210,8 @@ temporal —124 puntos de historia, íntegro—.
 | `scripts/prueba-aislamiento.ts` | 24 intentos de cruce entre empresas por identificador, 12 listados y pantallas, sin sesión, QR público, traspasos |
 | `scripts/prueba-permisos.ts` | los 7 roles contra 17 acciones, llamando a la API directo, más la coincidencia de la interfaz |
 | `scripts/prueba-acceso.ts` | sesiones revocadas, ligas de un solo uso, freno de intentos, archivos, límites de plan, exportación y bitácora |
+| `scripts/prueba-portal-publico.ts` | el QR mínimo y el configurado, códigos inválidos y desactivados, saneamiento de texto, fórmulas de Excel, foto falsa, freno por punto y por origen |
+| `scripts/prueba-bitacora.ts` | los filtros uno por uno y combinados, el aislamiento de la bitácora, y que la referencia de roles diga lo mismo que aplica el servidor |
 
 Las tres levantan la aplicación y llaman a las rutas con una sesión firmada,
 igual que el navegador: un filtro que exista en `lib/` pero que la ruta no
@@ -177,5 +226,7 @@ aplique, ahí se ve.
 - Las sesiones **no se pueden listar** («estos son sus dispositivos»): se pueden
   cerrar todas, pero no una sola. Requeriría guardar cada sesión emitida.
 - El registro de intentos (`AccessAttempt`) **no se purga solo** todavía.
+- El aviso de privacidad del sistema describe lo que MainTrack hace; **no
+  sustituye el aviso legal de cada empresa**, que se configura aparte.
 - La descarga de un archivo ya firmada sigue sirviendo hasta 15 minutos aunque
   el adjunto se borre. Es la contraparte de no exponer URLs permanentes.

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { NuevoPunto } from "./nuevo-punto";
+import { VisibilidadDelPunto } from "./visibilidad";
 
 export const metadata = { title: "Puntos de reporte" };
 export const dynamic = "force-dynamic";
@@ -129,6 +130,12 @@ export default async function PuntosPage() {
               <p className="mt-2 text-center text-xs text-slate-600">
                 {p._count.solicitudes} {p._count.solicitudes === 1 ? "reporte" : "reportes"}
               </p>
+
+              <VisibilidadDelPunto
+                puntoId={p.id}
+                editable={editable}
+                inicial={{ mostrarEmpresa: p.mostrarEmpresa, mostrarPlanta: p.mostrarPlanta, mostrarEquipo: p.mostrarEquipo }}
+              />
             </Card>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import { diaEnZona } from "./periodos";
+import { seguroParaHoja } from "./texto-publico";
 
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -125,7 +126,10 @@ export function toCsv(rows: Record<string, unknown>[]) {
   if (!rows.length) return "";
   const headers = Object.keys(rows[0]);
   const escape = (value: unknown) => {
-    const str = value === null || value === undefined ? "" : String(value);
+    // `seguroParaHoja` va ANTES de las comillas: un texto que viene del portal
+    // publico —el titulo de una solicitud— no puede volverse formula al abrir
+    // el archivo en Excel.
+    const str = seguroParaHoja(value);
     return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
   };
   return [

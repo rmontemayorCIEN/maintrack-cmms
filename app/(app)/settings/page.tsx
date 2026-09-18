@@ -29,6 +29,9 @@ import { ContextoDelNegocio } from "./contexto";
 import { contextoEnvejecido, PREGUNTAS, type ClavePregunta } from "@/lib/contexto-negocio";
 import { PanelAvisos } from "./avisos";
 import { PanelSeguridad } from "./seguridad";
+import { ReferenciaDeRoles } from "./referencia-roles";
+import { FiltrosBitacora } from "./filtros-bitacora";
+import { consultarBitacora, hayFiltro, TOPE_BITACORA } from "@/lib/bitacora";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
@@ -54,7 +57,7 @@ const DESCRIPCIONES: Record<Seccion, string> = {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string }>;
+  searchParams: Promise<{ s?: string; desde?: string; hasta?: string; usuario?: string; modulo?: string; accion?: string }>;
 }) {
   const user = await requireUser();
   const org = user.organization;
@@ -103,7 +106,7 @@ export default async function SettingsPage({
         })()
       : null;
 
-  const [uso, consumo, solicitudPlan, cobranza, usuarios, sitios, ubicaciones, bitacora] = await Promise.all([
+  const [uso, consumo, solicitudPlan, cobranza, usuarios, sitios, ubicaciones, bitacora, personasBitacora] = await Promise.all([
     consumoIa(user.organizationId),
     activa === "suscripcion" ? consumoDe(org.id, org.plan) : Promise.resolve(null),
     activa === "suscripcion"
@@ -135,14 +138,28 @@ export default async function SettingsPage({
         })
       : Promise.resolve(null),
     activa === "auditoria"
-      ? prisma.auditLog.findMany({
+      ? consultarBitacora(org.id, {
+          desde: params.desde, hasta: params.hasta,
+          usuarioId: params.usuario, modulo: params.modulo, accion: params.accion,
+        })
+      : Promise.resolve(null),
+    // Para el filtro por persona: quien aparece en la bitacora es de la empresa.
+    activa === "auditoria"
+      ? prisma.user.findMany({
           where: { organizationId: org.id },
-          include: { user: { select: { name: true } } },
-          orderBy: { createdAt: "desc" },
-          take: 60,
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
         })
       : Promise.resolve(null),
   ]);
+
+  // Se dice si la lista viene filtrada: «sin movimientos» y «sin resultados con
+  // esos filtros» son dos cosas distintas, y confundirlas hace pensar que la
+  // bitacora esta vacia cuando solo esta acotada.
+  const filtrada = hayFiltro({
+    desde: params.desde, hasta: params.hasta,
+    usuarioId: params.usuario, modulo: params.modulo, accion: params.accion,
+  });
 
   return (
     <>
@@ -366,6 +383,8 @@ export default async function SettingsPage({
       ) : null}
 
       {activa === "usuarios" && usuarios ? (
+        <>
+        <ReferenciaDeRoles />
         <Card padded={false}>
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
@@ -414,6 +433,7 @@ export default async function SettingsPage({
             </table>
           </div>
         </Card>
+        </>
       ) : null}
 
       {activa === "integracion" ? (
@@ -437,11 +457,21 @@ export default async function SettingsPage({
         <Card padded={false}>
           <div className="px-5 py-4">
             <h3 className="text-sm font-semibold text-slate-900">Bitácora de auditoría</h3>
-            <p className="text-xs text-slate-500">Ultimas {bitacora.length} operaciones registradas</p>
+            <p className="text-xs text-slate-500">
+              {filtrada ? "Con los filtros aplicados: " : "Últimas "}
+              {bitacora.length}
+              {bitacora.length === TOPE_BITACORA ? "+" : ""} operaciones.
+              {bitacora.length === TOPE_BITACORA ? " Acote las fechas para ver más atrás." : ""}
+              {" "}Los registros no se pueden editar ni borrar desde el sistema.
+            </p>
           </div>
+          <FiltrosBitacora usuarios={personasBitacora ?? []} />
           {bitacora.length === 0 ? (
             <div className="px-5 pb-5">
-              <EmptyState title="Sin movimientos" description="Aquí apareceran las operaciones conforme se usen." />
+              <EmptyState
+                title={filtrada ? "Sin resultados con esos filtros" : "Sin movimientos"}
+                description={filtrada ? "Pruebe con otro rango de fechas, otra persona u otra acción." : "Aquí apareceran las operaciones conforme se usen."}
+              />
             </div>
           ) : (
             <div className="table-wrap">

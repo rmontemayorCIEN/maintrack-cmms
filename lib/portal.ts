@@ -7,6 +7,7 @@ import { clasificar, construirRuta, guardarArchivo } from "./almacenamiento";
 import { notify } from "./audit";
 import { evaluarRiesgo } from "./riesgo";
 import { estaFrenado, registrarIntento } from "./acceso";
+import { imagenDeVerdad, telefonoDeFuera, textoDeFuera } from "./texto-publico";
 
 /**
  * Portal publico de reportes.
@@ -115,14 +116,53 @@ export async function contextoDelPunto(tok: string) {
     where: { token: tok },
     select: {
       id: true, nombre: true, activo: true, organizationId: true,
-      organization: { select: { name: true, logoUrl: true } },
+      mostrarEmpresa: true, mostrarPlanta: true, mostrarEquipo: true,
+      organization: { select: { name: true, logoUrl: true, avisoPrivacidadUrl: true } },
       site: { select: { id: true, name: true } },
       location: { select: { id: true, name: true } },
       asset: { select: { id: true, code: true, name: true } },
     },
   });
+  // La misma respuesta para un codigo inventado y para uno desactivado: quien
+  // escanea no tiene por que distinguirlos, y distinguirlos sirve para tantear.
   if (!punto || !punto.activo) return null;
   return punto;
+}
+
+/**
+ * Lo que se le ENSEÑA a quien escanea, que puede ser cualquiera.
+ *
+ * El punto conserva todo su contexto por dentro —la solicitud se cuelga del
+ * equipo, del area y de la planta correctos— pero hacia afuera solo sale lo que
+ * su configuracion permita. Por omision: el nombre del punto y la clave del
+ * equipo, que es lo minimo para saber que se esta reportando.
+ */
+export function vistaPublicaDelPunto(punto: NonNullable<Awaited<ReturnType<typeof contextoDelPunto>>>) {
+  /**
+   * El nombre del PUNTO no se usa cuando hay equipo.
+   *
+   * Los puntos de un equipo se llaman como el equipo —«CMP-301 · Compresor de
+   * tornillo Atlas Copco GA-75»— porque se generan solos al abrir su ficha. Ese
+   * nombre es justo lo que no debe salir sin permiso: la clave basta para saber
+   * que se esta reportando. El nombre escrito a mano solo manda en los puntos
+   * de lugar, donde no hay equipo del cual heredar nada.
+   */
+  const referencia = punto.asset
+    ? punto.mostrarEquipo
+      ? `${punto.asset.code} · ${punto.asset.name}`
+      : punto.asset.code
+    : punto.nombre;
+
+  const lugar = punto.mostrarPlanta
+    ? [punto.location?.name, punto.site?.name].filter(Boolean).join(" — ")
+    : "";
+
+  return {
+    punto: referencia,
+    empresa: punto.mostrarEmpresa ? punto.organization.name : null,
+    lugar: lugar || null,
+    avisoPrivacidadUrl: punto.organization.avisoPrivacidadUrl,
+  };
 }
 
 /**
@@ -139,8 +179,11 @@ export async function levantarSolicitud(params: {
   celular: string;
   correo?: string | null;
   foto?: { base64: string; tipo: string } | null;
+  /** De donde viene el envio. Sirve para frenar a quien insiste desde un aparato. */
+  origen?: string | null;
 }) {
   const punto = await contextoDelPunto(params.tokenPunto);
+  // Mismo texto para un codigo inventado, uno vencido y uno desactivado.
   if (!punto) throw new ErrorDePortal("Este código ya no esta activo. Pida uno nuevo a mantenimiento.");
 
   const desde = new Date(Date.now() - VENTANA_MINUTOS * 60_000);
@@ -153,28 +196,49 @@ export async function levantarSolicitud(params: {
     );
   }
 
+  /**
+   * Y ademas por ORIGEN.
+   *
+   * El limite por punto protege la bandeja de ese punto, pero no de quien
+   * recorre veinte codigos distintos desde el mismo aparato —o de un script que
+   * los tiene todos—. Se cuentan los envios recientes de ese origen, sin
+   * importar por que codigo entraron.
+   */
+  if (params.origen) {
+    const clave = `portal-origen:${params.origen}`;
+    const freno = await estaFrenado(clave);
+    if (freno.frenado) {
+      throw new ErrorDePortal(
+        `Se recibieron demasiados envíos desde este dispositivo. Espere ${freno.minutos} minuto(s) antes de enviar otro.`,
+      );
+    }
+    await registrarIntento({ email: clave, ip: params.origen, exito: false, motivo: "PORTAL_ENVIO" });
+  }
+
   const numero = await nextRequestNumber(punto.organizationId);
   const seguimiento = token();
 
   // El riesgo se evalua en el acto y sin IA: un "huele a gas" no puede esperar
   // a que alguien abra la bandeja, ni el reportante a que responda un modelo.
-  const riesgo = evaluarRiesgo(params.titulo, params.descripcion);
+  const riesgo = evaluarRiesgo(textoDeFuera(params.titulo, 140), textoDeFuera(params.descripcion, 1000));
 
   const solicitud = await prisma.workRequest.create({
     data: {
       organizationId: punto.organizationId,
       number: numero,
-      title: params.titulo.trim(),
-      description: params.descripcion?.trim() || null,
+      // Lo que escribio alguien de fuera se limpia ANTES de guardarse: sin
+      // caracteres invisibles y con su largo acotado.
+      title: textoDeFuera(params.titulo, 140),
+      description: textoDeFuera(params.descripcion, 1000) || null,
       // El lugar lo pone el QR, no quien reporta: por eso no hace falta que
       // sepa como se llama el equipo.
       assetId: punto.asset?.id ?? null,
       siteId: punto.site?.id ?? null,
       locationId: punto.location?.id ?? null,
       reportPointId: punto.id,
-      reporterNombre: params.nombre.trim(),
-      reporterCelular: params.celular.trim(),
-      reporterCorreo: params.correo?.trim() || null,
+      reporterNombre: textoDeFuera(params.nombre, 120),
+      reporterCelular: telefonoDeFuera(params.celular),
+      reporterCorreo: textoDeFuera(params.correo, 160) || null,
       publicToken: seguimiento,
       riesgo: riesgo.nivel,
       riesgoMotivo: riesgo.motivo,
@@ -185,9 +249,13 @@ export async function levantarSolicitud(params: {
     select: { id: true, number: true },
   });
 
+  let fotoGuardada = false;
   if (params.foto) {
     try {
       const datos = Buffer.from(params.foto.base64, "base64");
+      // El tipo lo declara el navegador y se puede mentir; los primeros bytes
+      // no. Lo que no sea la imagen que dice ser, no entra al almacen.
+      if (!imagenDeVerdad(datos, params.foto.tipo)) throw new ErrorDePortal("El archivo no es una imagen válida");
       const ruta = construirRuta(punto.organizationId, "solicitudes", `reporte.${params.foto.tipo.split("/")[1] ?? "jpg"}`);
       await guardarArchivo(ruta, datos, params.foto.tipo);
       await prisma.attachment.create({
@@ -199,12 +267,14 @@ export async function levantarSolicitud(params: {
           mimeType: params.foto.tipo,
           kind: clasificar(params.foto.tipo),
           size: datos.length,
-          note: `Foto tomada al reportar por ${params.nombre.trim()}`,
+          note: `Foto tomada al reportar por ${textoDeFuera(params.nombre, 120)}`,
         },
       });
+      fotoGuardada = true;
     } catch {
-      // Si el almacen falla, la solicitud ya quedo levantada. Perder la foto es
-      // molesto; perder el reporte es peor.
+      // Si el almacen falla —o el archivo no era una imagen— la solicitud ya
+      // quedo levantada: perder la foto es molesto, perder el reporte es peor.
+      // Pero no se calla: la respuesta lo dice y la pantalla lo muestra.
     }
   }
 
@@ -238,7 +308,7 @@ export async function levantarSolicitud(params: {
     ),
   );
 
-  return { numero: solicitud.number, seguimiento };
+  return { numero: solicitud.number, seguimiento, fotoGuardada: params.foto ? fotoGuardada : null };
 }
 
 /** El estado de una solicitud, para quien la levanto. Sin sesion. */
