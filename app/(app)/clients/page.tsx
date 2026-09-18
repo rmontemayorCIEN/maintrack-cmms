@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Receipt, Sparkles } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { PageHeader, Stat } from "@/components/ui";
+import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
+import { estadoTecnicoPlataforma } from "@/lib/avisos/estado-plataforma";
 import { formatNumber } from "@/lib/utils";
 import { PanelClientes } from "./panel";
 import { consumoPorOrganizacion } from "@/lib/ia/consumo";
@@ -38,6 +39,7 @@ export default async function ClientsPage() {
   });
 
   const consumoIa = await consumoPorOrganizacion();
+  const tecnico = await estadoTecnicoPlataforma();
   // Avance de puesta en marcha por cliente: una cuenta estancada en 20% a las
   // tres semanas es una cuenta que no va a renovar, y conviene saberlo antes.
   // En serie a proposito: cada avance son varias decenas de conteos y la
@@ -87,6 +89,35 @@ export default async function ClientsPage() {
           tone={organizaciones.some((o) => o.status === "SUSPENDED") ? "warn" : "good"}
         />
       </div>
+
+      {/* Estado técnico de avisos e integraciones: solo conteos, sin contenido de las empresas. */}
+      {tecnico.empresas.length || tecnico.plataforma.correo === "sin proveedor" ? (
+        <Card className="mb-5">
+          <CardHeader
+            title="Avisos e integraciones"
+            subtitle={`Correo: ${tecnico.plataforma.correo} · Celular: ${tecnico.plataforma.navegador}. Solo conteos: el contenido de cada empresa no se ve aquí.`}
+          />
+          {tecnico.empresas.length ? (
+            <div className="table-wrap">
+              <table className="data">
+                <thead><tr><th>Empresa</th><th className="text-right">Entregas fallidas 24 h</th><th className="text-right">En cola</th><th>Webhooks</th><th className="text-right">Credenciales</th><th className="text-right">Errores de API 24 h</th></tr></thead>
+                <tbody>
+                  {tecnico.empresas.map((e) => (
+                    <tr key={e.id}>
+                      <td className="text-xs font-medium text-slate-700">{e.nombre}</td>
+                      <td className={`text-right text-xs tabular-nums ${e.entregasFallidas24h ? "text-red-600" : "text-slate-500"}`}>{e.entregasFallidas24h}</td>
+                      <td className="text-right text-xs tabular-nums text-slate-500">{e.enCola}</td>
+                      <td className="text-xs">{e.webhooksActivos} activos{e.webhooksSuspendidos ? <Badge tone="danger">{e.webhooksSuspendidos} suspendido(s)</Badge> : null}</td>
+                      <td className="text-right text-xs tabular-nums text-slate-500">{e.credencialesActivas}</td>
+                      <td className={`text-right text-xs tabular-nums ${e.apiErrores24h ? "text-amber-600" : "text-slate-500"}`}>{e.apiErrores24h}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="text-xs text-slate-500">Ninguna empresa tiene integraciones ni entregas pendientes.</p>}
+        </Card>
+      ) : null}
 
       <PanelClientes
         solicitudes={solicitudes.map((s) => ({

@@ -21,6 +21,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { logAudit } from "./audit";
+import { emitirAviso } from "./avisos/emitir";
 import { aplicarMovimiento } from "./almacen";
 import { recalcularEn } from "./medidores";
 import { ESTADOS_CON_REGISTROS, type EstadoLote } from "./estados-lote";
@@ -515,6 +516,11 @@ export async function revertirLote(p: { organizationId: string; loteId: string; 
       entity: "ImportBatch", entityId: p.loteId, action: "IMPORT_REVERT_BLOCKED",
       summary: `No se revirtió nada: los ${diag.bloqueados.length} registros ya se usaron`,
       changes: { bloqueados: diag.bloqueados.length },
+    });
+    await emitirAviso({
+      organizationId: p.organizationId, tipo: "IMPORTACION_TERMINADA", entidad: "ImportBatch", entidadId: p.loteId, version: "REVERSION_BLOQUEADA",
+      titulo: "Reversión bloqueada", cuerpo: `Los ${diag.bloqueados.length} registros ya se usaron y se quedaron.`,
+      enlace: "/import", contexto: { solicitanteId: p.userId },
     });
     throw new ErrorDeLote(
       `Ninguno de los ${diag.bloqueados.length} registros se puede revertir: todos ya se usaron. Revise la lista.`,

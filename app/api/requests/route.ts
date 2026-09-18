@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { ok, withAuth } from "@/lib/api";
 import { nextRequestNumber } from "@/lib/numbering";
-import { notify } from "@/lib/audit";
+import { avisarSolicitudNueva } from "@/lib/avisos/detectores";
 
 const schema = z.object({
   title: z.string().min(3),
@@ -50,22 +50,8 @@ export async function POST(request: Request) {
       },
     });
 
-    const reviewers = await prisma.user.findMany({
-      where: { organizationId: orgId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] }, active: true },
-      select: { id: true },
-    });
-    await Promise.all(
-      reviewers.map((r) =>
-        notify({
-          organizationId: orgId,
-          userId: r.id,
-          title: `Nueva solicitud ${number}`,
-          body: input.title,
-          link: "/requests",
-          kind: input.priority === "CRITICAL" ? "CRITICAL" : "INFO",
-        }),
-      ),
-    );
+    // A quien revisa solicitudes, empezando por supervisión (no a todo rol alto).
+    await avisarSolicitudNueva(orgId, workRequest, { cuerpo: input.title });
 
     return ok({ request: workRequest }, 201);
   });

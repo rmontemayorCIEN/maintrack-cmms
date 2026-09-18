@@ -30,6 +30,7 @@ import { prisma } from "./db";
 import { leerCsv, type FilaCsv } from "./csv";
 import { ErrorDeXlsx, leerXlsx } from "./xlsx";
 import { logAudit } from "./audit";
+import { emitirAviso } from "./avisos/emitir";
 import { verificarCupo } from "./planes";
 import { ZONA_POR_OMISION } from "./periodos";
 import type { EstadoLote } from "./estados-lote";
@@ -437,6 +438,11 @@ export async function ejecutarImportacion(p: Entrada & {
       entity: "ImportBatch", entityId: lote.id, action: "IMPORT_FAILED",
       summary: `${def.titulo}: la importación no se hizo — ${motivo}`,
     });
+    await emitirAviso({
+      organizationId: p.organizationId, tipo: "IMPORTACION_TERMINADA", entidad: "ImportBatch", entidadId: lote.id, version: "FALLIDA",
+      titulo: `Importación fallida: ${def.titulo}`, cuerpo: motivo, enlace: "/import", contexto: { solicitanteId: p.userId },
+      prioridad: "MEDIA",
+    });
     throw new ErrorDeImportacion(motivo, codigo);
   };
 
@@ -502,6 +508,12 @@ export async function ejecutarImportacion(p: Entrada & {
     entity: "ImportBatch", entityId: lote.id, action: "IMPORT_COMPLETED",
     summary: `${def.titulo}: ${resultado.creados} creados, ${resultado.actualizados} actualizados, ${totales.exactos + totales.posibles} duplicados omitidos`,
     changes: { archivo: nombre, huella, creados: resultado.creados, actualizados: resultado.actualizados, omitidos: totales.exactos + totales.posibles },
+  });
+  await emitirAviso({
+    organizationId: p.organizationId, tipo: "IMPORTACION_TERMINADA", entidad: "ImportBatch", entidadId: lote.id, version: estado,
+    titulo: `Importación completada: ${def.titulo}`,
+    cuerpo: `${resultado.creados} creados, ${resultado.actualizados} actualizados, ${totales.exactos + totales.posibles} duplicados omitidos.`,
+    enlace: "/import", contexto: { solicitanteId: p.userId },
   });
   return {
     loteId: lote.id, estado, ...resultado, omitidos: totales.exactos + totales.posibles,

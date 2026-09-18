@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
+import { avisarCambiosDeOrden } from "@/lib/avisos/ordenes";
 import { recalcWorkOrder } from "@/lib/workorders";
 import { esReprogramacion, revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
 import { OPEN_STATUSES } from "@/lib/constants";
@@ -140,6 +141,8 @@ export async function PATCH(request: Request, { params }: Params) {
 
     await prisma.workOrder.update({ where: { id }, data });
     const workOrder = await recalcWorkOrder(id);
+    // Cambió el responsable o la prioridad: se avisa a quien corresponde.
+    await avisarCambiosDeOrden(orgId, existing);
 
     await logAudit({
       organizationId: orgId,

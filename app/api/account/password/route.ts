@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarContrasena } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { createSession, hashPassword, revocarSesiones, verifyPassword } from "@/lib/auth";
@@ -47,6 +48,8 @@ export async function POST(request: Request) {
       action: "PASSWORD_CHANGED",
       summary: `${user.name} cambio su contraseña`,
     });
+    // A su propia empresa: el operador que la cambia dentro de un cliente sigue siendo de la suya.
+    await avisarContrasena(user.organizacionPropia.id, user.id, "La cambió usted desde Mi cuenta.");
 
     return ok({ success: true });
   });

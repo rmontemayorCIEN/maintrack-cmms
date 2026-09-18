@@ -205,6 +205,27 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/notificaciones": {
+    titulo: "Avisos",
+    que: "Todo lo que el sistema le ha avisado, con qué tan urgente es, de qué módulo viene y si ya se atendió.",
+    hacer: [
+      "Ver primero lo pendiente de atención; filtrar por prioridad, módulo o fecha",
+      "Abrir el registro relacionado desde cada aviso",
+      "Marcar uno o todos como leídos",
+      "Decir «Enterado» en un aviso que pide acción",
+    ],
+    flujo: [
+      "Leer no es atender. Un aviso que pide acción sigue pendiente hasta que se resuelve lo que lo originó —la orden se inicia, la compra se autoriza, la refacción se repone— y entonces se marca «atendida» solo, con el motivo.",
+      "«Enterado» deja dicho que ya lo vio. En las situaciones donde con eso basta (una alerta crítica, una orden crítica sin aceptar) detiene los recordatorios; el problema sigue pendiente hasta resolverse.",
+      "Si el mismo problema sigue, no llegan avisos nuevos: se actualiza el mismo, y dice cuántas veces se le ha recordado.",
+      "Cada aviso dice qué pasó, por qué importa, qué hacer y desde cuándo. La prioridad sale de reglas fijas: la de la orden, la criticidad del equipo, el tiempo vencido, si hay un equipo parado. Estar vencido sube la prioridad pero no vuelve crítico a nada por sí solo.",
+    ],
+    campos: [
+      { nombre: "Prioridad", explica: "Informativa, baja, media, alta o crítica. Lo crítico llega a cualquier hora; lo demás, dentro del horario de avisos." },
+      { nombre: "Pendiente / Atendida", explica: "Pendiente: pide acción y la causa sigue ahí. Atendida: la causa se resolvió; se dice cómo." },
+    ],
+  },
+
   "/search": {
     titulo: "Búsqueda",
     que: "Encontrar una orden, un activo o una refacción por código o por nombre.",
@@ -1280,6 +1301,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Decidir cómo se arman las órdenes: si los días se cuentan corridos o hábiles, cuánto se puede adelantar un preventivo y desde dónde se recalcula",
       "Dar de alta usuarios y revisar la bitácora",
       "Encender los avisos al teléfono y activar cada aparato",
+      "Elegir qué avisos le llegan y por dónde; y, si administra, cómo avisa la empresa: canales, horario, resúmenes, recordatorios y escalamiento",
+      "Crear credenciales de API y webhooks para otros sistemas, y revisar el historial de entregas",
       "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [
@@ -1290,6 +1313,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Seguridad y sesiones» puede cerrar su sesión en todos los dispositivos: la del teléfono que perdió deja de servir en ese momento, no cuando caduque. Cambiar una contraseña —la propia o una repuesta por administración— también cierra las demás sesiones de esa cuenta.",
       "En «Usuarios», el botón de liga genera una dirección para que la persona elija su propia contraseña. Vence en una hora, sirve una sola vez y solo se ve al generarla: si se cierra la caja, se genera otra.",
       "Exportar información pide permiso —propietario, administrador o supervisor— y cada exportación queda en la bitácora con quién la hizo.",
+      "En «Avisos», los avisos obligatorios (seguridad, órdenes críticas, contraseñas) no se pueden apagar. Un aviso configurable tampoco se apaga cuando usted es el responsable directo de algo alto o la única persona que puede atenderlo.",
+      "Los avisos no críticos respetan un horario (por omisión de 8 a 18, días laborables, en la zona de la empresa); los críticos salen a cualquier hora. Si el correo o el celular fallan, el aviso sigue en el centro de avisos y se reintenta.",
+      "En «Integración», el secreto de una credencial o de un webhook se ve una sola vez, al crearlo. Revocar corta el acceso en la siguiente petición. Cada credencial y cada webhook son solo de esta empresa.",
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
     ],
     campos: [

@@ -4,7 +4,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "./db";
 import { nextRequestNumber } from "./numbering";
 import { clasificar, construirRuta, guardarArchivo } from "./almacenamiento";
-import { notify } from "./audit";
+import { avisarSolicitudNueva } from "./avisos/detectores";
 import { evaluarRiesgo } from "./riesgo";
 import { estaFrenado, registrarIntento } from "./acceso";
 import { imagenDeVerdad, telefonoDeFuera, textoDeFuera } from "./texto-publico";
@@ -246,7 +246,7 @@ export async function levantarSolicitud(params: {
       // se describe, no lo que el reportante creyo que era grave.
       priority: riesgo.nivel === "ALTO" ? "CRITICAL" : "MEDIUM",
     },
-    select: { id: true, number: true },
+    select: { id: true, number: true, title: true, priority: true, riesgo: true, siteId: true, requestedById: true },
   });
 
   let fotoGuardada = false;
@@ -278,35 +278,14 @@ export async function levantarSolicitud(params: {
     }
   }
 
-  // Mantenimiento se entera de inmediato, sin depender del correo.
-  const equipo = await prisma.user.findMany({
-    where: {
-      organizationId: punto.organizationId,
-      active: true,
-      role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] },
-    },
-    select: { id: true },
-  });
+  // Mantenimiento se entera de inmediato: quien revisa solicitudes, empezando
+  // por supervisión. El riesgo alto sube la prioridad a crítica.
   const donde = [punto.asset ? `${punto.asset.code} ${punto.asset.name}` : null, punto.location?.name, punto.site?.name]
     .filter(Boolean).join(" · ");
-  await Promise.all(
-    equipo.map((u) =>
-      notify({
-        organizationId: punto.organizationId,
-        userId: u.id,
-        title:
-          riesgo.nivel === "ALTO"
-            ? `RIESGO · ${numero}: ${params.titulo.trim().slice(0, 50)}`
-            : `Solicitud ${numero}: ${params.titulo.trim().slice(0, 60)}`,
-        body:
-          riesgo.nivel === "ALTO"
-            ? `${riesgo.motivo}. Reportó ${params.nombre.trim()} · ${params.celular.trim()}${donde ? ` — ${donde}` : ""}`
-            : `${params.nombre.trim()} · ${params.celular.trim()}${donde ? ` — ${donde}` : ""}`,
-        link: `/requests/${solicitud.id}`,
-        kind: riesgo.nivel === "ALTO" ? "CRITICAL" : "WARNING",
-      }),
-    ),
-  );
+  await avisarSolicitudNueva(punto.organizationId, solicitud, {
+    cuerpo: `${params.nombre.trim()} · ${params.celular.trim()}${donde ? ` — ${donde}` : ""}`,
+    porQue: riesgo.nivel === "ALTO" ? riesgo.motivo ?? undefined : undefined,
+  });
 
   return { numero: solicitud.number, seguimiento, fotoGuardada: params.foto ? fotoGuardada : null };
 }

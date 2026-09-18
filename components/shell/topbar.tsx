@@ -9,17 +9,10 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { BotonAyuda } from "./ayuda";
 import { Avatar } from "@/components/ui";
 import { ROLE_LABELS } from "@/lib/constants";
+import { PuntoPrioridad, EstadoAviso, type AvisoVista } from "@/components/avisos/aviso";
 import { formatDateTime } from "@/lib/utils";
 
-type Notification = {
-  id: string;
-  title: string;
-  body: string | null;
-  link: string | null;
-  kind: string;
-  read: boolean;
-  createdAt: string;
-};
+type Notification = AvisoVista;
 
 export function Topbar({
   user,
@@ -29,6 +22,7 @@ export function Topbar({
   const zona = useZona();
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
+  const [cuentas, setCuentas] = useState({ noLeidas: 0, pendientes: 0 });
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -46,7 +40,10 @@ export function Topbar({
         const res = await fetch("/api/notifications");
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setItems(data.notifications ?? []);
+        if (!cancelled) {
+          setItems(data.notifications ?? []);
+          setCuentas({ noLeidas: data.noLeidas ?? 0, pendientes: data.pendientes ?? 0 });
+        }
       } catch { /* sin red: se reintenta en el siguiente minuto */ }
     }
     load();
@@ -57,13 +54,25 @@ export function Topbar({
     };
   }, []);
 
-  const unread = items.filter((n) => !n.read).length;
+  const unread = cuentas.noLeidas;
 
+  // Abrir la campana ya no marca todo como leído: se marca lo que se abre, o
+  // todo con el botón. Y leer no atiende: lo pendiente sigue pendiente.
   async function markRead() {
     try {
       await fetch("/api/notifications", { method: "PATCH" });
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      setCuentas((c) => ({ ...c, noLeidas: 0 }));
     } catch { /* si no hay red, siguen marcados como no leidos */ }
+  }
+  async function leerUna(n: Notification) {
+    setOpen(false);
+    if (n.read) return;
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+    setCuentas((c) => ({ ...c, noLeidas: Math.max(0, c.noLeidas - 1) }));
+    try {
+      await fetch(`/api/notifications/${n.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "leer" }) });
+    } catch { /* sin red */ }
   }
 
   async function logout() {
@@ -109,7 +118,7 @@ export function Topbar({
         <div className="relative">
           <button
             type="button"
-            onClick={() => { setOpen((v) => !v); if (!open && unread) markRead(); }}
+            onClick={() => setOpen((v) => !v)}
             className="relative grid h-9 w-9 place-items-center rounded-lg hover:bg-slate-100"
             aria-label="Notificaciones"
           >
@@ -121,10 +130,15 @@ export function Topbar({
             ) : null}
           </button>
           {open ? (
-            <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-              <p className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
-                Notificaciones
-              </p>
+            <div className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+                <p className="text-xs font-semibold text-slate-700">
+                  Avisos{cuentas.pendientes ? <span className="ml-1.5 font-normal text-amber-700">{cuentas.pendientes} pendiente(s)</span> : null}
+                </p>
+                {unread ? (
+                  <button type="button" onClick={markRead} className="text-[0.6875rem] text-brand-700 hover:underline">Marcar todas como leídas</button>
+                ) : null}
+              </div>
               <div className="max-h-80 overflow-y-auto">
                 {items.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-slate-400">Sin notificaciones</p>
@@ -132,17 +146,26 @@ export function Topbar({
                   items.map((n) => (
                     <Link
                       key={n.id}
-                      href={n.link ?? "#"}
-                      onClick={() => setOpen(false)}
-                      className="block border-b border-slate-50 px-3 py-2.5 hover:bg-slate-50"
+                      href={n.link ?? "/notificaciones"}
+                      onClick={() => leerUna(n)}
+                      className={`flex gap-2 border-b border-slate-50 px-3 py-2.5 hover:bg-slate-50 ${n.read ? "" : "bg-brand-50/40"}`}
                     >
-                      <p className="text-xs font-medium text-slate-800">{n.title}</p>
-                      {n.body ? <p className="mt-0.5 text-[0.6875rem] text-slate-500">{n.body}</p> : null}
-                      <p className="mt-1 text-[0.625rem] text-slate-400">{formatDateTime(n.createdAt, zona)}</p>
+                      <PuntoPrioridad prioridad={n.prioridad} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <p className={`text-xs ${n.read ? "font-medium text-slate-700" : "font-semibold text-slate-900"}`}>{n.title}</p>
+                          <EstadoAviso a={n} />
+                        </div>
+                        {n.body ? <p className="mt-0.5 line-clamp-2 whitespace-pre-line text-[0.6875rem] text-slate-500">{n.body}</p> : null}
+                        <p className="mt-1 text-[0.625rem] text-slate-400">{formatDateTime(n.createdAt, zona)}</p>
+                      </div>
                     </Link>
                   ))
                 )}
               </div>
+              <Link href="/notificaciones" onClick={() => setOpen(false)} className="block border-t border-slate-100 px-3 py-2 text-center text-[0.6875rem] font-medium text-brand-700 hover:bg-slate-50">
+                Ver todos los avisos
+              </Link>
             </div>
           ) : null}
         </div>

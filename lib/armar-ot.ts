@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { avisarNuevaOrden } from "./avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
 import {
@@ -546,5 +547,6 @@ export async function armarOrden(p: {
     }`,
   });
 
+  await avisarNuevaOrden(p.organizationId, orden.id);
   return { orden, cuantas: actividades.length };
 }

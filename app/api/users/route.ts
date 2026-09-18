@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarAltaDeUsuario } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       // La contrasena no va a la bitacora, ni su hash.
       changes: { correo: created.email, rol: created.role },
     });
+    await avisarAltaDeUsuario(orgId, created);
     return ok({ user: created }, 201);
   });
 }

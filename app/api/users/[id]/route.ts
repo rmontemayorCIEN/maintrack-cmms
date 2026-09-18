@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarCambioDeUsuario } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { revocarSesiones } from "@/lib/auth";
@@ -66,6 +67,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         summary: `${target.name}: ${cambios.join(", ")}`,
         changes: { antes: { rol: target.role, activo: target.active }, despues: { rol: updated.role, activo: updated.active } },
       });
+      await avisarCambioDeUsuario(orgId, { id, name: target.name }, { role: target.role, active: target.active }, { role: updated.role, active: updated.active });
     }
     return ok({ user: updated });
   });

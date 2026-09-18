@@ -56,6 +56,20 @@ function llaveABytes(base64url: string): Uint8Array {
 }
 
 /** Si la aplicacion se abrio desde el icono y no desde el navegador. */
+/**
+ * Deja dicho en el servidor que el navegador negó (o concedió) el permiso. Con
+ * el permiso negado no se intenta ese canal ni se vuelve a pedir solo: pedirlo
+ * de nuevo solo lo hace la persona, con el botón.
+ */
+async function recordarPermiso(rechazado: boolean) {
+  try {
+    await fetch("/api/avisos/preferencias", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ navegadorRechazado: rechazado }),
+    });
+  } catch { /* sin red: se vuelve a decir la próxima vez */ }
+}
+
 function estaInstalada(): boolean {
   if (typeof window === "undefined") return false;
   const iosInstalada = (window.navigator as Navigator & { standalone?: boolean }).standalone;
@@ -130,6 +144,7 @@ export function PanelAvisos({
     }
     if (Notification.permission === "denied") {
       setEstado("BLOQUEADO");
+      void recordarPermiso(true);
       return;
     }
 
@@ -184,8 +199,10 @@ export function PanelAvisos({
       const permiso = await Notification.requestPermission();
       if (permiso === "denied") {
         setEstado("BLOQUEADO");
+        void recordarPermiso(true);
         return;
       }
+      void recordarPermiso(false);
       if (permiso !== "granted") {
         setError("No se concedió el permiso. Puede volver a intentarlo.");
         return;

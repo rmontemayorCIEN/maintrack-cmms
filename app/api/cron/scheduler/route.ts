@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generateScheduledWorkOrders } from "@/lib/scheduler";
+import { ejecutarProgramador } from "@/lib/avisos/proceso";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -24,10 +24,14 @@ export async function GET(request: Request) {
     select: { id: true, name: true },
   });
 
+  // Cada empresa por separado: si una falla, se avisa a esa empresa y las
+  // demás siguen. Antes una excepción cortaba la corrida de todas, en silencio.
   const summary = [];
   for (const org of organizations) {
-    const result = await generateScheduledWorkOrders(org.id, { horizonDays: 0 });
-    summary.push({ organization: org.name, generated: result.generated, skipped: result.skipped });
+    const result = await ejecutarProgramador(org.id);
+    summary.push(result.ok
+      ? { organization: org.name, generated: result.generadas, skipped: result.omitidas, sinProgramacion: result.sinProgramacion }
+      : { organization: org.name, error: result.error });
   }
 
   return NextResponse.json({ ranAt: new Date().toISOString(), organizations: summary });

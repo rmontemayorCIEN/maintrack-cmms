@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
-import { logAudit, notify } from "./audit";
+import { logAudit } from "./audit";
 
 /**
  * El estado predictivo de un punto de monitoreo: la UNICA evaluacion que leen
@@ -419,22 +419,9 @@ export async function ingestSensorReading(params: {
     });
     await prisma.predictiveAlert.update({ where: { id: alertDbId }, data: { workOrderId: wo.id } });
 
-    const supervisors = await prisma.user.findMany({
-      where: { organizationId: params.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] }, active: true },
-      select: { id: true },
-    });
-    await Promise.all(
-      supervisors.map((s) =>
-        notify({
-          organizationId: params.organizationId,
-          userId: s.id,
-          title: `Alerta critica: ${sensor!.asset.name}`,
-          body: message,
-          link: `/work-orders/${wo.id}`,
-          kind: "CRITICAL",
-        }),
-      ),
-    );
+    // A supervisión (no a todo rol alto), con liga a la orden. Ver lib/avisos.
+    const { avisarAlerta } = await import("./avisos/detectores");
+    await avisarAlerta(params.organizationId, alertDbId).catch(() => undefined);
     return number;
   }
 

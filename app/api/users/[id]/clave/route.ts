@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarContrasena } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { hashPassword, revocarSesiones } from "@/lib/auth";
@@ -57,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       action: "PASSWORD_RESET",
       summary: `${user.name} repuso la contraseña de ${objetivo.name} (${objetivo.email})`,
     });
+    await avisarContrasena(orgId, objetivo.id, `La repuso ${user.name}.`);
 
     return ok({ success: true, usuario: { name: objetivo.name, email: objetivo.email } });
   });

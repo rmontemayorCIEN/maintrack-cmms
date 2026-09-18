@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
@@ -50,6 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         where: { id },
         data: { workOrderId: workOrder.id, status: "ACKNOWLEDGED", acknowledgedById: user.id, acknowledgedAt: new Date() },
       });
+      await avisarNuevaOrden(orgId, workOrder.id);
       return ok({ workOrder }, 201);
     }
 

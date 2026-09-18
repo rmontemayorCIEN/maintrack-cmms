@@ -250,6 +250,11 @@ model Organization {
   rootCauses        RootCause[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  entregasAviso     EntregaAviso[]
+  configAvisos      ConfigAvisos?
+  escalamientos     Escalamiento[]
+  credencialesApi   CredencialApi[]
+  webhooks          Webhook[]
   auditLogs         AuditLog[]
   attachments       Attachment[]
   links             ReferenceLink[]
@@ -325,6 +330,7 @@ model User {
   stockMovements       StockMovement[]
   notifications        Notification[]
   pushSubscriptions    PushSubscription[]
+  preferenciaAvisos    PreferenciaAvisos?
   auditLogs            AuditLog[]
   passwordResets       PasswordReset[]         @relation("ResetDeUsuario")
   resetsEmitidos       PasswordReset[]         @relation("ResetEmitidoPor")
@@ -2454,10 +2460,291 @@ model Notification {
   read           Boolean  @default(false)
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Bloque 5. Todo nulo o con valor por omision: los avisos anteriores se
+  /// siguen leyendo igual, como avisos generales.
+  ///
+  /// El tipo de evento del catalogo (lib/avisos/catalogo.ts): OT_ASIGNADA,
+  /// REFACCION_BAJO_MINIMO... GENERAL para los que no vienen del catalogo.
+  tipo           String    @default("GENERAL")
+  /// INFORMATIVA | BAJA | MEDIA | ALTA | CRITICA
+  prioridad      String    @default("MEDIA")
+  /// ORDENES | SOLICITUDES | PREVENTIVO | MEDIDORES | ALMACEN | COMPRAS | ADMINISTRACION
+  modulo         String?
+  /// El registro del que habla: WorkOrder, Part, PurchaseRequest...
+  entidad        String?
+  entidadId      String?
+  /// Pide que alguien haga algo. Leerla no la atiende: se atiende cuando se
+  /// resuelve lo que la origino.
+  requiereAccion Boolean   @default(false)
+  atendidaEl     DateTime?
+  atendidaMotivo String?
+  leidaEl        DateTime?
+  /// Por que importa y que hay que hacer, en una linea cada uno.
+  porQue         String?
+  accion         String?
+  /// Mismo problema, mismo destinatario: una sola notificacion que se
+  /// actualiza, en vez de una nueva cada vez que corre el proceso.
+  claveDedup     String?
+  /// Cuantas veces se presento el mismo problema en esta notificacion.
+  veces          Int       @default(1)
+  actualizadaEl  DateTime?
+  /// Identificador estable del evento: el mismo para todos sus destinatarios
+  /// y canales. Es lo que se manda como identificador en los webhooks.
+  eventoId       String?
 
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entregas     EntregaAviso[]
+
+  @@unique([userId, claveDedup])
   @@index([userId])
+  @@index([organizationId, entidad, entidadId])
+}
+
+/// Cada intento de llevar un aviso por un canal: correo, navegador, webhook.
+///
+/// Es el historial tecnico, aparte de la bitacora: la bitacora dice quien
+/// cambio que; esto dice si el aviso llego. Nunca guarda el contenido
+/// completo ni secretos: titulo recortado, destino enmascarado, categoria del
+/// error.
+model EntregaAviso {
+  id             String    @id @default(cuid())
+  organizationId String
+  notificationId String?
+  /// Nulo en los avisos sin destinatario valido y en los webhooks.
+  userId         String?
+  webhookId      String?
+  tipo           String
+  eventoId       String
+  /// CAMPANA | NAVEGADOR | CORREO | WEBHOOK
+  canal          String
+  /// PENDIENTE | EN_PROCESO | ENTREGADA | FALLIDA | EN_REINTENTO | CANCELADA |
+  /// OMITIDA_PREFERENCIA | SIN_DESTINATARIO
+  estado         String    @default("PENDIENTE")
+  programadaPara DateTime  @default(now())
+  intentadaEl    DateTime?
+  intentos       Int       @default(0)
+  proveedor      String?
+  /// TEMPORAL | PERMANENTE | TIEMPO_AGOTADO | SIN_PROVEEDOR | DESTINO_INVALIDO |
+  /// SIN_DISPOSITIVOS | USUARIO_INACTIVO | SIN_RESPONSABLE | LIMITE | ...
+  errorCategoria String?
+  /// Codigo o mensaje corto, sin datos del contenido.
+  errorDetalle   String?
+  proximoIntento DateTime?
+  entregadaEl    DateTime?
+  /// Lo que hace falta para reintentar un webhook: el evento en JSON, sin
+  /// datos personales. En correo y navegador se arma de la notificacion.
+  carga          String?
+  /// Evita dos entregas del mismo evento por el mismo canal al mismo destino.
+  claveDedup     String    @unique
+  /// Titulo recortado, para leer el historial sin abrir cada aviso.
+  resumen        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  webhook      Webhook?      @relation(fields: [webhookId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([estado, programadaPara])
+}
+
+/// Lo que cada persona quiere recibir. Una por usuario: el usuario pertenece
+/// a una sola empresa, asi que no se comparte entre organizaciones.
+model PreferenciaAvisos {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  userId             String   @unique
+  /// Canales que la persona permite, en JSON: ["NAVEGADOR","CORREO"].
+  canales            String   @default("[\"NAVEGADOR\",\"CORREO\"]")
+  /// Tipos de aviso configurables que apago, en JSON.
+  tiposApagados      String   @default("[]")
+  resumenDiario      Boolean  @default(true)
+  resumenSemanal     Boolean  @default(true)
+  /// Horario para avisos no criticos, "HH:MM". Nulo: el de la empresa.
+  horaInicio         String?
+  horaFin            String?
+  /// Sitios de interes en JSON; vacio = todos los que le tocan por rol.
+  sitios             String   @default("[]")
+  /// El navegador nego el permiso: no se le vuelve a pedir solo.
+  navegadorRechazado Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+/// Como avisa la empresa. Sin renglon, rigen los valores recomendados.
+model ConfigAvisos {
+  id                   String   @id @default(cuid())
+  organizationId       String   @unique
+  /// Canales encendidos para la empresa, JSON: ["NAVEGADOR","CORREO","WEBHOOK"].
+  canales              String   @default("[\"NAVEGADOR\",\"CORREO\",\"WEBHOOK\"]")
+  /// Ventana para avisos no criticos, "HH:MM", en la zona de la empresa.
+  horaInicio           String   @default("08:00")
+  horaFin              String   @default("18:00")
+  /// Horas antes del vencimiento para avisar que una OT esta por vencer.
+  anticipacionHoras    Int      @default(24)
+  /// Quienes reciben los avisos administrativos, JSON de ids. Vacio: dueno y
+  /// administradores.
+  destinatariosAdmin   String   @default("[]")
+  resumenDiario        Boolean  @default(true)
+  resumenSemanal       Boolean  @default(true)
+  /// Hora local del resumen diario, "HH:MM". El semanal sale el lunes.
+  horaResumen          String   @default("07:30")
+  /// Mandar el resumen aunque no haya pendientes.
+  resumenSinPendientes Boolean  @default(false)
+  /// Reglas de escalamiento que la empresa ajusto, JSON. Lo que no esta, usa
+  /// el valor recomendado.
+  reglas               String   @default("{}")
+  /// Nombre con que salen los correos.
+  remitente            String?
+  updatedAt            DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Un recordatorio que sigue vivo mientras el problema siga ahi.
+///
+/// Una fila por regla y registro: el proceso programado la avanza (recordar,
+/// subir de nivel) y la detiene cuando se atiende. Asi el mismo problema no
+/// produce un aviso nuevo en cada corrida.
+model Escalamiento {
+  id              String    @id @default(cuid())
+  organizationId  String
+  regla           String
+  entidad         String
+  entidadId       String
+  /// ACTIVO | AGOTADO (ya no insiste; sigue en resumenes) | DETENIDO
+  estado          String    @default("ACTIVO")
+  nivel           Int       @default(0)
+  recordatorios   Int       @default(0)
+  iniciadoEl      DateTime  @default(now())
+  proximoEl       DateTime
+  ultimoAvisoEl   DateTime?
+  /// Quien debia actuar al iniciar: si cambia, el escalamiento se detiene.
+  responsableId   String?
+  detenidoEl      DateTime?
+  motivoDetencion String?
+  reconocidoPorId String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, regla, entidadId])
+  @@index([estado, proximoEl])
+}
+
+/// Una credencial para que un sistema externo use la API de una empresa.
+///
+/// El secreto se muestra una sola vez, al crearla; aqui solo queda su huella.
+/// La empresa sale de la credencial, nunca de un parametro de la peticion.
+model CredencialApi {
+  id             String    @id @default(cuid())
+  organizationId String
+  nombre         String
+  /// Los primeros caracteres visibles, para reconocerla en la lista.
+  prefijo        String    @unique
+  huella         String    @unique
+  /// JSON: ["activos:leer","solicitudes:crear","lecturas:crear",...]
+  alcances       String    @default("[]")
+  /// ACTIVA | REVOCADA
+  estado         String    @default("ACTIVA")
+  expiraEl       DateTime?
+  ultimoUsoEl    DateTime?
+  usos           Int       @default(0)
+  creadaPorId    String?
+  revocadaEl     DateTime?
+  revocadaPorId  String?
+  /// La credencial a la que sustituyo al rotar.
+  rotadaDeId     String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  usosApi      UsoApi[]
+  idempotencia ClaveIdempotencia[]
+
+  @@index([organizationId])
+}
+
+/// Registro de uso de la API: quien, que, cuando y con que resultado. Sin
+/// cuerpo de la peticion.
+model UsoApi {
+  id             String   @id @default(cuid())
+  /// Nulo cuando la credencial no existe: tambien se registra el intento.
+  organizationId String?
+  credencialId   String?
+  metodo         String
+  ruta           String
+  estado         Int
+  /// OK | RECHAZADA | LIMITE | ERROR
+  resultado      String
+  createdAt      DateTime @default(now())
+
+  credencial CredencialApi? @relation(fields: [credencialId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([credencialId, createdAt])
+}
+
+/// Un destino al que la empresa quiere que MainTrack le avise por HTTP.
+model Webhook {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  nombre             String
+  url                String
+  /// JSON de tipos de evento del catalogo.
+  eventos            String    @default("[]")
+  /// ACTIVO | PAUSADO | SUSPENDIDO
+  estado             String    @default("ACTIVO")
+  /// Secreto de firma cifrado con la llave de integraciones. Se muestra una
+  /// vez; se guarda cifrado porque hace falta para firmar cada envio.
+  secretoCifrado     String
+  secretoPista       String
+  ultimoEnvioEl      DateTime?
+  ultimoResultado    String?
+  fallasConsecutivas Int       @default(0)
+  suspendidoEl       DateTime?
+  creadoPorId        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entregas     EntregaAviso[]
+
+  @@index([organizationId])
+}
+
+/// Una peticion externa ya procesada, para que repetirla no la duplique.
+model ClaveIdempotencia {
+  id             String   @id @default(cuid())
+  organizationId String
+  credencialId   String
+  clave          String
+  ruta           String
+  estado         Int
+  /// La respuesta que se dio, para devolver la misma al repetir.
+  respuesta      String
+  createdAt      DateTime @default(now())
+
+  credencial CredencialApi @relation(fields: [credencialId], references: [id], onDelete: Cascade)
+
+  @@unique([credencialId, clave])
+  @@index([createdAt])
+}
+
+/// Contadores de uso por ventana de tiempo. La clave dice que se limita:
+/// empresa, credencial, ruta, webhook o canal.
+model LimiteUso {
+  id        String   @id @default(cuid())
+  clave     String
+  ventana   DateTime
+  conteo    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([clave, ventana])
+  @@index([ventana])
 }
 
 /// Un telefono o computadora que acepto recibir avisos de MainTrack.

@@ -3,6 +3,7 @@ import { nextWorkOrderNumber } from "./numbering";
 import { tocanEn } from "./frecuencias";
 import { addDays, startOfDay } from "./utils";
 import { logAudit, notify } from "./audit";
+import { avisarNuevaOrden } from "./avisos/ordenes";
 import { esHabil, jornada } from "./agenda";
 import { can } from "./rbac";
 import {
@@ -270,16 +271,8 @@ async function generarPorMedidor(
       summary: `${number} generada por el plan ${plan.name}`,
     });
 
-    if (plan.assignedToId) {
-      await notify({
-        organizationId,
-        userId: plan.assignedToId,
-        title: `Nueva OT preventiva ${number}`,
-        body: plan.name,
-        link: `/work-orders/${workOrder.id}`,
-        tag: number,
-      });
-    }
+    // Aviso al responsable del plan (y a supervisión si es crítica).
+    await avisarNuevaOrden(organizationId, workOrder.id);
 
     result.generated += 1;
     result.details.push({ plan: plan.name, workOrder: number });
@@ -816,16 +809,8 @@ async function generarPorActividad(
       }`,
     });
 
-    if (plan.assignedToId) {
-      await notify({
-        organizationId,
-        userId: plan.assignedToId,
-        title: `Nueva OT preventiva ${number}`,
-        body: `${plan.name} · ${primera.assetCode}`,
-        link: `/work-orders/${workOrder.id}`,
-        tag: number,
-      });
-    }
+    // Aviso al responsable del plan (y a supervisión si es crítica).
+    await avisarNuevaOrden(organizationId, workOrder.id);
 
     result.generated += 1;
     result.details.push({

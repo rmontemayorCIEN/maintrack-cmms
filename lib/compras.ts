@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
 import { siguienteFolio } from "./numbering";
-import { notify } from "./audit";
+import { atenderAvisos, emitirAviso } from "./avisos/emitir";
+import { avisarCompraPorAutorizar } from "./avisos/detectores";
 
 /**
  * Requisicion de compra y recepcion.
@@ -30,43 +31,31 @@ export function requiereAutorizacion(montoEstimado: number, umbral: number) {
 }
 
 /**
- * Avisa a quien compra que hay algo que adquirir.
+ * Avisa de una compra nueva a quien le toca actuar.
  *
- * Va por aviso dentro de la aplicacion, no por correo: el correo necesita
- * dominio propio y un proveedor de envio, y desde una direccion prestada los
- * avisos se van a spam. Esto no depende de nada y no se pierde.
+ * Si espera firma, a quien puede autorizar (nunca a quien la pidió). Si nació
+ * autorizada por estar debajo del umbral, a compras, que es quien la coloca.
+ * Antes iba a compras, dueño y administrador por igual, firmara o no.
  */
 async function avisarACompras(params: {
   organizationId: string;
-  folio: string;
-  requestId: string;
-  urgencia: string;
-  monto: number;
+  req: { id: string; folio: string; urgencia: string; montoEstimado: number; estado: string; solicitanteId: string | null; warehouseId: string };
+  montoAutorizacion: number;
 }) {
-  const destinatarios = await prisma.user.findMany({
-    where: {
-      organizationId: params.organizationId,
-      active: true,
-      role: { in: ["COMPRAS", "OWNER", "ADMIN"] },
-    },
-    select: { id: true },
+  const { req } = params;
+  if (req.estado === "SOLICITADA") {
+    await avisarCompraPorAutorizar(params.organizationId, req, params.montoAutorizacion);
+    return;
+  }
+  await emitirAviso({
+    organizationId: params.organizationId, tipo: "ORDEN_COMPRA_PENDIENTE", entidad: "PurchaseRequest", entidadId: req.id,
+    titulo: `Compra ${req.folio} autorizada: falta colocarla`,
+    cuerpo: req.urgencia === "PARO" ? "Hay equipo parado esperando este material." : "Mantenimiento necesita material que no hay en almacén.",
+    porQue: "Se autorizó sola por estar debajo del umbral; nadie la ha pedido al proveedor.",
+    accion: "Coloque la orden de compra.", enlace: `/compras/${req.id}`,
+    prioridad: req.urgencia === "PARO" ? "ALTA" : undefined,
+    contexto: { warehouseId: req.warehouseId }, tag: req.folio, datos: { folio: req.folio, urgencia: req.urgencia },
   });
-
-  await Promise.all(
-    destinatarios.map((u) =>
-      notify({
-        organizationId: params.organizationId,
-        userId: u.id,
-        title: `Requisicion de compra ${params.folio}`,
-        body:
-          params.urgencia === "PARO"
-            ? "Hay equipo parado esperando este material."
-            : "Mantenimiento necesita material que no hay en almacén.",
-        link: `/compras/${params.requestId}`,
-        kind: params.urgencia === "PARO" ? "CRITICAL" : "WARNING",
-      }),
-    ),
-  );
 }
 
 /** Estados en los que una requisicion de compra sigue viva (cubre un faltante). */
@@ -208,16 +197,10 @@ export async function crearRequisicionDeCompra(params: {
         })),
       },
     },
-    select: { id: true, folio: true, urgencia: true, montoEstimado: true, estado: true },
+    select: { id: true, folio: true, urgencia: true, montoEstimado: true, estado: true, solicitanteId: true, warehouseId: true },
   });
 
-  await avisarACompras({
-    organizationId: params.organizationId,
-    folio: req.folio,
-    requestId: req.id,
-    urgencia: req.urgencia,
-    monto: req.montoEstimado,
-  });
+  await avisarACompras({ organizationId: params.organizationId, req, montoAutorizacion: umbral });
 
   return req;
 }
@@ -252,16 +235,18 @@ export async function autorizar(params: {
     select: { id: true, folio: true, estado: true },
   });
 
+  // Ya se firmó: el aviso de «por autorizar» queda atendido y su escalamiento se detiene.
+  await atenderAvisos({ organizationId: params.organizationId, entidadId: req.id, tipos: ["REQUISICION_POR_AUTORIZAR"], motivo: params.aprueba ? "se autorizó" : "se rechazó" });
   // Quien pidio se entera sin tener que ir a revisar.
   if (req.solicitanteId) {
-    await notify({
-      organizationId: params.organizationId,
-      userId: req.solicitanteId,
-      title: `Compra ${req.folio} ${params.aprueba ? "autorizada" : "rechazada"}`,
-      body: params.aprueba ? undefined : params.motivo?.trim(),
-      link: `/compras/${req.id}`,
-      kind: params.aprueba ? "SUCCESS" : "WARNING",
-      tag: req.folio,
+    await emitirAviso({
+      organizationId: params.organizationId, tipo: "REQUISICION_RESUELTA", entidad: "PurchaseRequest", entidadId: req.id,
+      version: params.aprueba ? "AUTORIZADA" : "RECHAZADA",
+      prioridad: params.aprueba ? "INFORMATIVA" : "MEDIA", kind: params.aprueba ? "SUCCESS" : "WARNING",
+      titulo: `Compra ${req.folio} ${params.aprueba ? "autorizada" : "rechazada"}`,
+      cuerpo: params.aprueba ? undefined : params.motivo?.trim(),
+      enlace: `/compras/${req.id}`, contexto: { solicitanteId: req.solicitanteId }, tag: req.folio,
+      datos: { folio: req.folio, estado: params.aprueba ? "AUTORIZADA" : "RECHAZADA" },
     });
   }
 

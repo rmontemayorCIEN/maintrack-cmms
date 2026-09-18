@@ -9,7 +9,9 @@ import {
 } from "./reglas-ot";
 import { rollForwardPlan } from "./scheduler";
 import { avanzarActividadesDeOrden } from "./calendario-actividad";
-import { logAudit, notify } from "./audit";
+import { logAudit } from "./audit";
+import { avisarTransicion } from "./avisos/ordenes";
+import { avisarInventario } from "./avisos/detectores";
 
 /**
  * Recalcula horas y costos de una OT.
@@ -585,17 +587,9 @@ export async function transitionWorkOrder(params: {
      * como normalizada con esa lectura como evidencia, y alguien la valida.
      */
 
-    if (wo.createdById && wo.createdById !== params.userId) {
-      await notify({
-        organizationId: params.organizationId,
-        userId: wo.createdById,
-        title: `${wo.number} completada`,
-        body: wo.title,
-        link: `/work-orders/${wo.id}`,
-        kind: "SUCCESS",
-        tag: wo.number,
-      });
-    }
+    // Quien la creó o la pidió se entera al CERRARSE (OT_CERRADA); al
+    // terminarse se avisa a quien la revisa (OT_LISTA_REVISION). Ver
+    // lib/avisos/ordenes.ts.
   }
 
   if (params.to === "IN_PROGRESS" && wo.assetId && wo.requiresShutdown) {
@@ -642,6 +636,9 @@ export async function transitionWorkOrder(params: {
       },
     });
   }
+
+  // Avisos del cambio de estado: a quién le toca actuar ahora y qué quedó atendido.
+  await avisarTransicion(params.organizationId, wo.id, wo.status, params.to, motivo);
 
   return updated;
 }
@@ -720,24 +717,9 @@ export async function consumePart(params: {
     );
   });
 
-  if (balance <= part.minQuantity) {
-    const buyers = await prisma.user.findMany({
-      where: { organizationId: params.organizationId, role: { in: ["OWNER", "ADMIN", "SUPERVISOR"] }, active: true },
-      select: { id: true },
-    });
-    await Promise.all(
-      buyers.map((b) =>
-        notify({
-          organizationId: params.organizationId,
-          userId: b.id,
-          title: `Stock minimo: ${part.name}`,
-          body: `Quedan ${balance} ${part.unit} (minimo ${part.minQuantity}).`,
-          link: "/inventory",
-          kind: "WARNING",
-        }),
-      ),
-    );
-  }
+  // Cruzó el mínimo: aviso agrupado a almacén y compras (no a todo el que
+  // tenga rol alto), y si se agotó una refacción crítica, aviso propio.
+  if (balance <= part.minQuantity) await avisarInventario(params.organizationId).catch(() => undefined);
 
   return recalcWorkOrder(params.workOrderId);
 }

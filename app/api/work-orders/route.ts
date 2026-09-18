@@ -2,7 +2,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
-import { logAudit, notify } from "@/lib/audit";
+import { logAudit } from "@/lib/audit";
+import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { OPEN_STATUSES } from "@/lib/constants";
 import { revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
 
@@ -130,16 +131,8 @@ export async function POST(request: Request) {
       summary: `${number} — ${input.title}`,
     });
 
-    if (input.assignedToId) {
-      await notify({
-        organizationId: orgId,
-        userId: input.assignedToId,
-        title: `OT asignada ${number}`,
-        body: input.title,
-        link: `/work-orders/${workOrder.id}`,
-        tag: number,
-      });
-    }
+    // Aviso al responsable y, si es crítica, a supervisión.
+    await avisarNuevaOrden(orgId, workOrder.id);
 
     return ok({ workOrder }, 201);
   });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avisarCambiosDeOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAgenda, reprogramar } from "@/lib/agenda";
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
 
     const antes = await prisma.workOrder.findFirst({
       where: { organizationId: orgId, number: input.orden },
-      select: { id: true, dueDate: true },
+      select: { id: true, dueDate: true, assignedToId: true, priority: true },
     });
 
     try {
@@ -29,6 +30,11 @@ export async function POST(request: Request) {
         responsableNombre: input.aResponsable ?? null,
         estadosAbiertos: OPEN_STATUSES,
       });
+
+      // Si cambió el responsable, al nuevo le llega la asignación y al anterior
+      // que ya no es suya. Aquí y no en lib/agenda: ese archivo lo lee también
+      // una pantalla del navegador, y los avisos son código de servidor.
+      if (antes) await avisarCambiosDeOrden(orgId, antes);
 
       await logAudit({
         organizationId: orgId,

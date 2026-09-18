@@ -28,6 +28,8 @@ import { ConfiguracionOrdenes } from "./ordenes";
 import { ContextoDelNegocio } from "./contexto";
 import { contextoEnvejecido, PREGUNTAS, type ClavePregunta } from "@/lib/contexto-negocio";
 import { PanelAvisos } from "./avisos";
+import { ConfigDeAvisos } from "./avisos-config";
+import { PanelIntegracion } from "./integracion";
 import { PanelSeguridad } from "./seguridad";
 import { ReferenciaDeRoles } from "./referencia-roles";
 import { FiltrosBitacora } from "./filtros-bitacora";
@@ -51,7 +53,7 @@ const DESCRIPCIONES: Record<Seccion, string> = {
   suscripcion: "Plan contratado, consumo y carga inicial de información.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
   usuarios: "Quien entra al sistema, con que rol y a que tarifa.",
-  integracion: "Endpoints para conectar sistemas externos, IoT y tareas programadas.",
+  integracion: "API con credenciales por empresa, webhooks firmados e historial de entregas de los avisos.",
   auditoria: "Registro de las operaciones realizadas en el sistema.",
 };
 
@@ -207,10 +209,17 @@ export default async function SettingsPage({
       ) : null}
 
       {activa === "avisos" ? (
-        <PanelAvisos
-          encendidoInicial={org.avisosPush}
-          puedeEditar={can(user.role, "settings:write")}
-        />
+        <div className="grid gap-4">
+          <PanelAvisos
+            encendidoInicial={org.avisosPush}
+            puedeEditar={can(user.role, "settings:write")}
+          />
+          <ConfigDeAvisos
+            puedeEditar={can(user.role, "settings:write")}
+            supervisa={can(user.role, "workorder:write")}
+            sitios={await prisma.site.findMany({ where: { organizationId: org.id }, select: { id: true, name: true }, orderBy: { name: "asc" } })}
+          />
+        </div>
       ) : null}
 
       {activa === "seguridad" ? (
@@ -442,20 +451,13 @@ export default async function SettingsPage({
       ) : null}
 
       {activa === "integracion" ? (
-        <Card>
-          <CardHeader
-            title="Endpoints disponibles"
-            subtitle="Todos requieren sesión, salvo el programador, que usa su propio token."
-          />
-          <div className="grid gap-3 text-xs md:grid-cols-2">
-            <Endpoint method="GET" path="/api/cron/scheduler" description="Genera las OT preventivas vencidas de todas las organizaciones. Autenticacion: encabezado Authorization: Bearer CRON_SECRET. Programelo en Cloud Scheduler cada hora." />
-            <Endpoint method="POST" path="/api/sensors/readings" description="Ingesta de lecturas de condicion (una o hasta 500 en lote). Evalua umbrales, actualiza la tendencia y abre alertas u ordenes predictivas." />
-            <Endpoint method="POST" path="/api/readings" description="Registro de lectura de medidor (horas, km, ciclos). Recalcula el consumo diario y adelanta los planes por uso." />
-            <Endpoint method="GET" path="/api/work-orders" description="Consulta de órdenes con filtros por estado, tipo, activo y responsable." />
-            <Endpoint method="POST" path="/api/requests" description="Alta de solicitudes de servicio desde portales o sistemas de producción." />
-            <Endpoint method="GET" path="/api/assets" description="Catalogo de activos, con busqueda por código, nombre o número de serie." />
-          </div>
-        </Card>
+        can(user.role, "settings:write") ? (
+          <PanelIntegracion />
+        ) : (
+          <Card>
+            <p className="text-sm text-slate-600">La integración con otros sistemas la administra el dueño o un administrador de la empresa.</p>
+          </Card>
+        )
       ) : null}
 
       {activa === "auditoria" && bitacora ? (
@@ -513,16 +515,3 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function Endpoint({ method, path, description }: { method: string; path: string; description: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 p-3">
-      <div className="flex items-center gap-2">
-        <span className="rounded bg-slate-900 px-1.5 py-0.5 font-mono text-[0.625rem] font-semibold text-white">
-          {method}
-        </span>
-        <code className="font-mono text-[0.6875rem] text-slate-700">{path}</code>
-      </div>
-      <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">{description}</p>
-    </div>
-  );
-}

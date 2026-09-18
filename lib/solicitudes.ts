@@ -1,6 +1,8 @@
 import { prisma } from "./db";
 import { nextWorkOrderNumber } from "./numbering";
-import { logAudit, notify } from "./audit";
+import { logAudit } from "./audit";
+import { atenderAvisos, emitirAviso } from "./avisos/emitir";
+import { avisarNuevaOrden } from "./avisos/ordenes";
 import { tipoDeTrabajo } from "./tipos-solicitud";
 
 /**
@@ -195,15 +197,14 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
     changes: { workOrderId: workOrder.id, tipo: tipoFinal, assetId, revisadaPor: p.userId },
   });
 
+  await atenderAvisos({ organizationId: p.organizationId, entidadId: solicitud.id, motivo: "la solicitud se convirtió en orden" });
+  await avisarNuevaOrden(p.organizationId, workOrder.id);
   if (solicitud.requestedById) {
-    await notify({
-      organizationId: p.organizationId,
-      userId: solicitud.requestedById,
-      title: `Solicitud ${solicitud.number} aprobada`,
-      body: `Se genero la orden ${workOrder.number}`,
-      link: `/work-orders/${workOrder.id}`,
-      kind: "SUCCESS",
-      tag: solicitud.number,
+    await emitirAviso({
+      organizationId: p.organizationId, tipo: "SOLICITUD_CONVERTIDA", entidad: "WorkRequest", entidadId: solicitud.id,
+      titulo: `Solicitud ${solicitud.number} aprobada`, cuerpo: `Se generó la orden ${workOrder.number}`,
+      enlace: `/work-orders/${workOrder.id}`, contexto: { solicitanteId: solicitud.requestedById }, tag: solicitud.number,
+      datos: { folio: solicitud.number, orden: workOrder.number },
     });
   }
 
@@ -255,15 +256,12 @@ export async function rechazarSolicitud(p: {
     summary: `${solicitud.number} rechazada — ${motivo}`,
     changes: { motivo },
   });
+  await atenderAvisos({ organizationId: p.organizationId, entidadId: solicitud.id, motivo: "la solicitud se rechazó" });
   if (solicitud.requestedById) {
-    await notify({
-      organizationId: p.organizationId,
-      userId: solicitud.requestedById,
-      title: `Solicitud ${solicitud.number} rechazada`,
-      body: motivo,
-      link: "/requests",
-      kind: "WARNING",
-      tag: solicitud.number,
+    await emitirAviso({
+      organizationId: p.organizationId, tipo: "SOLICITUD_RECHAZADA", entidad: "WorkRequest", entidadId: solicitud.id,
+      titulo: `Solicitud ${solicitud.number} rechazada`, cuerpo: motivo, enlace: "/requests",
+      contexto: { solicitanteId: solicitud.requestedById }, tag: solicitud.number, datos: { folio: solicitud.number },
     });
   }
   return prisma.workRequest.findUniqueOrThrow({ where: { id: solicitud.id } });

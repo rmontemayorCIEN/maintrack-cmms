@@ -13,6 +13,7 @@
  *     contrasenas es gratis.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { avisarContrasena } from "./avisos/cuenta";
 import { prisma } from "./db";
 import { hashPassword, revocarSesiones } from "./auth";
 import { logAudit } from "./audit";
@@ -176,6 +177,7 @@ export async function usarRestablecimiento(token: string, nuevaClave: string) {
     action: "PASSWORD_RESET_USED",
     summary: "Contraseña restablecida con liga de un solo uso; sesiones anteriores cerradas",
   });
+  await avisarContrasena(reset.organizationId, reset.userId, "Se restableció con una liga de un solo uso.");
   return { ok: true };
 }
 
