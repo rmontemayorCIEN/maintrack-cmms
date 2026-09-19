@@ -1,4 +1,4 @@
-import {
+import { LifeBuoy, Presentation,
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList,
   Cpu, Factory, Flame, Gauge, Home, Inbox, KanbanSquare, Library, LineChart, ListChecks, MessageCircleQuestion,
   PackageX, PauseCircle, Plus, QrCode, Rocket, ScanLine, Search, Settings, ShoppingCart, Sparkles, Truck, Upload,
@@ -15,7 +15,7 @@ const ICONOS: Record<string, React.ComponentType<{ className?: string }>> = {
   activos: Factory, escanear: ScanLine, medidores: Cpu, planes: ListChecks, conjuntos: Waypoints,
   predictivo: Activity, almacen: Boxes, requisiciones: ClipboardList, compras: ShoppingCart, proveedores: Truck,
   indicadores: LineChart, paros: Flame, reportes: BarChart3, consulta: MessageCircleQuestion, diagnostico: Sparkles,
-  puesta: Rocket, catalogos: Library, importar: Upload, glosario: BookOpen, ajustes: Settings, clientes: Building2,
+  puesta: Rocket, catalogos: Library, importar: Upload, glosario: BookOpen, soporte: LifeBuoy, demo: Presentation, ajustes: Settings, clientes: Building2,
   avisos: Bell, nueva: Plus, buscar: Search, revisar: ClipboardCheck, bloqueo: PauseCircle, panel: Gauge,
 };
 

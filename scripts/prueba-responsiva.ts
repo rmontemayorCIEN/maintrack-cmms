@@ -104,7 +104,8 @@ const MEDIDA = `(() => {
   const ancho = window.innerWidth;
   const doc = document.documentElement;
   const desborde = doc.scrollWidth > ancho + 1;
-  const visibles = (e) => { const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+  // Lo marcado aria-hidden (la trampa para robots de los formularios) no es para personas: no cuenta.
+  const visibles = (e) => { if (e.closest('[aria-hidden="true"]')) return false; const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
   const fuera = [...document.querySelectorAll("a,button,input,select,textarea")].filter((e) => {
     if (!visibles(e)) return false;
     // Lo que se desliza dentro de su propio contenedor (índice, tablas) no cuenta.
@@ -153,6 +154,7 @@ async function main() {
   const ARCHIVOS = join(tmpdir(), `mt-archivos-${sello}`);
   mkdirSync(ARCHIVOS, { recursive: true });
   const creadas: string[] = [];
+  let demoId: string | null = null;
   const DIA = 86_400_000;
   try {
     // ── Datos: una empresa exclusiva con algo en cada pantalla, y otra para el aislamiento.
@@ -212,6 +214,11 @@ async function main() {
     });
     await prisma.supplier.create({ data: { organizationId: A.id, name: "Rodamientos del Norte, S.A. de C.V." } });
     const punto = await puntoDeActivo(A.id, activos[0].id, u.OWNER.id);
+    // Bloque 7: una empresa demostrativa propia de la prueba (otro slug y otro dominio).
+    const { crearEmpresaDemostrativa } = await import("../lib/demo-comercial");
+    const demo = await crearEmpresaDemostrativa({ contrasena: "prueba-demo-123", slug: `demo-${sello}`, dominio: `${sello}.rs.mx` });
+    demoId = demo.id;
+    const du = Object.fromEntries((await prisma.user.findMany({ where: { organizationId: demo.id } })).map((x) => [x.email.split("@")[0], x]));
 
     // ── Archivos de prueba: una foto grande de lado (EXIF orientación 6), una imagen y un PDF
     //    de galería, un ejecutable y un video de 201 MB (vacío: el navegador solo mira el tamaño).
@@ -284,6 +291,12 @@ async function main() {
     const t = await abrirPestana();
 
     const secreto = new TextEncoder().encode(process.env.AUTH_SECRET!);
+    /** Sesión de cualquier usuario (la demo tiene los suyos). */
+    const sesionDe = async (x: { id: string; organizationId: string; email: string; name: string; role: string }, p: Pestana = t) => {
+      await p.enviar("Network.clearBrowserCookies");
+      const jwt = await new SignJWT({ userId: x.id, organizationId: x.organizationId, email: x.email, name: x.name, role: x.role }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2h").sign(secreto);
+      await p.enviar("Network.setCookie", { name: "mt_session", value: jwt, url: base, httpOnly: true });
+    };
     const sesion = async (rol: Quien | null, p: Pestana = t) => {
       await p.enviar("Network.clearBrowserCookies");
       if (!rol) return;
@@ -967,6 +980,73 @@ async function main() {
     await captura("320x568-orden-barra-dueno");
     revisar("En 320 × 568 la barra de acciones de la orden (con todos los botones del dueño) ocupa menos de un tercio de la pantalla", barra320.botones >= 4 && barra320.alto < 568 / 3, barra320);
 
+    // ═══════════════════════════════════════════ Bloque 7: sitio, contratación, demo, recorrido y soporte
+    console.log("\nBloque 7. Sitio comercial, contratación, empresa demostrativa y soporte");
+    const comercial: Record<string, unknown> = {};
+    for (const [ancho, alto, etiqueta] of [[390, 844, "390"], [1440, 900, "1440"]] as Array<[number, number, string]>) {
+      await pantalla(ancho, alto);
+      await sesion(null);
+      for (const [nombre, ruta] of [["sitio", "/"], ["contratar", "/contratar"], ["legal", "/legal/sla"]]) {
+        donde = `publico ${etiqueta} ${ruta}`;
+        await t.ir(`${base}${ruta}`, 900);
+        const m = await medir();
+        comercial[`${nombre}-${etiqueta}`] = m.desborde || m.fuera.length || m.errorPagina ? { desborde: m.desborde, fuera: m.fuera } : "ok";
+        await captura(`b7-${etiqueta}-${nombre}`);
+      }
+    }
+    revisar("El sitio, la contratación y los documentos se ven completos en teléfono y en computadora, sin desplazamiento lateral", Object.values(comercial).every((x) => x === "ok"), comercial);
+    // La solicitud de demostración, llenada como persona (no se envía nada fuera: queda en la base local).
+    await pantalla(390, 844);
+    donde = "solicitud demo";
+    await t.ir(`${base}/#demostracion`, 900);
+    await teclear(t, "#d-nombre", "Ana Pruebas"); await teclear(t, "#d-empresa", `${sello} Bebidas`); await teclear(t, "#d-correo", `ana@${sello}.rs.mx`);
+    await t.evaluar(`(() => { const c = document.querySelector('input[type=checkbox][required]'); c.click(); return c.checked; })()`);
+    await tocar(t, "Solicitar demostración", "form");
+    const recibida = await hasta(t, `document.body.innerText.includes("Solicitud recibida")`);
+    await captura("b7-390-solicitud-recibida");
+    revisar("Solicitar una demostración desde el teléfono: valida, confirma y queda registrada con su origen", recibida && !!(await prisma.prospecto.findFirst({ where: { correo: `ana@${sello}.rs.mx`, origen: "SITIO" } })));
+    await prisma.prospecto.deleteMany({ where: { correo: { endsWith: `@${sello}.rs.mx` } } });
+    await prisma.notification.deleteMany({ where: { title: { contains: sello } } });
+
+    // La demo en el teléfono: banda, recorrido que no bloquea, se omite y no vuelve; se reinicia desde la guía.
+    await sesionDe(du.mecanico);
+    donde = "demo tecnico";
+    await t.evaluar("localStorage.clear(); true").catch(() => undefined);
+    await t.ir(`${base}/dashboard`, 1200);
+    const conRecorrido = await t.evaluar<{ banda: boolean; recorrido: boolean; tapa: boolean; pasos: string }>(`(() => {
+      const r = document.querySelector('aside[aria-label="Recorrido de la demostración"]');
+      const rr = r?.getBoundingClientRect();
+      return { banda: document.body.innerText.includes("Empresa demostrativa"), recorrido: !!r, tapa: !!rr && rr.height > innerHeight * 0.45, pasos: r?.innerText.match(/\d+ de \d+/)?.[0] ?? "" };
+    })()`);
+    await captura("b7-390-demo-tecnico-recorrido");
+    const m390 = await medir();
+    await t.evaluar(`document.querySelector('aside[aria-label="Recorrido de la demostración"] button[aria-label="Omitir el recorrido"]')?.click(); true`);
+    await t.ir(`${base}/dashboard`, 1000);
+    const trasOmitir = await t.evaluar<boolean>(`!document.querySelector('aside[aria-label="Recorrido de la demostración"]')`);
+    await t.ir(`${base}/demo`, 1000);
+    await tocar(t, "Reiniciar el recorrido guiado");
+    const reiniciado = await hasta(t, `!!document.querySelector('aside[aria-label="Recorrido de la demostración"]')`, 4000);
+    await captura("b7-390-demo-guia");
+    revisar("Demo en el teléfono: banda «Empresa demostrativa», recorrido chico que no tapa la pantalla, por rol; omitido no vuelve; se reinicia desde la guía",
+      conRecorrido.banda && conRecorrido.recorrido && !conRecorrido.tapa && !m390.desborde && trasOmitir && reiniciado, { ...conRecorrido, trasOmitir, reiniciado });
+    // Las pantallas de las historias, con el rol de cada una, en el teléfono.
+    const demoMovil: Record<string, unknown> = {};
+    for (const [quien, ruta] of [["direccion", "/dashboard"], ["direccion", "/paros"], ["supervision", "/dashboard"], ["supervision", "/alerts"], ["mecanico", "/work-orders?mias=1"], ["compras", "/inventory"], ["compras", "/compras"], ["operador", "/requests"], ["gerencia", "/demo"], ["mecanico", "/soporte"]] as Array<[string, string]>) {
+      await sesionDe(du[quien]);
+      donde = `demo ${quien} ${ruta}`;
+      await t.ir(`${base}${ruta}`, 900);
+      const m = await medir();
+      demoMovil[`${quien} ${ruta}`] = m.desborde || m.fuera.length || m.sinPermiso || m.errorPagina ? { desborde: m.desborde, fuera: m.fuera, sinPermiso: m.sinPermiso } : "ok";
+      await captura(`b7-390-demo-${quien}-${ruta.replace(/[/?=]/g, "_")}`);
+    }
+    revisar("Vista móvil de la demo: las pantallas de las cinco historias y el soporte, con su rol, completas y sin desplazamiento lateral", Object.values(demoMovil).every((x) => x === "ok"), demoMovil);
+    await pantalla(1440, 900);
+    await sesionDe(du.direccion);
+    await t.evaluar("localStorage.clear(); true").catch(() => undefined);
+    await t.ir(`${base}/dashboard`, 1500); await captura("b7-1440-demo-direccion-inicio");
+    await t.ir(`${base}/paros`, 1500); await captura("b7-1440-demo-donde-para");
+    await t.ir(`${base}/demo`, 1000); await captura("b7-1440-demo-guia");
+
     // ═══════════════════════════════════════════ 35-36 (en pantalla) y rendimiento
     console.log("\nRendimiento en red móvil (4G simulada)");
     await t.enviar("Network.emulateNetworkConditions", { offline: false, latency: 150, downloadThroughput: (9 * 1024 * 1024) / 8, uploadThroughput: (1.5 * 1024 * 1024) / 8 });
@@ -995,6 +1075,7 @@ async function main() {
     console.log(`\n  Capturas en ${CAPTURAS}`);
     t.cerrar(); nav.cerrar();
   } finally {
+    if (demoId) { const { borrarDemo } = await import("../lib/demo-comercial"); await borrarDemo(demoId).catch((e) => console.error("no se borró la demo", e)); }
     for (const id of [...creadas].reverse()) await prisma.organization.delete({ where: { id } }).catch((e) => console.error("no se borró", id, e));
     try { chrome?.kill("SIGTERM"); } catch { /* ya cerró */ }
     rmSync(ARCHIVOS, { recursive: true, force: true });

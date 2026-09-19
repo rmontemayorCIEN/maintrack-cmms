@@ -15,6 +15,14 @@ export function fail(message: string, status = 400, extra?: unknown) {
 }
 
 /** Envuelve un handler resolviendo sesion, tenant y permiso requerido. */
+export const NO_EN_DEMO = "Esto no está disponible en la empresa demostrativa.";
+export const EN_RESTAURACION = "La empresa demostrativa se está restaurando. Intente de nuevo en un minuto.";
+
+/** Un candado de restauración que quedó puesto más de 15 minutos se da por vencido (falla a medias). */
+export function demoEnRestauracion(org: { demoRestaurandoDesde?: Date | null }, ahora = Date.now()) {
+  return !!org.demoRestaurandoDesde && ahora - new Date(org.demoRestaurandoDesde).getTime() < 15 * 60_000;
+}
+
 export async function withAuth<T>(
   permission: Permission | null,
   handler: (ctx: {
@@ -29,11 +37,24 @@ export async function withAuth<T>(
    * vencida tiene que poder sacar su informacion. Sin esta distincion, dejar de
    * pagar equivaldria a perder el acceso a los propios datos.
    */
-  opciones?: { esLectura?: boolean },
+  opciones?: {
+    esLectura?: boolean;
+    /** Acciones que no se permiten en la empresa demostrativa (credenciales, webhooks). */
+    noEnDemo?: boolean;
+  },
 ) {
   const user = await getCurrentUser();
   if (!user) return fail("No autenticado", 401);
   if (permission && !can(user.role, permission)) return fail("Sin permisos suficientes", 403);
+
+  // La empresa demostrativa (Bloque 7): mientras se restaura no atiende a
+  // nadie, y lo que tocaría a la plataforma o al exterior —el plan, las
+  // credenciales, los avisos a otros sistemas— no se hace desde ahí.
+  const org = user.organization as { esDemo?: boolean; demoRestaurandoDesde?: Date | null };
+  if (org.esDemo) {
+    if (demoEnRestauracion(org)) return fail(EN_RESTAURACION, 503);
+    if (!user.isSuperAdmin && (permission === "billing:manage" || opciones?.noEnDemo)) return fail(NO_EN_DEMO, 403);
+  }
 
   // Un `permission` no nulo siempre corresponde a una operacion que modifica
   // datos; las lecturas pasan null. Por eso el control comercial cabe aqui, en

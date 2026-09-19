@@ -42,8 +42,9 @@ export type ResultadoEmision = {
 /**
  * Emite los cargos de un periodo.
  *
- * Se omiten: el plan Free (no cuesta), las cuentas canceladas, las que siguen
- * en prueba vigente, y las que ya tienen cargo de ese periodo. Es idempotente:
+ * Se omiten: la empresa demostrativa (nunca genera cargos), las cuentas
+ * canceladas, las que siguen en prueba vigente, y las que ya tienen cargo de
+ * ese periodo. Es idempotente:
  * volver a ejecutarlo no duplica nada.
  */
 export async function emitirCargosDelPeriodo(
@@ -54,7 +55,7 @@ export async function emitirCargosDelPeriodo(
     where: opciones.organizationId ? { id: opciones.organizationId } : {},
     select: {
       id: true, name: true, plan: true, status: true, currency: true, trialEndsAt: true,
-      iaComplemento: true,
+      iaComplemento: true, esDemo: true,
       invoices: { where: { periodo }, select: { id: true } },
     },
   });
@@ -67,6 +68,10 @@ export async function emitirCargosDelPeriodo(
   for (const org of organizaciones) {
     if (org.invoices.length) {
       resultado.omitidos.push({ empresa: org.name, motivo: "Ya tiene cargo de este periodo" });
+      continue;
+    }
+    if (org.esDemo) {
+      resultado.omitidos.push({ empresa: org.name, motivo: "Empresa demostrativa: no genera cargos" });
       continue;
     }
     if (org.status === "CANCELLED") {
@@ -89,8 +94,8 @@ export async function emitirCargosDelPeriodo(
     const importeIa = org.iaComplemento ? COMPLEMENTO_IA.precioMensual : 0;
     const importe = plan.precioMensual + importeIa;
     const concepto = importeIa
-      ? `Servicio MainTrack CMMS · Plan ${plan.nombre} + ${COMPLEMENTO_IA.nombre} · ${nombrePeriodo(periodo)}`
-      : `Servicio MainTrack CMMS · Plan ${plan.nombre} · ${nombrePeriodo(periodo)}`;
+      ? `Servicio MainTrack · Plan ${plan.nombre} + ${COMPLEMENTO_IA.nombre} · ${nombrePeriodo(periodo)}`
+      : `Servicio MainTrack · Plan ${plan.nombre} · ${nombrePeriodo(periodo)}`;
 
     const folio = await siguienteFolio(org.id);
     await prisma.invoice.create({

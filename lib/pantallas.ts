@@ -32,6 +32,9 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/notificaciones", roles: TODOS },
   { ruta: "/search", roles: TODOS },
   { ruta: "/glossary", roles: TODOS },
+  // Bloque 7: pedir ayuda a MainTrack es de todos; la guía de demostración, solo en la empresa demostrativa.
+  { ruta: "/soporte", roles: TODOS },
+  { ruta: "/demo", roles: TODOS },
   // Ajustes: cada quien ve lo suyo (preferencias de avisos, su contraseña); las
   // pestañas de la empresa las filtra la propia pantalla con settings:write.
   { ruta: "/settings", roles: TODOS },
@@ -96,9 +99,10 @@ function reglaDe(ruta: string) {
  * ¿Este rol ve esta pantalla? Una ruta que no está en la tabla solo la ve el
  * mando: lo nuevo nace cerrado y se abre a propósito, no al revés.
  */
-export function puedeVerRuta(rol: string | undefined, ruta: string, opciones: { esSuperAdmin?: boolean } = {}): boolean {
+export function puedeVerRuta(rol: string | undefined, ruta: string, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}): boolean {
   if (!rol) return false;
   const limpia = ruta.split("?")[0].replace(/\/+$/, "") || "/";
+  if ((limpia === "/demo" || limpia.startsWith("/demo/")) && !opciones.esDemo) return false;
   if (DE_PLATAFORMA.some((p) => limpia === p || limpia.startsWith(`${p}/`))) return Boolean(opciones.esSuperAdmin);
   const regla = reglaDe(limpia);
   return (regla?.roles ?? MANDO).includes(rol as Rol);
@@ -191,17 +195,25 @@ const MENU: GrupoMenu[] = [
       { href: "/puesta-en-marcha", etiqueta: "Puesta en marcha", icono: "puesta" },
       { href: "/catalogs", etiqueta: "Catálogos", icono: "catalogos" },
       { href: "/import", etiqueta: "Importar datos", icono: "importar" },
-      { href: "/glossary", etiqueta: "Glosario", icono: "glosario" },
       { href: "/settings", etiqueta: "Ajustes", icono: "ajustes" },
+    ],
+  },
+  {
+    seccion: "Ayuda", clave: "ayuda", items: [
+      { href: "/soporte", etiqueta: "Soporte", icono: "soporte" },
+      { href: "/glossary", etiqueta: "Glosario", icono: "glosario" },
     ],
   },
 ];
 
 /** El menú de un rol: solo lo que puede abrir, sin grupos vacíos. */
-export function menuDe(rol: string | undefined, opciones: { esSuperAdmin?: boolean } = {}): GrupoMenu[] {
+export function menuDe(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}): GrupoMenu[] {
   const grupos = MENU
     .map((g) => ({ ...g, items: g.items.filter((i) => puedeVerRuta(rol, i.href, opciones)) }))
     .filter((g) => g.items.length);
+  if (opciones.esDemo) {
+    grupos.unshift({ seccion: "Demostración", clave: "demo", items: [{ href: "/demo", etiqueta: "Guía de la demostración", icono: "demo" }] });
+  }
   if (opciones.esSuperAdmin) {
     grupos.push({ seccion: "Plataforma", clave: "plataforma", items: [{ href: "/clients", etiqueta: "Empresas cliente", icono: "clientes" }] });
   }

@@ -114,7 +114,8 @@ export function FichasPlanes({
           const actual = p.clave === planActual;
           const i = ORDEN.indexOf(p.clave);
           const sube = i > iActual;
-          const recomendado = p.clave === "PROFESSIONAL" && !actual;
+          // Sin «más contratado»: no hay dato que lo respalde (Bloque 7).
+          const recomendado = false;
 
           return (
             <Card
@@ -131,7 +132,7 @@ export function FichasPlanes({
                 </span>
               ) : recomendado ? (
                 <span className="absolute -top-2 left-4">
-                  <Badge tone="success">Mas contratado</Badge>
+                  <Badge tone="success">Recomendado</Badge>
                 </span>
               ) : null}
 

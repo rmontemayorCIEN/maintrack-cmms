@@ -17,7 +17,7 @@ import { medianocheEnZona } from "./periodos";
 export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: string[] }> = {
   ACCESO: { titulo: "Acceso y usuarios", entidades: ["User"] },
   ORDENES: { titulo: "Órdenes de trabajo", entidades: ["WorkOrder", "WorkOrderTask", "WorkRequest"] },
-  ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "Meter", "MeterReading", "Sensor", "PlanRequest", "Conjunto"] },
+  ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "Meter", "MeterReading", "Sensor", "PredictiveAlert", "PlanRequest", "Conjunto"] },
   ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier"] },
   CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink"] },
   IMPORTACION: { titulo: "Importaciones y puesta en marcha", entidades: ["Importacion", "ImportBatch"] },

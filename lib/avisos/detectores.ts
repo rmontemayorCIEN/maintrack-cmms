@@ -268,7 +268,7 @@ export async function detectar(organizationId: string, cfg: ConfigEmpresa, ahora
       await emitirAviso({
         organizationId, tipo: "PRUEBA_POR_TERMINAR", entidad: "Organization", entidadId: organizationId, version: org.trialEndsAt.toISOString().slice(0, 10),
         titulo: `El periodo de prueba termina ${fecha(org.trialEndsAt, zona)}`,
-        porQue: "Al terminar, la cuenta queda suspendida y nadie podrá registrar trabajo.",
+        porQue: "Al terminar, la cuenta queda en solo lectura: se consulta y se exporta, pero nadie podrá registrar trabajo hasta contratar un plan.",
         accion: "Elija un plan en Configuración → Suscripción.", enlace: "/settings?s=suscripcion",
       });
       suma("PRUEBA_POR_TERMINAR");

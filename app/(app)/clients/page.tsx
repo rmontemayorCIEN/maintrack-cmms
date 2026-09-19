@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Receipt, Sparkles } from "lucide-react";
+import { LifeBuoy, Receipt, Sparkles, UserPlus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
@@ -27,6 +27,11 @@ export default async function ClientsPage() {
     },
     orderBy: { createdAt: "asc" },
   });
+
+  const [prospectosNuevos, soporteAbierto] = await Promise.all([
+    prisma.prospecto.count({ where: { estado: "NUEVA" } }),
+    prisma.solicitudSoporte.count({ where: { estado: { in: ["RECIBIDA", "EN_REVISION"] } } }),
+  ]);
 
   const organizaciones = await prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
@@ -74,6 +79,12 @@ export default async function ClientsPage() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <Receipt className="h-3.5 w-3.5" /> Cobranza
+          </Link>
+          <Link href="/clients/prospectos" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <UserPlus className="h-3.5 w-3.5" /> Prospectos{prospectosNuevos ? <span className="rounded-full bg-amber-100 px-1.5 text-amber-900">{prospectosNuevos}</span> : null}
+          </Link>
+          <Link href="/clients/soporte" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <LifeBuoy className="h-3.5 w-3.5" /> Soporte{soporteAbierto ? <span className="rounded-full bg-amber-100 px-1.5 text-amber-900">{soporteAbierto}</span> : null}
           </Link>
           </>
         }

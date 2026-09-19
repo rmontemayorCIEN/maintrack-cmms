@@ -10,6 +10,8 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { ORDEN_PLANES } from "@/lib/planes";
 import { ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/estado-operativo";
 import { MODOS_DE_INICIO, type ModoDeInicio } from "@/lib/modos-inicio";
+import { nombreSolicitado } from "@/lib/planes";
+import { PRUEBA_DIAS } from "@/lib/comercial";
 
 type Org = {
   id: string; name: string; slug: string; plan: string; status: string;
@@ -57,7 +59,7 @@ export function PanelClientes({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [form, setForm] = useState({
-    name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30",
+    name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: String(PRUEBA_DIAS),
     ownerName: "", ownerEmail: "", ownerPassword: "",
     // Sin opción marcada: hay que elegir cómo empieza, después de leer qué trae.
     modo: "" as ModoDeInicio | "",
@@ -81,7 +83,7 @@ export function PanelClientes({
     setOcupado(null);
     if (!res.ok) { setError(data.error ?? "No fue posible crear la empresa"); return; }
     setAviso(`Empresa "${data.organization.name}" creada. Ya puede entregar el acceso a su responsable.`);
-    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30", ownerName: "", ownerEmail: "", ownerPassword: "", modo: "" });
+    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: String(PRUEBA_DIAS), ownerName: "", ownerEmail: "", ownerPassword: "", modo: "" });
     setCreando(false);
     router.refresh();
   }
@@ -125,7 +127,7 @@ export function PanelClientes({
     setOcupado(null);
     if (!res.ok) { setError(data.error ?? "No fue posible resolver la solicitud"); return; }
     setAviso(accion === "APLICAR"
-      ? `Plan de ${s.empresa} cambiado a ${s.planSolicitado}.`
+      ? `Plan de ${s.empresa} cambiado a ${nombreSolicitado(s.planSolicitado)}.`
       : `Solicitud de ${s.empresa} descartada.`);
     setTimeout(() => setAviso(null), 4000);
     router.refresh();
@@ -151,7 +153,7 @@ export function PanelClientes({
                   <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-800">
                     {s.empresa}
                     <span className="inline-flex items-center gap-1 text-xs font-normal text-slate-500">
-                      {s.planActual} <ArrowRight className="h-3 w-3" /> <strong className="text-slate-800">{s.planSolicitado}</strong>
+                      {nombreSolicitado(s.planActual)} <ArrowRight className="h-3 w-3" /> <strong className="text-slate-800">{nombreSolicitado(s.planSolicitado)}</strong>
                     </span>
                   </p>
                   <p className="text-[0.6875rem] text-slate-500">

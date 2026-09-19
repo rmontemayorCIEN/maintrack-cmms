@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { iniciarEmpresa } from "@/lib/demo";
 import { MODOS_DE_INICIO } from "@/lib/modos-inicio";
 import { fail, ok } from "@/lib/api";
-import { hashPassword } from "@/lib/auth";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { logAudit } from "@/lib/audit";
-import { slugify } from "@/lib/utils";
+import { ErrorDeAlta, darDeAltaEmpresa } from "@/lib/alta-empresa";
+import { PRUEBA_DIAS } from "@/lib/comercial";
 
 /** Listado de empresas cliente con su consumo, para el panel del operador. */
 export async function GET() {
@@ -29,7 +28,7 @@ const schema = z.object({
   industry: z.string().trim().optional().nullable(),
   tipoInstalacion: z.string().trim().max(20).optional().nullable(),
   plan: z.enum(["PROFESSIONAL", "ENTERPRISE"]).default("PROFESSIONAL"),
-  trialDays: z.coerce.number().int().min(0).max(365).default(30),
+  trialDays: z.coerce.number().int().min(0).max(365).default(PRUEBA_DIAS),
   ownerName: z.string().trim().min(2, "El nombre del responsable es obligatorio"),
   ownerEmail: z.string().email("Correo invalido"),
   ownerPassword: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
@@ -51,55 +50,18 @@ export async function POST(request: Request) {
     return fail(zerr.errors?.[0]?.message ?? "Datos invalidos", 422);
   }
 
-  const email = input.ownerEmail.toLowerCase().trim();
-  if (await prisma.user.findUnique({ where: { email } })) {
-    return fail("Ese correo ya esta registrado en la plataforma", 409);
+  let org: { id: string; name: string; slug: string };
+  try {
+    ({ org } = await darDeAltaEmpresa({
+      nombre: input.name, giro: input.industry, tipoInstalacion: input.tipoInstalacion, plan: input.plan, diasPrueba: input.trialDays,
+      responsable: { nombre: input.ownerName, correo: input.ownerEmail, contrasena: input.ownerPassword },
+      modo: input.modo, origen: "OPERADOR", iniciadoPor: user.id,
+    }));
+  } catch (e) {
+    if (e instanceof ErrorDeAlta) return fail(e.message, e.status);
+    throw e;
   }
-
-  let slug = slugify(input.name);
-  let intento = 1;
-  while (await prisma.organization.findUnique({ where: { slug } })) {
-    slug = `${slugify(input.name)}-${intento++}`;
-  }
-
-  const trialEndsAt = input.trialDays > 0
-    ? new Date(Date.now() + input.trialDays * 86_400_000)
-    : null;
-
-  const org = await prisma.organization.create({
-    data: {
-      name: input.name,
-      slug,
-      industry: input.industry || null,
-      tipoInstalacion: input.tipoInstalacion || null,
-      plan: input.plan,
-      status: input.trialDays > 0 ? "TRIAL" : "ACTIVE",
-      trialEndsAt,
-    },
-  });
-
-  const owner = await prisma.user.create({
-    data: {
-      organizationId: org.id,
-      email,
-      name: input.ownerName,
-      passwordHash: await hashPassword(input.ownerPassword),
-      role: "OWNER",
-      jobTitle: "Direccion",
-    },
-    select: { id: true },
-  });
-
-  // Lo que recibe según lo elegido: indispensables, recomendada o demostración.
-  // Solo para esta empresa nueva; las que ya existen no se tocan.
-  await iniciarEmpresa({ organizationId: org.id, userId: user.id, modo: input.modo });
   const elegido = MODOS_DE_INICIO.find((m) => m.modo === input.modo)!;
-  await logAudit({
-    organizationId: org.id, userId: user.id,
-    entity: "Organization", entityId: org.id, action: "ORG_CREATED",
-    summary: `Empresa creada: ${elegido.titulo.toLowerCase()}`,
-    changes: { modo: input.modo, responsable: owner.id },
-  });
 
   await logAudit({
     organizationId: user.organizacionPropia.id,

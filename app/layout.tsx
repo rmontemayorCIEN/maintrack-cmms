@@ -3,14 +3,14 @@ import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
 import { estiloDeApariencia } from "@/lib/apariencia";
 import { TextosQueCrecen } from "@/components/textos-que-crecen";
+import { DESCRIPCION, MARCA } from "@/lib/comercial";
 
 export const metadata: Metadata = {
   title: {
-    default: "MainTrack CMMS",
-    template: "%s · MainTrack CMMS",
+    default: MARCA,
+    template: `%s · ${MARCA}`,
   },
-  description:
-    "Plataforma SaaS para la programación y control de mantenimiento preventivo, correctivo y predictivo.",
+  description: DESCRIPCION,
   /**
    * Iconos de la aplicacion instalable. El de Apple va aparte porque iOS
    * ignora el manifiesto para esto y solo lee `apple-touch-icon`.

@@ -87,6 +87,11 @@ echo "     Sin errores de tipos y sin migraciones mal generadas."
 # debe bloquear un arreglo urgente— pero sale con nombre y apellido cada vez.
 npx tsx scripts/revisar-ayuda.ts
 
+# Los documentos comerciales (precios, SLA, borradores legales) se generan de
+# las mismas fuentes que el sitio. Si alguien cambia un precio y no los regenera,
+# el documento que se entrega dice otro número. Avisa, no bloquea.
+npx tsx scripts/generar-documentos-comerciales.ts --revisar || echo "     AVISO: regenere los documentos comerciales antes de entregarlos."
+
 # Los esquemas de IA se validan aparte porque su error no lo ve el compilador
 # ni el despliegue: aparece cuando un usuario aprieta el boton en produccion.
 npx tsx scripts/prueba-esquemas-ia.ts >/dev/null 2>&1 \

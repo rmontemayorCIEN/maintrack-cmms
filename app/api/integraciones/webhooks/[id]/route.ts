@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: Params) {
   return withAuth("settings:write", async ({ user, orgId }) => {
     const input = cambios.parse(await request.json());
     return conError(async () => ({ webhook: vistaDeWebhook(await modificarWebhook({ organizationId: orgId, userId: user.id, id, cambios: input })) }));
-  });
+  }, { noEnDemo: true });
 }
 
 /** Probar la conexión (evento de prueba sin datos reales) o rotar el secreto de firma. */
@@ -38,5 +38,5 @@ export async function POST(request: Request, { params }: Params) {
     return conError(() => (a === "probar"
       ? probarWebhook({ organizationId: orgId, userId: user.id, id })
       : rotarSecretoWebhook({ organizationId: orgId, userId: user.id, id })));
-  });
+  }, { noEnDemo: true });
 }

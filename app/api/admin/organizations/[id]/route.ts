@@ -21,7 +21,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { error, user } = await requireSuperAdmin();
   if (error) return error;
 
-  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true, name: true } });
+  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true, name: true, esDemo: true, plan: true } });
   if (!org) return fail("Empresa no encontrada", 404);
 
   if (id === user.organizacionPropia.id) {
@@ -29,6 +29,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const input = schema.parse(await request.json());
+  // La demo no se suspende ni se cancela por cobranza: no tiene cargos (Bloque 7).
+  if (org.esDemo && (input.status === "SUSPENDED" || input.status === "CANCELLED")) {
+    return fail("La empresa demostrativa no se suspende ni se cancela; si ya no se usa, avísele a quien administra la plataforma.", 409);
+  }
   const actualizada = await prisma.organization.update({
     where: { id },
     data: input,
@@ -41,7 +45,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     entity: "Organization",
     entityId: id,
     action: "CLIENT_UPDATED",
-    summary: `${org.name}: ${JSON.stringify(input)}`,
+    // El cambio de plan surte efecto hoy: queda la fecha para cuadrar la siguiente nota de cobro.
+    summary: input.plan && input.plan !== org.plan
+      ? `${org.name}: plan ${org.plan} → ${input.plan}, efectivo el ${new Date().toLocaleDateString("es-MX", { timeZone: "America/Monterrey" })}`
+      : `${org.name}: ${JSON.stringify(input)}`,
+    changes: { ...input, efectivoEl: new Date().toISOString() },
   });
 
   return ok({ organization: actualizada });

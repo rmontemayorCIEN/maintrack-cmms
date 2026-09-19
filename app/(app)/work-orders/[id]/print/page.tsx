@@ -149,12 +149,12 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         </div>
         <div>
           <div className="h-16 border-b border-slate-800" />
-          <p className="mt-1 text-center text-xs">Superviso / Recibio conforme</p>
+          <p className="mt-1 text-center text-xs">Supervisó / Recibió conforme</p>
         </div>
       </section>
 
       <footer className="mt-8 border-t border-slate-300 pt-2 text-[0.625rem] text-slate-500">
-        Impreso {formatDateTime(new Date(), zona)} · MainTrack CMMS
+        Impreso {formatDateTime(new Date(), zona)} · MainTrack
       </footer>
     </div>
   );

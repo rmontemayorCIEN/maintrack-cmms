@@ -255,6 +255,52 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/soporte": {
+    titulo: "Soporte",
+    que: "Pedir ayuda al equipo de MainTrack y ver en qué va. Es el canal de soporte: no hace falta correo ni teléfono.",
+    hacer: ["Escribir qué intentaba hacer y qué pasó, elegir la severidad y enviar", "Ver el folio, el estado y la respuesta", "Agregar información, subir la severidad si urge más o confirmar que quedó resuelto"],
+    flujo: [
+      "Horario: lunes a viernes de 9:00 a 18:00, hora del centro de México, días hábiles. Los tiempos objetivo son de respuesta, no de solución, y dependen de la severidad y del plan (la tabla está en la misma pantalla).",
+      "Severidad: Crítica si nadie puede usar MainTrack o hay riesgo de perder datos; Alta si una función principal no sirve y no hay forma de rodearlo; Media si hay forma de seguir; Baja para dudas y sugerencias.",
+      "Los datos técnicos (navegador, pantalla, idioma, conexión y hora) se adjuntan solo si deja la casilla marcada; no incluyen contraseñas ni datos de su operación.",
+      "Cada quien ve sus solicitudes; la administración ve las de toda la empresa. Cuando hay respuesta, llega un aviso a la campana.",
+      "Si no puede entrar a MainTrack, su administrador lo reporta desde otra cuenta de la empresa.",
+    ],
+  },
+
+  "/demo": {
+    titulo: "Guía de la demostración",
+    que: "Solo existe en la empresa demostrativa: cómo presentar MainTrack con cinco historias sobre el sistema real, y cómo dejar la demo como nueva.",
+    hacer: ["Seguir el orden recomendado para una demostración de 20 a 30 minutos", "Abrir los registros que usa cada historia", "Reiniciar el recorrido guiado", "Restaurar la demo al terminar (dirección o gerencia)"],
+    flujo: [
+      "Cada historia dice con qué rol se muestra, cuánto tarda, el problema, los pasos y el resultado que se explica.",
+      "Todo lo que se captura durante la demostración funciona igual que en una cuenta real. Restaurar lo borra y vuelve a sembrar la historia de 90 días con fechas al día; se conservan la empresa y las cuentas.",
+      "Mientras se restaura, la demo muestra «se está restaurando» y no atiende a nadie; tarda menos de un minuto. La operación queda en la auditoría.",
+      "En la demo no se puede cambiar el plan, crear credenciales de API ni conectar avisos a otros sistemas, y nunca genera cargos.",
+    ],
+  },
+
+  "/clients/prospectos": {
+    titulo: "Prospectos",
+    que: "Las solicitudes de demostración y de contratación que llegan del sitio, para darles seguimiento. Solo para el operador.",
+    hacer: ["Cambiar el estado: contactada, demostración agendada o realizada, propuesta, ganada, perdida", "Anotar el resultado o el motivo de la pérdida", "Dar de alta la empresa en Empresas cliente cuando se gana"],
+    flujo: [
+      "Llegan con origen y fecha; una solicitud repetida por la misma persona el mismo día no se duplica.",
+      "Arriba se ve cuántas son nuevas, cuántas demostraciones se hicieron, la tasa de las ganadas y los motivos de pérdida.",
+      "No es un CRM: si se usa otro, esta lista sirve de entrada y se lleva allá.",
+    ],
+  },
+
+  "/clients/soporte": {
+    titulo: "Soporte a clientes",
+    que: "Las solicitudes de soporte de todas las empresas, abiertas primero y por severidad. Solo para el operador.",
+    hacer: ["Responder y cambiar el estado: en revisión, esperando al cliente, resuelta o cerrada", "Revisar los datos técnicos que el cliente adjuntó"],
+    flujo: [
+      "Cada cambio le llega a quien lo pidió en su campana. La primera respuesta queda registrada para medir el tiempo contra el objetivo del plan.",
+      "Una solicitud resuelta se cierra cuando el cliente lo confirma; si no responde en 5 días hábiles, ciérrela usted.",
+    ],
+  },
+
   "/clients": {
     titulo: "Empresas cliente",
     que: "Las cuentas que opera desde esta plataforma. Solo para el operador.",

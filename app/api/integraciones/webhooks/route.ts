@@ -22,5 +22,5 @@ export async function POST(request: Request) {
       if (e instanceof ErrorDeWebhook) return fail(e.message, e.codigo);
       throw e;
     }
-  });
+  }, { noEnDemo: true });
 }

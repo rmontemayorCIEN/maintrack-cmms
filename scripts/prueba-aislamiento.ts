@@ -234,7 +234,8 @@ async function main() {
     const rPortal = await pedir("GET", `/reportar/${puntoA.token}`, null);
     revisar("la pantalla del QR abre sin sesión (así debe ser)", rPortal.status === 200, rPortal.status);
     revisar("y no muestra costos, personal ni el historial del equipo",
-      !/costo|Costo|OT-A1|Dueña A|historial/i.test(rPortal.texto) || rPortal.texto.length === 0);
+      // Solo lo que se ve: el <head> y los datos de Next llevan la descripción pública del producto («…condición y costos…»).
+      !/costo|Costo|OT-A1|Dueña A|historial/i.test(rPortal.texto.replace(/<head>[\s\S]*?<\/head>/, "").replace(/<script[\s\S]*?<\/script>/g, "")) || rPortal.texto.length === 0);
     const rPortalApi = await pedir("POST", "/api/publico", null, { accion: "RECUPERAR", folio: "SOL-A1", celular: "0000000000" });
     revisar("con el folio de A pero sin su celular, el portal no entrega la solicitud", rPortalApi.status === 404, rPortalApi.status);
 

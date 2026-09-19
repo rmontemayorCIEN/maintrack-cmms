@@ -23,7 +23,7 @@ model Organization {
   /// Tipo de instalacion, de lib/instalaciones.ts. Alimenta los ejemplos de
   /// captura y el contexto de todos los prompts de IA.
   tipoInstalacion       String?
-  plan                  String    @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
+  plan                  String    @default("PROFESSIONAL") // PROFESSIONAL | ENTERPRISE (lib/planes.ts)
   status                String    @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELLED
   trialEndsAt           DateTime?
   seats                 Int       @default(10)
@@ -213,72 +213,88 @@ model Organization {
   /// COMERCIAL (prueba, activa, suspendida): una empresa puede estar pagando y
   /// todavía sin configurar.
   operandoPorId      String?
+
+  /// Bloque 7. Empresa demostrativa: sin cobranza, sin cambios de plan ni
+  /// credenciales, con su recorrido y su ayuda de demostracion, y
+  /// restaurable a su estado inicial (lib/demo-comercial.ts).
+  esDemo               Boolean   @default(false)
+  /// Mientras se restaura, la demo no atiende peticiones (lib/api.ts).
+  demoRestaurandoDesde DateTime?
+  demoRestauradaAt     DateTime?
+  /// Documentos aceptados al contratar (lib/legal.ts), y quien los acepto.
+  terminosVersion      String?
+  terminosAceptadosAt  DateTime?
+  terminosAceptadosPor String?
+  /// Como nacio la cuenta: REGISTRO | OPERADOR | DEMO
+  origenAlta           String?
+  spSequence           Int       @default(0)
   /// Los modulos que la empresa dijo que NO usara, en JSON: {"almacen":false}.
   /// Un paso de la puesta en marcha que la empresa no va a usar se muestra
   /// como «no aplica» y no le baja el avance. Sin decidir = se espera.
-  modulosPuesta      String    @default("{}")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  modulosPuesta        String    @default("{}")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  users             User[]
-  sites             Site[]
-  locations         Location[]
-  assetCategories   AssetCategory[]
-  assets            Asset[]
-  meters            Meter[]
-  meterReadings     MeterReading[]
-  plans             MaintenancePlan[]
-  conjuntos         Conjunto[]
-  conjuntoAssets    ConjuntoAsset[]
-  workOrders        WorkOrder[]
-  workRequests      WorkRequest[]
-  parts             Part[]
-  partCategories    PartCategory[]
-  partUnits         PartUnit[]
-  aiUsage           AiUsage[]
-  aiReports         AiReport[]
-  assetIntakes      AssetIntake[]
-  specialties       Specialty[]
-  externalServices  ExternalService[]
-  stockMovements    StockMovement[]
-  suppliers         Supplier[]
-  teams             Team[]
-  sensors           Sensor[]
-  sensorReadings    SensorReading[]
-  alerts            PredictiveAlert[]
-  failureCodes      FailureCode[]
-  rootCauses        RootCause[]
-  notifications     Notification[]
-  pushSubscriptions PushSubscription[]
-  entregasAviso     EntregaAviso[]
-  historialAvisos   HistorialAviso[]
-  configAvisos      ConfigAvisos?
-  escalamientos     Escalamiento[]
-  credencialesApi   CredencialApi[]
-  webhooks          Webhook[]
-  auditLogs         AuditLog[]
-  attachments       Attachment[]
-  links             ReferenceLink[]
-  invites           Invitation[]
-  planRequests      PlanRequest[]
-  invoices          Invoice[]
-  warehouses        Warehouse[]
-  partStocks        PartStock[]
-  stockTransfers    StockTransfer[]
-  materialRequests  MaterialRequest[]
-  purchaseRequests  PurchaseRequest[]
-  goodsReceipts     GoodsReceipt[]
-  quotes            Quote[]
-  purchaseOrders    PurchaseOrder[]
-  inventoryCounts   InventoryCount[]
-  reportPoints      ReportPoint[]
-  festivos          DiaFestivo[]
-  equivalencias     EquivalenciaRefaccion[]
-  asignacionesPlan  PlanAsset[]
-  calendariosTarea  PlanTaskAsset[]
-  revisionesAgenda  RevisionAgenda[]
-  passwordResets    PasswordReset[]
-  importBatches     ImportBatch[]
+  users              User[]
+  sites              Site[]
+  locations          Location[]
+  assetCategories    AssetCategory[]
+  assets             Asset[]
+  meters             Meter[]
+  meterReadings      MeterReading[]
+  plans              MaintenancePlan[]
+  conjuntos          Conjunto[]
+  conjuntoAssets     ConjuntoAsset[]
+  workOrders         WorkOrder[]
+  workRequests       WorkRequest[]
+  parts              Part[]
+  partCategories     PartCategory[]
+  partUnits          PartUnit[]
+  aiUsage            AiUsage[]
+  aiReports          AiReport[]
+  assetIntakes       AssetIntake[]
+  specialties        Specialty[]
+  externalServices   ExternalService[]
+  stockMovements     StockMovement[]
+  suppliers          Supplier[]
+  teams              Team[]
+  sensors            Sensor[]
+  sensorReadings     SensorReading[]
+  alerts             PredictiveAlert[]
+  failureCodes       FailureCode[]
+  rootCauses         RootCause[]
+  notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
+  entregasAviso      EntregaAviso[]
+  historialAvisos    HistorialAviso[]
+  configAvisos       ConfigAvisos?
+  escalamientos      Escalamiento[]
+  credencialesApi    CredencialApi[]
+  webhooks           Webhook[]
+  auditLogs          AuditLog[]
+  attachments        Attachment[]
+  links              ReferenceLink[]
+  invites            Invitation[]
+  planRequests       PlanRequest[]
+  invoices           Invoice[]
+  solicitudesSoporte SolicitudSoporte[]
+  warehouses         Warehouse[]
+  partStocks         PartStock[]
+  stockTransfers     StockTransfer[]
+  materialRequests   MaterialRequest[]
+  purchaseRequests   PurchaseRequest[]
+  goodsReceipts      GoodsReceipt[]
+  quotes             Quote[]
+  purchaseOrders     PurchaseOrder[]
+  inventoryCounts    InventoryCount[]
+  reportPoints       ReportPoint[]
+  festivos           DiaFestivo[]
+  equivalencias      EquivalenciaRefaccion[]
+  asignacionesPlan   PlanAsset[]
+  calendariosTarea   PlanTaskAsset[]
+  revisionesAgenda   RevisionAgenda[]
+  passwordResets     PasswordReset[]
+  importBatches      ImportBatch[]
 }
 
 model User {
@@ -340,6 +356,7 @@ model User {
   attachments          Attachment[]
   links                ReferenceLink[]
   planRequests         PlanRequest[]
+  solicitudesSoporte   SolicitudSoporte[]
   aiUsage              AiUsage[]
   assetIntakes         AssetIntake[]
   warehousesACargo     Warehouse[]
@@ -2415,6 +2432,81 @@ model PlanRequest {
   @@index([status])
 }
 
+// ------------------------------------------------ Comercial (Bloque 7)
+
+/// Quien pidio una demostracion o quiso contratar desde el sitio.
+///
+/// Es de la plataforma, no de una empresa cliente: no lleva organizationId de
+/// dueño y solo lo ve el operador. No es un CRM: registra lo minimo para dar
+/// seguimiento y saber por que se gana o se pierde.
+model Prospecto {
+  id              String    @id @default(cuid())
+  /// DEMO | CONTRATACION
+  tipo            String    @default("DEMO")
+  nombre          String
+  empresa         String
+  correo          String
+  telefono        String?
+  tipoInstalacion String?
+  /// "1-50" | "51-200" | "201-1000" | "1000+"
+  rangoActivos    String?
+  problema        String?
+  planInteres     String?
+  /// De donde llego: SITIO | CONTRATAR | la fuente que traiga la liga (?origen=)
+  origen          String    @default("SITIO")
+  /// NUEVA | CONTACTADA | DEMO_AGENDADA | DEMO_REALIZADA | PROPUESTA | GANADA | PERDIDA | DESCARTADA
+  estado          String    @default("NUEVA")
+  demoRealizadaAt DateTime?
+  resultado       String?
+  motivoPerdida   String?
+  notas           String?
+  /// Version del aviso de privacidad que acepto.
+  avisoPrivacidad String
+  /// Tipo + correo normalizado + dia: la misma persona dos veces el mismo dia es un duplicado.
+  huella          String    @unique
+  /// La empresa que se creo, si contrato.
+  organizationId  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([estado])
+  @@index([createdAt])
+}
+
+/// Una solicitud de ayuda al equipo de MainTrack, hecha desde el producto.
+///
+/// Es el unico canal de soporte (Bloque 7): no se publican correos ni
+/// telefonos. El folio es por empresa (spSequence).
+model SolicitudSoporte {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  folio              String
+  userId             String?
+  asunto             String
+  descripcion        String
+  /// CRITICA | ALTA | MEDIA | BAJA (lib/soporte.ts)
+  severidad          String    @default("MEDIA")
+  /// Pantalla desde donde se pidio.
+  pantalla           String?
+  /// Datos tecnicos que la persona acepto adjuntar (JSON): navegador, pantalla, hora.
+  datosTecnicos      String?
+  /// RECIBIDA | EN_REVISION | ESPERANDO_CLIENTE | RESUELTA | CERRADA
+  estado             String    @default("RECIBIDA")
+  respuesta          String?
+  primeraRespuestaAt DateTime?
+  respondidaPorId    String?
+  cerradaAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, folio])
+  @@index([organizationId])
+  @@index([estado])
+}
+
 // -------------------------------------------------------------------- Soporte ---
 
 /// Por que fallo, no que fallo. El codigo de falla describe el sintoma
@@ -2495,8 +2587,8 @@ model Notification {
   /// y canales. Es lo que se manda como identificador en los webhooks.
   eventoId       String?
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   entregas     EntregaAviso[]
   historial    HistorialAviso[]
 

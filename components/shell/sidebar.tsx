@@ -23,6 +23,7 @@ export function Sidebar({
   plan,
   rol,
   esSuperAdmin = false,
+  esDemo = false,
   tieneLogo = false,
   terminoConjuntoPlural,
 }: {
@@ -31,6 +32,7 @@ export function Sidebar({
   /** El rol efectivo (el del operador dentro de un cliente es OWNER). */
   rol: string;
   esSuperAdmin?: boolean;
+  esDemo?: boolean;
   /** Si la empresa subio su logotipo, sustituye al icono generico. */
   tieneLogo?: boolean;
   /** Como le llama esta cuenta a un conjunto de equipos: Lineas, Sistemas, Servicios, Rutas. */
@@ -46,7 +48,7 @@ export function Sidebar({
    * usuario todavia no sabe que existe. Quien ya lo conoce cierra lo que no
    * usa y el navegador se lo recuerda.
    */
-  const menu = menuDe(rol, { esSuperAdmin });
+  const menu = menuDe(rol, { esSuperAdmin, esDemo });
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(menu.map((g) => [g.clave, true])),
   );
@@ -166,7 +168,7 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-slate-200 px-4 py-3 text-[0.625rem] text-slate-400">
-        MainTrack CMMS v1.0
+        MainTrack
       </div>
     </div>
   );

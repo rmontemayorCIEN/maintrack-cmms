@@ -12,6 +12,9 @@ import { BandaCliente } from "@/components/shell/banda-cliente";
 import { RegistrarSW } from "@/components/registrar-sw";
 import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { ZonaEmpresaProvider } from "@/components/zona-empresa";
+import { demoEnRestauracion } from "@/lib/api";
+import { BandaDemo, DemoRestaurando } from "@/components/demo/banda";
+import { RecorridoDemo } from "@/components/demo/recorrido";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -21,7 +24,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // (lib/pantallas.ts). Si el rol no la ve, la página ni se consulta: se
   // responde «Sin permiso» con el menú de su rol alrededor.
   const ruta = (await headers()).get("x-ruta") ?? "/dashboard";
-  const permitida = puedeVerRuta(user.role, ruta, { esSuperAdmin: user.isSuperAdmin });
+  const esDemo = user.organization.esDemo;
+  const permitida = puedeVerRuta(user.role, ruta, { esSuperAdmin: user.isSuperAdmin, esDemo });
+  // Mientras se restaura la demo no se muestra ninguna pantalla a medio sembrar.
+  const restaurando = esDemo && demoEnRestauracion(user.organization);
 
   return (
     <ZonaEmpresaProvider zona={user.organization.timezone || "America/Mexico_City"}>
@@ -33,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         plan={user.organization.plan}
         rol={user.role}
         esSuperAdmin={user.isSuperAdmin}
+        esDemo={esDemo}
         terminoConjuntoPlural={nombreDelMapa(terminoConjunto(user.organization))}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -43,9 +50,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           user={{ name: user.name, email: user.email, role: user.role, color: user.color }}
           empresa={user.organization.name}
         />
+        {esDemo ? <BandaDemo /> : null}
         <EstadoConexion />
         {/* Abajo deja lugar a la barra del teléfono para que no tape contenido. */}
-        <main className="flex-1 px-3 py-4 pb-24 sm:px-4 sm:py-6 lg:px-8 lg:pb-6">{permitida ? children : <SinPermiso />}</main>
+        <main className="flex-1 px-3 py-4 pb-24 sm:px-4 sm:py-6 lg:px-8 lg:pb-6">{restaurando ? <DemoRestaurando /> : permitida ? children : <SinPermiso />}</main>
+        {esDemo && !restaurando ? <RecorridoDemo rol={user.role} /> : null}
       </div>
       <Suspense fallback={null}>
         <BarraMovil rol={user.role} />

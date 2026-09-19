@@ -21,6 +21,7 @@ const SERIES = {
   recepcion: { campo: "reSequence", prefijo: "RE" },
   ordenCompra: { campo: "poSequence", prefijo: "OC" },
   conteo: { campo: "icSequence", prefijo: "CI" },
+  soporte: { campo: "spSequence", prefijo: "SOP" },
 } as const;
 
 export type Serie = keyof typeof SERIES;

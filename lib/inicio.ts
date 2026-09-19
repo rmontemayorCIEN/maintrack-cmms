@@ -50,7 +50,11 @@ type Usuario = { id: string; role: string; isSuperAdmin: boolean; organizationId
 const DIA = 86_400_000;
 const MAX = 6;
 const n = (x: number) => new Intl.NumberFormat("es-MX").format(x);
-const pct = (x: number | null) => (x === null ? "—" : `${Math.round(x)} %`);
+/**
+ * Porcentaje para el inicio. Cerca de 100 se muestra con un decimal y hacia
+ * abajo: 99.97 % redondeado a «100 %» dice que no hubo un solo paro, y sí hubo.
+ */
+const pct = (x: number | null) => (x === null ? "—" : x >= 99 && x < 100 ? `${(Math.floor(x * 10) / 10).toLocaleString("es-MX")} %` : `${Math.round(x)} %`);
 
 const selOt = {
   id: true, number: true, title: true, status: true, priority: true, dueDate: true, estimatedHours: true,
