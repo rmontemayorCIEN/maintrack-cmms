@@ -158,8 +158,8 @@ async function main() {
     }
     const firmas = ROLES.map((r) => `${inicios[r].titulo}|${inicios[r].resumen.map((x) => x.etiqueta).join(",")}`);
     revisar("15. inicio distinto para cada rol (título y resumen propios)", new Set(firmas).size === ROLES.length, firmas.map((f) => f.slice(0, 40)));
-    revisar("    el técnico ve su orden; el dueño, además, los resultados; nadie más los indicadores",
-      JSON.stringify(inicios.TECHNICIAN.bloques).includes(ot.number) && inicios.OWNER.conIndicadores && ROLES.filter((r) => r !== "OWNER").every((r) => !inicios[r].conIndicadores));
+    revisar("    el técnico ve su orden; el dueño liga a Indicadores y Reportes; la administración a sus pantallas; nadie más",
+      JSON.stringify(inicios.TECHNICIAN.bloques).includes(ot.number) && inicios.OWNER.masDetalle.some((d) => d.href === "/indicadores") && ROLES.filter((r) => !["OWNER", "ADMIN"].includes(r)).every((r) => !inicios[r].masDetalle.length));
     revisar("    las acciones rápidas de cada rol llevan a pantallas que puede abrir", ROLES.every((r) => accionesRapidasDe(r).every((a) => a.href.startsWith("#") || puedeVerRuta(r, a.href))));
     revisar("    la barra del teléfono de cada rol, también", ROLES.every((r) => barraDe(r).every((i) => puedeVerRuta(r, i.href))));
     const menuSol = menuDe("REQUESTER").flatMap((g) => g.items.map((i) => i.href));
@@ -366,6 +366,86 @@ async function main() {
     revisar("41. la segunda edición del mismo campo se rechaza (409, dice cuál) y no pisa; otro campo sí se guarda sin tocar el título",
       e1.status === 200 && e2.status === 409 && String(e2.json.error).includes("el título") && e3.status === 200 && final.title === "Lubricar rodamientos" && final.priority === "HIGH",
       { e1: e1.status, e2: e2.status, e3: e3.status, error: e2.json.error, titulo: final.title });
+
+    // ═══════════════════════════════════════════ Cierre del bloque: roles, QR, aceptar, doble envío
+    console.log("\nCierre: roles, QR, aceptar y doble envío");
+    const menuTec = menuDe("TECHNICIAN").flatMap((g) => g.items.map((i) => i.href));
+    const comprasTec = await Promise.all([pagina("/compras", c.TECHNICIAN), pagina(`/compras/${compraId}`, c.TECHNICIAN)]);
+    revisar("técnico: sin Compras completas (ni en el menú ni por dirección), sin configuración ni empresas cliente",
+      !menuTec.includes("/compras") && comprasTec.every((r) => r.texto.includes(SIN_PERMISO)) && !menuTec.some((h) => ["/settings?s=usuarios", "/catalogs", "/clients", "/import"].includes(h)) &&
+      menuTec.includes("/escanear") && accionesRapidasDe("TECHNICIAN").some((a) => a.etiqueta === "Registrar lectura"));
+    const admin = inicios.ADMIN;
+    const auditoria = await pagina("/settings?s=auditoria", c.ADMIN);
+    revisar("administrador: su inicio liga a usuarios, configuración, catálogos, calidad, puesta en marcha y auditoría, y la auditoría abre",
+      ["/settings?s=usuarios", "/settings?s=organizacion", "/catalogs", "/puesta-en-marcha", "/settings?s=auditoria"].every((h) => admin.masDetalle.some((d) => d.href === h)) && auditoria.status === 200 && !auditoria.texto.includes(SIN_PERMISO),
+      { ligas: admin.masDetalle.map((d) => d.href), auditoria: auditoria.status, sinPermiso: auditoria.texto.includes(SIN_PERMISO) });
+    const dueno = inicios.OWNER;
+    revisar("propietario: máximo cuatro indicadores, sin la lista de vencidas repetida, con situación crítica y ligas a Indicadores y Reportes",
+      dueno.resumen.length <= 4 && !dueno.bloques.some((b) => b.id === "vencidas") && dueno.masDetalle.map((d) => d.href).join() === "/indicadores,/reports" &&
+      accionesRapidasDe("OWNER").some((a) => a.href === "#situacion-critica"));
+    const indicadoresDueno = await pagina("/indicadores", c.OWNER);
+    const indicadoresConsulta = await pagina("/indicadores", c.VIEWER);
+    revisar("    las gráficas y el desglose que salieron del inicio están en Indicadores (no se perdió nada)",
+      indicadoresDueno.texto.includes("Tendencias y desglose") && !(await pagina("/dashboard", c.OWNER)).texto.includes("Tendencias y desglose") && indicadoresConsulta.status === 200);
+    const compras = inicios.COMPRAS;
+    revisar("compras: accesos a requisiciones, preparar compra, entregas, proveedores y almacén",
+      ["/requisiciones", "/suppliers", "/inventory"].every((h) => compras.acciones.some((a) => a.href.startsWith(h))));
+    const avisos = await Promise.all(ROLES.map((r) => pagina("/notificaciones", c[r])));
+    revisar("avisos: la pantalla abre para los siete roles", avisos.every((r) => r.status === 200 && !r.texto.includes(SIN_PERMISO)), avisos.map((r) => r.status));
+
+    // Aceptar
+    const ot4 = await prisma.workOrder.create({ data: { organizationId: A.id, number: `OT-9${sello.slice(-6)}`, title: "Aceptar", maintenanceType: "INSPECTION", status: "ASSIGNED", assignedToId: u.TECHNICIAN.id, assetId: equipo.id, estimatedHours: 1 } });
+    await avisarNuevaOrden(A.id, ot4.id);
+    const ac1 = await Promise.all([1, 2].map(() => pedir("POST", `/api/work-orders/${ot4.id}/aceptar`, c.TECHNICIAN)));
+    const ajeno = await pedir("POST", `/api/work-orders/${ot4.id}/aceptar`, c.SUPERVISOR);
+    const avisoAsig = await prisma.notification.findFirst({ where: { userId: u.TECHNICIAN.id, tipo: "OT_ASIGNADA", entidadId: ot4.id } });
+    revisar("aceptar: el responsable la acepta una sola vez (queda en la bitácora y reconoce su aviso, que sigue pendiente hasta iniciarla); otro no puede",
+      ac1.map((r) => r.status).sort().join() === "200,201" && ajeno.status === 403 &&
+      (await prisma.workOrderComment.count({ where: { workOrderId: ot4.id, body: "Aceptó la orden." } })) === 1 &&
+      Boolean(avisoAsig?.read) && !avisoAsig?.atendidaEl && (await prisma.workOrder.findUniqueOrThrow({ where: { id: ot4.id } })).status === "ASSIGNED",
+      { ac1: ac1.map((r) => r.status), ajeno: ajeno.status });
+
+    // QR
+    const { resolverCodigo } = await import("../lib/qr");
+    const origen = base;
+    const puntoA = await puntoDeActivo(A.id, equipo.id, u.OWNER.id);
+    const tecU = await prisma.user.findUniqueOrThrow({ where: { id: u.TECHNICIAN.id } });
+    const solU = await prisma.user.findUniqueOrThrow({ where: { id: u.REQUESTER.id } });
+    const q1 = await resolverCodigo(tecU, `${origen}/reportar/${puntoA.token}`, origen);
+    const q2 = await resolverCodigo(solU, `${origen}/reportar/${puntoA.token}`, origen);
+    const q3 = await resolverCodigo({ ...duenoB }, `${origen}/reportar/${puntoA.token}`, origen);
+    const q4 = await resolverCodigo(tecU, "https://ejemplo.com/promo", origen);
+    const q5 = await resolverCodigo(tecU, "val-7", origen);
+    const q6 = await resolverCodigo(tecU, ot4.number.toLowerCase(), origen);
+    const q7 = await pedir("GET", `/api/qr?codigo=${encodeURIComponent(`${origen}/reportar/${puntoA.token}`)}`, c.TECHNICIAN);
+    revisar("QR: el técnico abre el equipo; el solicitante, el reporte con su usuario; otra empresa y un código ajeno se rechazan con motivo; clave y folio escritos también sirven",
+      "destino" in q1 && q1.destino === `/assets/${equipo.id}` && "destino" in q2 && q2.destino === `/reportar/${puntoA.token}` &&
+      "error" in q3 && "error" in q4 && /no es de MainTrack/.test(q4.error) && "destino" in q5 && q5.destino === `/assets/${equipo.id}` &&
+      "destino" in q6 && q6.destino === `/work-orders/${ot4.id}` && q7.status === 200 && q7.json.destino === `/assets/${equipo.id}`,
+      { q1, q2, q3, q4, q5, q6 });
+
+    // Doble envío en lo que faltaba
+    // Un medidor con su última lectura de hace tres días: 25 h de uso es posible.
+    const hace3 = new Date(Date.now() - 3 * DIA);
+    const medidor2 = await prisma.meter.create({ data: { organizationId: A.id, assetId: equipo.id, name: "Contador", unit: "h", currentValue: 100, lastReadingAt: hace3 } });
+    await prisma.meterReading.create({ data: { organizationId: A.id, meterId: medidor2.id, value: 100, readingAt: hace3 } });
+    const lect = await Promise.all([1, 2].map(() => pedir("POST", "/api/readings", c.TECHNICIAN, { meterId: medidor2.id, value: 125 })));
+    const sols = await Promise.all([1, 2].map(() => pedir("POST", "/api/requests", c.REQUESTER, { title: "Se fue la luz del pasillo 3" })));
+    const pr2 = await prisma.purchaseRequest.create({ data: { organizationId: A.id, folio: `RC2-${sello}`, warehouseId: almacen.id, solicitanteId: u.COMPRAS.id, estado: "SOLICITADA", montoEstimado: 100 } });
+    const firmasDobles = await Promise.all([1, 2].map(() => pedir("POST", `/api/compras/${pr2.id}`, c.OWNER, { accion: "AUTORIZAR" })));
+    const ot5 = await prisma.workOrder.create({ data: { organizationId: A.id, number: `OT5-${sello}`, title: "Terminar dos veces", maintenanceType: "INSPECTION", status: "IN_PROGRESS", startedAt: new Date(), assignedToId: u.TECHNICIAN.id, assetId: equipo.id, estimatedHours: 1 } });
+    await pedir("POST", `/api/work-orders/${ot5.id}/labor`, c.TECHNICIAN, { hours: 1 });
+    const terminar = await Promise.all([1, 2].map(() => pedir("POST", `/api/work-orders/${ot5.id}/status`, c.TECHNICIAN, { status: "COMPLETED", resolution: "Listo sin novedad", motivoSinDiagnostico: "Inspección" })));
+    revisar("doble envío: lectura, solicitud, autorización de compra y terminar la OT cuentan una sola vez",
+      lect.map((r) => r.status).sort().join() === "201,409" && (await prisma.meterReading.count({ where: { meterId: medidor2.id, value: 125 } })) === 1 &&
+      sols.map((r) => r.status).sort().join() === "201,409" && (await prisma.workRequest.count({ where: { organizationId: A.id, title: "Se fue la luz del pasillo 3" } })) === 1 &&
+      firmasDobles.filter((r) => r.status === 200).length === 1 && (await prisma.auditLog.count({ where: { organizationId: A.id, entityId: pr2.id, action: "AUTORIZAR" } })) === 1 &&
+      (await prisma.auditLog.count({ where: { organizationId: A.id, entityId: ot5.id, action: "STATUS_CHANGED" } })) === 1 &&
+      (await prisma.notification.count({ where: { tipo: "OT_LISTA_REVISION", entidadId: ot5.id, userId: u.SUPERVISOR.id } })) === 1,
+      { lect: lect.map((r) => r.status), sols: sols.map((r) => r.status), firmas: firmasDobles.map((r) => r.status), terminar: terminar.map((r) => r.status) });
+    const vistaSup5 = await pagina(`/work-orders/${ot5.id}`, c.SUPERVISOR);
+    revisar("sincronización: supervisión ve en su pantalla, en ese momento, la orden terminada y lista para cerrar",
+      vistaSup5.texto.includes("Completada") && vistaSup5.texto.includes("Validar y cerrar"));
 
     // ═══════════════════════════════════════════ 42-44: empresas y archivos
     console.log("\n42-44. Empresas y archivos");

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Badge } from "@/components/ui";
+import { MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, WO_STATUS_COLORS, WO_STATUS_LABELS } from "@/lib/constants";
 import { AlertTriangle, MapPin, ShieldAlert } from "lucide-react";
 
 /**
@@ -8,6 +10,7 @@ import { AlertTriangle, MapPin, ShieldAlert } from "lucide-react";
  * pantallas angostas.
  */
 export function FichaDeEjecucion(p: {
+  estado: string; prioridad: string; tipo: string; aceptada: string | null;
   compromiso: string | null; vencida: boolean;
   activo: { id: string; texto: string } | null; puedeVerActivo: boolean;
   ubicacion: string | null; responsable: string | null;
@@ -23,6 +26,12 @@ export function FichaDeEjecucion(p: {
         </dd>
         <dt className="text-slate-500">Dónde</dt>
         <dd className="flex min-w-0 items-start gap-1 text-slate-800"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />{p.ubicacion ?? "Sin ubicación"}</dd>
+        <dt className="text-slate-500">Estado</dt>
+        <dd className="flex flex-wrap gap-1.5">
+          <Badge className={WO_STATUS_COLORS[p.estado]}>{WO_STATUS_LABELS[p.estado]}</Badge>
+          <Badge className={PRIORITY_COLORS[p.prioridad]}>Prioridad {PRIORITY_LABELS[p.prioridad]}</Badge>
+          <Badge className={MAINTENANCE_TYPE_COLORS[p.tipo]}>{MAINTENANCE_TYPE_LABELS[p.tipo]}</Badge>
+        </dd>
         <dt className="text-slate-500">Para</dt>
         <dd className={p.vencida ? "font-medium text-red-700" : "text-slate-800"}>{p.compromiso ?? "Sin fecha"}{p.vencida ? " · vencida" : ""}</dd>
         <dt className="text-slate-500">A cargo</dt>
@@ -30,6 +39,7 @@ export function FichaDeEjecucion(p: {
         <dt className="text-slate-500">Actividades</dt>
         <dd className="text-slate-800">{p.actividades.total ? `${p.actividades.hechas} de ${p.actividades.total}` : "Sin actividades"}</dd>
       </dl>
+      {p.aceptada ? <p className="text-xs font-medium text-emerald-700">{p.aceptada}</p> : null}
       {p.requiereParo || p.conSeguridad ? (
         <a href="#seguridad" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {p.requiereParo ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />}

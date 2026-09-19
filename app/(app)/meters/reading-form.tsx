@@ -122,6 +122,7 @@ export function MeterReadingForm({
           min={0}
           className="field"
           placeholder={tipo !== "LECTURA" ? `Valor inicial del medidor (${unit})` : current === null ? `Nueva lectura (${unit})` : `Lectura (actual ${formatNumber(current, 0)} ${unit})`}
+          aria-label={`Lectura del medidor, en ${unit}`}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);

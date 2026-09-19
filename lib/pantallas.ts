@@ -63,7 +63,9 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/inventory/indicadores", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/kardex", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/requisiciones", roles: ALMACEN },
-  { ruta: "/compras", roles: ALMACEN },
+  // Compras completas (montos, cotizaciones, proveedores) no son del técnico:
+  // él pide material con un vale en Requisiciones y el almacén lo escala.
+  { ruta: "/compras", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/suppliers", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
 
   { ruta: "/paros", roles: ANALISIS },
@@ -296,6 +298,8 @@ const ACCIONES: Record<Rol, AccionRapida[]> = {
     { href: "/requisiciones", etiqueta: "Ver requisiciones", icono: "requisiciones" },
     { href: "/compras?estado=AUTORIZADA", etiqueta: "Preparar compra", icono: "compras", permiso: "purchase:receive" },
     { href: "/compras?estado=EN_COMPRA", etiqueta: "Revisar entregas", icono: "proveedores" },
+    { href: "/suppliers", etiqueta: "Proveedores", icono: "proveedores" },
+    { href: "/inventory", etiqueta: "Almacén", icono: "almacen" },
   ],
   REQUESTER: [
     { href: "/requests?nueva=1", etiqueta: "Reportar un problema", icono: "nueva", permiso: "request:create" },

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { enFila, hace } from "@/lib/repeticion";
+import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { LecturaRechazada, registrarLectura } from "@/lib/medidores";
 
@@ -20,6 +22,13 @@ const schema = z.object({
 export async function POST(request: Request) {
   return withAuth("workorder:execute", async ({ user, orgId }) => {
     const input = schema.parse(await request.json());
+    // Un doble toque no registra la misma lectura dos veces (lib/repeticion.ts).
+    return enFila(`lectura:${user.id}:${input.meterId}:${input.value}`, async () => {
+    const repetida = await prisma.meterReading.count({
+      // Sin fecha capturada, la lectura es «ahora»: la repetida cae en los últimos segundos; con fecha, es la misma fecha.
+      where: { organizationId: orgId, meterId: input.meterId, userId: user.id, value: input.value, readingAt: input.readingAt ? new Date(input.readingAt) : { gte: hace() } },
+    });
+    if (repetida) return fail("Esa lectura ya se registró hace un momento. No se volvió a registrar.", 409);
     try {
       const r = await registrarLectura({
         organizationId: orgId,
@@ -39,5 +48,6 @@ export async function POST(request: Request) {
       if (error instanceof Error && error.message === "Medidor no encontrado") return fail(error.message, 404);
       throw error;
     }
+    });
   });
 }

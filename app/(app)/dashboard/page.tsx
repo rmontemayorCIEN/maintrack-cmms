@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -6,7 +5,6 @@ import { inicioDe, type Bloque, type Cifra, type Renglon, type Tono } from "@/li
 import { PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
 import { IconoMenu } from "@/components/shell/iconos";
 import { cn } from "@/lib/utils";
-import { PanelIndicadores } from "./panel-indicadores";
 
 export const metadata = { title: "Inicio" };
 export const dynamic = "force-dynamic";
@@ -73,10 +71,15 @@ export default async function InicioPage() {
         </div>
       )}
 
-      {inicio.conIndicadores ? (
-        <Suspense fallback={<p className="mt-8 text-sm text-slate-500" role="status">Cargando resultados…</p>}>
-          <PanelIndicadores />
-        </Suspense>
+      {inicio.masDetalle.length ? (
+        <nav aria-label={inicio.tituloDetalle} className="mt-6 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-500">{inicio.tituloDetalle}:</span>
+          {inicio.masDetalle.map((d) => (
+            <Link key={d.href} href={d.href} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 font-medium text-brand-700 hover:bg-brand-50">
+              {d.texto}<ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          ))}
+        </nav>
       ) : null}
     </>
   );

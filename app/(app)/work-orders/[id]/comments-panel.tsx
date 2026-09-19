@@ -1,7 +1,7 @@
 "use client";
 
 import { useZona } from "@/components/zona-empresa";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Send } from "lucide-react";
 import { Avatar, Button } from "@/components/ui";
@@ -28,6 +28,19 @@ export function CommentsPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState<string | null>(null);
+  const campo = useRef<HTMLTextAreaElement>(null);
+
+  // «Pedir apoyo» desde la barra de acciones lleva aquí (#pedir-apoyo) con la casilla ya marcada.
+  useEffect(() => {
+    const revisar = () => {
+      if (window.location.hash !== "#pedir-apoyo") return;
+      setValor((v) => ({ ...v, apoyo: true }));
+      setTimeout(() => { campo.current?.focus(); campo.current?.scrollIntoView({ block: "center" }); }, 50);
+    };
+    revisar();
+    window.addEventListener("hashchange", revisar);
+    return () => window.removeEventListener("hashchange", revisar);
+  }, [setValor]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -80,10 +93,11 @@ export function CommentsPanel({
       )}
 
       {editable ? (
-        <form onSubmit={submit} className="grid gap-2">
+        <form id="pedir-apoyo" onSubmit={submit} className="grid scroll-mt-28 gap-2">
           <label htmlFor={`nota-${workOrderId}`} className="sr-only">Nota para la bitácora</label>
           <div className="flex gap-2">
             <textarea
+              ref={campo}
               id={`nota-${workOrderId}`}
               className="field min-h-11"
               rows={1}
@@ -99,6 +113,7 @@ export function CommentsPanel({
             <input type="checkbox" className="h-5 w-5" checked={valor.apoyo} onChange={(e) => setValor((v) => ({ ...v, apoyo: e.target.checked }))} />
             Pedir apoyo a supervisión (se le avisa)
           </label>
+          {valor.body.trim() && !loading ? <p className="text-xs text-amber-700">Sin guardar todavía: toque enviar. Si sale de la pantalla, se conserva aquí.</p> : null}
           {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
           {enviado ? <p role="status" className="text-sm text-emerald-700">{enviado}</p> : null}
         </form>

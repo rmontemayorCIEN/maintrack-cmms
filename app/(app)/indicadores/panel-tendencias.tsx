@@ -31,11 +31,15 @@ import { ArrowRight, ListChecks } from "lucide-react";
 import { evaluarPuntos } from "@/lib/predictive";
 
 /**
- * Los resultados de los últimos 90 días: indicadores, tendencia y costo por
- * equipo. Es la parte del dueño que se lee con calma, no lo que se atiende hoy,
- * así que el inicio la carga después de lo urgente (Suspense).
+ * Tendencias y desglose de los últimos 90 días: indicadores con su detalle,
+ * tendencia mensual, mezcla de mantenimiento, costo por equipo, lo próximo a
+ * vencer, alertas y refacciones bajo mínimo.
+ *
+ * Vivía en el inicio del dueño y repetía lo que el inicio ya dice (vencidas,
+ * alertas). Aquí es donde se consulta con calma; el inicio responde qué está
+ * mal y qué requiere decisión, y liga a esta pantalla para el detalle.
  */
-export async function PanelIndicadores() {
+export async function PanelTendencias() {
   const user = await requireUser();
   const orgId = user.organizationId;
   const currency = user.organization.currency;
@@ -104,8 +108,8 @@ export async function PanelIndicadores() {
     <>
       <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Resultados</h2>
-          <p className="text-xs text-slate-500">Últimos {DIAS} días de {user.organization.name}</p>
+          <h2 className="text-base font-semibold text-slate-900">Tendencias y desglose</h2>
+          <p className="text-xs text-slate-500">Últimos {DIAS} días de {user.organization.name}: detalle de cada indicador, gráficas y costos por equipo</p>
         </div>
         <LinkButton href="/reports" variant="secondary" size="sm">Ver reportes</LinkButton>
       </div>

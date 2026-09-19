@@ -76,7 +76,7 @@ export function PartsPanel({
           <p className="text-[0.6875rem] text-slate-400">No hay refacciones con existencia en el almacén.</p>
         ) : (
           <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-            <select className="field" value={partId} onChange={(e) => setPartId(e.target.value)}>
+            <select className="field" aria-label="Refacción" value={partId} onChange={(e) => setPartId(e.target.value)}>
               {catalog.map((part) => (
                 <option key={part.id} value={part.id}>
                   {part.code} — {part.name} ({formatNumber(part.quantityOnHand, 0)} {part.unit})
@@ -91,6 +91,7 @@ export function PartsPanel({
                 className="field max-w-24"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
+                aria-label="Cantidad"
               />
               <Button size="sm" onClick={add} disabled={loading} className="flex-1">
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}

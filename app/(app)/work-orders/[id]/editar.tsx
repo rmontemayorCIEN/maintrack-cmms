@@ -172,14 +172,14 @@ export function EditarOrden({
       </Button>
 
       {abierto ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 text-left">
+        <div role="dialog" aria-modal="true" aria-label="Editar orden" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-2 text-left sm:p-4">
           <form onSubmit={guardar} className="mt-8 w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
             <h2 className="text-sm font-semibold text-slate-800">Editar orden</h2>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="text-[0.6875rem] font-medium text-slate-600">Título *</label>
-                <input value={v.title} onChange={(e) => set({ title: e.target.value })} required minLength={3}
+                <input aria-label="Título" value={v.title} onChange={(e) => set({ title: e.target.value })} required minLength={3}
                   className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs" />
               </div>
 

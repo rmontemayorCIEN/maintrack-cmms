@@ -244,13 +244,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/escanear": {
     titulo: "Escanear QR",
-    que: "Leer el código QR de un equipo o de un punto de reporte y hacer, con su usuario, lo que su rol permite con ese equipo.",
-    hacer: ["Abrir la cámara y apuntar al código", "Escribir el código del equipo o un folio si no hay cámara"],
+    que: "Leer con la cámara el código QR de un equipo, de un punto de reporte o de una orden, y abrir lo que corresponde con su usuario.",
+    hacer: ["Tocar «Abrir cámara y escanear» y apuntar al código", "Escribir la clave del equipo o un folio si no hay cámara o el código está dañado"],
     flujo: [
-      "La cámara se pide solo cuando toca «Abrir cámara», y se apaga al leer o al salir.",
-      "En teléfonos cuyo navegador no lee QR (el iPhone), abra la cámara del teléfono, apunte al código y toque el enlace: llega al mismo lugar con su usuario.",
-      "El código lleva al portal del equipo. Con sesión le ofrece abrir el equipo, crear una orden, registrar una lectura o reportar con su usuario, según su rol. Sin sesión es el reporte público de siempre, que no muestra datos internos.",
-      "Un código de otra empresa no abre nada de la suya.",
+      "La cámara se pide solo al tocar el botón (nunca al entrar) y se apaga al leer o al cancelar. Se usa la trasera.",
+      "Funciona en Android y en iPhone: donde el navegador no trae lector, MainTrack lee el código por su cuenta.",
+      "Lo leído se valida: tiene que ser de MainTrack y de su empresa. El QR de un equipo abre la ficha del equipo (órdenes abiertas, planes, lecturas, historial) a quien la puede ver; quien solo reporta llega al reporte con su usuario.",
+      "Si el código no sirve, se dice por qué y se puede escanear otro o escribirlo.",
+      "Sin sesión, el mismo QR es el reporte público de siempre, que no muestra datos internos.",
     ],
   },
 
@@ -444,8 +445,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Cambiar la fecha compromiso de una orden ya programada pide el motivo de la reprogramación. Si la fecha no es laborable o el responsable no tiene capacidad ese día, el sistema advierte, propone días y personas con lugar, y deja programarla así si usted lo confirma.",
       "En las preventivas, el plan ya dice qué refacciones se van a consumir: la requisición se arma con eso y descuenta lo que ya se pidió o se consumió.",
       "Al pedir, el sistema dice cuánto cubre el almacén y cuánto no, para poder empezar con lo que hay y mandar el resto a compras.",
-      "En el teléfono, cada orden se lee en el orden del trabajo: qué es, dónde está el equipo, actividades, seguridad, tiempo, materiales, lecturas, evidencias y resultado, con un índice arriba para saltar a cada paso. Las acciones del paso siguiente (iniciar, pausar o reportar bloqueo, terminar y enviar a revisión) quedan fijas abajo.",
-      "«Pausar o reportar bloqueo» deja la orden en espera con el motivo. Para pedir ayuda sin pausar, escriba en la bitácora y marque «Pedir apoyo a supervisión»: la nota queda en la orden y a supervisión le llega un aviso.",
+      "En el teléfono, cada orden se lee en el orden del trabajo: qué es, dónde está el equipo, estado, prioridad y vencimiento; luego actividades, seguridad, tiempo, materiales, lecturas, evidencias y resultado, con un índice arriba para saltar a cada paso. Lo secundario (servicios, procedimiento, historial, datos completos) está plegado: se abre al tocarlo. Las acciones del paso siguiente quedan fijas abajo: aceptar, iniciar, pausar o reportar bloqueo, terminar y enviar a revisión, y pedir apoyo.",
+      "«Aceptar» le dice a supervisión que usted ya vio la orden asignada y la va a atender, sin iniciarla todavía. Queda en la bitácora y aparece solo para el responsable, antes de iniciar.",
+      "«Pausar o reportar bloqueo» deja la orden en espera con el motivo. Para pedir ayuda sin pausar, toque «Pedir apoyo»: lo lleva a la bitácora con la casilla «Pedir apoyo a supervisión» marcada; la nota queda en la orden y a supervisión le llega un aviso.",
       "Las fotos de evidencia se eligen, se ven y se pueden quitar antes de subirlas; se reducen para que suban por datos móviles sin perder lo que muestran. Si una falla, se reintenta sola esa.",
       "Un doble toque no registra dos veces el mismo consumo de refacción ni las mismas horas: la segunda se rechaza y se avisa que la primera sí quedó.",
       "Si otra persona cambió un dato de la orden mientras usted la editaba, no se pisa: se avisa qué cambió, se carga lo vigente y lo que usted escribió se queda en el formulario para revisarlo.",

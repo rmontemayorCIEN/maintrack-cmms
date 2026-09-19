@@ -283,7 +283,8 @@ export function WorkOrderActions({
   const sinResponsableAlIniciar = pidiendo?.a === "IN_PROGRESS" && !conResponsable;
 
   return (
-    <div className="relative flex flex-wrap items-center gap-2">
+    // «contents»: los botones se acomodan junto a Aceptar y Pedir apoyo en la misma fila de la barra.
+    <div className="contents">
       {acciones.map((accion) => (
         <Button
           key={accion.a + accion.etiqueta}
@@ -350,6 +351,7 @@ export function WorkOrderActions({
               <div>
                 <label className="label">Motivo</label>
                 <textarea
+                  aria-label="Motivo"
                   className="field min-h-20"
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
@@ -636,8 +638,9 @@ export function WorkOrderActions({
                   ) : null}
                 </div>
                 <textarea
+                  aria-label="Solución aplicada o resumen del trabajo"
                   className="field min-h-20"
-                  placeholder="Que encontro y que hizo. Con dos renglones basta."
+                  placeholder="Qué encontró y qué hizo. Con dos renglones basta."
                   value={closeForm.resolution}
                   onChange={(e) => setCloseForm((f) => ({ ...f, resolution: e.target.value }))}
                 />

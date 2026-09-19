@@ -81,7 +81,7 @@ export function LaborPanel({
 
       {editable ? (
         <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-          <select className="field" value={userId} onChange={(e) => setUserId(e.target.value)}>
+          <select className="field" aria-label="Quién trabajó" value={userId} onChange={(e) => setUserId(e.target.value)}>
             {technicians.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}{currency ? ` — ${formatCurrency(t.hourlyRate, currency)}/h` : ""}
@@ -97,9 +97,10 @@ export function LaborPanel({
               value={hours}
               onChange={(e) => setHours(e.target.value)}
               placeholder="Horas"
+              aria-label="Horas trabajadas"
             />
-            <input className="field" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Actividad realizada" />
-            <Button size="sm" onClick={add} disabled={loading}>
+            <input className="field" aria-label="Actividad realizada" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Actividad realizada" />
+            <Button size="sm" onClick={add} disabled={loading} aria-label="Registrar horas">
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             </Button>
           </div>

@@ -225,16 +225,19 @@ export async function autorizar(params: {
     throw new ErrorDeCompra("Indique por que se rechaza");
   }
 
-  const actualizada = await prisma.purchaseRequest.update({
-    where: { id: req.id },
+  // Solo si sigue solicitada: dos toques (o dos personas) a la vez leían
+  // «solicitada» y las dos firmaban. Ahora gana una; la otra se entera.
+  const firmada = await prisma.purchaseRequest.updateMany({
+    where: { id: req.id, estado: "SOLICITADA" },
     data: {
       estado: params.aprueba ? "AUTORIZADA" : "RECHAZADA",
       autorizadaPorId: params.userId,
       autorizadaEl: new Date(),
       motivoRechazo: params.aprueba ? null : params.motivo?.trim(),
     },
-    select: { id: true, folio: true, estado: true },
   });
+  if (!firmada.count) throw new ErrorDeCompra("Esta compra ya se había firmado hace un momento. No se volvió a firmar.");
+  const actualizada = await prisma.purchaseRequest.findUniqueOrThrow({ where: { id: req.id }, select: { id: true, folio: true, estado: true } });
 
   // Ya se firmó: los avisos de «por autorizar» se reconcilian contra el estado nuevo.
   await reconciliar({ organizationId: params.organizationId, entidadId: req.id, origen: "FLUJO", actorId: params.userId, evento: params.aprueba ? "Autorización" : "Rechazo" });

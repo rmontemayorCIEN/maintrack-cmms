@@ -97,6 +97,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                     <Badge className={REQUEST_STATUS_COLORS[r.status]}>{REQUEST_STATUS_LABELS[r.status]}</Badge>
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-900">{r.title}</p>
+                  {r.reviewNotes ? <p className="mt-1 rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-900">Respuesta de quien revisa: {r.reviewNotes}</p> : null}
                   <p className="mt-1 text-xs text-slate-500">
                     {r.asset ? `${r.asset.code} · ${r.asset.name} · ` : ""}{formatDateTime(r.createdAt)}
                     {r._count.attachments ? ` · ${r._count.attachments} foto(s)` : ""}

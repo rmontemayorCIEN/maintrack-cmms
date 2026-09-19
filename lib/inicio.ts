@@ -36,8 +36,9 @@ export type Bloque = {
 };
 export type Inicio = {
   rol: Rol; titulo: string; resumen: Cifra[]; bloques: Bloque[]; acciones: AccionRapida[];
-  /** Solo el dueño y la administración ven la gráfica de resultados debajo. */
-  conIndicadores: boolean;
+  /** Dónde se consulta el detalle o se administra (Indicadores, Reportes, Usuarios…): el inicio no lo repite. */
+  masDetalle: Array<{ texto: string; href: string }>;
+  tituloDetalle: string;
   /** Si todo está al día: se dice, en vez de mostrar bloques vacíos. */
   alDia: boolean;
   /** Dueño y administración, mientras la cuenta no esté lista: cuánto falta (el mismo número de /puesta-en-marcha). */
@@ -96,13 +97,15 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
   }
   return {
     rol, titulo: TITULO_INICIO[rol] ?? "Inicio", resumen: armado.resumen, bloques,
-    acciones: accionesRapidasDe(rol), conIndicadores: armado.conIndicadores ?? false,
+    acciones: accionesRapidasDe(rol),
+    masDetalle: (armado.masDetalle ?? []).filter((d) => puedeVerRuta(rol, d.href)),
+    tituloDetalle: armado.tituloDetalle ?? "Más detalle",
     alDia: bloques.length === 0, puesta,
   };
 }
 
 type Ctx = { user: Usuario; rol: Rol; zona: string; org: string; ahora: Date };
-type Armado = { resumen: Cifra[]; bloques: Bloque[]; conIndicadores?: boolean };
+type Armado = { resumen: Cifra[]; bloques: Bloque[]; masDetalle?: Inicio["masDetalle"]; tituloDetalle?: string };
 
 // ─────────────────────────────────────────── Piezas compartidas
 
@@ -183,7 +186,8 @@ async function inicioPropietario(c: Ctx): Promise<Armado> {
     ...agotadas.filter((p) => p.detieneTrabajo).map<Renglon>((p) => ({ id: p.id, folio: p.code, titulo: `${p.name}: agotada`, detalle: p.motivo, tono: "critico", enlace: `/inventory?q=${encodeURIComponent(p.code)}` })),
   ];
   return {
-    conIndicadores: true,
+    // Tendencias, mezcla, costo por equipo e indicadores secundarios viven en Indicadores y Reportes.
+    masDetalle: [{ texto: "Indicadores y tendencias", href: "/indicadores" }, { texto: "Reportes", href: "/reports" }],
     resumen: [
       { etiqueta: "OT vencidas", valor: n(cv.nVencidas), tono: cv.nVencidas ? "critico" : "bien", enlace: "/work-orders?vencidas=1" },
       { etiqueta: "Cumplimiento preventivo (30 días)", valor: pct(i.cumplimientoPreventivo.valor), tono: (i.cumplimientoPreventivo.valor ?? 100) < 80 ? "atencion" : "bien", enlace: "/indicadores" },
@@ -193,8 +197,8 @@ async function inicioPropietario(c: Ctx): Promise<Armado> {
     bloques: [
       bloque("situacion-critica", "Situación crítica", criticas, { descripcion: "Órdenes críticas, alertas críticas y refacciones agotadas que detienen trabajo.", total: cv.nCriticas + alertas.filter((a) => a.tono === "critico").length + agotadas.filter((p) => p.detieneTrabajo).length }),
       bloque("autorizaciones", "Compras que esperan su firma", compras, { verTodo: { texto: "Ver compras", enlace: "/compras" } }),
-      bloque("vencidas", "Órdenes vencidas", cv.vencidas.map((o) => renglonOt(o, c.zona, c.ahora, { conResponsable: true })), { total: cv.nVencidas, verTodo: { texto: "Ver todas", enlace: "/work-orders?vencidas=1" } }),
-      bloque("alertas", "Alertas predictivas", alertas.filter((a) => a.tono !== "critico"), { verTodo: { texto: "Ver predictivo", enlace: "/predictive" } }),
+      // Las vencidas ya están en el resumen (con su liga a la lista): no se repiten como bloque.
+      bloque("alertas", "Alertas importantes", alertas.filter((a) => a.tono !== "critico"), { verTodo: { texto: "Ver predictivo", enlace: "/predictive" } }),
       bloque("cuenta", "Configuración, plan y avisos", avisosAdmin, { descripcion: "Lo que falta configurar, límites del plan e integraciones con errores." }),
       ...(c.user.isSuperAdmin ? [bloque("clientes", "Empresas cliente", [{ id: "clientes", folio: "Plataforma", titulo: "Administrar empresas cliente", tono: "normal", enlace: "/clients" }])] : []),
     ],
@@ -218,6 +222,13 @@ async function inicioAdministrador(c: Ctx): Promise<Armado> {
   const problemas = calidad.filter((r) => r.cantidad > 0).sort((a, b) => b.peso - a.peso);
   const puesta = await import("./puesta-en-marcha").then((m) => m.puestaEnMarcha(c.org)).catch(() => null);
   return {
+    tituloDetalle: "Administración",
+    masDetalle: [
+      { texto: "Usuarios", href: "/settings?s=usuarios" }, { texto: "Configuración", href: "/settings?s=organizacion" },
+      { texto: "Catálogos", href: "/catalogs" }, { texto: "Reglas de avisos", href: "/settings?s=avisos" },
+      { texto: "Importar datos", href: "/import" }, { texto: "Puesta en marcha", href: "/puesta-en-marcha" },
+      { texto: "Auditoría", href: "/settings?s=auditoria" },
+    ],
     resumen: [
       { etiqueta: "Críticas abiertas", valor: n(cv.nCriticas), tono: cv.nCriticas ? "critico" : "bien", enlace: "/work-orders?prioridad=CRITICAL" },
       { etiqueta: "OT vencidas", valor: n(cv.nVencidas), tono: cv.nVencidas ? "atencion" : "bien", enlace: "/work-orders?vencidas=1" },
@@ -414,8 +425,11 @@ async function inicioSolicitante(c: Ctx): Promise<Armado> {
   const enAtencion = mias.filter((s) => s.workOrder && !["COMPLETED", "CLOSED", "CANCELLED"].includes(s.workOrder.status));
   const atendidas = mias.filter((s) => s.workOrder && ["COMPLETED", "CLOSED"].includes(s.workOrder.status));
   const rechazadas = mias.filter((s) => s.status === "REJECTED");
+  // Lo que quien revisa le respondió o le pide va a la vista: es la «respuesta» que espera.
   const renglon = (s: (typeof mias)[number], estado: string, tono: Tono): Renglon => ({
-    id: s.id, folio: s.number, titulo: s.title, detalle: estado, fecha: formatDia(s.createdAt, { zona: c.zona }), tono, enlace: `/requests/${s.id}`,
+    id: s.id, folio: s.number, titulo: s.title,
+    detalle: s.reviewNotes && !estado.includes(s.reviewNotes) ? `${estado} · Respuesta: ${s.reviewNotes}` : estado,
+    fecha: formatDia(s.createdAt, { zona: c.zona }), tono, enlace: `/requests/${s.id}`,
   });
   return {
     resumen: [

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ok, withAuth, withVista } from "@/lib/api";
+import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { veTodasLasSolicitudes } from "@/lib/pantallas";
+import { enFila, hace } from "@/lib/repeticion";
 import { nextRequestNumber } from "@/lib/numbering";
 import { avisarSolicitudNueva } from "@/lib/avisos/detectores";
 
@@ -44,6 +45,14 @@ export async function POST(request: Request) {
       ? await prisma.asset.findFirst({ where: { id: input.assetId, organizationId: orgId } })
       : null;
 
+    // Un doble toque no levanta dos reportes (lib/repeticion.ts).
+    return enFila(`solicitud:${user.id}:${input.title.trim().toLowerCase()}`, async () => {
+    const repetida = await prisma.workRequest.findFirst({
+      where: { organizationId: orgId, requestedById: user.id, title: input.title, createdAt: { gte: hace() } },
+      select: { number: true },
+    });
+    if (repetida) return fail(`Ese reporte ya se envió hace un momento (${repetida.number}). No se levantó otro.`, 409);
+
     const number = await nextRequestNumber(orgId);
     const workRequest = await prisma.workRequest.create({
       data: {
@@ -72,5 +81,6 @@ export async function POST(request: Request) {
     await avisarSolicitudNueva(orgId, workRequest, { cuerpo: input.title });
 
     return ok({ request: workRequest }, 201);
+    });
   });
 }

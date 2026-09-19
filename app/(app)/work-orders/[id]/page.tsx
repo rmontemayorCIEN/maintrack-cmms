@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, LifeBuoy, Printer } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -35,6 +35,8 @@ import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable } from "@/
 import { puedeVerRuta, verCostos } from "@/lib/pantallas";
 import { MeterReadingForm } from "../../meters/reading-form";
 import { FichaDeEjecucion, IndiceDeSecciones } from "./ejecucion";
+import { AceptarOrden } from "./aceptar";
+import { Plegable } from "@/components/plegable";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
 
@@ -324,6 +326,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const canExecute = can(user.role, "workorder:execute");
   const canEdit = can(user.role, "workorder:write");
   const doneTasks = wo.tasks.filter((t) => t.done).length;
+  // Aceptar: el responsable, antes de iniciar, si no la ha aceptado ya. Pedir apoyo: mientras esté abierta.
+  const aceptacion = wo.assignedToId === user.id && !wo.startedAt && ["OPEN", "ASSIGNED"].includes(wo.status)
+    ? await prisma.auditLog.findFirst({ where: { organizationId: user.organizationId, entity: "WorkOrder", entityId: wo.id, action: "ACCEPTED", userId: user.id }, select: { createdAt: true } })
+    : null;
+  const puedeAceptar = canExecute && wo.assignedToId === user.id && !wo.startedAt && ["OPEN", "ASSIGNED"].includes(wo.status) && !aceptacion;
+  const aceptadaPor = aceptacion ? `Usted la aceptó el ${formatDateTime(aceptacion.createdAt, zona)}` : null;
+  const puedePedirApoyo = canExecute && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status);
   const hayAcciones = accionesDisponibles({ status: wo.status, iniciada: !!wo.startedAt, conResponsable: !!wo.assignedToId }, user.role).length > 0;
   // La secuencia del trabajo, en el orden en que se hace.
   const indice = [
@@ -334,7 +343,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas" }] : []),
     { id: "evidencias", texto: "Evidencias" },
     { id: "bitacora", texto: "Bitácora" },
-    ...(wo.completedAt ? [{ id: "resultado", texto: "Resultado" }] : []),
+    { id: "resultado-movil", texto: "Resultado" },
   ];
 
   return (
@@ -382,11 +391,14 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge>
-        <Badge className={MAINTENANCE_TYPE_COLORS[wo.maintenanceType]}>
-          {MAINTENANCE_TYPE_LABELS[wo.maintenanceType]}
-        </Badge>
-        <Badge className={PRIORITY_COLORS[wo.priority]}>Prioridad {PRIORITY_LABELS[wo.priority]}</Badge>
+        {/* En el teléfono, estado y prioridad van en la ficha, después del equipo y la ubicación. */}
+        <span className="hidden lg:contents">
+          <Badge className={WO_STATUS_COLORS[wo.status]}>{WO_STATUS_LABELS[wo.status]}</Badge>
+          <Badge className={MAINTENANCE_TYPE_COLORS[wo.maintenanceType]}>
+            {MAINTENANCE_TYPE_LABELS[wo.maintenanceType]}
+          </Badge>
+          <Badge className={PRIORITY_COLORS[wo.priority]}>Prioridad {PRIORITY_LABELS[wo.priority]}</Badge>
+        </span>
         {wo.requiresShutdown ? <Badge tone="danger">Requiere paro</Badge> : null}
         {activaSinResponsable ? (
           <Badge tone="warning">{wo.startedAt ? "En curso sin responsable" : "Sin responsable"}</Badge>
@@ -407,11 +419,14 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         ))}
       </div>
 
-      {canExecute && hayAcciones ? (
+      {canExecute && (hayAcciones || puedeAceptar || puedePedirApoyo) ? (
         // En el teléfono, las acciones del paso siguiente quedan fijas abajo, sobre la barra de navegación:
         // iniciar, pausar o terminar sin recorrer toda la orden. En computadora van en su renglón.
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-slate-200 bg-white px-3 py-2 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] no-print lg:static lg:z-auto lg:mb-4 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none [&_button]:min-h-11 lg:[&_button]:min-h-0">
-              <WorkOrderActions
+          <div className="flex flex-wrap items-center gap-2">
+              {/* Primero aceptar (si toca), luego el paso siguiente, y pedir apoyo al final. */}
+              {puedeAceptar ? <AceptarOrden workOrderId={wo.id} /> : null}
+              {hayAcciones ? <WorkOrderActions
               iaDisponible={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("CIERRE_OT")}
                 workOrderId={wo.id}
                 status={wo.status}
@@ -427,7 +442,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 requiereParo={wo.requiresShutdown}
                 evidenciaRequerida={evidenciaRequerida}
                 cierre={cierre}
-              />
+              /> : null}
+              {puedePedirApoyo ? (
+                <a href="#pedir-apoyo" className="boton inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 lg:min-h-0 lg:py-1.5">
+                  <LifeBuoy className="h-3.5 w-3.5" /> Pedir apoyo
+                </a>
+              ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -454,6 +475,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 lg:col-span-2">
           <FichaDeEjecucion
+            estado={wo.status} prioridad={wo.priority} tipo={wo.maintenanceType}
+            aceptada={aceptadaPor}
             compromiso={wo.dueDate ? formatDia(wo.dueDate, { zona }) : null}
             vencida={vencida}
             activo={wo.asset ? { id: wo.asset.id, texto: `${wo.asset.code} · ${wo.asset.name}` } : null}
@@ -669,6 +692,31 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
 
           </section>
+          {/* 10. Resultado: qué se pedirá al terminar (o lo que quedó). El botón está en la barra de abajo. */}
+          <section id="resultado-movil" className="grid min-w-0 scroll-mt-28 lg:hidden">
+            <Card>
+              <CardHeader title="Resultado" subtitle={wo.completedAt ? "Lo que quedó registrado al terminar" : "Al terminar se le pedirá esto"} />
+              {wo.completedAt ? (
+                <dl className="grid gap-3 text-sm">
+                  <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
+                  <Row label="Código de falla">{wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}</Row>
+                  <Row label="Causa raíz">{wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}</Row>
+                </dl>
+              ) : (
+                <ul className="grid list-disc gap-1 pl-5 text-sm text-slate-700">
+                  <li>La solución aplicada o el resumen del trabajo.</li>
+                  <li>Horas registradas (o por qué no hay).</li>
+                  {wo.requiresShutdown ? <li>Los minutos de paro del equipo.</li> : null}
+                  {esFalla(wo.maintenanceType) ? <li>Código de falla y causa raíz (o por qué no se determinó).</li> : null}
+                  <li>Todas las actividades hechas o enviadas al backlog{evidenciaRequerida ? ", y la evidencia" : ""}.</li>
+                </ul>
+              )}
+              <p className="mt-3 text-xs text-slate-500">Después toque «Terminar y enviar a revisión» abajo: supervisión la revisa y la cierra.</p>
+            </Card>
+          </section>
+
+          {/* Lo secundario va plegado en el teléfono y abierto en computadora: no se oculta, se acomoda. */}
+          <Plegable titulo="Más de la orden: servicios, procedimiento, material por actividad e historial">
           {conCostos ? (
           <Card>
             <CardHeader
@@ -715,9 +763,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           <MaterialPorActividad organizationId={user.organizationId} workOrderId={wo.id} moneda={moneda} />
 
           <BitacoraDeEstados organizationId={user.organizationId} workOrderId={wo.id} zona={zona} />
+          </Plegable>
         </div>
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <Plegable titulo="Datos completos de la orden">
           <Card>
             <CardHeader title="Resumen" />
             <dl className="grid gap-3 text-sm">
@@ -779,7 +829,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           ) : null}
 
           {wo.completedAt ? (
-            <Card id="resultado">
+            <Card id="resultado" className="hidden lg:block">
               <CardHeader title="Resultado del trabajo" />
               <dl className="grid gap-3 text-sm">
                 <Row label="Código de falla">
@@ -792,10 +842,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               </dl>
             </Card>
           ) : null}
+          </Plegable>
         </div>
       </div>
       {/* Lugar para la barra de acciones fija del teléfono: el final de la orden no queda debajo. */}
-      {canExecute && hayAcciones ? <div className="h-20 lg:hidden" aria-hidden /> : null}
+      {canExecute && (hayAcciones || puedeAceptar || puedePedirApoyo) ? <div className="h-32 lg:hidden" aria-hidden /> : null}
     </>
   );
 }

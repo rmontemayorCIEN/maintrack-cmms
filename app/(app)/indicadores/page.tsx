@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { verCostos } from "@/lib/pantallas";
+import { PanelTendencias } from "./panel-tendencias";
 import { requireUser } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { calcularIndicadores, periodoDeLaEmpresa } from "@/lib/indicadores";
@@ -52,6 +55,12 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
           </Link>
         ))}
       </div>
+      {/* Las gráficas y el desglose que antes estaban en el inicio del dueño. Con costos: solo a quien los ve. */}
+      {verCostos(user.role) ? (
+        <Suspense fallback={<p className="mt-8 text-sm text-slate-500" role="status">Cargando tendencias…</p>}>
+          <PanelTendencias />
+        </Suspense>
+      ) : null}
     </>
   );
 }
