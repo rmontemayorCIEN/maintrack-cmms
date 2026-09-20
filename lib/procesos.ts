@@ -127,8 +127,17 @@ export async function estadoDeProcesos() {
       ultimoError: fila?.ultimoError ?? null,
       fallasSeguidas: fila?.fallasSeguidas ?? 0,
       corriendo: Boolean(fila?.corriendoDesde),
-      /** Nunca corrio, o lleva mas de tres periodos sin terminar una corrida. */
-      callado: desdeMinutos === null || desdeMinutos > p.cadaMinutos * 3,
+      /**
+       * Lleva mas de tres periodos sin terminar una corrida.
+       *
+       * «Nunca corrio» NO es estar callado: un proceso semanal recien
+       * desplegado tardaria una semana en correr por primera vez, y marcarlo
+       * en rojo desde el primer dia ensena a ignorar el indicador, que es
+       * exactamente lo contrario de para lo que existe.
+       */
+      callado: desdeMinutos !== null && desdeMinutos > p.cadaMinutos * 3,
+      /** Todavia no hay de donde juzgarlo. */
+      sinDatos: desdeMinutos === null,
       desdeMinutos,
     };
   });

@@ -173,7 +173,7 @@ alta disponibilidad. Una zona caída es una caída total hasta restaurar.
 
 | Qué | Dónde se ve |
 |---|---|
-| Procesos programados: última corrida, fallas seguidas, «callado» | Empresas cliente › Procesos programados |
+| Procesos programados: última corrida, fallas seguidas, «callado» | Empresas cliente › Procesos programados. «Callado» es distinto de «aún no le toca»: un proceso semanal recién desplegado no se marca en rojo |
 | Entregas de avisos fallidas y en cola, por empresa | Empresas cliente › Avisos e integraciones |
 | Webhooks suspendidos y errores de API | La misma pantalla |
 | Consumo y fallas de IA por empresa | Empresas cliente › IA |

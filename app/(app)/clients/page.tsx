@@ -127,6 +127,7 @@ export default async function ClientsPage() {
                   <td className="text-xs">
                     {p.corriendo ? <Badge tone="info">corriendo</Badge>
                       : p.callado ? <Badge tone="danger">callado</Badge>
+                      : p.sinDatos ? <Badge tone="muted">aún no le toca</Badge>
                       : p.ultimoOk === false ? <Badge tone="danger">falló</Badge>
                       : <Badge tone="success">al día</Badge>}
                     {p.fallasSeguidas > 1 ? <span className="ml-1 text-red-600">{p.fallasSeguidas} fallas seguidas</span> : null}
