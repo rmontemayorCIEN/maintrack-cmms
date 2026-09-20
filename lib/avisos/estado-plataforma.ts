@@ -5,6 +5,7 @@
  * tener que entrar a la empresa. Lo leen la consola del operador y su ruta.
  */
 import { prisma } from "../db";
+import { estadoDeProcesos } from "../procesos";
 import { proveedorDeCorreo } from "./canales";
 import { pushConfigurado } from "../push";
 
@@ -19,8 +20,12 @@ export async function estadoTecnicoPlataforma() {
     prisma.usoApi.groupBy({ by: ["organizationId"], where: { resultado: { in: ["LIMITE", "ERROR"] }, createdAt: { gte: hace24 } }, _count: true }),
   ]);
   const de = <T extends { organizationId: string | null; _count: number }>(g: T[], id: string) => g.filter((x) => x.organizationId === id).reduce((a, x) => a + x._count, 0);
+  // Los procesos que corren solos: si uno dejo de correr, el silencio es
+  // identico al de un proceso sano. Aqui se ve la diferencia.
+  const procesos = await estadoDeProcesos();
   return {
     plataforma: { correo: proveedorDeCorreo() ?? "sin proveedor", navegador: pushConfigurado() ? "configurado" : "sin llaves" },
+    procesos,
     empresas: orgs.map((o) => ({
       id: o.id, nombre: o.name,
       entregasFallidas24h: de(fallidas, o.id), enCola: de(enCola, o.id),

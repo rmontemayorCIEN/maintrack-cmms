@@ -11,6 +11,7 @@ import { consumoPorOrganizacion } from "@/lib/ia/consumo";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { formatoUsd } from "@/lib/ia/precios";
 import { avancePuestaEnMarcha } from "@/lib/puesta-en-marcha";
+import { formatDateTime } from "@/lib/utils";
 
 export const metadata = { title: "Empresas cliente" };
 export const dynamic = "force-dynamic";
@@ -45,6 +46,8 @@ export default async function ClientsPage() {
 
   const consumoIa = await consumoPorOrganizacion();
   const tecnico = await estadoTecnicoPlataforma();
+  // La consola es del operador: las horas van en SU zona, no en la de un cliente.
+  const zona = user.organization.timezone;
   // Avance de puesta en marcha por cliente: una cuenta estancada en 20% a las
   // tres semanas es una cuenta que no va a renovar, y conviene saberlo antes.
   // En serie a proposito: cada avance son varias decenas de conteos y la
@@ -100,6 +103,41 @@ export default async function ClientsPage() {
           tone={organizaciones.some((o) => o.status === "SUSPENDED") ? "warn" : "good"}
         />
       </div>
+
+      {/* Procesos que corren solos. Un proceso muerto calla igual que uno sano:
+          esta tabla es la única forma de notar la diferencia sin abrir los
+          registros de Cloud Run. */}
+      <Card className="mb-5">
+        <CardHeader
+          title="Procesos programados"
+          subtitle="Lo que corre sin que nadie lo pida. «Callado» significa que lleva más de tres periodos sin terminar una corrida: o dejó de correr, o algo lo está deteniendo."
+        />
+        <div className="table-wrap">
+          <table className="data">
+            <thead><tr><th>Proceso</th><th>Cada</th><th>Última corrida</th><th>Estado</th></tr></thead>
+            <tbody>
+              {tecnico.procesos.map((p) => (
+                <tr key={p.clave}>
+                  <td className="text-xs font-medium text-slate-700">{p.nombre}</td>
+                  <td className="text-xs text-slate-500">{p.cadaMinutos < 60 ? `${p.cadaMinutos} min` : p.cadaMinutos < 1440 ? `${p.cadaMinutos / 60} h` : `${p.cadaMinutos / 1440} días`}</td>
+                  <td className="text-xs text-slate-500">
+                    {p.ultimoFin ? formatDateTime(p.ultimoFin, zona) : "nunca"}
+                    {p.desdeMinutos !== null ? <span className="text-slate-400"> · hace {p.desdeMinutos < 60 ? `${p.desdeMinutos} min` : `${Math.round(p.desdeMinutos / 60)} h`}</span> : null}
+                  </td>
+                  <td className="text-xs">
+                    {p.corriendo ? <Badge tone="info">corriendo</Badge>
+                      : p.callado ? <Badge tone="danger">callado</Badge>
+                      : p.ultimoOk === false ? <Badge tone="danger">falló</Badge>
+                      : <Badge tone="success">al día</Badge>}
+                    {p.fallasSeguidas > 1 ? <span className="ml-1 text-red-600">{p.fallasSeguidas} fallas seguidas</span> : null}
+                    {p.ultimoError ? <p className="mt-0.5 text-[0.6875rem] text-red-700">{p.ultimoError}</p> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Estado técnico de avisos e integraciones: solo conteos, sin contenido de las empresas. */}
       {tecnico.empresas.length || tecnico.plataforma.correo === "sin proveedor" ? (

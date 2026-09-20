@@ -316,12 +316,13 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/clients": {
     titulo: "Empresas cliente",
     que: "Las cuentas que opera desde esta plataforma. Solo para el operador.",
-    hacer: ["Dar de alta una empresa eligiendo cómo empieza: vacía, con configuración recomendada o con datos de demostración", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance y su estado operativo"],
+    hacer: ["Dar de alta una empresa eligiendo cómo empieza: vacía, con configuración recomendada o con datos de demostración", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance y su estado operativo", "Vigilar los procesos que corren solos y las entregas de avisos de todas las empresas"],
     flujo: [
       "Estado comercial y estado operativo son dos cosas. El comercial —en prueba, activa, suspendida— lo decide usted. El operativo —en configuración, lista para operar, operando— sale de la puesta en marcha y nunca cambia el comercial.",
       "Al dar de alta se explica qué trae cada opción antes de crear. Vacía: la empresa, su responsable y los catálogos técnicos indispensables. Recomendada: además, los catálogos de su giro, su primer sitio y el almacén. Demostración: además, un juego chico marcado «[DEMO]». Ninguna inventa órdenes ni indicadores.",
       "Al entrar a una cuenta se ve un aviso permanente arriba, y todo lo que haga queda en la bitácora de esa empresa.",
       "El acceso se revalida en cada petición: si se retira el privilegio, la sesión deja de servir de inmediato.",
+      "«Procesos programados» dice cuándo corrió por última vez cada tarea automática. «Callado» significa que lleva más de tres periodos sin terminar: un proceso detenido calla igual que uno sano, y esta tabla es la única forma de notar la diferencia sin abrir los registros del servidor.",
     ],
   },
 
