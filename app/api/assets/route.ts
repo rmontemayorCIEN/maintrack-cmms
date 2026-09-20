@@ -4,6 +4,7 @@ import { fail, ok, parseDate, withAuth, withVista } from "@/lib/api";
 import { verificarCupo } from "@/lib/planes";
 import { validarFechasDeActivo } from "@/lib/calidad-datos";
 import { logAudit } from "@/lib/audit";
+import { contiene } from "@/lib/busqueda-texto";
 
 const schema = z.object({
   code: z.string().min(1),
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
         organizationId: orgId,
         active: true,
         ...(q
-          ? { OR: [{ name: { contains: q } }, { code: { contains: q } }, { serialNumber: { contains: q } }] }
+          ? { OR: [{ name: contiene(q) }, { code: contiene(q) }, { serialNumber: contiene(q) }] }
           : {}),
       },
       include: {

@@ -357,6 +357,25 @@ async function main() {
       (await prisma.goodsReceipt.count({ where: { organizationId: A.id, clave: `rec-${sello}` } })) === 1,
       { partes: dobleParte.map((r) => r.status), horas: dobleHoras.map((r) => r.status), estado: dobleEstado.map((r) => r.status), existenciaAntes, existenciaDespues });
 
+    // Bloque 8: crear una ORDEN y crear una REQUISICION tampoco pueden
+    // duplicarse. Eran los dos unicos formularios sin defensa de servidor: lo
+    // unico que los cuidaba era que el boton se deshabilitara en el navegador,
+    // y eso no sobrevive a un reintento de red ni a una segunda pestana.
+    const dobleOT = await Promise.all([1, 2].map(() => pedir("POST", "/api/work-orders", c.SUPERVISOR, {
+      title: `Doble creacion ${sello}`, maintenanceType: "CORRECTIVE", priority: "MEDIUM",
+      assetId: equipo.id, aceptarAdvertencias: true,
+    })));
+    const creadas = await prisma.workOrder.count({ where: { organizationId: A.id, title: `Doble creacion ${sello}` } });
+    const dobleReq = await Promise.all([1, 2].map(() => pedir("POST", "/api/requisiciones", c.TECHNICIAN, {
+      renglones: [{ partId: parte.id, descripcion: "Material del doble toque", cantidadSolicitada: 1 }],
+      urgencia: "NORMAL", assetId: equipo.id,
+    })));
+    const requisiciones = await prisma.materialRequest.count({ where: { organizationId: A.id, solicitanteId: u.TECHNICIAN.id } });
+    revisar("39b. crear una orden y crear una requisición dos veces seguidas dejan UNA de cada una",
+      creadas === 1 && dobleOT.map((r) => r.status).sort().join() === "201,409" &&
+      requisiciones === 1 && dobleReq.map((r) => r.status).sort().join() === "201,409",
+      { ot: dobleOT.map((r) => r.status), creadas, req: dobleReq.map((r) => r.status), requisiciones });
+
     // ═══════════════════════════════════════════ 41: conflicto
     console.log("\n41. Conflicto por cambio simultáneo");
     const e1 = await pedir("PATCH", `/api/work-orders/${ot2.id}`, c.SUPERVISOR, { title: "Lubricar rodamientos", base: { title: "Lubricar" }, aceptarAdvertencias: true });

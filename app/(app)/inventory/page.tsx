@@ -12,6 +12,7 @@ import { verCostosDeAlmacen } from "@/lib/pantallas";
 import { vistaGuardada } from "@/lib/vistas";
 import { MovementForm } from "./movement-form";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const metadata = { title: "Almacén" };
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export default async function InventoryPage({
       where: {
         organizationId: user.organizationId,
         active: true,
-        ...(params.q ? { OR: [{ name: { contains: params.q } }, { code: { contains: params.q } }] } : {}),
+        ...(params.q ? { OR: [{ name: contiene(params.q) }, { code: contiene(params.q) }] } : {}),
       },
       include: {
         supplier: { select: { name: true } },

@@ -1,6 +1,6 @@
 import { conversarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
-import { HERRAMIENTAS, ejecutarHerramienta } from "./herramientas";
+import { ejecutarHerramienta, herramientasPara } from "./herramientas";
 import { ROLE_LABELS } from "../constants";
 
 /**
@@ -62,8 +62,8 @@ export async function responderAyuda(
     funcion: "AYUDA",
     sistema: sistema({ pantalla: params.pantalla, titulo: params.titulo, rol: params.rol, plan: org.plan }),
     pregunta: params.pregunta,
-    herramientas: HERRAMIENTAS,
-    ejecutar: (nombre, entrada) => ejecutarHerramienta(org.id, nombre, entrada),
+    herramientas: herramientasPara(params.rol),
+    ejecutar: (nombre, entrada) => ejecutarHerramienta(org.id, nombre, entrada, { rol: params.rol }),
   });
 
   return {

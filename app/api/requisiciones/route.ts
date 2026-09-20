@@ -6,6 +6,7 @@ import { siguienteFolio } from "@/lib/numbering";
 import { motivoDeLaOrden, motivoDeRenglones } from "@/lib/requisiciones-datos";
 import { tipoDeActividad } from "@/lib/fallas";
 import { logAudit } from "@/lib/audit";
+import { enFila, hace } from "@/lib/repeticion";
 
 const schema = z.object({
   warehouseId: z.string().optional().nullable(),
@@ -94,6 +95,24 @@ export async function POST(request: Request) {
       if (!activo) return fail("Activo no encontrado", 404);
     }
 
+    // Mismo cuidado que en la orden: dos vales del mismo material aguas abajo
+    // se vuelven dos compras y dos entradas al almacen.
+    // La huella son los renglones, no solo el destino: dos vales distintos de
+    // la misma orden en el mismo minuto son legitimos y deben pasar.
+    const huellaDe = (renglones: Array<{ partId?: string | null; descripcion: string; cantidadSolicitada: number }>) =>
+      renglones.map((r) => `${r.partId ?? r.descripcion}x${r.cantidadSolicitada}`).sort().join("|");
+    const huella = huellaDe(input.renglones);
+    return enFila(`requisicion:${user.id}:${huella}`, async () => {
+    const recientes = await prisma.materialRequest.findMany({
+      where: {
+        organizationId: orgId, solicitanteId: user.id,
+        workOrderId: input.workOrderId || null, createdAt: { gte: hace() },
+      },
+      select: { folio: true, renglones: { select: { partId: true, descripcion: true, cantidadSolicitada: true } } },
+    });
+    const repetida = recientes.find((r) => huellaDe(r.renglones) === huella);
+    if (repetida) return fail(`Esa requisición ya se envió hace un momento (${repetida.folio}). No se creó otra.`, 409);
+
     const folio = await siguienteFolio(orgId, "requisicion");
     const req = await prisma.materialRequest.create({
       data: {
@@ -128,5 +147,6 @@ export async function POST(request: Request) {
     });
 
     return ok({ id: req.id, folio: req.folio }, 201);
+    });
   });
 }

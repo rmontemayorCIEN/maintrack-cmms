@@ -16,6 +16,7 @@ import { verCostos } from "@/lib/pantallas";
 import { AssetDialog } from "./asset-dialog";
 import { TablaActivos, type FilaActivo } from "./tabla-activos";
 import { vistaGuardada } from "@/lib/vistas";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const metadata = { title: "Activos" };
 export const dynamic = "force-dynamic";
@@ -41,10 +42,10 @@ export default async function AssetsPage({
         ...(params.q
           ? {
               OR: [
-                { name: { contains: params.q } },
-                { code: { contains: params.q } },
-                { serialNumber: { contains: params.q } },
-                { manufacturer: { contains: params.q } },
+                { name: contiene(params.q) },
+                { code: contiene(params.q) },
+                { serialNumber: contiene(params.q) },
+                { manufacturer: contiene(params.q) },
               ],
             }
           : {}),

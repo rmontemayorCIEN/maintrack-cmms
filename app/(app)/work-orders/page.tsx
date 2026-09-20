@@ -19,6 +19,7 @@ import { WorkOrderFilters } from "./filters";
 import { TablaOrdenes, type FilaOrden } from "./tabla-ordenes";
 import { vistaGuardada } from "@/lib/vistas";
 import { verCostos } from "@/lib/pantallas";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const metadata = { title: "Órdenes de trabajo" };
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
     ...(mias ? { assignedToId: user.id } : {}),
     ...(sinResponsable ? { assignedToId: null } : {}),
     ...(params.q
-      ? { OR: [{ number: { contains: params.q } }, { title: { contains: params.q } }] }
+      ? { OR: [{ number: contiene(params.q) }, { title: contiene(params.q) }] }
       : {}),
   };
 

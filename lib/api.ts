@@ -106,6 +106,10 @@ export async function withVista<T>(
 const CAMPOS_DE_COSTO = new Set([
   "laborCost", "partsCost", "serviceCost", "otherCost", "totalCost", "unitCost", "hourlyRate", "rate", "cost",
   "costoEstimado", "purchaseCost", "replacementCost", "costoUnitario",
+  // Los nombres en espanol los producen las herramientas de IA, que responden
+  // en prosa lo que la pantalla le oculta al mismo rol (hallazgo del Bloque 8).
+  "costo", "costos", "costoSumado", "costoTotal", "costoDeReemplazo", "proporcionDelReemplazo",
+  "costoDeParo", "valorInventario",
 ]);
 
 /**

@@ -3196,3 +3196,42 @@ model ConjuntoAsset {
   @@index([organizationId])
   @@index([assetId])
 }
+
+/// Candado y ultima corrida de cada proceso programado.
+///
+/// Nacio de un hallazgo del Bloque 8: los cron no tenian candado, y dos
+/// corridas solapadas del programador —el reintento de Cloud Scheduler, o el
+/// boton manual mientras corre el cron— generaban DOS ordenes preventivas
+/// identicas para el mismo plan y equipo. La decision se tomaba contra una
+/// foto en memoria leida al inicio del barrido y se escribia mucho despues.
+///
+/// Sirve para dos cosas a la vez, y por eso vive en una sola tabla: tomar el
+/// candado (`corriendoDesde` + `expiraEl`, con escritura condicional) y saber
+/// cuando corrio por ultima vez, si termino bien y cuantas veces seguidas ha
+/// fallado. Sin esto, un proceso que deja de correr es indistinguible de uno
+/// que corre sin novedad: los dos callan.
+///
+/// No lleva relacion con Organization a proposito: es una tabla de la
+/// plataforma, no de un inquilino, y una empresa borrada no debe llevarse el
+/// historial de operacion por delante.
+model ProcesoProgramado {
+  /// "avisos", "diagnostico" o "scheduler:<organizationId>".
+  clave          String    @id
+  /// Presente solo en los procesos que corren por empresa.
+  organizationId String?
+
+  corriendoDesde DateTime?
+  /// Hasta cuando vale el candado. Un proceso muerto no bloquea para siempre.
+  expiraEl       DateTime?
+
+  ultimoInicio   DateTime?
+  ultimoFin      DateTime?
+  ultimoOk       Boolean?
+  ultimoResumen  String?
+  ultimoError    String?
+  fallasSeguidas Int       @default(0)
+  corridas       Int       @default(0)
+
+  @@index([ultimoFin])
+  @@index([organizationId])
+}

@@ -169,12 +169,12 @@ async function main() {
     revisar("el detalle cuadra en los cuatro periodos", [30, 90, 180, 365].every((d) => Object.values(detalleCuadra(kPor[d])).every(Boolean)));
 
     console.log("\nLas mismas cifras en otros módulos");
-    const herr = (await ejecutarHerramienta(orgA.id, "indicadores", { dias: 30 })) as { indicadores: Array<{ indicador: string; valor: number | null }> };
+    const herr = (await ejecutarHerramienta(orgA.id, "indicadores", { dias: 30 }, { rol: "OWNER" })) as { indicadores: Array<{ indicador: string; valor: number | null }> };
     const deIa = (nombre: string) => herr.indicadores.find((x) => x.indicador === nombre)?.valor ?? null;
     revisar("la herramienta de IA da el mismo MTTR", deIa(i.mttr.nombre) === i.mttr.valor, deIa(i.mttr.nombre));
     revisar("la herramienta de IA da la misma disponibilidad", cerca(deIa(i.disponibilidad.nombre), i.disponibilidad.valor as number), deIa(i.disponibilidad.nombre));
     revisar("la herramienta de IA da el mismo costo", deIa(i.costoMantenimiento.nombre) === i.costoMantenimiento.valor);
-    const busqueda = (await ejecutarHerramienta(orgA.id, "buscar_ordenes", { dias: 30, soloVencidas: true })) as { total: number };
+    const busqueda = (await ejecutarHerramienta(orgA.id, "buscar_ordenes", { dias: 30, soloVencidas: true }, { rol: "OWNER" })) as { total: number };
     revisar("«vencidas» de la IA = vencidas del Panel", busqueda.total === k30.totales.backlogVencido, busqueda.total);
 
     // ─────────────────────────────────────────────── Aislamiento + OT ───
@@ -450,7 +450,7 @@ async function main() {
 
     // ───────────────────────────────────────── IA y zona horaria ───
     console.log("\nIA: ficha de activo y zona horaria");
-    const ficha = (await ejecutarHerramienta(orgA.id, "consultar_activo", { codigo: "A1" })) as { planes?: Array<{ plan: string }>; plans?: unknown };
+    const ficha = (await ejecutarHerramienta(orgA.id, "consultar_activo", { codigo: "A1" }, { rol: "OWNER" })) as { planes?: Array<{ plan: string }>; plans?: unknown };
     revisar("la ficha de activo de la IA lee las asignaciones, no el encabezado del plan",
       Boolean(ficha.planes?.some((p) => p.plan === "Servicio 500 h")) && ficha.plans === undefined, ficha.planes);
     const once = new Date("2026-09-17T04:30:00Z"); // 11:30 pm del 16 en Monterrey

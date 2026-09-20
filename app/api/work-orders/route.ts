@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { OPEN_STATUSES } from "@/lib/constants";
 import { revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
+import { enFila, hace } from "@/lib/repeticion";
 
 const createSchema = z.object({
   title: z.string().min(3),
@@ -85,6 +86,19 @@ export async function POST(request: Request) {
       if (revision.advertencias.length) return fail(revision.advertencias.join(" "), 409, { programacion: revision });
     }
 
+    // Un doble toque, un reintento del navegador o una segunda pestana no
+    // pueden levantar dos ordenes para el mismo trabajo. El `disabled` del
+    // boton no sobrevive a una red lenta; esto si (lib/repeticion.ts).
+    return enFila(`ot:${user.id}:${input.title.trim().toLowerCase()}:${input.assetId ?? ""}`, async () => {
+    const repetida = await prisma.workOrder.findFirst({
+      where: {
+        organizationId: orgId, createdById: user.id, title: input.title,
+        assetId: input.assetId || null, createdAt: { gte: hace() },
+      },
+      select: { number: true },
+    });
+    if (repetida) return fail(`Esa orden ya se creó hace un momento (${repetida.number}). No se creó otra.`, 409);
+
     const number = await nextWorkOrderNumber(orgId);
     const workOrder = await prisma.workOrder.create({
       data: {
@@ -135,5 +149,6 @@ export async function POST(request: Request) {
     await avisarNuevaOrden(orgId, workOrder.id);
 
     return ok({ workOrder }, 201);
+    });
   });
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { almacenPorOmision, aplicarMovimiento } from "@/lib/almacen";
+import { contiene } from "@/lib/busqueda-texto";
 
 const schema = z.object({
   code: z.string().min(1),
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
       where: {
         organizationId: orgId,
         active: true,
-        ...(q ? { OR: [{ name: { contains: q } }, { code: { contains: q } }] } : {}),
+        ...(q ? { OR: [{ name: contiene(q) }, { code: contiene(q) }] } : {}),
       },
       include: { supplier: { select: { name: true } } },
       orderBy: { code: "asc" },

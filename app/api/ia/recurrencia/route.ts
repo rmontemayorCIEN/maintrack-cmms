@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
+import { puedeVerRuta } from "@/lib/pantallas";
 import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
 import { analizarRecurrencia } from "@/lib/ia/recurrencia";
 
@@ -14,6 +15,9 @@ export async function POST(request: Request) {
   return withAuth(null, async ({ user, orgId }) => {
     if (!iaConfigurada()) {
       return fail("El análisis de recurrencia no esta configurado en este servidor.", 503);
+    }
+    if (!puedeVerRuta(user.role, "/indicadores", { esSuperAdmin: user.isSuperAdmin, esDemo: user.organization.esDemo })) {
+      return fail("Esta función no es de su rol.", 403);
     }
     const input = schema.parse(await request.json());
 

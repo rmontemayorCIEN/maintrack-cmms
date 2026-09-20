@@ -5,6 +5,8 @@ import { diaDelCompromiso, estadoDeVencimiento } from "../vencimiento";
 import { analizarAlmacen } from "../almacen-analisis";
 import { AYUDA, CONTROLES_TABLA } from "../ayuda";
 import { agruparPorCodigo, fallasCodificadas, filtroDeFalla } from "@/lib/fallas";
+import { contiene } from "../busqueda-texto";
+import { verCostos, verCostosDeAlmacen } from "../pantallas";
 
 /**
  * Herramientas de consulta para la IA.
@@ -134,10 +136,84 @@ export const HERRAMIENTAS = [
 ];
 
 /**
+ * Las herramientas que este rol puede usar.
+ *
+ * Hallazgo del Bloque 8: las herramientas recibian la empresa pero NUNCA el
+ * rol, asi que un tecnico o un solicitante —a quienes el sistema les oculta
+ * los importes en todas las pantallas— los obtenian pidiendoselos a la IA en
+ * prosa. Aqui se resuelve en los dos lados: la herramienta de costos no se le
+ * ofrece siquiera al modelo, y lo que devuelven las demas se depura al salir.
+ */
+export function herramientasPara(rol: string | undefined) {
+  if (verCostos(rol)) return HERRAMIENTAS;
+  return HERRAMIENTAS.filter((h) => h.name !== "costo_por_activo");
+}
+
+/**
+ * Cualquier campo que sea dinero, por patron y no por lista.
+ *
+ * La lista cerrada de `sinCostos` se queda corta aqui: la primera version de
+ * esta depuracion dejaba pasar `costoDeSurtirFaltantes` y
+ * `costoDeReponerMinimos` del analisis de almacen, y la siguiente herramienta
+ * que alguien agregue traera otro nombre nuevo. Con un patron, lo que se
+ * agregue nace tapado y hay que abrirlo a proposito.
+ */
+const DINERO = /costo|cost|tarifa|precio|importe/i;
+
+function sinDinero(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(sinDinero);
+  if (valor && typeof valor === "object" && !(valor instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(valor as Record<string, unknown>)
+        .filter(([k]) => !DINERO.test(k))
+        .map(([k, v]) => [k, sinDinero(v)]),
+    );
+  }
+  return valor;
+}
+
+/**
+ * Quita de la respuesta lo que este rol no puede ver en pantalla.
+ *
+ * Lo que el patron no puede cubrir es un indicador cuyo importe viaja en un
+ * campo llamado `valor`, asi que los indicadores de costo se quitan por su
+ * nombre.
+ */
+function depurarPorRol(nombre: string, resultado: unknown, rol: string | undefined): unknown {
+  const almacen = nombre === "consultar_almacen" ? verCostosDeAlmacen(rol) : verCostos(rol);
+  if (almacen) return resultado;
+
+  if (nombre === "costo_por_activo") {
+    return { nota: "El costo por activo no esta disponible para este rol. Conteste sin importes." };
+  }
+  if (nombre === "indicadores" && resultado && typeof resultado === "object") {
+    const r = resultado as Record<string, unknown>;
+    const indicadores = Array.isArray(r.indicadores)
+      ? r.indicadores.filter((i) => !/costo/i.test(String((i as Record<string, unknown>).indicador ?? "")))
+      : r.indicadores;
+    return sinDinero({ ...r, indicadores, costos: undefined });
+  }
+  return sinDinero(resultado);
+}
+
+/**
  * Ejecuta una herramienta. `organizationId` lo pone quien llama, desde la
- * sesion: es el unico parametro que el modelo no controla.
+ * sesion: es el unico parametro que el modelo no controla. `rol` tampoco, y
+ * decide que parte de la respuesta sale.
  */
 export async function ejecutarHerramienta(
+  organizationId: string,
+  nombre: string,
+  entrada: Record<string, unknown>,
+  // Obligatorio a proposito: olvidar el rol tiene que ser un error de
+  // compilacion y no una fuga silenciosa. `undefined` significa «sin rol», y
+  // entonces se depura todo.
+  opciones: { rol: string | undefined },
+): Promise<unknown> {
+  return depurarPorRol(nombre, await ejecutar(organizationId, nombre, entrada), opciones.rol);
+}
+
+async function ejecutar(
   organizationId: string,
   nombre: string,
   entrada: Record<string, unknown>,
@@ -349,7 +425,7 @@ export async function ejecutarHerramienta(
         const partes = await prisma.part.findMany({
           where: {
             organizationId,
-            OR: [{ code: { contains: buscar } }, { name: { contains: buscar } }],
+            OR: [{ code: contiene(buscar) }, { name: contiene(buscar) }],
           },
           select: {
             code: true, name: true, unit: true, unitCost: true, quantityOnHand: true,
