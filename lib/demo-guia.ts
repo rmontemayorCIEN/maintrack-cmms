@@ -45,7 +45,7 @@ export const HISTORIAS: Historia[] = [
       "Abra LLN-101: la orden, su costo y la falla ya están en el historial; es la tercera fuga en válvulas en tres meses.",
     ],
     resultado: "El reporte se atendió en minutos, con responsable, costo y causa registrados; la recurrencia de fugas en la llenadora queda a la vista para decidir.",
-    registros: [{ etiqueta: "Solicitud del operador", tipo: "solicitud", clave: "SS-000001" }, { etiqueta: "Llenadora LLN-101", tipo: "activo", clave: "LLN-101" }, { etiqueta: "Kit de empaques", tipo: "refaccion", clave: "KIT-VLL" }],
+    registros: [{ etiqueta: "Solicitud del operador", tipo: "solicitud", clave: "SS-000001" }, { etiqueta: "Solicitudes", tipo: "ruta", clave: "/requests" }, { etiqueta: "Órdenes de trabajo", tipo: "ruta", clave: "/work-orders" }, { etiqueta: "Llenadora LLN-101", tipo: "activo", clave: "LLN-101" }, { etiqueta: "Kit de empaques", tipo: "refaccion", clave: "KIT-VLL" }],
   },
   {
     clave: "preventiva", titulo: "El preventivo que se programa solo", rol: "Supervisión → Técnico", minutos: 4,
@@ -59,7 +59,7 @@ export const HISTORIAS: Historia[] = [
       "Vea el cumplimiento preventivo en el inicio y la siguiente fecha en el plan.",
     ],
     resultado: "El preventivo se generó, se ejecutó con lista de verificación y medición, y el cumplimiento se actualizó sin capturar nada aparte.",
-    registros: [{ etiqueta: "Planes preventivos", tipo: "ruta", clave: "/plans" }, { etiqueta: "Llenadora LLN-101", tipo: "activo", clave: "LLN-101" }],
+    registros: [{ etiqueta: "Planes preventivos", tipo: "ruta", clave: "/plans" }, { etiqueta: "Llenadora LLN-101", tipo: "activo", clave: "LLN-101" }, { etiqueta: "Órdenes de trabajo", tipo: "ruta", clave: "/work-orders" }, { etiqueta: "Indicadores", tipo: "ruta", clave: "/indicadores" }],
   },
   {
     clave: "condicion", titulo: "Por uso y por condición", rol: "Supervisión → Técnico", minutos: 5,
@@ -73,7 +73,7 @@ export const HISTORIAS: Historia[] = [
       "En Medidores: el montacargas MON-301 está a 18 h de su servicio; el sistema ya generó la orden por horas.",
     ],
     resultado: "El trabajo se hizo antes de la falla, por la condición real del equipo y no por calendario, y la alerta quedó cerrada con evidencia.",
-    registros: [{ etiqueta: "Compresor CMP-201", tipo: "activo", clave: "CMP-201" }, { etiqueta: "Alertas", tipo: "ruta", clave: "/alerts" }, { etiqueta: "Medidores", tipo: "ruta", clave: "/meters" }],
+    registros: [{ etiqueta: "Alertas", tipo: "ruta", clave: "/alerts" }, { etiqueta: "Compresor CMP-201", tipo: "activo", clave: "CMP-201" }, { etiqueta: "Predictivo", tipo: "ruta", clave: "/predictive" }, { etiqueta: "Medidores", tipo: "ruta", clave: "/meters" }],
   },
   {
     clave: "compras", titulo: "Inventario y compras", rol: "Compras → Dirección → Compras → Técnico", minutos: 5,
@@ -87,7 +87,7 @@ export const HISTORIAS: Historia[] = [
       "Muestre el kardex: la entrada con su costo; y la orden del compresor, que ya puede continuar.",
     ],
     resultado: "La necesidad real (una orden detenida) se convirtió en compra autorizada y recibida; la existencia y el costo quedaron en el kardex y en la orden.",
-    registros: [{ etiqueta: "Elemento separador", tipo: "refaccion", clave: "FIL-SEP" }, { etiqueta: "Compras", tipo: "ruta", clave: "/compras" }, { etiqueta: "Compresor CMP-201", tipo: "activo", clave: "CMP-201" }],
+    registros: [{ etiqueta: "Elemento separador", tipo: "refaccion", clave: "FIL-SEP" }, { etiqueta: "Almacén", tipo: "ruta", clave: "/inventory" }, { etiqueta: "Requisiciones", tipo: "ruta", clave: "/requisiciones" }, { etiqueta: "Compras", tipo: "ruta", clave: "/compras" }, { etiqueta: "Compresor CMP-201", tipo: "activo", clave: "CMP-201" }],
   },
   {
     clave: "direccion", titulo: "Lo que ve la dirección", rol: "Dirección", minutos: 4,
@@ -101,7 +101,7 @@ export const HISTORIAS: Historia[] = [
       "Decisión: autorizar la compra pendiente y pedir que se revise la frecuencia de cambio de empaques de la llenadora.",
     ],
     resultado: "En cinco minutos, la dirección pasa de ver números a tomar dos decisiones concretas con evidencia.",
-    registros: [{ etiqueta: "Indicadores", tipo: "ruta", clave: "/indicadores" }, { etiqueta: "Dónde para la planta", tipo: "ruta", clave: "/paros" }],
+    registros: [{ etiqueta: "Inicio de la dirección", tipo: "ruta", clave: "/dashboard" }, { etiqueta: "Órdenes de trabajo", tipo: "ruta", clave: "/work-orders" }, { etiqueta: "Indicadores", tipo: "ruta", clave: "/indicadores" }, { etiqueta: "Dónde para la planta", tipo: "ruta", clave: "/paros" }],
   },
 ];
 

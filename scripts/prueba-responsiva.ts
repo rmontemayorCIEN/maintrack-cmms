@@ -1047,6 +1047,56 @@ async function main() {
     await t.ir(`${base}/paros`, 1500); await captura("b7-1440-demo-donde-para");
     await t.ir(`${base}/demo`, 1000); await captura("b7-1440-demo-guia");
 
+    // ═══════════════════════════════════════════ Presentación al cliente
+    console.log("\nPresentación al cliente (diapositivas)");
+    const { armarPresentacion } = await import("../lib/demo-presentacion");
+    const totalSlides = armarPresentacion().length;
+    const nDe = (clave: string) => armarPresentacion().findIndex((d) => d.clave === clave) + 1;
+    const slides: Record<string, unknown> = {};
+    for (const [ancho, alto, etiqueta] of [[1440, 900, "1440"], [390, 844, "390"]] as Array<[number, number, string]>) {
+      await pantalla(ancho, alto);
+      donde = `presentacion ${etiqueta}`;
+      await t.ir(`${base}/demo/presentacion`, 1500);
+      const portada = await t.evaluar<{ titulo: string; contador: string; cubre: boolean }>(`(() => {
+        const capa = document.querySelector("[data-presentacion]");
+        const r = capa?.getBoundingClientRect();
+        return {
+          titulo: capa?.querySelector("h1")?.textContent ?? "",
+          contador: capa?.innerText.match(/\\d+\\/\\d+/)?.[0] ?? "",
+          cubre: !!r && r.width >= document.documentElement.clientWidth - 1 && r.height >= document.documentElement.clientHeight - 1,
+        };
+      })()`);
+      const m = await medir();
+      await captura(`presentacion-${etiqueta}-portada`);
+      // Avanzar con el teclado, como en una junta.
+      await t.evaluar(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); true`);
+      await new Promise((r) => setTimeout(r, 400));
+      const tras = await t.evaluar<{ contador: string; url: string }>(`({ contador: document.querySelector("[data-presentacion]")?.innerText.match(/\\d+\\/\\d+/)?.[0] ?? "", url: location.search })`);
+      // Un caso, con sus botones al sistema.
+      await t.ir(`${base}/demo/presentacion?d=${nDe("caso-direccion")}`, 1200);
+      const caso = await t.evaluar<{ titulo: string; ligas: number; rol: boolean }>(`(() => {
+        const ligas = [...document.querySelectorAll("main a[href^='/']")].length;
+        return { titulo: document.querySelector("main h1")?.textContent ?? "", ligas, rol: document.body.innerText.includes("Se muestra como") };
+      })()`);
+      const mCaso = await medir();
+      await captura(`presentacion-${etiqueta}-caso`);
+      slides[etiqueta] = {
+        portadaTitulo: portada.titulo.includes("Anticipe fallas"),
+        portadaContador: portada.contador === `1/${totalSlides}` ? true : portada.contador,
+        cubreLaPantalla: portada.cubre,
+        avanzaConFlechas: tras.contador === `2/${totalSlides}` && tras.url.includes("d=2"),
+        // El rol con el que se muestra el caso solo cabe en pantalla ancha.
+        casoConBotones: caso.titulo.length > 0 && caso.ligas >= 3 && (ancho < 768 || caso.rol),
+        sinDesborde: !m.desborde && !mCaso.desborde && !m.errorPagina && !mCaso.errorPagina,
+      };
+    }
+    revisar("La presentación abre a pantalla completa (sin menú), avanza con las flechas dejando la diapositiva en la dirección, y cada caso trae sus botones al sistema, en computadora y en teléfono",
+      Object.values(slides).every((x) => Object.values(x as Record<string, unknown>).every((v) => v === true)), slides);
+    await pantalla(1440, 900);
+    await t.ir(`${base}/demo/presentacion?d=${nDe("precios")}`, 1200); await captura("presentacion-1440-precios");
+    await t.ir(`${base}/demo/presentacion?d=${nDe("gracias")}`, 1200); await captura("presentacion-1440-gracias");
+    await t.ir(`${base}/demo`, 1200); await captura("presentacion-1440-guia");
+
     // ═══════════════════════════════════════════ Expedientes de refacción y de plan
     console.log("\nExpedientes de refacción y de plan");
     const expedientes: Record<string, unknown> = {};

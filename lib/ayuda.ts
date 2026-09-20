@@ -268,10 +268,22 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/demo/presentacion": {
+    titulo: "Presentación",
+    que: "La presentación al cliente en diapositivas, a pantalla completa: el problema, qué es y qué no es MainTrack, los cinco casos sobre esta empresa, la inteligencia artificial, cómo se arranca, los precios y el cierre.",
+    hacer: ["Avanzar y retroceder con las flechas del teclado, o con los botones de abajo", "Saltar a cualquier diapositiva desde el índice", "Abrir la pantalla real desde los botones de cada caso y regresar con «Atrás»", "Salir con Escape"],
+    flujo: [
+      "Una diapositiva a la vez y sin menú: lo que se proyecta es solo el tema del que se está hablando.",
+      "Los textos, los precios y los límites salen de la misma fuente que el sitio comercial, así que nunca dicen algo distinto de lo que el cliente ya leyó.",
+      "Los botones «abrir en el sistema» llevan a la pantalla real de la empresa demostrativa; el número de diapositiva va en la dirección, por eso al regresar se retoma en la misma.",
+      "Cada diapositiva de caso indica con qué cuenta conviene estar dentro, y trae una nota para quien presenta que no se proyecta hasta abrirla.",
+    ],
+  },
+
   "/demo": {
     titulo: "Guía de la demostración",
-    que: "Solo existe en la empresa demostrativa: cómo presentar MainTrack con cinco historias sobre el sistema real, y cómo dejar la demo como nueva.",
-    hacer: ["Seguir el orden recomendado para una demostración de 20 a 30 minutos", "Abrir los registros que usa cada historia", "Reiniciar el recorrido guiado", "Restaurar la demo al terminar (dirección o gerencia)"],
+    que: "Solo existe en la empresa demostrativa: la presentación al cliente, cinco historias sobre el sistema real y cómo dejar la demo como nueva.",
+    hacer: ["Iniciar la presentación en diapositivas", "Presentar un caso suelto desde su historia", "Seguir el orden recomendado para una demostración de 20 a 30 minutos", "Abrir los registros que usa cada historia", "Reiniciar el recorrido guiado", "Restaurar la demo al terminar (dirección o gerencia)"],
     flujo: [
       "Cada historia dice con qué rol se muestra, cuánto tarda, el problema, los pasos y el resultado que se explica.",
       "Todo lo que se captura durante la demostración funciona igual que en una cuenta real. Restaurar lo borra y vuelve a sembrar la historia de 90 días con fechas al día; se conservan la empresa y las cuentas.",

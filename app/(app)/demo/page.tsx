@@ -1,38 +1,30 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Play } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
-import { puedeVerRuta } from "@/lib/pantallas";
-import { HISTORIAS, ORDEN_RECOMENDADO, PREGUNTAS_DEMO, type Historia } from "@/lib/demo-guia";
+import { HISTORIAS, ORDEN_RECOMENDADO, PREGUNTAS_DEMO } from "@/lib/demo-guia";
+import { armarPresentacion } from "@/lib/demo-presentacion";
 import { DEMO, PERSONAS, vistaPreviaRestauracion } from "@/lib/demo-comercial";
 import { formatDateTime } from "@/lib/utils";
+import { ligasDeHistorias } from "./ligas";
 import { PanelRestaurar, ReiniciarRecorrido } from "./panel";
 
 export const metadata = { title: "Guía de la demostración" };
-
-/** Resuelve cada registro de una historia a una liga real de esta empresa. */
-async function ligas(orgId: string, h: Historia) {
-  return Promise.all(h.registros.map(async (r) => {
-    let href: string | null = null;
-    if (r.tipo === "ruta") href = r.clave;
-    if (r.tipo === "activo") { const x = await prisma.asset.findFirst({ where: { organizationId: orgId, code: r.clave }, select: { id: true } }); href = x ? `/assets/${x.id}` : null; }
-    if (r.tipo === "solicitud") { const x = await prisma.workRequest.findFirst({ where: { organizationId: orgId, number: r.clave }, select: { id: true } }); href = x ? `/requests/${x.id}` : null; }
-    if (r.tipo === "refaccion") { const x = await prisma.part.findFirst({ where: { organizationId: orgId, code: r.clave }, select: { id: true } }); href = x ? `/inventory/${x.id}` : null; }
-    if (r.tipo === "orden") { const x = await prisma.workOrder.findFirst({ where: { organizationId: orgId, number: r.clave }, select: { id: true } }); href = x ? `/work-orders/${x.id}` : null; }
-    return { ...r, href };
-  }));
-}
 
 export default async function DemoPage() {
   const user = await getCurrentUser();
   if (!user?.organization.esDemo) notFound();
   const puedeRestaurar = can(user.role, "settings:write") || user.isSuperAdmin;
   const previa = puedeRestaurar ? await vistaPreviaRestauracion(user.organizationId) : null;
-  const historias = await Promise.all(ORDEN_RECOMENDADO.map(async (k) => {
+  const porHistoria = await ligasDeHistorias(user.organizationId, user.role);
+  // La diapositiva de cada caso sale del mismo armado que la presentación:
+  // así el botón «Presentar este caso» nunca apunta a la diapositiva de al lado.
+  const diapositivas = armarPresentacion();
+  const historias = ORDEN_RECOMENDADO.map((k) => {
     const h = HISTORIAS.find((x) => x.clave === k)!;
-    return { ...h, ligas: await ligas(user.organizationId, h) };
-  }));
+    return { ...h, ligas: porHistoria[h.clave] ?? [], diapositiva: diapositivas.findIndex((d) => d.clave === `caso-${h.clave}`) + 1 };
+  });
   const zona = user.organization.timezone;
 
   return (
@@ -40,10 +32,27 @@ export default async function DemoPage() {
       <header>
         <h1 className="text-xl font-semibold text-slate-900">Guía de la demostración</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Cinco historias sobre el sistema real, de 4 a 5 minutos cada una. Orden recomendado para una demostración de 20 a 30 minutos: {ORDEN_RECOMENDADO.map((k) => HISTORIAS.find((h) => h.clave === k)!.titulo.toLowerCase()).join(" → ")}.
+          Todo para presentar MainTrack a un cliente: la presentación en diapositivas, las cinco historias sobre el sistema real y cómo dejar la demo como nueva.
         </p>
-        <div className="mt-3"><ReiniciarRecorrido /></div>
       </header>
+
+      <section aria-labelledby="presentar" className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+        <h2 id="presentar" className="font-semibold text-violet-950">Presentar al cliente</h2>
+        <p className="mt-1 text-sm text-violet-900">
+          {diapositivas.length} diapositivas a pantalla completa, una a la vez: el problema, qué es y qué no es MainTrack, los cinco casos sobre esta empresa —con botones que abren la pantalla real—, la inteligencia artificial, cómo se arranca, los precios y el cierre.
+          Se avanza con las flechas del teclado y se sale con Escape.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link href="/demo/presentacion" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-violet-600 px-4 font-semibold text-white hover:bg-violet-700">
+            <Play className="h-4 w-4" /> Iniciar la presentación
+          </Link>
+          <ReiniciarRecorrido />
+        </div>
+      </section>
+
+      <p className="text-sm text-slate-600">
+        Orden recomendado de los casos para una demostración de 20 a 30 minutos: {ORDEN_RECOMENDADO.map((k) => HISTORIAS.find((h) => h.clave === k)!.titulo.toLowerCase()).join(" → ")}.
+      </p>
 
       <section aria-labelledby="cuentas" className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 id="cuentas" className="font-semibold text-slate-900">Cuentas de la demo</h2>
@@ -64,8 +73,11 @@ export default async function DemoPage() {
           <ol className="mt-3 grid list-decimal gap-1.5 pl-5 text-sm text-slate-700">{h.pasos.map((p) => <li key={p}>{p}</li>)}</ol>
           <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900"><strong>Resultado que se explica: </strong>{h.resultado}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {h.ligas.filter((l) => l.href && puedeVerRuta(user.role, l.href, { esDemo: true })).map((l) => (
-              <Link key={l.etiqueta} href={l.href!} className="inline-flex min-h-10 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-brand-700 hover:bg-slate-50">{l.etiqueta}</Link>
+            <Link href={`/demo/presentacion?d=${h.diapositiva}`} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-sm font-semibold text-white hover:bg-violet-700">
+              <Play className="h-3.5 w-3.5" /> Presentar este caso
+            </Link>
+            {h.ligas.map((l) => (
+              <Link key={l.href + l.etiqueta} href={l.href} className="inline-flex min-h-10 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-brand-700 hover:bg-slate-50">{l.etiqueta}</Link>
             ))}
           </div>
         </section>

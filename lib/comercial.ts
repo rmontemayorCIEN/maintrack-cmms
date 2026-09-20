@@ -89,6 +89,15 @@ export const MODULOS: Array<{ nombre: string; texto: string }> = [
   { nombre: "Avisos", texto: "En la campana y en el celular, sin costo por mensaje." },
 ];
 
+/** Un recorrido real del sistema, en el orden en que pasa en la planta. */
+export const FLUJO_OPERATIVO: Array<{ paso: string; texto: string }> = [
+  { paso: "Alguien reporta", texto: "El operador escanea el QR del equipo y describe la falla, con foto, sin necesidad de cuenta." },
+  { paso: "Supervisión decide", texto: "Revisa la solicitud, la convierte en orden de trabajo y la asigna a un técnico con fecha." },
+  { paso: "El técnico ejecuta", texto: "Desde su teléfono: actividades, tiempo, refacciones del almacén, lecturas y evidencia." },
+  { paso: "Se valida y se cierra", texto: "Supervisión revisa horas, costo, causa y evidencia antes de cerrar." },
+  { paso: "Queda en el activo", texto: "El historial, el costo y la falla alimentan los indicadores y el diagnóstico." },
+];
+
 export const BENEFICIOS_POR_ROL: Array<{ rol: string; beneficio: string }> = [
   { rol: "Dirección", beneficio: "Ve la situación crítica, la disponibilidad, el cumplimiento y el costo sin pedir un reporte." },
   { rol: "Administración", beneficio: "Configura la empresa, usuarios y catálogos, y revisa la calidad de los datos." },
@@ -229,6 +238,36 @@ export const RESPALDOS = {
   diario: "Respaldo automático diario de la base de datos; se conservan 7.",
   puntoEnElTiempo: "Recuperación a un punto en el tiempo dentro de los últimos 7 días.",
 };
+
+/** Cómo se cuida la información del cliente. Lo usan el sitio y la presentación. */
+export const SEGURIDAD = [
+  "Cada empresa ve solo su información: toda consulta se filtra por empresa.",
+  "Acceso por rol: cada persona ve y hace solo lo de su función.",
+  "Los archivos no son públicos; cada descarga se autoriza por unos minutos.",
+  "Bitácora de auditoría: quién hizo qué y cuándo.",
+  `${RESPALDOS.diario} ${RESPALDOS.puntoEnElTiempo}`,
+  `Opera en ${RESPALDOS.ubicacion}`,
+];
+
+// ────────────────────────────────────────────────────── Implementación
+
+/**
+ * Las cuatro etapas del arranque, para decirlas en una junta.
+ *
+ * El detalle —los doce pasos con responsable y entregable— vive en
+ * `Docs/comercial/implementacion.md`. Aquí va la versión corta, que es lo
+ * único que cabe en una diapositiva; si cambian las etapas, se cambian en
+ * los dos lados a propósito.
+ */
+export const RUTA_IMPLEMENTACION: Array<{ etapa: string; texto: string; quien: string }> = [
+  { etapa: "Acuerdo y alta", texto: "Plan, documentos y fecha de arranque. Se crea la empresa y su responsable.", quien: "MainTrack con la dirección" },
+  { etapa: "Carga de información", texto: "Equipos, ubicaciones, refacciones, planes y usuarios, con plantillas de importación.", quien: "El administrador del cliente" },
+  { etapa: "Capacitación", texto: "Una sesión por rol: dirección, supervisión, técnicos, compras y solicitantes.", quien: "MainTrack" },
+  { etapa: "Operación acompañada", texto: "Puesta en marcha al 100 %, revisión semanal de la calidad de los datos el primer mes.", quien: "Los dos" },
+];
+
+export const IMPLEMENTACION_HONESTA =
+  "La implementación no es automática: la puesta en marcha guía paso por paso, pero la información la aporta el cliente y la revisamos juntos. Con el catálogo de equipos en una hoja de cálculo, una planta empieza a registrar órdenes la primera semana.";
 
 // ───────────────────────────────────────────────── Preguntas frecuentes
 

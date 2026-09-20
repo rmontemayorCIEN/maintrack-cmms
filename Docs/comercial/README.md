@@ -4,7 +4,7 @@
 |---|---|---|
 | `generados/propuesta-de-valor.md` | Descripción, cinco problemas, diferenciadores, módulos, qué no es | Generado de `lib/comercial.ts` |
 | `generados/planes-y-precios.md` | Planes, precios, límites, complemento, condiciones y comparación | Generado de `lib/planes.ts` y `lib/comercial.ts` |
-| `generados/presentacion.md` | 12 diapositivas que acompañan la demostración | Generado |
+| `generados/presentacion.md` | Las diapositivas de la presentación al cliente, en documento | Generado de `lib/demo-presentacion.ts` |
 | `generados/historias-demo.md` | Las cinco historias, el recorrido y cómo restaurar | Generado de `lib/demo-guia.ts` |
 | `generados/preguntas-frecuentes.md` | Preguntas frecuentes (las mismas del sitio) | Generado |
 | `generados/sla-resumen.md` y `generados/legal/*.md` | Borradores legales y de servicio (10) | Generado de `lib/legal.ts` |

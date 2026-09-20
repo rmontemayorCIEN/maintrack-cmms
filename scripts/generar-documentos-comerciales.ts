@@ -19,6 +19,7 @@ import {
 import { COMPLEMENTO_IA, NOMBRE_RECURSO, ORDEN_PLANES, PLANES } from "../lib/planes";
 import { DOCUMENTOS, ESTADO_DOCUMENTOS, PENDIENTES, VERSION_DOCUMENTOS } from "../lib/legal";
 import { HISTORIAS, ORDEN_RECOMENDADO, PASOS_RECORRIDO, PREGUNTAS_DEMO } from "../lib/demo-guia";
+import { armarPresentacion, type Bloque } from "../lib/demo-presentacion";
 
 const DIR = join("Docs", "comercial", "generados");
 const AVISO = "<!-- Generado por scripts/generar-documentos-comerciales.ts. No se edita a mano: cambie la fuente y vuelva a generar. -->\n\n";
@@ -133,23 +134,43 @@ Dentro de la demo: **Guía de la demostración › Restaurar la demo** (direcci�
 Se conservan la empresa y las cuentas; todo lo demás vuelve a su estado inicial con fechas al día y queda en la auditoría.
 `;
 
-const slide = (titulo: string, cuerpo: string) => `---\n\n## ${titulo}\n\n${cuerpo}\n`;
+/**
+ * La presentación no se escribe dos veces.
+ *
+ * La que vale es la que se proyecta dentro de MainTrack
+ * (`lib/demo-presentacion.ts`); esto la baja a documento para quien la quiera
+ * leer o imprimir. Escribirla aparte era garantizar que un día la diapositiva
+ * dijera un precio y el documento otro.
+ */
+const enMarkdown = (b: Bloque): string => {
+  switch (b.tipo) {
+    case "parrafo": return b.texto;
+    case "puntos": return b.items.map((x) => `- ${x}`).join("\n");
+    case "tarjetas": return b.items.map((x) => `- **${x.titulo}:** ${x.texto}${x.pie ? ` (${x.pie})` : ""}`).join("\n");
+    case "pasos": return b.items.map((x, i) => `${i + 1}. **${x.titulo}:** ${x.texto}`).join("\n");
+    case "cambio": return b.items.map((x) => `- **${x.antes}.** ${x.detalle} → *${x.despues}*: ${x.capacidades.join(", ")}.`).join("\n");
+    case "destacado": return `**${b.titulo}:** ${b.texto}`;
+    case "planes": return b.items.map((x) => `- **${x.nombre}** — ${x.precio}. ${x.descripcion}${x.nota ? ` ${x.nota}` : ""}\n${x.incluye.map((y) => `  - ${y}`).join("\n")}`).join("\n");
+    case "filas": return b.items.map((x) => `- **${x.etiqueta}:** ${x.texto}`).join("\n");
+  }
+};
+const DIAPOSITIVAS = armarPresentacion();
 archivos["presentacion.md"] = `# MainTrack — presentación comercial
 
-> 12 diapositivas. Complementa la demostración en vivo; no la sustituye. Formato: una diapositiva por sección separada por \`---\` (compatible con Marp).
+> ${DIAPOSITIVAS.length} diapositivas, las mismas que se proyectan en **Guía de la demostración › Presentar al cliente** (\`/demo/presentacion\`, dentro de la empresa demostrativa), donde además abren las pantallas reales. Formato: una diapositiva por sección separada por \`---\` (compatible con Marp).
 
-${slide("1. Cómo se mantiene hoy", "- Se repara cuando el equipo ya se detuvo.\n- El preventivo depende de la memoria de alguien.\n- La información vive en hojas, libretas y mensajes.")}
-${slide("2. El costo de reaccionar tarde", PROBLEMAS.map((p) => `- **${p.problema}.** ${p.detalle}`).join("\n"))}
-${slide("3. Qué es MainTrack", `${DESCRIPCION}\n\n**No es:** un ERP, un sistema contable, una nómina ni una plataforma IoT completa.`)}
-${slide("4. Cómo conecta la operación", MODULOS.map((m) => `- **${m.nombre}:** ${m.texto}`).join("\n"))}
-${slide("5. De punta a punta", "Reporte (QR) → solicitud → orden asignada → el técnico ejecuta con tiempo, material y evidencia → supervisión valida y cierra → costo y falla en el activo → indicadores.")}
-${slide("6. Cada rol, lo suyo", BENEFICIOS_POR_ROL.map((b) => `- **${b.rol}:** ${b.beneficio}`).join("\n"))}
-${slide("7. Prevención y condición", "- Planes por calendario y por horas que generan sus órdenes.\n- Medidores y umbrales; sensores con tendencia y fecha estimada de cruce.\n- La alerta crea la orden antes de la falla.")}
-${slide("8. Inventario y compras", "- Existencias por almacén, kardex y costo promedio.\n- La orden detenida por una refacción se ve en la dirección.\n- Requisición → autorización → cotización → orden de compra → recepción → el costo regresa a la orden.")}
-${slide("9. Indicadores y dirección", "- Situación crítica, OT vencidas, cumplimiento, disponibilidad y costo al entrar.\n- Dónde para la planta: qué equipos y áreas detienen la línea y cuánto cuesta.\n- Números calculados por el sistema, con su fórmula a la vista.")}
-${slide("10. Lo que lo hace distinto", DIFERENCIADORES.slice(0, 6).map((d) => `- **${d.titulo}.** ${d.texto}`).join("\n"))}
-${slide("11. Planes e implementación", `${ORDEN_PLANES.map((c) => `- **${PLANES[c].nombre}:** ${precio(PLANES[c].precioMensual, PLANES[c].moneda)} al mes — ${PLANES[c].descripcion}`).join("\n")}\n- **${COMPLEMENTO_IA.nombre}:** ${precio(COMPLEMENTO_IA.precioMensual)} al mes, opcional.\n- ${TEXTO_PRUEBA}, sin tarjeta. ${COBRO.impuestos}\n- Puesta en marcha guiada con importación desde hojas de cálculo; acompañamiento según la ruta acordada.`)}
-${slide("12. Siguiente paso", "- Una demostración de 20 a 30 minutos con su problema principal.\n- Lista de equipos en hoja de cálculo para una prueba con sus datos.\n- Fecha de arranque y responsable del lado del cliente.")}`;
+${DIAPOSITIVAS.map((d, i) => [
+  `---`,
+  ``,
+  `## ${i + 1}. ${d.titulo}`,
+  ``,
+  `*${d.seccion}${d.rol ? ` · se muestra como: ${d.rol}` : ""}${d.minutos ? ` · ${d.minutos} min` : ""}*`,
+  ...(d.entradilla ? ["", d.entradilla] : []),
+  ...d.bloques.flatMap((b) => ["", enMarkdown(b)]),
+  ...(d.ligas?.length ? ["", `Abrir en el sistema: ${d.ligas.map((l) => `${l.etiqueta} (\`${l.href}\`)`).join(" · ")}`] : []),
+  ...(d.nota ? ["", `> **Quien presenta:** ${d.nota}`] : []),
+  ``,
+].join("\n")).join("\n")}`;
 
 for (const d of DOCUMENTOS) {
   archivos[join("legal", `${d.clave}.md`)] = `# ${d.titulo}

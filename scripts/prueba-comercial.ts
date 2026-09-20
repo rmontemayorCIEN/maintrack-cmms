@@ -48,6 +48,7 @@ async function main() {
   const { inicioDe } = await import("../lib/inicio");
   const { PERSONAS, crearEmpresaDemostrativa, resumenDemo, DEMO } = await import("../lib/demo-comercial");
   const { HISTORIAS, PASOS_RECORRIDO } = await import("../lib/demo-guia");
+  const { ligasDeHistorias } = await import("../app/(app)/demo/ligas");
   const { PLANES, COMPLEMENTO_IA, ORDEN_PLANES } = await import("../lib/planes");
   const { comparacion, precio, PRUEBA_DIAS } = await import("../lib/comercial");
   const { DOCUMENTOS } = await import("../lib/legal");
@@ -294,6 +295,42 @@ async function main() {
     revisar("la demo lleva la banda «Empresa demostrativa» y el recorrido señala 10 pantallas reales, en orden", conBanda.texto.includes("Empresa demostrativa") && PASOS_RECORRIDO.length === 10 && PASOS_RECORRIDO.map((p) => p.href).join() === "/dashboard,/assets,/work-orders,/plans,/alerts,/inventory,/compras,/indicadores,/paros,/puesta-en-marcha");
     const rutasRecorrido = await Promise.all(PASOS_RECORRIDO.map((p) => pedir("GET", p.href, c.direccion)));
     revisar("   cada paso del recorrido abre sin error para la dirección", rutasRecorrido.every((r) => r.status === 200 && !r.texto.includes("Esta pantalla no es de su rol")), rutasRecorrido.map((r) => r.status));
+
+    // ═══════════════════════════════════════════ 16b. Presentación al cliente
+    console.log("\n16b. Presentación al cliente");
+    const { armarPresentacion } = await import("../lib/demo-presentacion");
+    const cubierta = armarPresentacion();
+    const pres = await pedir("GET", "/demo/presentacion", c.direccion);
+    const presNormal = await pedir("GET", "/demo/presentacion", cB);
+    revisar("la presentación existe en la demo y en una empresa normal no se llega a ella",
+      pres.status === 200 && presNormal.texto.includes("Esta pantalla no es de su rol") && !presNormal.texto.includes(cubierta[0].titulo),
+      { demo: pres.status, normal: presNormal.status });
+    revisar(`   trae las ${cubierta.length} diapositivas, con la portada, los 5 casos, la IA, los precios y el cierre`,
+      cubierta.length >= 16
+      && cubierta[0].clave === "portada" && cubierta[cubierta.length - 1].clave === "gracias"
+      && HISTORIAS.every((h) => cubierta.some((d) => d.clave === `caso-${h.clave}`))
+      && ["ia", "precios", "implementacion"].every((k) => cubierta.some((d) => d.clave === k))
+      && pres.texto.includes(cubierta[0].titulo));
+    // Los precios y los límites salen de lib/planes.ts: si alguien los escribe a
+    // mano en una diapositiva, la presentación y el sitio dirán cosas distintas
+    // delante del cliente.
+    const { PLANES: PL } = await import("../lib/planes");
+    const diaPrecios = cubierta.find((d) => d.clave === "precios")!;
+    const bloquePlanes = diaPrecios.bloques.find((b) => b.tipo === "planes");
+    revisar("   los precios de la presentación son los de los planes, sin escribirlos a mano",
+      bloquePlanes?.tipo === "planes" && bloquePlanes.items.length === 2
+      && bloquePlanes.items[0].precio.includes(PL.PROFESSIONAL.precioMensual.toLocaleString("es-MX"))
+      && bloquePlanes.items[1].precio.includes(PL.ENTERPRISE.precioMensual.toLocaleString("es-MX")));
+    // Un botón que lleva a «Sin permiso» delante del cliente es peor que no tenerlo.
+    const conLigas = armarPresentacion(await ligasDeHistorias(demo.id, "OWNER"));
+    const ligasCasos = conLigas.filter((d) => d.clave.startsWith("caso-")).flatMap((d) => d.ligas ?? []);
+    const abiertas = await Promise.all(ligasCasos.map((l) => pedir("GET", l.href, c.direccion)));
+    revisar(`   los ${ligasCasos.length} botones de los casos abren pantallas reales de esta demo`,
+      ligasCasos.length >= 20 && abiertas.every((r) => r.status === 200 && !r.texto.includes("Esta pantalla no es de su rol")),
+      abiertas.map((r, i) => `${ligasCasos[i].href}:${r.status}`).filter((x) => !x.endsWith(":200")));
+    const paraTecnico = armarPresentacion(await ligasDeHistorias(demo.id, "TECHNICIAN"));
+    revisar("   a un rol sin acceso no se le ofrecen: el técnico no ve el botón de compras ni el de indicadores",
+      !paraTecnico.flatMap((d) => d.ligas ?? []).some((l) => l.href === "/compras" || l.href === "/indicadores"));
 
     // ═══════════════════════════════════════════ 17-21. Planes, precios, límites, prueba y cambio de plan
     console.log("\n17-21. Planes, precios y cambios");

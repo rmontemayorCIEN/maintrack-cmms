@@ -18,7 +18,7 @@ Se muestran en la **empresa demostrativa**, sobre el sistema real. Orden recomen
 
 **Resultado que se explica:** En cinco minutos, la dirección pasa de ver números a tomar dos decisiones concretas con evidencia.
 
-**Registros:** Indicadores (/indicadores), Dónde para la planta (/paros)
+**Registros:** Inicio de la dirección (/dashboard), Órdenes de trabajo (/work-orders), Indicadores (/indicadores), Dónde para la planta (/paros)
 
 ## 2. Una falla, de principio a fin (5 min)
 
@@ -36,7 +36,7 @@ Se muestran en la **empresa demostrativa**, sobre el sistema real. Orden recomen
 
 **Resultado que se explica:** El reporte se atendió en minutos, con responsable, costo y causa registrados; la recurrencia de fugas en la llenadora queda a la vista para decidir.
 
-**Registros:** Solicitud del operador (SS-000001), Llenadora LLN-101 (LLN-101), Kit de empaques (KIT-VLL)
+**Registros:** Solicitud del operador (SS-000001), Solicitudes (/requests), Órdenes de trabajo (/work-orders), Llenadora LLN-101 (LLN-101), Kit de empaques (KIT-VLL)
 
 ## 3. Inventario y compras (5 min)
 
@@ -52,7 +52,7 @@ Se muestran en la **empresa demostrativa**, sobre el sistema real. Orden recomen
 
 **Resultado que se explica:** La necesidad real (una orden detenida) se convirtió en compra autorizada y recibida; la existencia y el costo quedaron en el kardex y en la orden.
 
-**Registros:** Elemento separador (FIL-SEP), Compras (/compras), Compresor CMP-201 (CMP-201)
+**Registros:** Elemento separador (FIL-SEP), Almacén (/inventory), Requisiciones (/requisiciones), Compras (/compras), Compresor CMP-201 (CMP-201)
 
 ## 4. Por uso y por condición (5 min)
 
@@ -68,7 +68,7 @@ Se muestran en la **empresa demostrativa**, sobre el sistema real. Orden recomen
 
 **Resultado que se explica:** El trabajo se hizo antes de la falla, por la condición real del equipo y no por calendario, y la alerta quedó cerrada con evidencia.
 
-**Registros:** Compresor CMP-201 (CMP-201), Alertas (/alerts), Medidores (/meters)
+**Registros:** Alertas (/alerts), Compresor CMP-201 (CMP-201), Predictivo (/predictive), Medidores (/meters)
 
 ## 5. El preventivo que se programa solo (4 min)
 
@@ -84,7 +84,7 @@ Se muestran en la **empresa demostrativa**, sobre el sistema real. Orden recomen
 
 **Resultado que se explica:** El preventivo se generó, se ejecutó con lista de verificación y medición, y el cumplimiento se actualizó sin capturar nada aparte.
 
-**Registros:** Planes preventivos (/plans), Llenadora LLN-101 (LLN-101)
+**Registros:** Planes preventivos (/plans), Llenadora LLN-101 (LLN-101), Órdenes de trabajo (/work-orders), Indicadores (/indicadores)
 
 ## Recorrido guiado (dentro de la demo)
 

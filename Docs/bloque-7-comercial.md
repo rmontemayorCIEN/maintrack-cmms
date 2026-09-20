@@ -38,6 +38,15 @@ Punto de partida de cada historia: SS-000001 pendiente (falla), preventivo de la
 
 Bloqueos: no cambia de plan, no crea credenciales ni webhooks, no genera cargos, no se suspende; mientras se restaura responde 503.
 
+## Presentar al cliente
+
+**Guía de la demostración › Iniciar la presentación** (`/demo/presentacion`, solo en la empresa demostrativa): 18 diapositivas a pantalla completa, una a la vez, con índice por secciones (Apertura · Por qué · El sistema · Casos · Cómo se trabaja · Cierre). Se avanza con las flechas, PageUp/PageDown o espacio; Escape sale.
+
+- Las cinco historias son cinco diapositivas, cada una con sus botones para abrir la pantalla real de la demo. El número de diapositiva va en la dirección (`?d=9`) y se escribe con `replaceState`: al volver del sistema con «Atrás» se retoma en la misma, y avanzar no llena el historial.
+- Todo sale de `lib/demo-presentacion.ts`, que solo ordena lo que ya dicen `lib/comercial.ts`, `lib/planes.ts` y `lib/demo-guia.ts`. Ningún precio ni promesa escrito a mano en la diapositiva.
+- El documento `Docs/comercial/generados/presentacion.md` se genera de ahí mismo, así que nunca dice algo distinto de lo que se proyecta.
+- Cada historia gana ligas (solicitudes, órdenes, almacén, requisiciones, predictivo, indicadores, inicio), filtradas por lo que el rol puede abrir.
+
 ## Procedimiento de restauración
 
 - **Dentro de la demo:** Guía de la demostración › Restaurar la demo (Propietario o Administrador). Muestra qué se conserva (empresa, configuración, cuentas y contraseñas) y qué se restaura; se confirma escribiendo RESTAURAR.
@@ -61,3 +70,4 @@ Bloqueos: no cambia de plan, no crea credenciales ni webhooks, no genera cargos,
 - **Alta abierta:** en producción `ALLOW_PUBLIC_SIGNUP` no está activo; `/contratar` registra solicitudes. Abrirla es una decisión aparte.
 - **Demo en producción:** no existe todavía; se crea con autorización. Scripts viejos de la demo de Acero (`sembrar-contexto-demo.ts`, `sembrar-costo-demo.ts`) escriben sin `--aplicar`.
 - **Límite por dirección** de las solicitudes es en memoria: por instancia de Cloud Run.
+- **Presentación pública:** la presentación en diapositivas vive solo dentro de MainTrack (`/demo/presentacion`, empresa demostrativa). **Pendiente, decidido el 19 de septiembre de 2026: dejarla para después.** La versión pública —en el sitio, sin entrar al sistema, para mandarla antes de la reunión— implica repetir las diapositivas sin los botones que abren pantallas reales, que es justo lo que la hace distinta de un archivo de PowerPoint. Si se hace, sale del mismo `lib/demo-presentacion.ts` con las ligas vacías; el trabajo real es decidir qué se enseña sin sesión y si se pide correo para verla.

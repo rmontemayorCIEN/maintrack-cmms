@@ -5,30 +5,12 @@ import { MarcoPublico } from "@/components/publico/marco";
 import { FormularioDemo } from "@/components/publico/formulario-demo";
 import { TablaPlanes, TarjetasPlanes } from "@/components/publico/planes";
 import {
-  BENEFICIOS_POR_ROL, DESCRIPCION, DIFERENCIADORES, LEMA, MODULOS, NO_ES, PREGUNTAS, PROBLEMAS, RESPALDOS, SOPORTE, SUBLEMA, TEXTO_PRUEBA,
+  BENEFICIOS_POR_ROL, DESCRIPCION, DIFERENCIADORES, FLUJO_OPERATIVO, LEMA, MODULOS, NO_ES, PREGUNTAS, PROBLEMAS, SEGURIDAD, SOPORTE, SUBLEMA, TEXTO_PRUEBA,
 } from "@/lib/comercial";
 import { CLAVES_INSTALACION, INSTALACIONES } from "@/lib/instalaciones";
 import { RANGOS_ACTIVOS } from "@/lib/prospectos";
 
 export const metadata = { title: { absolute: "MainTrack — gestión y confiabilidad del mantenimiento" }, description: DESCRIPCION };
-
-/** Un recorrido real del sistema, en el orden en que pasa en la planta. */
-const FLUJO = [
-  { paso: "Alguien reporta", texto: "El operador escanea el QR del equipo y describe la falla, con foto, sin necesidad de cuenta." },
-  { paso: "Supervisión decide", texto: "Revisa la solicitud, la convierte en orden de trabajo y la asigna a un técnico con fecha." },
-  { paso: "El técnico ejecuta", texto: "Desde su teléfono: actividades, tiempo, refacciones del almacén, lecturas y evidencia." },
-  { paso: "Se valida y se cierra", texto: "Supervisión revisa horas, costo, causa y evidencia antes de cerrar." },
-  { paso: "Queda en el activo", texto: "El historial, el costo y la falla alimentan los indicadores y el diagnóstico." },
-];
-
-const SEGURIDAD = [
-  "Cada empresa ve solo su información: toda consulta se filtra por empresa.",
-  "Acceso por rol: cada persona ve y hace solo lo de su función.",
-  "Los archivos no son públicos; cada descarga se autoriza por unos minutos.",
-  "Bitácora de auditoría: quién hizo qué y cuándo.",
-  RESPALDOS.diario + " " + RESPALDOS.puntoEnElTiempo,
-  `Opera en ${RESPALDOS.ubicacion}`,
-];
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<{ origen?: string }> }) {
   const user = await getCurrentUser();
@@ -82,7 +64,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           <div className="mx-auto max-w-6xl px-4 py-14">
             <h2 className="text-2xl font-semibold text-slate-900">Cómo funciona: una falla, de principio a fin</h2>
             <ol className="mt-6 grid gap-4 md:grid-cols-5">
-              {FLUJO.map((f, i) => (
+              {FLUJO_OPERATIVO.map((f, i) => (
                 <li key={f.paso} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-semibold text-brand-700">Paso {i + 1}</p>
                   <p className="mt-1 font-semibold text-slate-900">{f.paso}</p>
