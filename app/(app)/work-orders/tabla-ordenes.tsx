@@ -130,6 +130,7 @@ export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true }: {
       deFabrica={conCostos ? DE_FABRICA : DE_FABRICA.filter((c) => !COLUMNAS_DE_COSTO.has(c))}
       vistaInicial={vistaInicial}
       clave="ordenes"
+      paso={{ base: "/work-orders", etiqueta: (o) => `${o.number} · ${o.title}` }}
       sustantivo="ordenes"
       ejemploFiltro='Filtrar: "bomba", "correctivo", "vencida"…'
     />

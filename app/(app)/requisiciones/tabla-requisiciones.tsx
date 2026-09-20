@@ -97,6 +97,7 @@ export function TablaRequisiciones({ requisiciones, vistaInicial }: { requisicio
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="requisiciones"
+      paso={{ base: "/requisiciones", etiqueta: (r) => r.folio }}
       sustantivo="requisiciones"
       ejemploFiltro='Filtrar: "balero", "paro", "solicitada"…'
     />

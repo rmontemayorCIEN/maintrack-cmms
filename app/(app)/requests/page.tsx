@@ -15,6 +15,7 @@ import { formatDateTime } from "@/lib/utils";
 import { RequestDialog } from "./request-dialog";
 import { ReviewActions } from "./review-actions";
 import { puedeVerRuta, veTodasLasSolicitudes } from "@/lib/pantallas";
+import { RegistrarLista } from "@/components/paso-registros";
 
 export const metadata = { title: "Solicitudes de servicio" };
 export const dynamic = "force-dynamic";
@@ -85,6 +86,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         />
       ) : (
         <>
+        {/* Para pasar de un reporte al siguiente desde el detalle, en este mismo orden. */}
+        <RegistrarLista base="/requests" items={requests.map((r) => ({ id: r.id, etiqueta: `${r.number} · ${r.title}` }))} />
         {/* Teléfono: una tarjeta por reporte, con lo que importa arriba. */}
         <ul className="grid gap-2 md:hidden">
           {requests.map((r) => {

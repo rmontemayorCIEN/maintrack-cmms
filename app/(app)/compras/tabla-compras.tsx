@@ -110,6 +110,7 @@ export function TablaCompras({ compras, vistaInicial }: { compras: FilaCompra[];
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="compras"
+      paso={{ base: "/compras", etiqueta: (c) => c.folio }}
       sustantivo="requisiciones de compra"
       ejemploFiltro='Filtrar: "balero", "paro", "autorizada"…'
     />

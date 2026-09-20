@@ -7,6 +7,7 @@ import {
   RotateCcw, Search, X,
 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { RegistrarLista } from "@/components/paso-registros";
 
 /**
  * Tabla de lista configurable por usuario.
@@ -39,7 +40,7 @@ const TARJETAS_POR_TANDA = 40;
 
 export function TablaConfigurable<T extends { id: string }>({
   filas, fijas, columnas, deFabrica, vistaInicial, clave,
-  ejemploFiltro, acciones, sustantivo = "registros", busquedaInicial = "",
+  ejemploFiltro, paso, acciones, sustantivo = "registros", busquedaInicial = "",
 }: {
   filas: T[];
   /** Columnas que siempre van al frente. Sin ellas la tabla deja de identificar de que habla. */
@@ -51,6 +52,13 @@ export function TablaConfigurable<T extends { id: string }>({
   /** Con que nombre se guarda la preferencia de esta tabla. */
   clave: string;
   ejemploFiltro?: string;
+  /**
+   * Para pasar de un registro a otro desde el detalle sin volver aquí
+   * (components/paso-registros.tsx): la ruta base del detalle y cómo se
+   * nombra cada renglón. La secuencia que se guarda es la que se ve: con su
+   * filtro, su orden y sus grupos.
+   */
+  paso?: { base: string; etiqueta: (f: T) => string };
   acciones?: (f: T) => React.ReactNode;
   sustantivo?: string;
   /** Texto con que arranca el filtro: el que trae una liga (un aviso, un pendiente). */
@@ -132,6 +140,16 @@ export function TablaConfigurable<T extends { id: string }>({
     }
     return grupos.length ? armar(filtrados, grupos, 0, "") : [];
   }, [filtrados, grupos, porId]);
+
+  // La secuencia tal como se ve: agrupada si hay grupos, filtrada siempre.
+  const secuencia = useMemo(() => {
+    if (!paso) return [];
+    const salida: T[] = [];
+    if (grupos.length) (function recorrer(nodos: Nodo[]) { for (const n of nodos) { if (n.hijos.length) recorrer(n.hijos); else salida.push(...n.filas); } })(arbol);
+    else salida.push(...filtrados);
+    return salida.map((f) => ({ id: f.id, etiqueta: paso.etiqueta(f) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, arbol, filtrados, grupos]);
 
   const todasLasClaves = useMemo(() => {
     const salida: string[] = [];
@@ -285,6 +303,8 @@ export function TablaConfigurable<T extends { id: string }>({
   }
 
   return (
+    <>
+    {paso ? <RegistrarLista base={paso.base} items={secuencia} /> : null}
     /*
       `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
       telefono.
@@ -474,5 +494,6 @@ export function TablaConfigurable<T extends { id: string }>({
         {grupos.length ? ` · agrupados por ${grupos.map((g) => porId.get(g)?.etiqueta).join(" › ")}` : ""}
       </p>
     </div>
+    </>
   );
 }

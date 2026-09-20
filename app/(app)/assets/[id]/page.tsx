@@ -37,6 +37,7 @@ import { can } from "@/lib/rbac";
 import { AssetDialog } from "../asset-dialog";
 import { Adjuntos } from "@/components/adjuntos";
 import { Enlaces } from "@/components/enlaces";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -194,9 +195,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         title={`${asset.code} — ${asset.name}`}
         breadcrumb={
-          <Link href="/assets" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/assets" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Activos
           </Link>
+            <PasarRegistros base="/assets" id={id} />
+          </span>
         }
         description={asset.description ?? undefined}
         actions={

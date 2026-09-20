@@ -121,6 +121,7 @@ export function TablaActivos({
         deFabrica={DE_FABRICA}
         vistaInicial={vistaInicial}
         clave="activos"
+        paso={{ base: "/assets", etiqueta: (a) => `${a.code} · ${a.name}` }}
         sustantivo="activos"
         ejemploFiltro='Filtrar: "bomba", "alberca", "critico"…'
         acciones={puedeEditar ? (a) => (

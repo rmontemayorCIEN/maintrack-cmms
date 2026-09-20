@@ -27,6 +27,7 @@ import { ReviewActions } from "../review-actions";
 import { TriageSolicitud } from "./triage";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { iaDeLaOrganizacion } from "@/lib/planes";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -110,9 +111,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
       <PageHeader
         title={`${solicitud.number} — ${solicitud.title}`}
         breadcrumb={
-          <Link href="/requests" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/requests" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Solicitudes
           </Link>
+            <PasarRegistros base="/requests" id={id} />
+          </span>
         }
         actions={
           solicitud.status === "PENDING" && can(user.role, "request:review") ? (

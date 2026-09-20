@@ -10,6 +10,7 @@ import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesCompra, type RenglonCompra } from "./acciones";
 import { Comparativo, type Cotizacion } from "./comparativo";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +95,12 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         title={`Compra ${compra.folio}`}
         description={`Entra al almacén ${compra.warehouse.name} · estimado ${formatCurrency(compra.montoEstimado, moneda)}`}
         breadcrumb={
-          <Link href="/compras" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/compras" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Compras
           </Link>
+            <PasarRegistros base="/compras" id={id} />
+          </span>
         }
         actions={
           <div className="flex items-center gap-1.5">

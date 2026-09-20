@@ -12,6 +12,7 @@ import { tipoDeActividad } from "@/lib/fallas";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesRequisicion, type RenglonVale } from "./acciones";
 import { CompraDialog } from "../../compras/compra-dialog";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -127,9 +128,12 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
         title={`Requisición ${req.folio}`}
         description={`${MOTIVOS[req.motivo as keyof typeof MOTIVOS] ?? req.motivo} · almacén ${req.warehouse.name}`}
         breadcrumb={
-          <Link href="/requisiciones" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/requisiciones" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Requisiciones
           </Link>
+            <PasarRegistros base="/requisiciones" id={id} />
+          </span>
         }
         actions={
           <div className="flex items-center gap-1.5">

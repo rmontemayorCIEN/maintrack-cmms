@@ -479,6 +479,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Acomodar columnas, agrupar hasta en tres niveles y guardar su vista",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Las preventivas las genera el programador desde los planes; no se capturan una por una.",
       "Las correctivas nacen de una solicitud, de una alerta predictiva o a mano.",
       "Una misma orden puede juntar trabajo de varios orígenes: el preventivo del mes de esa bomba, más la fuga que alguien reportó. Cada actividad conserva de dónde vino.",
@@ -693,6 +694,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Eliminar un activo capturado por error",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Todo cuelga de aquí: los planes, las órdenes, las refacciones y los costos se acumulan por activo.",
       "La criticidad decide el orden de atención cuando hay varias cosas detenidas a la vez.",
     ],
@@ -901,6 +903,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Recibir de vuelta lo que no se usó",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Pedir no descuenta existencia. El almacén baja hasta que se surte.",
       "Cada renglón se liga a la ACTIVIDAD de la orden que necesita ese material, y de ahí sale su tipo: una misma requisición puede llevar el engrase del preventivo y el sello de una falla, cada uno con su clasificación.",
       "Si el material es de la orden completa se elige «Consumo general de la OT» y no se le inventa tipo. Los vales anteriores a este cambio se muestran como «Actividad no especificada»: no se les asigna una actividad sin evidencia.",
@@ -947,6 +950,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Anotar la orden de compra y recibir la mercancía",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción.",
       "Si está encendido, entre autorizar y recibir van las cotizaciones, el comparativo y la orden de compra.",
       "Al recibir, la existencia sube solo por lo que de verdad llegó y el costo promedio de la refacción se recalcula.",
@@ -1013,6 +1017,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Analizar con IA lo que llegó por el portal público",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Es la puerta de entrada del trabajo correctivo desde el resto de la empresa.",
       "Lo que llega por código QR trae el contexto que ese punto tenga: un QR pegado a un equipo trae el equipo; uno a la entrada de un área trae solo el área. Quien reporta nunca escoge equipo, y es a propósito — quien no trae el código tampoco se sabe la clave, y un equipo mal escogido ensucia el historial de uno que no falló y deja sin registro al que sí.",
       "Por eso el equipo lo pone QUIEN REVISA. Al aprobar aparece el buscador de equipos; si la solicitud llegó sin uno, la pantalla lo advierte: una orden sin activo no entra al expediente de ningún equipo ni cuenta en su historial de fallas.",

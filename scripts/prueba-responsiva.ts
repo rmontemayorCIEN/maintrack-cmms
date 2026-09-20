@@ -1047,6 +1047,58 @@ async function main() {
     await t.ir(`${base}/paros`, 1500); await captura("b7-1440-demo-donde-para");
     await t.ir(`${base}/demo`, 1000); await captura("b7-1440-demo-guia");
 
+    // ═══════════════════════════════════════════ Pasar de un registro a otro
+    console.log("\nPasar de un registro al siguiente desde el detalle");
+    await pantalla(1440, 900);
+    await sesion("SUPERVISOR");
+    donde = "paso entre registros";
+    await t.ir(`${base}/work-orders`, 1200);
+    const primera = await t.evaluar<{ href: string; total: number }>(`(() => {
+      const a = [...document.querySelectorAll("table a[href^='/work-orders/']")].filter((x) => x.getBoundingClientRect().width > 0);
+      return { href: a[0]?.getAttribute("href") ?? "", total: a.length };
+    })()`);
+    await t.ir(`${base}${primera.href}`, 1200);
+    const conFlechas = await t.evaluar<{ grupo: boolean; texto: string; anterior: boolean; siguiente: string }>(`(() => {
+      const g = document.querySelector('[role="group"][aria-label="Pasar de registro"]');
+      return { grupo: !!g, texto: g?.innerText.trim() ?? "", anterior: !!g?.querySelector('a[rel="prev"]'), siguiente: g?.querySelector('a[rel="next"]')?.getAttribute("href") ?? "" };
+    })()`);
+    await captura("paso-1440-orden-1");
+    await t.evaluar(`document.querySelector('a[rel="next"]').click(); true`);
+    await hasta(t, `location.pathname === "${""}" || true`, 200);
+    await esperar(1500);
+    const segunda = await t.evaluar<{ ruta: string; texto: string }>(`({ ruta: location.pathname, texto: document.querySelector('[role="group"][aria-label="Pasar de registro"]')?.innerText.trim() ?? "" })`);
+    // Con el teclado: la flecha izquierda regresa a la anterior.
+    await t.evaluar(`document.body.focus(); true`);
+    await t.enviar("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+    await t.enviar("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 });
+    await esperar(1800);
+    const deVuelta = await t.evaluar<string>("location.pathname");
+    // Al llegar por una liga directa (sin pasar por la lista) no hay flechas: «siguiente» no significaría nada.
+    await t.evaluar("sessionStorage.clear(); true");
+    await t.ir(`${base}${primera.href}`, 1200);
+    const directo = await t.evaluar<boolean>(`!document.querySelector('[role="group"][aria-label="Pasar de registro"]')`);
+    revisar("Desde la lista, el detalle ofrece «anterior» y «siguiente» con su posición, y avanzan de registro (también con las flechas del teclado)",
+      conFlechas.grupo && /1 de \d+/.test(conFlechas.texto) && !conFlechas.anterior && !!conFlechas.siguiente && segunda.ruta === conFlechas.siguiente && /2 de \d+/.test(segunda.texto) && deVuelta === primera.href,
+      { conFlechas, segunda, deVuelta, primera });
+    revisar("    y no aparecen cuando se llegó por una liga directa", directo);
+    // El filtro manda: la secuencia es la que la persona tiene enfrente.
+    await t.ir(`${base}/work-orders`, 1200);
+    await t.evaluar(`(() => { const f = document.querySelector('input[aria-label="Filtrar la lista"]'); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; s.call(f, "acoplamiento 1"); f.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    await esperar(900);
+    const filtrada = await t.evaluar<string>(`[...document.querySelectorAll("table a[href^='/work-orders/']")][0]?.getAttribute("href") ?? ""`);
+    await t.ir(`${base}${filtrada}`, 1200);
+    const conFiltro = await t.evaluar<string>(`document.querySelector('[role="group"][aria-label="Pasar de registro"]')?.innerText.trim() ?? ""`);
+    await captura("paso-1440-orden-filtrada");
+    revisar("    la secuencia respeta el filtro de la lista, no el catálogo completo", /de \d+/.test(conFiltro) && Number(conFiltro.match(/de (\d+)/)![1]) < primera.total, { conFiltro, sinFiltro: primera.total });
+    await pantalla(390, 844);
+    await t.ir(`${base}/work-orders`, 1000);
+    await t.evaluar(`(() => { const a = [...document.querySelectorAll("ul a[href^='/work-orders/']")].find((x) => x.getBoundingClientRect().width > 0); a.click(); return true; })()`);
+    await esperar(1500);
+    const enTelefono = await medir();
+    await captura("paso-390-orden");
+    revisar("    en el teléfono caben junto a la liga de regreso, sin desplazamiento lateral", !enTelefono.desborde && !enTelefono.fuera.length
+      && await t.evaluar<boolean>(`!!document.querySelector('[role="group"][aria-label="Pasar de registro"]')`), { desborde: enTelefono.desborde, fuera: enTelefono.fuera });
+
     // ═══════════════════════════════════════════ 35-36 (en pantalla) y rendimiento
     console.log("\nRendimiento en red móvil (4G simulada)");
     await t.enviar("Network.emulateNetworkConditions", { offline: false, latency: 150, downloadThroughput: (9 * 1024 * 1024) / 8, uploadThroughput: (1.5 * 1024 * 1024) / 8 });

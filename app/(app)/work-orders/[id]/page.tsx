@@ -39,6 +39,7 @@ import { AceptarOrden } from "./aceptar";
 import { Plegable } from "@/components/plegable";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -351,9 +352,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       <PageHeader
         title={`${wo.number} — ${wo.title}`}
         breadcrumb={
-          <Link href="/work-orders" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/work-orders" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Órdenes de trabajo
           </Link>
+            <PasarRegistros base="/work-orders" id={id} />
+          </span>
         }
         description={wo.description ?? undefined}
         actions={
