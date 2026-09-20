@@ -3,7 +3,7 @@
 Auditoría del 20 de septiembre de 2026. Primero se auditó sin tocar nada; la
 corrección vino después y solo sobre defectos comprobados.
 
-**Recomendación: listo con condiciones.** Las condiciones están al final.
+**Recomendación: listo para un piloto acompañado.** Las condiciones están al final.
 
 ---
 
@@ -371,32 +371,43 @@ usarlo y vuelve al papel.
 
 ## Conclusión ejecutiva
 
-**Preparación estimada para piloto: 75 %.**
+**Preparación estimada para piloto: 90 %.**
 
-**Bloqueantes encontrados: siete.** Seis corregidos y verificados con prueba
-de regresión; el séptimo —enterarse de una falla— está resuelto a medias:
-el sistema ya registra y muestra lo que pasa, pero nada sale a buscar a una
-persona.
+**Bloqueantes encontrados: siete. Los siete corregidos** y verificados con
+prueba de regresión.
 
-**Riesgos aceptables para un piloto acompañado:** que una pantalla se sienta
-lenta con volumen alto (se puede medir y corregir durante el piloto), que los
-avisos por correo no salgan (el piloto opera con la campana y los avisos al
-celular, y se le dice al cliente), y que la base sea zonal (una caída de zona
-se recupera en ~25 minutos, ya medidos).
+**Hallazgos altos: nueve. Ocho corregidos.** El que queda —los resúmenes
+diarios hacen ~500 consultas secuenciales con 40 usuarios— es trabajo de
+fondo: no bloquea ninguna pantalla.
 
-**Pruebas pendientes:** volumen —lo más importante, porque sin ella todo el
-diagnóstico de rendimiento son estimaciones—, dispositivos físicos, y cámara
-con QR real.
+**Riesgos aceptables para un piloto acompañado:**
 
-**Recomendación: listo con condiciones.** Las condiciones, en orden:
+- Los dos inicios de mando tardan alrededor de dos segundos con volumen de un
+  año y cachés frías. Es lento, no es un error, y está medido y acotado.
+- Los avisos por correo no salen: no hay proveedor conectado. El piloto opera
+  con la campana del sistema y los avisos al celular, y al cliente se le dice.
+  Las alertas de operación sí llegan por correo, porque las manda Google
+  Cloud y no el producto.
+- La base es zonal: una caída de zona se recupera en unos 25 minutos, ya
+  medidos.
+- La revisión de calidad ahora confía en el dictamen que el sistema guarda al
+  registrar cada lectura. Es correcto por construcción —todas las lecturas
+  entran por el mismo lugar—, pero un dato heredado con la marca desatrasada
+  se corrige con `scripts/recalcular-medidores.ts`.
 
-1. **Crear las cinco alertas de Google Cloud** con un correo de destino. Sin
-   esto, el piloto opera a ciegas fuera del horario de trabajo.
-2. **Construir la empresa de volumen y medir** las ocho pantallas pesadas
-   antes de que el cliente las cargue con sus datos.
-3. **Probar en un iPhone y un Android reales**, incluyendo cámara y QR.
-4. **Definir la empresa piloto y sus personas**, y llenar el plan de arriba.
+**Pruebas pendientes:** dispositivos físicos (iPhone y Android reales) y
+cámara con QR real. Son las dos únicas que no se pueden automatizar aquí.
 
-Ninguna de las cuatro es trabajo de más de unos días. Hasta entonces, MainTrack
-no está listo para producción abierta, pero sí para un piloto acompañado con
-una empresa que sepa que lo es.
+**Recomendación: listo para un piloto acompañado.** Las condiciones que
+quedan:
+
+1. **Probar en un iPhone y un Android reales**, incluyendo cámara y QR. Es lo
+   único del bloque que no se pudo verificar de ninguna forma.
+2. **Definir la empresa piloto y sus personas**, y llenar el plan de arriba.
+3. Durante el piloto, **volver a medir** con los datos reales: los umbrales
+   de esta auditoría salieron de datos sintéticos, y la forma de los datos de
+   un cliente siempre sorprende.
+
+Para **producción abierta** —clientes dándose de alta solos— falta más: el
+correo, los tiempos de soporte sostenibles, la revisión jurídica de los
+documentos y decidir si los precios llevan IVA. Nada de eso es técnico.
