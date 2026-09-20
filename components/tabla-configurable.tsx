@@ -310,25 +310,25 @@ export function TablaConfigurable<T extends { id: string }>({
     );
   }
 
+  /**
+   * `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
+   * telefono.
+   *
+   * Una rejilla sin columnas declaradas arma una columna implicita de tamano
+   * `auto`, y una pista `auto` se mide por el CONTENIDO, no por la pantalla.
+   * La tabla de aqui abajo mide mil trescientos pixeles, asi que la pista
+   * crecia a mil trescientos y arrastraba consigo a la barra de filtros, a la
+   * tarjeta y al documento entero —el `overflow-x: auto` de .table-wrap nunca
+   * alcanzaba a desplazarse porque su contenedor tambien habia crecido—.
+   * Peor: con el documento desbordado, los dialogos `position: fixed` se
+   * miden contra ese ancho inflado y sus campos terminan fuera de la pantalla.
+   *
+   * Con `minmax(0,1fr)` la pista se queda del ancho disponible y el
+   * desplazamiento lateral vuelve a ocurrir donde debe: dentro de la tabla.
+   */
   return (
     <>
     {paso ? <RegistrarLista base={paso.base} items={secuencia} /> : null}
-    /*
-      `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
-      telefono.
-
-      Una rejilla sin columnas declaradas arma una columna implicita de tamano
-      `auto`, y una pista `auto` se mide por el CONTENIDO, no por la pantalla.
-      La tabla de aqui abajo mide mil trescientos pixeles, asi que la pista
-      crecia a mil trescientos y arrastraba consigo a la barra de filtros, a la
-      tarjeta y al documento entero —el `overflow-x: auto` de .table-wrap nunca
-      alcanzaba a desplazarse porque su contenedor tambien habia crecido—.
-      Peor: con el documento desbordado, los dialogos `position: fixed` se
-      miden contra ese ancho inflado y sus campos terminan fuera de la pantalla.
-
-      Con `minmax(0,1fr)` la pista se queda del ancho disponible y el
-      desplazamiento lateral vuelve a ocurrir donde debe: dentro de la tabla.
-    */
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       {/* ── Barra de control ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">

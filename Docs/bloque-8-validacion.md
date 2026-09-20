@@ -237,20 +237,31 @@ Se midió dos veces, y la diferencia importa:
 
 ### Lo que se midió en PostgreSQL
 
-Instancia nueva del tamaño de producción (`db-f1-micro`), cachés frías, 20 000
-órdenes · 60 000 movimientos · 100 000 lecturas. Antes y después de corregir:
+Instancia nueva del tamaño de producción (`db-f1-micro`), 20 000 órdenes ·
+60 000 movimientos · 100 000 lecturas.
 
-| Pantalla | Antes | Después |
-|---|---|---|
-| Inicio del administrador | 6 624 ms | **2 432 ms** |
-| Calidad de datos | 6 402 ms | **960 ms** |
-| Inicio de la dirección | 5 167 ms | **1 996 ms** |
-| Indicadores (90 días) | 4 752 ms | **1 085 ms** |
-| Buscar «bomba» | 1 301 ms | 296 ms |
-| Órdenes de trabajo (200) | 695 ms | 250 ms |
-| Kardex (1 000) | 499 ms | 162 ms |
-| Expediente del activo | 495 ms | 62 ms |
-| Indicadores de almacén, dónde para la planta, almacén, bitácora, vencidas | < 250 ms | < 250 ms |
+**Una advertencia sobre estos números, porque ya me hizo equivocarme una
+vez.** Una instancia recién creada tiene la caché fría, y la diferencia con
+la misma instancia ya caliente es de dos a cuatro veces. La primera tabla que
+escribí comparaba un «antes» frío contra un «después» caliente y exageraba la
+mejora. Esta compara **frío contra frío** —primera corrida después de sembrar,
+en las dos— y añade el caliente aparte.
+
+| Pantalla | Antes (frío) | Después (frío) | Después (caliente) |
+|---|---|---|---|
+| Inicio del administrador | 6 624 ms | **3 148 ms** | 2 400 – 3 400 ms |
+| Inicio de la dirección | 5 167 ms | **2 695 ms** | 2 000 – 2 200 ms |
+| Calidad de datos | 6 402 ms | **4 730 ms** | 960 – 1 071 ms |
+| Indicadores (90 días) | 4 752 ms | **1 373 ms** | 1 085 – 1 417 ms |
+| Buscar «bomba» | 1 301 ms | 1 499 ms | 194 – 296 ms |
+| Órdenes de trabajo (200) | 695 ms | 748 ms | 250 ms |
+| Kardex (1 000) | 499 ms | 760 ms | 160 ms |
+| Expediente del activo | 495 ms | 299 ms | 125 ms |
+| Almacén, bitácora, vencidas, dónde para la planta | < 500 ms | < 500 ms | < 250 ms |
+
+Las cifras de una misma pantalla varían hasta el triple entre corridas: sirven
+para el orden de magnitud y para comparar antes/después, **no** como promesa
+de tiempos.
 
 ### Qué estaba mal, y era distinto de lo que se suponía
 
@@ -269,21 +280,35 @@ resultó ser de las rápidas. **Lo caro era otra cosa:**
 3. **`refaccionesBajoMinimo` traía 5 000 refacciones** en cada carga del
    inicio de dirección, administración y compras.
 
+### `calcularIndicadores`
+
+Bajó de 4 752 a 1 373 ms en frío y queda debajo del límite. Lo que se le
+corrigió:
+
+- **El backlog era la única consulta sin periodo**: traía todas las órdenes
+  abiertas de la empresa, con sus actividades, en cada carga. Ahora el
+  conteo y las sumas las hace la base, las vencidas salen del filtro que ya
+  existe, y solo se dibujan las primeras 500 como muestra. Los números siguen
+  siendo exactos; lo acotado es la lista.
+- **Las actividades viajaban en las cinco consultas.** Solo tres clasifican
+  fallas y las necesitan; el cumplimiento y el backlog no. Quitarlas de esas
+  dos elimina una consulta anidada y miles de renglones que nadie leía.
+
 ### Lo que sigue pendiente
 
-Los dos inicios de mando siguen sobre el límite de 1.5 s: **2.4 s** el del
-administrador y **2.0 s** el de la dirección, con cachés frías y en la
-instancia más chica que vende Google. La pieza que queda es
-`calcularIndicadores` (1 085 ms), que trae cinco consultas sin tope con sus
-actividades anidadas y suma en JavaScript lo que la base puede agregar. Pasar
-esos `reduce` a `aggregate`/`groupBy` es el siguiente paso; no se hizo aquí
-porque toca la función de la que dependen cinco pantallas y media docena de
-pruebas, y no se corrige eso al final de una jornada.
+**Los dos inicios de mando siguen sobre el límite**: 3.1 s el del
+administrador y 2.7 s el de la dirección, en frío. No es una consulta lenta:
+es que esas pantallas piden *todo* a la vez —indicadores, calidad de datos,
+críticas, vencidas, compras por autorizar, refacciones bajo mínimo, avisos y
+puesta en marcha—, y con un grupo de cinco conexiones contra la instancia más
+chica que vende Google, las consultas se forman.
 
-**Los números tienen ruido.** Dos corridas de la misma prueba en la misma
-instancia dieron 1 229 ms y 4 752 ms para los indicadores. Una `db-f1-micro`
-recién creada no tiene la caché caliente y comparte CPU: sirven para ver el
-orden de magnitud y para comparar antes/después, no como promesa de tiempos.
+El siguiente paso no es optimizar otra consulta, es **dejar de calcular en la
+carga**: que el proceso que ya corre cada hora deje escrito el resumen de
+indicadores y de calidad por empresa, y que el inicio lea ese renglón. La
+pantalla de Indicadores seguiría calculando en vivo. Es una decisión de
+producto —el inicio mostraría cifras de hasta una hora antes— y por eso se
+deja anotada en vez de tomarla de lado.
 
 ## Plan del piloto
 

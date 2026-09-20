@@ -132,6 +132,19 @@ const MEDIDA = `(() => {
     barra: !!barra && getComputedStyle(barra).display !== "none",
     titulo: (document.querySelector("h1")?.textContent || "").trim().slice(0, 60),
     errorPagina: document.body.innerText.includes("Application error") || document.body.innerText.includes("This page could not be found"),
+    // Comentarios de codigo dibujados como texto.
+    //
+    // Paso de verdad: un comentario de bloque dentro del JSX —donde no es
+    // comentario sino texto literal— se estuvo mostrando en la pantalla de
+    // ordenes de trabajo, en produccion, durante dias. Compilaba, ninguna
+    // prueba lo veia, y las capturas nadie las miro con esa pregunta en la
+    // cabeza. Se revisa en TODAS las pantallas y roles, porque el error puede
+    // nacer en cualquier componente compartido.
+    comentario: (() => {
+      const texto = document.body.innerText;
+      const i = texto.indexOf("/*") >= 0 ? texto.indexOf("/*") : texto.indexOf("*/");
+      return i >= 0 ? texto.slice(Math.max(0, i - 10), i + 70).replace(/\s+/g, " ") : "";
+    })(),
   };
 })()`;
 
@@ -312,7 +325,7 @@ async function main() {
       const { data } = await p.enviar<{ data: string }>("Page.captureScreenshot", { format: "png" });
       writeFileSync(join(CAPTURAS, `${nombre}.png`), Buffer.from(data, "base64"));
     };
-    type Medida = { desborde: boolean; anchoDoc: number; ancho: number; fuera: string[]; chicos: string[]; nChicos: number; sinPermiso: boolean; barra: boolean; titulo: string; errorPagina: boolean };
+    type Medida = { desborde: boolean; anchoDoc: number; ancho: number; fuera: string[]; chicos: string[]; nChicos: number; sinPermiso: boolean; barra: boolean; titulo: string; errorPagina: boolean; comentario: string };
     const medir = (p: Pestana = t) => p.evaluar<Medida>(MEDIDA);
     // Manejo de la página como lo haría una persona: tocar por el texto visible, teclear de verdad.
     const tocar = (p: Pestana, texto: string, dentro = "main, body") => p.evaluar<boolean>(`(() => {
@@ -371,8 +384,8 @@ async function main() {
         porAncho[etiqueta]++;
         // El portal del QR es público (fuera de la aplicación): no lleva la barra de navegación.
         const conBarra = !ruta.startsWith("/reportar/");
-        if (m.desborde || m.fuera.length || m.sinPermiso || m.errorPagina || (ancho < 1024 && conBarra && !m.barra)) {
-          problemas[etiqueta].push({ rol, ruta, desborde: m.desborde ? `${m.anchoDoc}>${m.ancho}` : undefined, fuera: m.fuera.length ? m.fuera : undefined, sinPermiso: m.sinPermiso || undefined, error: m.errorPagina || undefined, barra: ancho < 1024 ? m.barra : undefined });
+        if (m.desborde || m.fuera.length || m.sinPermiso || m.errorPagina || m.comentario || (ancho < 1024 && conBarra && !m.barra)) {
+          problemas[etiqueta].push({ rol, ruta, desborde: m.desborde ? `${m.anchoDoc}>${m.ancho}` : undefined, fuera: m.fuera.length ? m.fuera : undefined, sinPermiso: m.sinPermiso || undefined, error: m.errorPagina || undefined, comentario: m.comentario || undefined, barra: ancho < 1024 ? m.barra : undefined });
         }
         if (etiqueta === "390x844" && m.nChicos) problemas["390-tactiles"] = [...(problemas["390-tactiles"] ?? []), { rol, ruta, chicos: m.chicos }];
       };

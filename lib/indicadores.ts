@@ -28,7 +28,7 @@ import {
   ZONA_POR_OMISION, type Periodo,
 } from "./periodos";
 import {
-  ESTADOS_ABIERTOS, ESTADOS_TERMINADOS, estadoDeVencimiento, diaDelCompromiso,
+  ESTADOS_ABIERTOS, ESTADOS_TERMINADOS, estadoDeVencimiento, diaDelCompromiso, filtroDeVencidas,
 } from "./vencimiento";
 
 const HORA = 3_600_000;
@@ -173,7 +173,32 @@ export async function calcularIndicadores(
     tasks: { select: { title: true, maintenanceType: true, failureCodeId: true, origenRequestId: true } },
   } as const;
 
-  const [creadas, terminadas, iniciadas, programadas, abiertas, eventos, activos, deFalla] = await Promise.all([
+  /**
+   * Sin `tasks`, para las consultas que no clasifican fallas.
+   *
+   * `clasificarFalla` mira las actividades de la orden, y por eso el select
+   * completo las trae. Pero el cumplimiento y el backlog no clasifican nada:
+   * arrastrar las actividades ahi era una segunda consulta y miles de
+   * renglones que nadie leia.
+   */
+  const seleccionLigera = {
+    id: true, number: true, title: true, status: true, maintenanceType: true, priority: true,
+    createdAt: true, dueDate: true, startedAt: true, completedAt: true,
+    actualHours: true, estimatedHours: true, totalCost: true,
+    asset: { select: { code: true } },
+  } as const;
+
+  /**
+   * Cuantos renglones de detalle se dibujan como maximo.
+   *
+   * El backlog no tiene periodo: son TODAS las ordenes abiertas de la empresa.
+   * Traerlas todas para armar una lista que nadie recorre entera costaba mas
+   * que todo lo demas junto. Los numeros del indicador siguen siendo exactos
+   * —salen de contar y sumar en la base—; lo acotado es la muestra.
+   */
+  const MAX_DETALLE = 500;
+
+  const [creadas, terminadas, iniciadas, programadas, abiertasMuestra, nAbiertas, sumasAbiertas, vencidasCandidatas, eventos, activos, deFalla] = await Promise.all([
     prisma.workOrder.findMany({ where: { organizationId, createdAt: dentroDe(periodo) }, select: seleccion }),
     prisma.workOrder.findMany({
       where: { organizationId, status: { in: [...ESTADOS_TERMINADOS] }, completedAt: dentroDe(periodo) },
@@ -188,9 +213,25 @@ export async function calcularIndicadores(
         organizationId, status: { not: "CANCELLED" },
         maintenanceType: { in: [...TIPOS_PROGRAMADOS] }, dueDate: holgura,
       },
-      select: seleccion,
+      select: seleccionLigera,
     }),
-    prisma.workOrder.findMany({ where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } }, select: seleccion }),
+    // El backlog, en cuatro consultas en vez de una sin tope: la muestra que
+    // se dibuja, el conteo, las sumas y las candidatas a vencidas.
+    prisma.workOrder.findMany({
+      where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } },
+      select: seleccionLigera, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: MAX_DETALLE,
+    }),
+    prisma.workOrder.count({ where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } } }),
+    prisma.workOrder.aggregate({
+      where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } },
+      _sum: { estimatedHours: true, totalCost: true },
+    }),
+    // Vencidas: el filtro de la base acota a las candidatas —unas pocas— y la
+    // etiqueta, que es la autoridad, descarta las que no lo son de verdad.
+    prisma.workOrder.findMany({
+      where: { organizationId, ...filtroDeVencidas(zona, ahora) },
+      select: seleccionLigera,
+    }),
     eventosDeParoDelPeriodo(organizationId, periodo),
     prisma.asset.findMany({
       where: { organizationId, active: true, status: { not: "RETIRED" } },
@@ -203,10 +244,12 @@ export async function calcularIndicadores(
   const ordenEsFalla = (o: Parameters<typeof falla>[0]) => falla(o).esFalla;
 
   type Orden = (typeof creadas)[number];
-  const renglonOrden = (o: Orden, aporte: number, fecha: Date | null, aFavor?: boolean, conRazon = false): Renglon => ({
+  /** Lo minimo que necesita un renglon de detalle: lo cumplen los dos selects. */
+  type OrdenDibujable = Omit<Orden, "tasks" | "failureCodeId" | "laborCost" | "partsCost" | "serviceCost" | "otherCost">;
+  const renglonOrden = (o: OrdenDibujable, aporte: number, fecha: Date | null, aFavor?: boolean, conRazon = false): Renglon => ({
     id: o.id, tipo: "ORDEN", folio: o.number, workOrderId: o.id, titulo: o.title,
     activo: o.asset?.code ?? null, fecha, aporte, aFavor,
-    ...(conRazon ? { razon: falla(o).razon } : {}),
+    ...(conRazon ? { razon: falla(o as Orden).razon } : {}),
   });
 
   const horasPeriodo = (periodo.hasta.getTime() - periodo.desde.getTime()) / HORA;
@@ -320,7 +363,7 @@ export async function calcularIndicadores(
     return dia >= primerDia && dia <= ultimoDia;
   });
   let sinFechaFin = 0;
-  const juzgables: Array<{ o: Orden; aFavor: boolean }> = [];
+  const juzgables: Array<{ o: OrdenDibujable; aFavor: boolean }> = [];
   for (const o of conCompromisoEnPeriodo) {
     const e = estadoDeVencimiento(o, { zona, ahora });
     if (e.clave === "CUMPLIDA_EN_FECHA") juzgables.push({ o, aFavor: true });
@@ -394,13 +437,13 @@ export async function calcularIndicadores(
   };
 
   // ── Backlog (foto de hoy) ───────────────────────────────────────────────
-  const vencidas = abiertas.filter((o) => estadoDeVencimiento(o, { zona, ahora }).clave === "VENCIDA");
+  const vencidas = vencidasCandidatas.filter((o) => estadoDeVencimiento(o, { zona, ahora }).clave === "VENCIDA");
   const backlog: Indicador = {
-    clave: "backlog", calculo: `${abiertas.length} orden(es) abiertas, ${vencidas.length} vencida(s)`,
+    clave: "backlog", calculo: `${nAbiertas} orden(es) abiertas, ${vencidas.length} vencida(s)`,
     nombre: "Backlog",
     definicion: "Órdenes abiertas hoy. No depende del periodo: es la carga pendiente en este momento.",
     formula: "número de órdenes en estado abierto",
-    unidad: "ordenes", valor: abiertas.length, sinValor: null,
+    unidad: "ordenes", valor: nAbiertas, sinValor: null,
     alcance: {
       estadosOT: ESTADOS_ABIERTOS.join(", "),
       tiposTrabajo: "Todos",
@@ -408,7 +451,7 @@ export async function calcularIndicadores(
       fechaQueCuenta: "Estado actual, sin periodo",
     },
     notas: vencidas.length ? [`${vencidas.length} vencida(s).`] : [],
-    detalle: abiertas.map((o) => renglonOrden(o, 1, o.dueDate)), denominador: null,
+    detalle: abiertasMuestra.map((o) => renglonOrden(o, 1, o.dueDate)), denominador: null,
   };
 
   // ── Costo ───────────────────────────────────────────────────────────────
@@ -429,7 +472,7 @@ export async function calcularIndicadores(
     notas: [],
     detalle: terminadas.map((o) => renglonOrden(o, o.totalCost, o.completedAt)), denominador: null,
   };
-  const enCurso = Math.round(abiertas.reduce((s, o) => s + o.totalCost, 0));
+  const enCurso = Math.round(sumasAbiertas._sum.totalCost ?? 0);
   if (enCurso > 0) costoMantenimiento.notas.push(`Además hay $${enCurso.toLocaleString("es-MX")} cargados a órdenes todavía abiertas, que no entran hasta terminarse.`);
 
   // ── Apoyos para pantallas e IA ──────────────────────────────────────────
@@ -454,9 +497,9 @@ export async function calcularIndicadores(
       ordenesCreadas: vivas.length,
       ordenesCanceladas: creadas.length - vivas.length,
       ordenesTerminadas: terminadas.length,
-      backlog: abiertas.length,
+      backlog: nAbiertas,
       backlogVencido: vencidas.length,
-      backlogHoras: r1(abiertas.reduce((s, o) => s + (o.estimatedHours || 0), 0)),
+      backlogHoras: r1(sumasAbiertas._sum.estimatedHours ?? 0),
       activosEnServicio: nActivos,
       activosParados: activos.filter((a) => a.status === "DOWN").length,
       activosCriticos: activos.filter((a) => a.criticality === "A").length,

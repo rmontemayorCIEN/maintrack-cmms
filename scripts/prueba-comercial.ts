@@ -349,6 +349,11 @@ async function main() {
 
     // ═══════════════════════════════════════════ 22. Solicitud de demostración
     console.log("\n22. Solicitud de demostración");
+    // El freno por dirección ahora se cuenta EN LA BASE, no en memoria del
+    // proceso (era de cinco por instancia de Cloud Run, o sea cincuenta por
+    // hora). Eso hace que el conteo sobreviva entre corridas de esta prueba:
+    // sin limpiarlo, la segunda corrida de la hora arranca ya frenada.
+    await prisma.limiteUso.deleteMany({ where: { clave: { startsWith: "prospectos:" } } }).catch(() => undefined);
     const ip = { "x-forwarded-for": `10.9.${Math.floor(Math.random() * 200)}.1` };
     const datos = { nombre: "Laura Prueba", empresa: `${sello} Envases`, correo: `laura@${dominio}`, telefono: "81 5555 0000", tipoInstalacion: "PLANTA", rangoActivos: "51-200", problema: "Los preventivos se atrasan", aceptaPrivacidad: true };
     const d1 = await pedir("POST", "/api/prospectos", ip, datos);
@@ -488,6 +493,7 @@ async function main() {
     revisar("sin acentos faltantes en los textos nuevos y la marca es «MainTrack» en título, acceso, menú e impresos", conFalta.length === 0 && marcaVieja.length === 0 && /<title>MainTrack/.test(sitio.texto), { conFalta, marcaVieja });
   } finally {
     await prisma.prospecto.deleteMany({ where: { correo: { endsWith: `@${dominio}` } } }).catch(() => undefined);
+    await prisma.limiteUso.deleteMany({ where: { clave: { startsWith: "prospectos:" } } }).catch(() => undefined);
     // Los avisos que recibió el operador de la plataforma por las solicitudes de la prueba.
     await prisma.notification.deleteMany({ where: { title: { contains: sello } } }).catch(() => undefined);
     const { borrarDemo } = await import("../lib/demo-comercial");
