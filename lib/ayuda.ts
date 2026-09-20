@@ -608,6 +608,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Ejecutar el programador para que nazcan las órdenes",
     ],
     flujo: [
+      "El nombre abre el expediente del plan: sus equipos con la próxima fecha y la última ejecución, sus actividades con recursos, las órdenes que ha generado y su cumplimiento. Editar se hace ahí mismo.",
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
       "Cada actividad lleva su fecha en CADA equipo. Al aplicar el plan todas arrancan con la fecha que se dé en común; las que en la realidad van distinto se corrigen en «Equipos → Fechas de sus actividades».",
       "Qué equipos van en cada plan lo decide usted: dos compresores de la misma categoría pueden llevar planes distintos si cambia una actividad o la frecuencia. Lo que el sistema sí vigila es que ningún equipo se quede sin plan, y lo avisa en «Equipos y sus planes».",
@@ -736,6 +738,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Entrar al kardex, a los traspasos, a los conteos y a los indicadores",
     ],
     flujo: [
+      "La clave abre el expediente de la refacción: existencia por almacén, últimos movimientos, en qué equipos se ha ido, compras, planes que la piden, equivalentes y fichas técnicas. Editar se hace ahí mismo.",
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Cada refacción puede tener equivalentes: la misma pieza de otra marca, o un sustituto que sirve cuando la original no llega. Se registran con el botón «Equivalentes» del renglón.",
       "En un sustituto, la salvedad —«requiere espaciador de 2 mm»— es lo más importante del registro: sin ella alguien monta la pieza equivocada creyendo que hizo bien.",
       "La relación se guarda una sola vez y sirve en los dos sentidos: si A sirve para B, B sirve para A.",

@@ -1047,6 +1047,38 @@ async function main() {
     await t.ir(`${base}/paros`, 1500); await captura("b7-1440-demo-donde-para");
     await t.ir(`${base}/demo`, 1000); await captura("b7-1440-demo-guia");
 
+    // ═══════════════════════════════════════════ Expedientes de refacción y de plan
+    console.log("\nExpedientes de refacción y de plan");
+    const expedientes: Record<string, unknown> = {};
+    for (const [ancho, alto, etiqueta] of [[1440, 900, "1440"], [390, 844, "390"]] as Array<[number, number, string]>) {
+      await pantalla(ancho, alto);
+      await sesionDe(du.gerencia);
+      for (const [nombre, lista, selector] of [
+        ["refaccion", "/inventory", "a[href^='/inventory/']"],
+        ["plan", "/plans", "a[href^='/plans/']"],
+      ] as Array<[string, string, string]>) {
+        donde = `expediente ${nombre} ${etiqueta}`;
+        await t.ir(`${base}${lista}`, 1200);
+        const href = await t.evaluar<string>(`(() => { const a = [...document.querySelectorAll(${JSON.stringify(selector)})].filter((x) => x.getBoundingClientRect().width > 0 && /\\/(inventory|plans)\\/[a-z0-9]{20,}/.test(x.getAttribute("href"))); return a[0]?.getAttribute("href") ?? ""; })()`);
+        if (!href) { expedientes[`${nombre}-${etiqueta}`] = "sin liga en la lista"; continue; }
+        await t.ir(`${base}${href}`, 1200);
+        const m = await medir();
+        const contenido = await t.evaluar<{ secciones: string[]; flechas: boolean }>(`({
+          secciones: [...document.querySelectorAll("main h3")].map((h) => h.textContent.trim()),
+          flechas: !!document.querySelector('[role="group"][aria-label="Pasar de registro"]'),
+        })`);
+        const esperadas = nombre === "refaccion"
+          ? ["Existencia por almacén", "Últimos movimientos", "En qué equipos se ha ido", "Compras", "Planes que la consumen", "Equivalentes"]
+          : ["Equipos del plan", "Actividades", "Órdenes que ha generado", "Ficha"];
+        const faltan = esperadas.filter((x) => !contenido.secciones.includes(x));
+        expedientes[`${nombre}-${etiqueta}`] = m.desborde || m.fuera.length || m.errorPagina || faltan.length || !contenido.flechas
+          ? { desborde: m.desborde, fuera: m.fuera, error: m.errorPagina, faltan, flechas: contenido.flechas }
+          : "ok";
+        await captura(`expediente-${etiqueta}-${nombre}`);
+      }
+    }
+    revisar("El expediente de la refacción y el del plan abren desde su lista, con sus secciones y sus flechas, en computadora y en teléfono", Object.values(expedientes).every((x) => x === "ok"), expedientes);
+
     // ═══════════════════════════════════════════ Pasar de un registro a otro
     console.log("\nPasar de un registro al siguiente desde el detalle");
     await pantalla(1440, 900);
