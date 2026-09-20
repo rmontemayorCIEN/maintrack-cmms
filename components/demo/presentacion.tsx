@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ExternalLink, List, X } from "lucide-react";
 import { MARCA } from "@/lib/comercial";
+import { olvidarPresentacion, recordarPresentacion } from "./volver-presentacion";
 import type { Bloque, Diapositiva } from "@/lib/demo-presentacion";
 
 /**
@@ -35,6 +36,11 @@ export function Presentacion({ diapositivas, inicial }: { diapositivas: Diaposit
     } catch { /* sin historial: la presentación sigue, solo no se puede regresar a la misma diapositiva */ }
   }, [total]);
 
+  // Dónde se quedó, para que la banda de la demo ofrezca el regreso desde
+  // cualquier pantalla del sistema. Se anota al abrir y en cada cambio, no
+  // solo al salir a una pantalla: así también sirve si se sale por el menú.
+  useEffect(() => { recordarPresentacion(i + 1, diapositivas[i].titulo); }, [i, diapositivas]);
+
   useEffect(() => {
     const teclas = (e: KeyboardEvent) => {
       const en = e.target as HTMLElement | null;
@@ -43,7 +49,7 @@ export function Presentacion({ diapositivas, inicial }: { diapositivas: Diaposit
       else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); ir(i - 1); }
       else if (e.key === "Home") { e.preventDefault(); ir(0); }
       else if (e.key === "End") { e.preventDefault(); ir(total - 1); }
-      else if (e.key === "Escape") { if (indice) setIndice(false); else window.location.assign("/demo"); }
+      else if (e.key === "Escape") { if (indice) setIndice(false); else { olvidarPresentacion(); window.location.assign("/demo"); } }
     };
     window.addEventListener("keydown", teclas);
     return () => window.removeEventListener("keydown", teclas);
@@ -71,7 +77,7 @@ export function Presentacion({ diapositivas, inicial }: { diapositivas: Diaposit
           <List className="h-4 w-4" /> <span className="hidden sm:inline">{d.seccion}</span> <span className="tabular-nums text-slate-500">{i + 1}/{total}</span>
         </button>
         {d.rol ? <span className="hidden truncate rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-900 md:inline">Se muestra como: {d.rol}</span> : null}
-        <Link href="/demo" className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
+        <Link href="/demo" onClick={olvidarPresentacion} className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-100">
           <X className="h-4 w-4" /> Salir
         </Link>
       </header>

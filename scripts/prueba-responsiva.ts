@@ -1092,6 +1092,22 @@ async function main() {
     }
     revisar("La presentación abre a pantalla completa (sin menú), avanza con las flechas dejando la diapositiva en la dirección, y cada caso trae sus botones al sistema, en computadora y en teléfono",
       Object.values(slides).every((x) => Object.values(x as Record<string, unknown>).every((v) => v === true)), slides);
+
+    // El camino de regreso: se sale a una pantalla real y se vuelve al punto
+    // exacto. Sin esto, el botón de un caso es un viaje de ida.
+    await pantalla(1440, 900);
+    donde = "presentacion regreso";
+    await t.ir(`${base}/demo/presentacion?d=${nDe("caso-direccion")}`, 1500);
+    await t.evaluar(`document.querySelector("[data-presentacion] main a[href='/indicadores']").click(); true`);
+    const enIndicadores = await hasta(t, `location.pathname === "/indicadores" && !!document.querySelector('a[href^="/demo/presentacion?d="]')`, 8000);
+    await captura("presentacion-1440-volver");
+    await t.evaluar(`document.querySelector('[role=note] a[href^="/demo/presentacion?d="]').click(); true`);
+    const deVueltaEnLaDiapositiva = await hasta(t, `document.querySelector("[data-presentacion] h1")?.textContent === ${JSON.stringify(armarPresentacion().find((d) => d.clave === "caso-direccion")!.titulo)}`, 8000);
+    // Al salir de la presentación, la banda deja de ofrecer el regreso.
+    await t.evaluar(`document.querySelector('[data-presentacion] header a[href="/demo"]').click(); true`);
+    const sinOferta = await hasta(t, `location.pathname === "/demo" && !sessionStorage.getItem("mt_presentacion")`, 8000);
+    revisar("Desde una pantalla abierta por un caso, la banda de la demo regresa a la misma diapositiva; al salir de la presentación deja de ofrecerlo",
+      enIndicadores && deVueltaEnLaDiapositiva && sinOferta, { enIndicadores, deVueltaEnLaDiapositiva, sinOferta });
     await pantalla(1440, 900);
     await t.ir(`${base}/demo/presentacion?d=${nDe("precios")}`, 1200); await captura("presentacion-1440-precios");
     await t.ir(`${base}/demo/presentacion?d=${nDe("gracias")}`, 1200); await captura("presentacion-1440-gracias");

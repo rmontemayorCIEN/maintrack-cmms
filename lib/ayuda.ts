@@ -275,7 +275,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Una diapositiva a la vez y sin menú: lo que se proyecta es solo el tema del que se está hablando.",
       "Los textos, los precios y los límites salen de la misma fuente que el sitio comercial, así que nunca dicen algo distinto de lo que el cliente ya leyó.",
-      "Los botones «abrir en el sistema» llevan a la pantalla real de la empresa demostrativa; el número de diapositiva va en la dirección, por eso al regresar se retoma en la misma.",
+      "Los botones «abrir en el sistema» llevan a la pantalla real de la empresa demostrativa. Para volver, la banda morada de arriba ofrece «Volver a la presentación» con el nombre del caso, y regresa a la misma diapositiva; el «Atrás» del navegador también sirve. El ofrecimiento desaparece al salir de la presentación.",
       "Cada diapositiva de caso indica con qué cuenta conviene estar dentro, y trae una nota para quien presenta que no se proyecta hasta abrirla.",
     ],
   },
