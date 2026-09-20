@@ -226,7 +226,7 @@ async function ordenCerrada(c: Contexto, o: {
     await prisma.workOrderService.create({ data: { workOrderId: wo.id, supplierId: c.prov[o.servicio.prov], descripcion: o.servicio.descripcion, quantity: 1, unitCost: o.servicio.costo, cost: o.servicio.costo, folioProveedor: `F-${folio.slice(-4)}`, createdAt: fin } });
   }
   if (o.paroMin > 0) {
-    await prisma.downtimeEvent.create({ data: { assetId: a.id, workOrderId: wo.id, startedAt: o.inicio, endedAt: new Date(o.inicio.getTime() + o.paroMin * 60_000), minutes: o.paroMin, planned: o.paroPlaneado, reason: o.titulo } });
+    await prisma.downtimeEvent.create({ data: { organizationId: c.orgId, assetId: a.id, workOrderId: wo.id, startedAt: o.inicio, endedAt: new Date(o.inicio.getTime() + o.paroMin * 60_000), minutes: o.paroMin, planned: o.paroPlaneado, reason: o.titulo } });
   }
   await recalcWorkOrder(wo.id);
   return wo;

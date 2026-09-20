@@ -6,7 +6,7 @@ import { can } from "@/lib/rbac";
 import { verificarCupo } from "@/lib/planes";
 import {
   TAMANO_MAXIMO_MB, TIPOS_PERMITIDOS, clasificar, construirRuta,
-  urlDeSubida, verificarSubida,
+  borrarArchivo, urlDeSubida, verificarSubida,
 } from "@/lib/almacenamiento";
 import { logAudit } from "@/lib/audit";
 
@@ -119,6 +119,27 @@ export async function PUT(request: Request) {
     const tamanoReal = await verificarSubida(input.storagePath);
     if (tamanoReal === null) {
       return fail("El archivo no llego al almacén. Intente subirlo de nuevo.", 409);
+    }
+
+    /**
+     * Lo que se valida arriba es el tamano DECLARADO por el navegador; esto
+     * es el real.
+     *
+     * Sin esta comprobacion, declarar un mega para obtener la URL firmada y
+     * subir cinco gigas funcionaba: el archivo quedaba en el almacen, se
+     * cobraba, y el cupo del plan se rebasaba despues del hecho. Si no cabe,
+     * se borra del almacen y no se registra: dejarlo ahi seria pagar por un
+     * archivo que nadie puede ver.
+     */
+    if (tamanoReal > TAMANO_MAXIMO_MB * 1_048_576) {
+      await borrarArchivo(input.storagePath).catch(() => undefined);
+      return fail(`El archivo pesa ${Math.round(tamanoReal / 1_048_576)} MB y el máximo son ${TAMANO_MAXIMO_MB} MB. No se guardó.`, 413);
+    }
+    // El cupo se vuelve a revisar con el peso real, por la misma razon.
+    const cupoReal = await verificarCupo(orgId, user.organization.plan, "storageGb", 1, tamanoReal);
+    if (!cupoReal.permitido) {
+      await borrarArchivo(input.storagePath).catch(() => undefined);
+      return fail(cupoReal.mensaje, 402);
     }
 
     const ctx = contextoDe(input);

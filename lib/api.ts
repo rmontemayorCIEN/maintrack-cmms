@@ -1,10 +1,59 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "./auth";
 import { can, type Permission } from "./rbac";
 import { puedeVerRuta, verCostos } from "./pantallas";
 import { estadoSuscripcion } from "./planes";
 import { diaLocal } from "./utils";
+
+/**
+ * Los errores que NO son para el usuario.
+ *
+ * Todo lo demas que llega al manejador central son nuestras clases de regla
+ * de negocio (`ErrorDeAlmacen`, `ErrorDeCompra`, `LecturaRechazada`...), cuyo
+ * mensaje esta escrito para la persona y tiene que llegarle tal cual. Lo que
+ * no puede salir es esto: un error de Prisma trae el nombre del modelo, los
+ * campos y hasta la invocacion —«Invalid prisma.user.update() invocation»— y
+ * un TypeError trae el detalle de una implementacion que al cliente no le
+ * dice nada y a un curioso le dice de mas.
+ */
+function esInterno(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError ||
+    error instanceof Prisma.PrismaClientUnknownRequestError ||
+    error instanceof Prisma.PrismaClientValidationError ||
+    error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientRustPanicError ||
+    error instanceof TypeError ||
+    error instanceof RangeError ||
+    error instanceof ReferenceError ||
+    error instanceof SyntaxError
+  );
+}
+
+/**
+ * Contesta una falla inesperada sin contar por dentro, y la deja en el
+ * registro CON contexto.
+ *
+ * El registro decia solo el mensaje: sin empresa, sin usuario y sin rastro,
+ * un 500 en los registros de Cloud Run era irreconstruible. Lo que se escribe
+ * aqui es lo unico que va a existir de ese error.
+ */
+export function fallaInesperada(error: unknown, quien: { userId?: string; orgId?: string } = {}) {
+  const mensaje = error instanceof Error ? error.message : String(error);
+  if (!esInterno(error)) {
+    console.error("[api]", { mensaje, ...quien });
+    return fail(mensaje, 500);
+  }
+  console.error("[api] falla interna", {
+    tipo: error instanceof Error ? error.name : typeof error,
+    mensaje,
+    ...quien,
+    rastro: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join(" | ") : undefined,
+  });
+  return fail("Ocurrió un error inesperado. Vuelva a intentarlo; si sigue pasando, repórtelo desde Soporte.", 500);
+}
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json(data, { status: init ?? 200 });
@@ -80,9 +129,7 @@ export async function withAuth<T>(
       const e = error as Error & { codigo: number; detalles?: unknown };
       return fail(e.message, e.codigo, e.detalles);
     }
-    const message = error instanceof Error ? error.message : "Error interno";
-    console.error("[api]", message);
-    return fail(message, 500);
+    return fallaInesperada(error, { userId: user.id, orgId: user.organizationId });
   }
 }
 

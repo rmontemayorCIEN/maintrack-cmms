@@ -168,8 +168,8 @@ async function main() {
       new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: ZONA }).format(new Date(p90.hasta.getTime() - 1)) === new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: ZONA }).format(ahoraReal));
     // Dos áreas con 20 min planeados cada una: por área 0.3 + 0.3 = 0.6 h; en total 40 min = 0.7 h.
     await prisma.downtimeEvent.createMany({ data: [
-      { assetId: cnc.id, startedAt: new Date(ahoraReal.getTime() - 2 * DIA), minutes: 20, planned: true },
-      { assetId: bomba.id, startedAt: new Date(ahoraReal.getTime() - 3 * DIA), minutes: 20, planned: true },
+      { organizationId: orgA.id, assetId: cnc.id, startedAt: new Date(ahoraReal.getTime() - 2 * DIA), minutes: 20, planned: true },
+      { organizationId: orgA.id, assetId: bomba.id, startedAt: new Date(ahoraReal.getTime() - 3 * DIA), minutes: 20, planned: true },
     ] });
     const dpp = await costoDeParar(orgA.id, v90.actual);
     const ind = await calcularIndicadores(orgA.id, p90, { ahora: ahoraReal });

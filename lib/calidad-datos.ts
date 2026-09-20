@@ -122,7 +122,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     prisma.workOrder.count({ where: f.conParo }),
     prisma.workOrder.findMany({ where: f.paroSinDuracion, select: selOt }),
     prisma.downtimeEvent.findMany({
-      where: { asset: { organizationId }, minutes: { lte: 0 } },
+      where: { organizationId, minutes: { lte: 0 } },
       select: { id: true, startedAt: true, asset: { select: selActivo } },
     }),
 
@@ -206,7 +206,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       select: { ...selOt, startedAt: true, completedAt: true },
     }).then((xs) => xs.filter((o) => o.completedAt! < o.startedAt!)),
     prisma.downtimeEvent.findMany({
-      where: { asset: { organizationId }, endedAt: { not: null } },
+      where: { organizationId, endedAt: { not: null } },
       select: { id: true, startedAt: true, endedAt: true, asset: { select: selActivo } },
     }).then((xs) => xs.filter((e) => e.endedAt! < e.startedAt)),
 
@@ -243,7 +243,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     // que pesa y no tumbe el indice completo.
     prisma.workOrder.count({ where: { organizationId } }),
     prisma.workOrder.count({ where: { organizationId, startedAt: { not: null }, completedAt: { not: null } } }),
-    prisma.downtimeEvent.count({ where: { asset: { organizationId }, endedAt: { not: null } } }),
+    prisma.downtimeEvent.count({ where: { organizationId, endedAt: { not: null } } }),
     prisma.partStock.count({ where: { organizationId } }),
   ]);
 

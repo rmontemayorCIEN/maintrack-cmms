@@ -140,7 +140,7 @@ export async function eventosDeParoDelPeriodo(
   periodo: { desde: Date; hasta: Date },
 ) {
   return prisma.downtimeEvent.findMany({
-    where: { asset: { organizationId }, startedAt: dentroDe(periodo) },
+    where: { organizationId, startedAt: dentroDe(periodo) },
     select: {
       id: true, minutes: true, planned: true, startedAt: true, reason: true, workOrderId: true,
       asset: { select: { id: true, code: true, name: true } },

@@ -397,6 +397,34 @@ export async function transitionWorkOrder(params: {
    * La actividad se queda en la orden cancelada como historia de lo que se
    * penso hacer. Lo que se libera es la solicitud.
    */
+  /**
+   * El cambio se aplica solo si la orden sigue en el estado que se leyo.
+   *
+   * Dos clics seguidos, o dos personas a la vez, leian el mismo estado y las
+   * dos escribian: el paro se registraba dos veces y el plan avanzaba doble.
+   * Ahora gana una; la otra encuentra la orden ya movida y no repite nada.
+   */
+  const aplicado = await prisma.workOrder.updateMany({
+    where: { id: wo.id, organizationId: params.organizationId, status: wo.status },
+    data,
+  });
+  if (aplicado.count === 0) {
+    const ahora = await prisma.workOrder.findUnique({ where: { id: wo.id } });
+    if (ahora?.status === params.to) return ahora;
+    throw new ErrorDeOrden(
+      `La orden cambió de estado mientras tanto (ahora está ${etiqueta(ahora?.status ?? "").toLowerCase()}). Recargue la página.`,
+      409,
+    );
+  }
+  /**
+   * Las solicitudes se mueven DESPUES del candado, no antes.
+   *
+   * Estaban arriba, y quien perdia la carrera —dos personas, una cancelando y
+   * otra cerrando— ya habia soltado o reclamado las solicitudes cuando
+   * recibia el 409, sin revertir nada. Quedaba una orden cerrada con sus
+   * solicitudes sueltas, o una solicitud reclamada por una orden que nunca se
+   * reabrio. Aqui abajo solo corre quien gano.
+   */
   if (params.to === "CANCELLED") {
     await prisma.workRequest.updateMany({
       where: { workOrderId: wo.id, status: "CONVERTED" },
@@ -423,25 +451,7 @@ export async function transitionWorkOrder(params: {
     }
   }
 
-  /**
-   * El cambio se aplica solo si la orden sigue en el estado que se leyo.
-   *
-   * Dos clics seguidos, o dos personas a la vez, leian el mismo estado y las
-   * dos escribian: el paro se registraba dos veces y el plan avanzaba doble.
-   * Ahora gana una; la otra encuentra la orden ya movida y no repite nada.
-   */
-  const aplicado = await prisma.workOrder.updateMany({
-    where: { id: wo.id, organizationId: params.organizationId, status: wo.status },
-    data,
-  });
-  if (aplicado.count === 0) {
-    const ahora = await prisma.workOrder.findUnique({ where: { id: wo.id } });
-    if (ahora?.status === params.to) return ahora;
-    throw new ErrorDeOrden(
-      `La orden cambió de estado mientras tanto (ahora está ${etiqueta(ahora?.status ?? "").toLowerCase()}). Recargue la página.`,
-      409,
-    );
-  }
+
   const updated = (await prisma.workOrder.findUnique({ where: { id: wo.id } }))!;
 
   if (completando) {
@@ -501,6 +511,7 @@ export async function transitionWorkOrder(params: {
               (wo.maintenanceType === "PREVENTIVE" || wo.maintenanceType === "INSPECTION"),
           },
           create: {
+            organizationId: params.organizationId,
             assetId: wo.assetId,
             workOrderId: wo.id,
             startedAt: wo.startedAt ?? wo.createdAt,

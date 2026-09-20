@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "./db";
+import { consumirLimite } from "./integraciones/limites";
 import { notify } from "./audit";
 import { CLAVES_INSTALACION } from "./instalaciones";
 import { VERSION_DOCUMENTOS } from "./legal";
@@ -41,14 +42,18 @@ export function huellaDe(tipo: string, correo: string, cuando = new Date()) {
   return createHash("sha256").update(`${tipo}|${correo.trim().toLowerCase()}|${dia}`).digest("hex");
 }
 
-// Límite por dirección: 5 solicitudes por hora. En memoria: basta contra un
-// robot que insiste; el duplicado por huella ya lo cuida la base.
-const porIp = new Map<string, number[]>();
-export function demasiadas(ip: string, ahora = Date.now()) {
-  const recientes = (porIp.get(ip) ?? []).filter((t) => ahora - t < 3_600_000);
-  recientes.push(ahora);
-  porIp.set(ip, recientes);
-  return recientes.length > 5;
+/**
+ * Límite por dirección: 5 solicitudes por hora, contadas EN LA BASE.
+ *
+ * Estaba en un `Map` del proceso, y en Cloud Run hay varias instancias: el
+ * límite efectivo era de cinco por instancia —con diez, cincuenta por hora— y
+ * se perdía en cada arranque en frío. El mecanismo correcto ya existía en
+ * `lib/integraciones/limites.ts`, que cuenta en la base por ventana; esto
+ * solo lo usa.
+ */
+export async function demasiadas(ip: string, ahora = new Date()) {
+  const cupo = await consumirLimite(`prospectos:${ip}`, 5, 3600, ahora);
+  return !cupo.permitido;
 }
 
 export async function registrarProspecto(d: DatosProspecto, extra: { organizationId?: string } = {}) {

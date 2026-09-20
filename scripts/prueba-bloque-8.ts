@@ -23,6 +23,9 @@ import { altaDePlan } from "../lib/alta-de-plan";
 import { generateScheduledWorkOrders } from "../lib/scheduler";
 import { ejecutarHerramienta, herramientasPara } from "../lib/ia/herramientas";
 import { estadoDeVencimiento, filtroDeVencidas } from "../lib/vencimiento";
+import { fallaInesperada } from "../lib/api";
+import { ErrorDeAlmacen } from "../lib/almacen";
+import { demasiadas } from "../lib/prospectos";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle?: unknown) {
@@ -274,6 +277,52 @@ async function main() {
     revisar("el bajo mínimo lo decide la base: sale aunque quede al final de la lista",
       bajas.length === 1 && bajas[0].code === escasa.code, bajas.map((b) => b.code));
     void almacen;
+
+    // ════════════════ 5. Lo que no debe salir del servidor
+    console.log("\n5. Errores, archivos y limites");
+
+    // Un error de Prisma trae el nombre del modelo, los campos y la
+    // invocacion. Un error de regla de negocio esta escrito para la persona y
+    // tiene que llegarle tal cual.
+    const dePrisma = await prisma.workOrder.findUniqueOrThrow({ where: { id: "no-existe-a-proposito" } }).catch((e) => e);
+    const respuestaPrisma = fallaInesperada(dePrisma, { orgId: org.id });
+    const cuerpoPrisma = await respuestaPrisma.json() as { error?: string };
+    revisar("un error de Prisma no le cuenta al cliente como esta hecho el sistema",
+      respuestaPrisma.status === 500 && !/prisma|invocation|workOrder|findUnique/i.test(cuerpoPrisma.error ?? ""), cuerpoPrisma.error);
+
+    const deNegocio = fallaInesperada(new ErrorDeAlmacen("No hay existencia suficiente de SEL-01"), { orgId: org.id });
+    const cuerpoNegocio = await deNegocio.json() as { error?: string };
+    revisar("un error de regla de negocio si le llega al usuario, con su texto",
+      cuerpoNegocio.error === "No hay existencia suficiente de SEL-01", cuerpoNegocio.error);
+
+    // El logotipo no puede ser un documento que el navegador ejecute.
+    const rutaLogo = readFileSync("app/api/apariencia/logo/route.ts", "utf8");
+    revisar("el logotipo ya no admite SVG y los viejos se sirven inertes",
+      !/const TIPOS = \[[^\]]*svg/.test(rutaLogo) && rutaLogo.includes("application/octet-stream") && rutaLogo.includes("sandbox"));
+
+    // El limite de solicitudes publicas cuenta en la base, no en el proceso.
+    const ip = `10.0.0.${Math.floor(Math.random() * 250)}`;
+    const intentos: boolean[] = [];
+    for (let i = 0; i < 6; i++) intentos.push(await demasiadas(ip));
+    const otraIp = await demasiadas(`10.9.9.${Math.floor(Math.random() * 250)}`);
+    revisar("a la sexta solicitud de la misma conexion se frena, y otra conexion no se ve afectada",
+      intentos.slice(0, 5).every((x) => x === false) && intentos[5] === true && otraIp === false, intentos);
+    await prisma.limiteUso.deleteMany({ where: { clave: { startsWith: "prospectos:10." } } });
+
+    // ════════════════ 6. La empresa del paro es la del equipo
+    //
+    // `DowntimeEvent` era el unico modelo grande sin `organizationId`: se le
+    // agrego para poder indexarlo, y con ello nacio la forma de equivocarse
+    // que antes no existia —escribir un paro con una empresa distinta de la
+    // de su equipo—. La primera vez que paso fue el mismo dia, en una prueba.
+    console.log("\n6. Los paros pertenecen a la empresa de su equipo");
+    const paros = await prisma.downtimeEvent.findMany({
+      select: { id: true, organizationId: true, asset: { select: { organizationId: true } } },
+      take: 3000,
+    });
+    const cruzados = paros.filter((p) => p.organizationId !== p.asset.organizationId);
+    revisar(`los ${paros.length} paros revisados coinciden con la empresa de su equipo`,
+      cruzados.length === 0, cruzados.slice(0, 5).map((p) => p.id));
   } finally {
     await prisma.procesoProgramado.deleteMany({ where: { clave: { startsWith: `prueba:${sello}` } } });
     await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

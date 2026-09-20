@@ -225,6 +225,15 @@ export async function verificarCupo(
    * «¿cabe uno más?» dejaba pasar la carga completa por encima del plan.
    */
   cantidad = 1,
+  /**
+   * Bytes que se van a agregar, solo para `storageGb`.
+   *
+   * Existe porque el cupo se revisaba ANTES de subir, con el tamano que
+   * declaraba el navegador: declarar un mega, obtener la URL firmada y subir
+   * cinco gigas rebasaba el plan despues del hecho. Con el peso real en la
+   * mano, la cuenta se hace de verdad.
+   */
+  bytesAdicionales = 0,
 ): Promise<{ permitido: true } | { permitido: false; mensaje: string }> {
   const definicion = planDe(plan);
   const limite = definicion.limites[recurso];
@@ -237,14 +246,16 @@ export async function verificarCupo(
     sensors: () => prisma.sensor.count({ where: { organizationId, active: true } }),
     storageGb: async () => {
       const r = await prisma.attachment.aggregate({ where: { organizationId }, _sum: { size: true } });
-      return Number(r._sum.size ?? 0) / 1_073_741_824;
+      return (Number(r._sum.size ?? 0) + bytesAdicionales) / 1_073_741_824;
     },
   };
 
   const actual = await contadores[recurso]();
   // El almacenamiento se mide en gigas, no en piezas: ahi basta con no haberse
   // pasado ya. Lo demas se cuenta con lo que se va a agregar.
-  const cabe = recurso === "storageGb" ? actual < limite : actual + cantidad <= limite;
+  // El almacenamiento ya trae sumado lo que se va a agregar, asi que aqui se
+  // compara con «cabe», no con «no se ha pasado».
+  const cabe = recurso === "storageGb" ? actual <= limite : actual + cantidad <= limite;
   if (cabe) return { permitido: true };
 
   if (cantidad > 1 && actual < limite) {

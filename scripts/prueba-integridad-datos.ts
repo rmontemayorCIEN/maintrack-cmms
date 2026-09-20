@@ -131,8 +131,12 @@ async function main() {
     await ot("W7", { maintenanceType: "CORRECTIVE", status: "CANCELLED", createdAt: hace(8), totalCost: 9999 });
     await ot("W8", { maintenanceType: "PREVENTIVE", status: "COMPLETED", createdAt: hace(100), completedAt: hace(100), actualHours: 1, totalCost: 300 });
 
-    const paro = (assetId: string, startedAt: Date, minutes: number, planned: boolean, workOrderId?: string) =>
-      prisma.downtimeEvent.create({ data: { assetId, startedAt, minutes, planned, workOrderId } });
+    // La empresa se saca del activo, no se fija: fijarla mandaba el paro de la
+    // empresa B a los indicadores de A, que es justo lo que esta prueba vigila.
+    const paro = async (assetId: string, startedAt: Date, minutes: number, planned: boolean, workOrderId?: string) => {
+      const duenio = await prisma.asset.findUniqueOrThrow({ where: { id: assetId }, select: { organizationId: true } });
+      return prisma.downtimeEvent.create({ data: { organizationId: duenio.organizationId, assetId, startedAt, minutes, planned, workOrderId } });
+    };
     await paro(a1.id, hace(9), 120, false, w1.id);
     await paro(a1.id, hace(2), 60, true, w4.id);
     await paro(a2.id, hace(100), 600, false);

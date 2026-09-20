@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (!cuerpo || typeof cuerpo !== "object") return fail("Datos inválidos", 400);
   if ((cuerpo as { sitioWeb?: string }).sitioWeb) return ok({ creada: false, recibido: true }, 201);
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
+  if (await demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
 
   const persona = esquemaProspecto.safeParse({ ...cuerpo, tipo: "CONTRATACION", aceptaPrivacidad: (cuerpo as { aceptaDocumentos?: boolean }).aceptaDocumentos === true });
   if (!persona.success) return fail(persona.error.errors[0]?.message ?? "Revise los datos", 422, { campo: persona.error.errors[0]?.path[0] });

@@ -295,6 +295,7 @@ model Organization {
   revisionesAgenda   RevisionAgenda[]
   passwordResets     PasswordReset[]
   importBatches      ImportBatch[]
+  downtimeEvents DowntimeEvent[]
 }
 
 model User {
@@ -714,19 +715,28 @@ model Asset {
 }
 
 model DowntimeEvent {
-  id          String    @id @default(cuid())
-  assetId     String
-  workOrderId String?
-  startedAt   DateTime
-  endedAt     DateTime?
-  minutes     Int       @default(0)
-  planned     Boolean   @default(false)
-  reason      String?
+  id String @id @default(cuid())
 
-  asset     Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id])
+  /// Era el unico modelo grande sin empresa: TODAS las consultas de paro
+  /// filtraban por `asset.organizationId`, asi que para pintar el indicador
+  /// de una empresa habia que recorrer los paros de todas y unirlos con
+  /// Activos. Se llena desde el activo (ver la migracion).
+  organizationId String
+  assetId        String
+  workOrderId    String?
+  startedAt      DateTime
+  endedAt        DateTime?
+  minutes        Int       @default(0)
+  planned        Boolean   @default(false)
+  reason         String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
 
   @@index([assetId])
+  @@index([organizationId, startedAt])
+  @@index([assetId, startedAt])
 }
 
 // ---------------------------------------------------------------- Medidores ---
@@ -822,6 +832,7 @@ model MeterReading {
 
   @@index([meterId])
   @@index([organizationId])
+  @@index([meterId, readingAt])
 }
 
 // --------------------------------------------------- Planes de mantenimiento ---
@@ -1042,6 +1053,11 @@ model WorkOrder {
   @@index([status])
   @@index([assetId])
   @@index([assignedToId])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, completedAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, maintenanceType, dueDate])
+  @@index([assetId, createdAt])
 }
 
 model WorkOrderTask {
@@ -1183,6 +1199,7 @@ model WorkOrderLabor {
 
   @@index([workOrderId])
   @@index([taskId])
+  @@index([userId, workedAt])
 }
 
 model WorkOrderPart {
@@ -1370,6 +1387,8 @@ model WorkRequest {
 
   @@unique([organizationId, number])
   @@index([organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, tipo])
 }
 
 // -------------------------------------------------------------------- Almacen ---
@@ -1493,6 +1512,8 @@ model StockMovement {
   @@index([organizationId])
   @@index([partId])
   @@index([warehouseId])
+  @@index([organizationId, createdAt])
+  @@index([partId, createdAt])
 }
 
 /// Un almacen fisico. La mayoria de las empresas tiene uno general y varios
@@ -2162,6 +2183,7 @@ model SensorReading {
 
   @@index([sensorId])
   @@index([organizationId])
+  @@index([sensorId, readingAt])
 }
 
 model PredictiveAlert {
@@ -2595,6 +2617,7 @@ model Notification {
   @@unique([userId, claveDedup])
   @@index([userId])
   @@index([organizationId, entidad, entidadId])
+  @@index([userId, atendidaEl, createdAt])
 }
 
 /// Cada vez que un aviso cambia de pendiente a atendido, o vuelve a abrirse.
@@ -2940,6 +2963,7 @@ model AuditLog {
 
   @@index([organizationId])
   @@index([entity, entityId])
+  @@index([organizationId, createdAt])
 }
 
 /// Dias que no se trabajan.

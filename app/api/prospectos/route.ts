@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   // El robot que llena el campo trampa recibe un «recibido» y no se guarda nada.
   if ((cuerpo as { sitioWeb?: string }).sitioWeb) return ok({ recibido: true }, 201);
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
+  if (await demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
   const parsed = esquemaProspecto.safeParse({ ...cuerpo, tipo: "DEMO" });
   if (!parsed.success) return fail(parsed.error.errors[0]?.message ?? "Revise los datos", 422, { campo: parsed.error.errors[0]?.path[0] });
   const { duplicado } = await registrarProspecto(parsed.data);
