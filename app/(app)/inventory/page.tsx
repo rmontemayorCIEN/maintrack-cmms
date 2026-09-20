@@ -42,6 +42,10 @@ export default async function InventoryPage({
         organizationId: user.organizationId,
         active: true,
         ...(params.q ? { OR: [{ name: contiene(params.q) }, { code: contiene(params.q) }] } : {}),
+        // Bajo minimo se decide en la base y no despues del tope: con 300
+        // refacciones traidas, la que estaba bajo minimo en el lugar 350 no
+        // aparecia nunca, y la pantalla decia que no habia ninguna.
+        ...(params.low === "1" ? { quantityOnHand: { lte: prisma.part.fields.minQuantity } } : {}),
       },
       include: {
         supplier: { select: { name: true } },
@@ -77,7 +81,7 @@ export default async function InventoryPage({
     }),
   ]);
 
-  const filtered = params.low === "1" ? parts.filter((p) => p.quantityOnHand <= p.minQuantity) : parts;
+  const filtered = parts;
 
   const vista = vistaGuardada(user.vistasTabla, "refacciones");
   // Con un almacen elegido, la existencia que se muestra es la de ESE almacen,

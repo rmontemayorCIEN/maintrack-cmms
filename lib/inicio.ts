@@ -22,6 +22,7 @@ import { prisma } from "./db";
 import { formatDia, formatCurrency } from "./utils";
 import { accionesRapidasDe, puedeVerRuta, TITULO_INICIO, type AccionRapida, type Rol } from "./pantallas";
 import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./avisos/situaciones";
+import { filtroDeVencidas } from "./vencimiento";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -123,8 +124,14 @@ async function ordenes(org: string, where: Record<string, unknown>, take = 50) {
 async function criticasYVencidas(c: Ctx) {
   const [criticas, vencidas, nVencidas, nCriticas] = await Promise.all([
     ordenes(c.org, { priority: "CRITICAL" }, MAX),
-    ordenes(c.org, { dueDate: { lt: c.ahora } }, MAX),
-    prisma.workOrder.count({ where: { organizationId: c.org, status: { in: OT_ACTIVAS }, dueDate: { lt: c.ahora } } }),
+    // El mismo criterio que la lista y que la etiqueta de cada orden: antes
+    // aqui se contaba `dueDate < ahora` al instante y alla se comparaba el DIA
+    // en la zona de la empresa, asi que el indicador y la pantalla a la que
+    // lleva podian no coincidir. Incluye los borradores, como los cuenta
+    // `estadoDeVencimiento`: un borrador con fecha pasada es trabajo vencido
+    // que nadie solto.
+    ordenes(c.org, filtroDeVencidas(c.zona, c.ahora), MAX),
+    prisma.workOrder.count({ where: { organizationId: c.org, ...filtroDeVencidas(c.zona, c.ahora) } }),
     prisma.workOrder.count({ where: { organizationId: c.org, status: { in: OT_ACTIVAS }, priority: "CRITICAL" } }),
   ]);
   return { criticas, vencidas, nVencidas, nCriticas };

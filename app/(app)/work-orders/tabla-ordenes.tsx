@@ -115,15 +115,17 @@ const DE_FABRICA = ["tipo", "prioridad", "estado", "responsable", "vencimiento",
 
 const COLUMNAS_DE_COSTO = new Set(["costoMo", "costoRef", "costoServ", "costoOtros", "costo"]);
 
-export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true }: {
+export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true, total}: {
   ordenes: FilaOrden[]; vistaInicial: Vista;
   /** Sin costos (técnico): las columnas de dinero ni se ofrecen (lib/pantallas.ts verCostos). */
   conCostos?: boolean;
+  total?: number;
 }) {
   const zona = useZona();
   const columnas = useMemo(() => crearColumnas(zona).filter((c) => conCostos || !COLUMNAS_DE_COSTO.has(c.id)), [zona, conCostos]);
   return (
     <TablaConfigurable
+      total={total}
       filas={ordenes}
       fijas={FIJAS}
       columnas={columnas}

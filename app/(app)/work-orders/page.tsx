@@ -13,7 +13,7 @@ import {
   WO_STATUS_LABELS,
 } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
-import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { estadoDeVencimiento, filtroDeVencidas } from "@/lib/vencimiento";
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { WorkOrderFilters } from "./filters";
 import { TablaOrdenes, type FilaOrden } from "./tabla-ordenes";
@@ -46,8 +46,11 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
   const where = {
     organizationId: orgId,
     ...(estado ? { status: estado } : {}),
-    ...(params.scope === "open" || soloVencidas || sinResponsable || (mias && !estado) ? { status: { in: OPEN_STATUSES } } : {}),
-    ...(soloVencidas ? { dueDate: { lt: new Date(Date.now() + 86_400_000) } } : {}),
+    ...(params.scope === "open" || sinResponsable || (mias && !estado) ? { status: { in: OPEN_STATUSES } } : {}),
+    // El criterio de «vencida» vive en lib/vencimiento y lo comparten el
+    // inicio y esta lista: antes cada uno usaba el suyo y daban cifras
+    // distintas para la misma pregunta.
+    ...(soloVencidas ? filtroDeVencidas(zona) : {}),
     ...(params.type ? { maintenanceType: params.type } : {}),
     ...(prioridad ? { priority: prioridad } : {}),
     ...(params.assignedToId ? { assignedToId: params.assignedToId } : {}),
@@ -58,7 +61,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
       : {}),
   };
 
-  const [encontradas, technicians, counts] = await Promise.all([
+  const [encontradas, technicians, counts, total] = await Promise.all([
     prisma.workOrder.findMany({
       where,
       include: {
@@ -85,6 +88,8 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
       where: { organizationId: orgId },
       _count: { _all: true },
     }),
+    // Cuantas cumplen el filtro DE VERDAD, no cuantas cupieron en el tope.
+    prisma.workOrder.count({ where }),
   ]);
 
   const workOrders = soloVencidas
@@ -139,7 +144,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
     <>
       <PageHeader
         title={mias ? "Mis órdenes" : sinResponsable ? "Órdenes sin responsable" : "Órdenes de trabajo"}
-        description={`${soloVencidas ? "Vencidas: " : ""}${workOrders.length} resultados · ${openCount} abiertas en total${conCostos ? ` · costo listado ${formatCurrency(totalCost, user.organization.currency)}` : ""}`}
+        description={`${soloVencidas ? "Vencidas: " : ""}${total > workOrders.length ? `${workOrders.length} de ${total}` : `${workOrders.length}`} resultados · ${openCount} abiertas en total${conCostos ? ` · costo listado ${formatCurrency(totalCost, user.organization.currency)}` : ""}`}
         actions={can(user.role, "workorder:write") ? (
           <div className="flex gap-2">
             {/* Armar junta trabajo de varios origenes en una sola orden; Nueva
@@ -159,7 +164,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: S
           action={can(user.role, "workorder:write") ? <LinkButton href="/work-orders/new" size="sm">Nueva orden</LinkButton> : undefined}
         />
       ) : (
-        <TablaOrdenes ordenes={filas} vistaInicial={vista} conCostos={conCostos} />
+        <TablaOrdenes ordenes={filas} vistaInicial={vista} conCostos={conCostos} total={total} />
       )}
     </>
   );

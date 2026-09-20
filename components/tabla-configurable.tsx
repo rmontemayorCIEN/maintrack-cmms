@@ -39,7 +39,7 @@ const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g,
 const TARJETAS_POR_TANDA = 40;
 
 export function TablaConfigurable<T extends { id: string }>({
-  filas, fijas, columnas, deFabrica, vistaInicial, clave,
+  filas, fijas, columnas, deFabrica, vistaInicial, clave, total,
   ejemploFiltro, paso, acciones, sustantivo = "registros", busquedaInicial = "",
 }: {
   filas: T[];
@@ -59,6 +59,14 @@ export function TablaConfigurable<T extends { id: string }>({
    * filtro, su orden y sus grupos.
    */
   paso?: { base: string; etiqueta: (f: T) => string };
+  /**
+   * Cuantos hay en la base, si son mas de los que se trajeron.
+   *
+   * Sin esto el pie decia «200 de 200» aunque hubiera 3 000: el tope de la
+   * consulta se veia igual que «ya no hay mas», y quien buscaba una orden que
+   * si existia concluia que el sistema la habia perdido.
+   */
+  total?: number;
   acciones?: (f: T) => React.ReactNode;
   sustantivo?: string;
   /** Texto con que arranca el filtro: el que trae una liga (un aviso, un pendiente). */
@@ -491,6 +499,7 @@ export function TablaConfigurable<T extends { id: string }>({
 
       <p className="text-[0.6875rem] text-slate-500">
         {filtrados.length} de {filas.length} {sustantivo}
+        {total !== undefined && total > filas.length ? ` · hay ${Number(total).toLocaleString("es-MX")} en total; afine la búsqueda para ver el resto` : ""}
         {grupos.length ? ` · agrupados por ${grupos.map((g) => porId.get(g)?.etiqueta).join(" › ")}` : ""}
       </p>
     </div>

@@ -22,6 +22,7 @@ import { conCandado } from "../lib/procesos";
 import { altaDePlan } from "../lib/alta-de-plan";
 import { generateScheduledWorkOrders } from "../lib/scheduler";
 import { ejecutarHerramienta, herramientasPara } from "../lib/ia/herramientas";
+import { estadoDeVencimiento, filtroDeVencidas } from "../lib/vencimiento";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle?: unknown) {
@@ -215,6 +216,64 @@ async function main() {
     const comprasOrdenes = await ejecutarHerramienta(org.id, "buscar_ordenes", { dias: 90 }, { rol: "COMPRAS" });
     revisar("compras ve importes del almacen pero no el costo de las ordenes",
       llavesDeDinero(comprasOrdenes).length === 0, { almacen: llavesDeDinero(comprasAlmacen).length, ordenes: llavesDeDinero(comprasOrdenes) });
+
+    // ════════════════ 4. Las listas no mienten sobre lo que hay
+    //
+    // Las pantallas traian un tope de registros y filtraban DESPUES, en
+    // memoria: con 500 vencidas, la lista a la que lleva el indicador del
+    // inicio no las tenia todas, y la refaccion bajo minimo que quedaba en el
+    // lugar 350 no aparecia nunca. No es lentitud, son cifras equivocadas.
+    console.log("\n4. Filtrar en la base, no despues del tope");
+
+    const zona = "America/Monterrey";
+    const dia = (n: number) => new Date(Date.now() + n * 86_400_000);
+    const casos: Array<[string, Record<string, unknown>]> = [
+      ["vencida de ayer", { status: "OPEN", dueDate: dia(-1) }],
+      ["vencida de hace un mes", { status: "ASSIGNED", dueDate: dia(-30) }],
+      ["borrador vencido", { status: "DRAFT", dueDate: dia(-3) }],
+      ["en espera vencida", { status: "ON_HOLD", dueDate: dia(-2) }],
+      ["vence manana", { status: "OPEN", dueDate: dia(1) }],
+      ["sin fecha", { status: "OPEN", dueDate: null }],
+      ["terminada tarde", { status: "COMPLETED", dueDate: dia(-5), completedAt: dia(-1) }],
+      ["cancelada vencida", { status: "CANCELLED", dueDate: dia(-9) }],
+    ];
+    for (const [titulo, datos] of casos) {
+      await prisma.workOrder.create({
+        data: { organizationId: org.id, number: `V-${titulo.replace(/\s/g, "-")}`, title: titulo, maintenanceType: "CORRECTIVE", ...datos } as never,
+      });
+    }
+    const todas = await prisma.workOrder.findMany({
+      where: { organizationId: org.id, number: { startsWith: "V-" } },
+      select: { id: true, title: true, status: true, dueDate: true, completedAt: true },
+    });
+    const porLaPantalla = todas.filter((w) => estadoDeVencimiento(w, { zona }).clave === "VENCIDA").map((w) => w.title).sort();
+    const porLaBase = (await prisma.workOrder.findMany({
+      where: { organizationId: org.id, number: { startsWith: "V-" }, ...filtroDeVencidas(zona) },
+      select: { title: true },
+    })).map((w) => w.title).sort();
+
+    // La direccion que importa: que no se pierda ninguna. El filtro de la base
+    // puede traer de mas (lo documenta `filtroDeVencidas`); la etiqueta de la
+    // pantalla descarta esas.
+    const perdidas = porLaPantalla.filter((t) => !porLaBase.includes(t));
+    revisar("ninguna orden vencida se le escapa al filtro de la base",
+      perdidas.length === 0, { pantalla: porLaPantalla, base: porLaBase, perdidas });
+    revisar("y el filtro incluye borradores y en espera, como la etiqueta",
+      porLaBase.includes("borrador vencido") && porLaBase.includes("en espera vencida"), porLaBase);
+    revisar("no cuenta canceladas, terminadas, futuras ni sin fecha",
+      !porLaBase.some((t) => ["cancelada vencida", "terminada tarde", "vence manana", "sin fecha"].includes(t)), porLaBase);
+
+    // Bajo minimo: la que queda al final del abecedario tambien tiene que salir.
+    const almacen = await prisma.warehouse.create({ data: { organizationId: org.id, siteId: sitio.id, code: "ALM", name: "Almacén", esGeneral: true } });
+    await prisma.part.create({ data: { organizationId: org.id, code: "AAA-1", name: "Con existencia", unit: "pza", quantityOnHand: 50, minQuantity: 5 } });
+    const escasa = await prisma.part.create({ data: { organizationId: org.id, code: "ZZZ-9", name: "La ultima del abecedario", unit: "pza", quantityOnHand: 0, minQuantity: 3 } });
+    const bajas = await prisma.part.findMany({
+      where: { organizationId: org.id, active: true, quantityOnHand: { lte: prisma.part.fields.minQuantity } },
+      select: { code: true },
+    });
+    revisar("el bajo mínimo lo decide la base: sale aunque quede al final de la lista",
+      bajas.length === 1 && bajas[0].code === escasa.code, bajas.map((b) => b.code));
+    void almacen;
   } finally {
     await prisma.procesoProgramado.deleteMany({ where: { clave: { startsWith: `prueba:${sello}` } } });
     await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

@@ -23,7 +23,10 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
   const [compras, almacenes, refacciones, proveedores] = await Promise.all([
     prisma.purchaseRequest.findMany({
-      where: { organizationId: orgId },
+      // El estado se filtra en la base: filtrarlo despues del tope hacia que
+      // «mostrando: Solicitadas (12)» significara «12 de las 300 que cupieron»
+      // y no «12 que hay».
+      where: { organizationId: orgId, ...(filtro ? { estado: filtro } : {}) },
       orderBy: { createdAt: "desc" },
       take: 300,
       select: {
@@ -75,9 +78,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     moneda,
   }));
 
-  const listadas = filtro ? filas.filter((f) => f.estado === filtro) : filas;
-  const porAutorizar = filas.filter((f) => f.estado === "SOLICITADA");
-  const porLlegar = filas.filter((f) => ["AUTORIZADA", "EN_COMPRA", "RECIBIDA_PARCIAL"].includes(f.estado));
+  const listadas = filas;
+  // Los dos resumenes de arriba son de TODA la empresa, no de lo que se este
+  // mostrando: se cuentan y se suman en la base, no sobre la lista filtrada.
+  const [porAutorizar, porLlegar] = await Promise.all([
+    prisma.purchaseRequest.count({ where: { organizationId: orgId, estado: "SOLICITADA" } }),
+    prisma.purchaseRequest.aggregate({
+      where: { organizationId: orgId, estado: { in: ["AUTORIZADA", "EN_COMPRA", "RECIBIDA_PARCIAL"] } },
+      _count: { _all: true }, _sum: { montoEstimado: true },
+    }),
+  ]);
 
   return (
     <>
@@ -99,11 +109,11 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
       {filas.length ? (
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <Stat label="Esperando autorización" value={String(porAutorizar.length)} tone={porAutorizar.length ? "warn" : "good"} />
+          <Stat label="Esperando autorización" value={String(porAutorizar)} tone={porAutorizar ? "warn" : "good"} />
           <Stat
             label="Comprometido por llegar"
-            value={formatCurrency(porLlegar.reduce((s, f) => s + f.montoEstimado, 0), moneda)}
-            hint={`${porLlegar.length} requisiciones`}
+            value={formatCurrency(porLlegar._sum.montoEstimado ?? 0, moneda)}
+            hint={`${porLlegar._count._all} requisiciones`}
           />
           <Stat label="Registradas" value={String(filas.length)} />
         </div>

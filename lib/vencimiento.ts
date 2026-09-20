@@ -23,7 +23,7 @@
  * servidor y se lee como ese dia; cualquier otra hora es un momento real y se
  * lee en la zona de la empresa (mismo criterio que `formatDia`).
  */
-import { claveDiaEnZona, ZONA_POR_OMISION } from "./periodos";
+import { claveDiaEnZona, medianocheEnZona, ZONA_POR_OMISION } from "./periodos";
 
 export const ESTADOS_ABIERTOS = ["DRAFT", "OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] as const;
 export const ESTADOS_TERMINADOS = ["COMPLETED", "CLOSED"] as const;
@@ -57,6 +57,32 @@ export function diaDelCompromiso(fecha: Date, zona: string): string {
     fecha.getUTCHours() === 0 && fecha.getUTCMinutes() === 0 &&
     fecha.getUTCSeconds() === 0 && fecha.getUTCMilliseconds() === 0;
   return esMedianocheUtc ? fecha.toISOString().slice(0, 10) : claveDiaEnZona(fecha, zona);
+}
+
+/**
+ * El filtro de «vencidas» PARA LA BASE, en un solo lugar.
+ *
+ * Existia dos veces y decia dos cosas distintas: el inicio contaba
+ * `dueDate < ahora` (al instante) y la lista traia 200 ordenes y despues
+ * filtraba en memoria por dia. Dos numeros para la misma pregunta, y ademas
+ * la lista mentia: si habia 500 vencidas, la pantalla a la que lleva el
+ * indicador del inicio no las tenia todas, porque el tope se aplicaba antes
+ * del filtro.
+ *
+ * El limite se calcula con los dos criterios de `diaDelCompromiso` —una fecha
+ * guardada a medianoche UTC es un dia de calendario; cualquier otra hora es
+ * un momento real que se lee en la zona de la empresa— y se toma el mayor.
+ * Eso deja un sobrante de, a lo sumo, el desfase de la zona: las pocas filas
+ * que caigan ahi las descarta `estadoDeVencimiento`, que sigue siendo la
+ * autoridad para lo que se DIBUJA.
+ */
+export function filtroDeVencidas(zona: string, ahora = new Date()) {
+  const hoy = claveDiaEnZona(ahora, zona);
+  const [anio, mes, dia] = hoy.split("-").map(Number);
+  const medianocheUtc = new Date(`${hoy}T00:00:00.000Z`);
+  const medianocheLocal = medianocheEnZona(anio, mes, dia, zona);
+  const limite = medianocheUtc > medianocheLocal ? medianocheUtc : medianocheLocal;
+  return { status: { in: [...ESTADOS_ABIERTOS] }, dueDate: { lt: limite } };
 }
 
 /** Dias de `a` a `b` entre dos claves "aaaa-mm-dd" (positivo si `b` es posterior). */
