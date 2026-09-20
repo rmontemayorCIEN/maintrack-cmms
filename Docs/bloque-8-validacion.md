@@ -37,21 +37,21 @@ que ya estaba bien) · **Pendiente manual** · **Bloqueado** · **Fuera de alcan
 | 4 | **La IA entregaba lo que la pantalla oculta.** Las herramientas recibían la empresa pero nunca el rol: un técnico o un solicitante obtenían en prosa los costos que el sistema les esconde en todas las pantallas. Cuatro rutas de IA además no comprobaban el rol | Corregido |
 | 5 | **Tres listas mostraban cifras incorrectas.** Traían un tope de registros y filtraban después, en memoria: con 500 vencidas la lista no las tenía todas, la refacción bajo mínimo en el lugar 350 no aparecía nunca, y «Solicitadas (12)» eran doce de las trescientas que cupieron | Corregido |
 | 6 | **La restauración nunca se había probado** | Corregido — ver «Evidencia de restauración» |
-| 7 | **No hay forma de enterarse de una falla nocturna.** Cero alertas en Google Cloud, ningún cron detectaba que dejó de correr, y las cuatro rutas respondían 200 aunque por dentro hubieran fallado | Parcial: los cron ya responden 500 y queda registro de cada corrida, visible en la consola del operador. **Faltan las alertas de Google Cloud** |
+| 7 | **No hay forma de enterarse de una falla nocturna.** Cero alertas en Google Cloud, ningún cron detectaba que dejó de correr, y las cuatro rutas respondían 200 aunque por dentro hubieran fallado | Corregido — ver «Monitoreo y alertas» |
 
 ### Altos
 
 | # | Hallazgo | Estado |
 |---|---|---|
 | 8 | Novena cuenta en la empresa demostrativa de producción, creada a mano, que contradecía la guía | Corregido: desactivada, no borrada |
-| 9 | El cierre de OT libera las solicitudes **antes** del candado de estado: quien pierde la carrera las deja sueltas | Pendiente |
-| 10 | `lib/api.ts` devuelve el mensaje crudo de cualquier excepción al cliente con 500, incluidos los de Prisma con nombre de modelo y campos | Pendiente |
-| 11 | Los adjuntos validan el tamaño **declarado**, no el real tras subir a Google Cloud Storage | Pendiente |
-| 12 | El logotipo admite SVG y se sirve como `image/svg+xml` desde el propio origen | Pendiente |
-| 13 | El límite de solicitudes públicas vive en memoria del proceso: con diez instancias son 50/hora, no 5 | Pendiente |
-| 14 | **No existe ninguna prueba de volumen**, así que todo el diagnóstico de rendimiento son estimaciones razonadas sobre el código, no mediciones | Pendiente |
-| 15 | Rendimiento: búsqueda global que trae 20 000 filas y filtra en memoria; `calcularIndicadores` con cinco consultas sin tope que alimenta cinco pantallas; faltan índices compuestos en las tablas que crecen; `DowntimeEvent` es el único modelo grande sin `organizationId` | Pendiente |
-| 16 | Los resúmenes diarios hacen ~500 consultas secuenciales con 40 usuarios, y comparten el grupo de conexiones con las pantallas | Pendiente |
+| 9 | El cierre de OT libera las solicitudes **antes** del candado de estado: quien pierde la carrera las deja sueltas | Corregido |
+| 10 | `lib/api.ts` devuelve el mensaje crudo de cualquier excepción al cliente con 500, incluidos los de Prisma con nombre de modelo y campos | Corregido: los de regla de negocio siguen llegando con su texto; los internos se contestan en genérico y se registran con empresa, usuario y rastro |
+| 11 | Los adjuntos validan el tamaño **declarado**, no el real tras subir a Google Cloud Storage | Corregido: se comprueba el peso real y el cupo con ese peso; lo que no cabe se borra del almacén |
+| 12 | El logotipo admite SVG y se sirve como `image/svg+xml` desde el propio origen | Corregido: ya no se admite, y los que existían se entregan inertes |
+| 13 | El límite de solicitudes públicas vive en memoria del proceso: con diez instancias son 50/hora, no 5 | Corregido: se cuenta en la base |
+| 14 | **No existe ninguna prueba de volumen**, así que todo el diagnóstico de rendimiento son estimaciones razonadas sobre el código, no mediciones | Corregido — ver «Rendimiento medido» |
+| 15 | Faltan índices compuestos en las tablas que crecen; `DowntimeEvent` es el único modelo grande sin `organizationId` | Corregido: doce índices compuestos y la columna, rellenada desde el activo |
+| 16 | Los resúmenes diarios hacen ~500 consultas secuenciales con 40 usuarios, y comparten el grupo de conexiones con las pantallas | Pendiente: es trabajo de fondo, no bloquea una pantalla |
 
 ### Medios y bajos
 
@@ -98,12 +98,19 @@ teléfono.
 | `prueba-bloque-8.ts` (nueva) | Que ninguna búsqueda use `contains` a pelo y que el ayudante se comporte bien en los **dos** motores, cada uno en su proceso; que dos corridas simultáneas del programador generen una sola orden; que un candado vencido se pueda retomar y que una corrida fallida quede marcada; que ninguna herramienta de IA devuelva importes a un rol que no los ve; que el filtro de vencidas de la base no pierda ninguna de las que la pantalla marca vencidas; que el bajo mínimo salga aunque quede al final de la lista |
 | `prueba-experiencia.ts` (ampliada) | Crear una orden y crear una requisición dos veces seguidas dejan una de cada una (201 + 409) |
 | `verificar-restauracion.ts` (nueva) | Conteos, relaciones, kardex, usuarios con su rol, empresas con su plan, adjuntos y bitácora de una base restaurada, comparados contra producción |
+| `prueba-bloque-8.ts` (ampliada) | Que un error de Prisma no le cuente al cliente cómo está hecho el sistema y que uno de regla de negocio sí le llegue con su texto; que el logotipo ya no admita SVG; que el límite de solicitudes frene a la sexta y no afecte a otra conexión; que cada paro pertenezca a la empresa de su equipo |
+| `sembrar-volumen.ts` + `prueba-rendimiento.ts` (nuevas) | El volumen de un piloto al cabo de un año, y el cronómetro sobre las mismas funciones que llaman las pantallas |
+| `prueba-rendimiento-real.sh` (nueva) | Lo mismo, pero en PostgreSQL del tamaño de producción, en una instancia nueva y vacía que se borra al terminar |
 
 **Cómo se comprobó que las pruebas sirven:** se quitó el candado del
 programador a propósito y la prueba falló con dos órdenes; se volvió a poner y
 pasó con una. La depuración de costos de la IA se escribió primero con una
 lista de nombres y la prueba encontró dos campos que se escapaban, lo que
 obligó a cambiarla por un patrón.
+
+La prueba de volumen **no** va en la corrida diaria: tarda y deja 400 000
+renglones en la base de desarrollo. Se corre cuando se toca una consulta de
+las pesadas o antes de un arranque.
 
 **Correr todo:**
 
@@ -180,23 +187,103 @@ alta disponibilidad. Una zona caída es una caída total hasta restaurar.
 | Fallas del programador por empresa | Campana de esa empresa |
 | Cambios relevantes | Bitácora de auditoría de cada empresa |
 
-### Lo que falta (pendiente, requiere decisión)
+### Lo que sale a buscar a una persona
 
-Ninguna alerta **sale** del sistema: hay que entrar a mirar. Para un piloto
-real hacen falta, en Google Cloud:
+Creadas con `./scripts/alertas.sh`, que es idempotente y deja escrito el
+umbral y la métrica de cada una. Todas avisan por correo a la cuenta del
+operador.
 
-| Alerta | Umbral sugerido | Canal |
-|---|---|---|
-| Servicio caído | Uptime check cada 5 min contra `/login` | Correo |
-| Errores 5xx | Más de 5 en 5 minutos | Correo |
-| Cron fallido | Job de Cloud Scheduler con resultado distinto de 200 | Correo |
-| Respaldo fallido | Operación de respaldo con estado distinto de exitoso | Correo |
-| Base sin espacio | Uso de disco por encima del 80 % | Correo |
+| Alerta | Cuándo suena |
+|---|---|
+| MainTrack no responde | La revisión de disponibilidad contra `/login` falla 5 minutos |
+| MainTrack devuelve errores (5xx) | Más de 5 respuestas de error en 5 minutos |
+| Un proceso programado dejó de correr | `/api/salud` contesta 503 durante 10 minutos |
+| La base se está llenando | Disco de Cloud SQL por encima del 80 % durante 10 minutos |
 
-Son cinco políticas y un canal de notificación. **No se crearon**: son cambios
-en la infraestructura de producción y no estaban autorizados.
+La tercera necesitaba algo que no existía. **Un proceso muerto no produce
+ninguna señal**: calla igual que uno sano. La métrica de Cloud Scheduler no
+sirve —mide intentos, no ausencias, y ni siquiera existe hasta que hay
+datos—, así que ahora hay `/api/salud`, que contesta 503 cuando un proceso
+lleva más de tres periodos sin terminar o acumula tres fallas seguidas, y una
+revisión de disponibilidad que le pega cada cinco minutos. Para contestar
+tiene que consultar la base, así que una caída de Cloud SQL también cae ahí.
+
+**Falta una:** que avise si un respaldo de Cloud SQL falla. No hay métrica
+estándar para eso; se revisa a mano con
+`gcloud sql backups list --instance maintrack-db`.
 
 ---
+
+## Rendimiento medido
+
+**Cómo se midió.** `scripts/sembrar-volumen.ts` crea una empresa con el
+volumen de un piloto al cabo de un año: 800 activos, 40 usuarios, 20 000
+órdenes con sus actividades, 5 000 solicitudes, 60 000 movimientos de
+almacén, 100 000 lecturas de medidor, 30 000 registros de auditoría, 20 000
+avisos y 3 000 paros. `scripts/prueba-rendimiento.ts` cronometra las **mismas
+funciones** que llaman las pantallas y falla si alguna pasa de 1.5 segundos.
+
+Se midió dos veces, y la diferencia importa:
+
+- **En SQLite** (la base de desarrollo), todo queda holgado. No dice mucho:
+  SQLite vive dentro del proceso, así que traer veinte mil renglones cuesta
+  microsegundos porque no hay red, ni serialización, ni conexiones que
+  compartir.
+- **En PostgreSQL**, con `./scripts/prueba-rendimiento-real.sh`, que crea una
+  instancia **nueva y vacía** del mismo tamaño que producción
+  (`db-f1-micro`), le aplica las migraciones, le siembra el volumen, mide y la
+  borra. No clona producción: no hay un solo dato de ningún cliente de por
+  medio.
+
+### Lo que se midió en PostgreSQL
+
+Instancia nueva del tamaño de producción (`db-f1-micro`), cachés frías, 20 000
+órdenes · 60 000 movimientos · 100 000 lecturas. Antes y después de corregir:
+
+| Pantalla | Antes | Después |
+|---|---|---|
+| Inicio del administrador | 6 624 ms | **2 432 ms** |
+| Calidad de datos | 6 402 ms | **960 ms** |
+| Inicio de la dirección | 5 167 ms | **1 996 ms** |
+| Indicadores (90 días) | 4 752 ms | **1 085 ms** |
+| Buscar «bomba» | 1 301 ms | 296 ms |
+| Órdenes de trabajo (200) | 695 ms | 250 ms |
+| Kardex (1 000) | 499 ms | 162 ms |
+| Expediente del activo | 495 ms | 62 ms |
+| Indicadores de almacén, dónde para la planta, almacén, bitácora, vencidas | < 250 ms | < 250 ms |
+
+### Qué estaba mal, y era distinto de lo que se suponía
+
+La auditoría había señalado la búsqueda global como el peor problema. Medida,
+resultó ser de las rápidas. **Lo caro era otra cosa:**
+
+1. **La revisión de calidad recorría todas las lecturas de todos los
+   medidores** para detectar saltos imposibles: cien mil renglones traídos a
+   memoria en cada carga del inicio del administrador, 2.4 de sus 6.4
+   segundos. Y era trabajo repetido: el sistema **ya** hace esa revisión al
+   registrar cada lectura y guarda el dictamen en el medidor. Ahora lo lee en
+   vez de recalcularlo.
+2. **Comparar dos columnas se hacía en JavaScript.** «Terminó antes de
+   empezar», «paro al revés» y «bajo mínimo» traían todas las filas para
+   descartar casi todas. La base sabe hacer eso.
+3. **`refaccionesBajoMinimo` traía 5 000 refacciones** en cada carga del
+   inicio de dirección, administración y compras.
+
+### Lo que sigue pendiente
+
+Los dos inicios de mando siguen sobre el límite de 1.5 s: **2.4 s** el del
+administrador y **2.0 s** el de la dirección, con cachés frías y en la
+instancia más chica que vende Google. La pieza que queda es
+`calcularIndicadores` (1 085 ms), que trae cinco consultas sin tope con sus
+actividades anidadas y suma en JavaScript lo que la base puede agregar. Pasar
+esos `reduce` a `aggregate`/`groupBy` es el siguiente paso; no se hizo aquí
+porque toca la función de la que dependen cinco pantallas y media docena de
+pruebas, y no se corrige eso al final de una jornada.
+
+**Los números tienen ruido.** Dos corridas de la misma prueba en la misma
+instancia dieron 1 229 ms y 4 752 ms para los indicadores. Una `db-f1-micro`
+recién creada no tiene la caché caliente y comparte CPU: sirven para ver el
+orden de magnitud y para comparar antes/después, no como promesa de tiempos.
 
 ## Plan del piloto
 
@@ -243,6 +330,8 @@ usarlo y vuelve al papel.
 | Restauración no comprobada | **Comprobada** el 20 de septiembre de 2026 |
 | Procesos críticos sin trazabilidad | Cubierto: bitácora inmutable, kardex, historial de avisos y ahora registro de corridas de procesos |
 | Errores frecuentes en móvil | Sin evidencia de errores, pero **no se ha probado en dispositivos físicos** |
+| Enterarse de una falla | **Cerrado.** Cuatro alertas activas por correo, incluida la del proceso que dejó de correr |
+| Rendimiento con volumen de piloto | **Medido** en PostgreSQL del tamaño de producción — ver «Rendimiento medido» |
 | Ausencia de responsable de soporte | Rafael Montemayor, por la sección Soporte dentro del producto |
 | Ausencia de procedimiento de recuperación | Documentado y probado |
 

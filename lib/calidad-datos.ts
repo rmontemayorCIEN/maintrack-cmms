@@ -22,7 +22,6 @@ import { filtrosDelProceso, DIAS_PARA_CERRAR } from "./saneamiento-ot";
 import { motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "./reglas-ot";
 
 const DIA = 86_400_000;
-const HORA = 3_600_000;
 
 export type NivelRegla = "ERROR" | "ADVERTENCIA" | "RECOMENDACION";
 
@@ -58,11 +57,19 @@ export type ResultadoRegla = {
 
 const MUESTRA = 25;
 
+/**
+ * `cantidad` es el numero REAL de incumplimientos; `hallazgos` es solo la
+ * muestra que se dibuja. Van separados porque hay reglas cuya consulta trae
+ * una muestra acotada —no tiene sentido traer siete mil renglones para
+ * enseñar veinticinco— pero cuyo conteo alimenta el indice de captura y
+ * tiene que ser exacto.
+ */
 function regla(
   base: Omit<ResultadoRegla, "cantidad" | "hallazgos">,
   hallazgos: Hallazgo[],
+  cantidad = hallazgos.length,
 ): ResultadoRegla {
-  return { ...base, cantidad: hallazgos.length, hallazgos: hallazgos.slice(0, MUESTRA) };
+  return { ...base, cantidad, hallazgos: hallazgos.slice(0, MUESTRA) };
 }
 
 const ot = (o: { id: string; number: string; title: string }, detalle?: string): Hallazgo => ({
@@ -112,6 +119,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     medidores, nMedidores, medidoresSinLectura,
     alertas,
     nOrdenes, nConFechas, nParosCerrados, nExistencias,
+    nTerminoAntes, nParosAlReves, nMedidoresImposibles,
   ] = await Promise.all([
     prisma.workOrder.count({ where: f.terminadas }),
     prisma.workOrder.findMany({ where: f.sinHoras, select: selOt }),
@@ -201,31 +209,48 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       select: { id: true, title: true, plan: { select: { id: true, name: true } } },
     }),
 
+    // «Termino antes de empezar» lo decide la base comparando las dos
+    // columnas. Antes se traian TODAS las ordenes con las dos fechas y se
+    // filtraban en memoria para encontrar, casi siempre, ninguna.
     prisma.workOrder.findMany({
-      where: { organizationId, startedAt: { not: null }, completedAt: { not: null } },
+      where: { organizationId, startedAt: { not: null }, completedAt: { lt: prisma.workOrder.fields.startedAt } },
       select: { ...selOt, startedAt: true, completedAt: true },
-    }).then((xs) => xs.filter((o) => o.completedAt! < o.startedAt!)),
+      take: MUESTRA,
+    }),
     prisma.downtimeEvent.findMany({
-      where: { organizationId, endedAt: { not: null } },
+      where: { organizationId, endedAt: { lt: prisma.downtimeEvent.fields.startedAt } },
       select: { id: true, startedAt: true, endedAt: true, asset: { select: selActivo } },
-    }).then((xs) => xs.filter((e) => e.endedAt! < e.startedAt)),
+      take: MUESTRA,
+    }),
 
     prisma.asset.findMany({
       where: { organizationId, OR: [{ purchaseDate: { not: null } }, { warrantyExpiry: { not: null } }] },
       select: { ...selActivo, purchaseDate: true, warrantyExpiry: true, commissionedAt: true },
     }),
 
+    /**
+     * Medidores con uso imposible, SIN recorrer sus lecturas.
+     *
+     * Esto recorria todas las lecturas de todos los medidores comparando cada
+     * una con la anterior: cien mil renglones traidos a memoria en cada carga
+     * del inicio del administrador, y 2.4 de los 6.4 segundos que tardaba esa
+     * pantalla. Era ademas trabajo repetido: el sistema YA hace esa revision
+     * al registrar cada lectura y guarda el resultado en el medidor
+     * (`proyeccionSuspendida` y `motivoSuspension`, ver lib/medidores.ts).
+     *
+     * Si un medidor viejo tuviera la marca desatrasada, se corrige con
+     * `scripts/recalcular-medidores.ts`, que es quien la mantiene.
+     */
     prisma.meter.findMany({
-      where: { organizationId },
-      select: {
-        id: true, name: true, tipo: true, unit: true, dailyAverage: true, maxIncrementoDiario: true,
-        asset: { select: selActivo },
-        readings: {
-          where: { estado: { not: "ANULADA" } },
-          orderBy: [{ readingAt: "asc" }, { id: "asc" }],
-          select: { value: true, readingAt: true, tipo: true, atipica: true },
-        },
+      where: {
+        organizationId,
+        OR: [
+          { proyeccionSuspendida: true },
+          { tipo: "HOROMETRO", dailyAverage: { gt: 24 } },
+        ],
       },
+      select: { id: true, name: true, tipo: true, dailyAverage: true, motivoSuspension: true, asset: { select: selActivo } },
+      take: MUESTRA,
     }),
     prisma.meter.count({ where: { organizationId } }),
     prisma.meter.findMany({
@@ -245,33 +270,28 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     prisma.workOrder.count({ where: { organizationId, startedAt: { not: null }, completedAt: { not: null } } }),
     prisma.downtimeEvent.count({ where: { organizationId, endedAt: { not: null } } }),
     prisma.partStock.count({ where: { organizationId } }),
+    // Conteos exactos de las dos reglas cuya muestra viene acotada.
+    prisma.workOrder.count({ where: { organizationId, startedAt: { not: null }, completedAt: { lt: prisma.workOrder.fields.startedAt } } }),
+    prisma.downtimeEvent.count({ where: { organizationId, endedAt: { lt: prisma.downtimeEvent.fields.startedAt } } }),
+    prisma.meter.count({
+      where: { organizationId, OR: [{ proyeccionSuspendida: true }, { tipo: "HOROMETRO", dailyAverage: { gt: 24 } }] },
+    }),
   ]);
 
   // ── Medidores con uso imposible ─────────────────────────────────────────
-  const medidoresImposibles: Hallazgo[] = [];
-  for (const m of medidores) {
+  // Lo que ya dictamino el sistema al registrar las lecturas, mas el promedio
+  // diario, que vive en el propio medidor.
+  const medidoresImposibles: Hallazgo[] = medidores.map((m) => {
     const problemas: string[] = [];
     if (m.tipo === "HOROMETRO" && m.dailyAverage > 24) problemas.push(`promedio de ${m.dailyAverage.toFixed(1)} h/día`);
-    for (let i = 1; i < m.readings.length; i++) {
-      const a = m.readings[i - 1];
-      const b = m.readings[i];
-      if (b.tipo !== "LECTURA") continue;
-      const horas = (b.readingAt.getTime() - a.readingAt.getTime()) / HORA;
-      const inc = b.value - a.value;
-      if (inc < 0) problemas.push(`lectura menor que la anterior el ${b.readingAt.toISOString().slice(0, 10)}`);
-      else if (m.tipo === "HOROMETRO" && inc > Math.max(0, horas) + 1e-9) {
-        problemas.push(`+${inc.toFixed(0)} h en ${horas.toFixed(0)} h de reloj el ${b.readingAt.toISOString().slice(0, 10)}`);
-      }
-    }
-    if (problemas.length) {
-      medidoresImposibles.push({
-        id: m.id,
-        etiqueta: `${m.asset.code} · ${m.name}`,
-        detalle: problemas.slice(0, 3).join("; "),
-        enlace: "/meters",
-      });
-    }
-  }
+    if (m.motivoSuspension) problemas.push(m.motivoSuspension);
+    return {
+      id: m.id,
+      etiqueta: `${m.asset.code} · ${m.name}`,
+      detalle: problemas.slice(0, 2).join("; "),
+      enlace: "/meters",
+    };
+  });
 
   // ── Alertas con fechas incoherentes ─────────────────────────────────────
   // Incoherente = anterior a la propia deteccion. Una fecha posterior que ya
@@ -305,7 +325,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     [
       ...terminoAntesDeInicio.map((o) => ot(o, "terminada antes de iniciarse")),
       ...parosAlReves.map((e) => activo(e.asset, `paro que termina antes de empezar (${e.startedAt.toISOString().slice(0, 10)})`)),
-    ]),
+    ], nTerminoAntes + nParosAlReves),
     regla({ clave: "costos-negativos", titulo: "Costos o cantidades negativas en órdenes", nivel: "ERROR",
       porque: "Un costo negativo resta del gasto real y hace ver barato lo que no lo fue.",
       enlace: "/work-orders", peso: 2, total: nOrdenes },
@@ -326,7 +346,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
       enlace: "/assets", peso: 1, total: fechasDeActivo.length }, fechasIncoherentes),
     regla({ clave: "medidores-imposibles", titulo: "Medidores con uso imposible", nivel: "ERROR",
       porque: "Un horómetro que suma más horas que las del reloj adelanta los planes por uso y falsea el promedio.",
-      enlace: "/meters", peso: 2, total: nMedidores }, medidoresImposibles),
+      enlace: "/meters", peso: 2, total: nMedidores }, medidoresImposibles, nMedidoresImposibles),
 
     // ── Advertencias ──
     regla({ clave: "ot-sin-horas", titulo: "Órdenes terminadas sin horas reales", nivel: "ADVERTENCIA", critica: true,

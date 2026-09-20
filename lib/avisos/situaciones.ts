@@ -50,12 +50,19 @@ export async function refaccionesCriticasAgotadas(organizationId: string) {
 
 /** Refacciones activas con mínimo, en o bajo él. */
 export async function refaccionesBajoMinimo(organizationId: string) {
-  const partes = await prisma.part.findMany({
-    where: { organizationId, active: true, minQuantity: { gt: 0 } },
+  // La comparacion entre las dos columnas la hace la base. Antes se traian
+  // cinco mil refacciones para filtrarlas en memoria, en cada carga del
+  // inicio de la direccion, de administracion y de compras: la que estaba
+  // bajo minimo en el lugar 5001 ademas no salia nunca.
+  return prisma.part.findMany({
+    where: {
+      organizationId, active: true, minQuantity: { gt: 0 },
+      quantityOnHand: { lte: prisma.part.fields.minQuantity },
+    },
     select: { id: true, code: true, name: true, quantityOnHand: true, minQuantity: true, unit: true },
-    take: 5000,
+    orderBy: { code: "asc" },
+    take: 200,
   });
-  return partes.filter((p) => p.quantityOnHand <= p.minQuantity);
 }
 
 /** Equipos de criticidad A, en servicio, sin ningún plan preventivo activo. */

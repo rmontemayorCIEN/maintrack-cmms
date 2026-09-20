@@ -473,6 +473,12 @@ async function main() {
       { organizationId: orgA.id, meterId: legado.id, value: 18420, readingAt: t(6) },
       { organizationId: orgA.id, meterId: legado.id, value: 20500, readingAt: t(2) },
     ] });
+    // Los renglones se insertan a mano porque simulan un dato heredado, pero
+    // el dictamen lo tiene que emitir el SISTEMA: es `recalcularMedidor` quien
+    // marca la cadena como inválida, y es esa marca la que lee la revisión de
+    // calidad. Sin esta línea la prueba estaría comprobando una conclusión que
+    // ella misma se inventó.
+    await recalcularMedidor(orgA.id, legado.id, ahora);
     const alertaVieja = await prisma.predictiveAlert.create({ data: { organizationId: orgA.id, assetId: a2.id, title: "Alerta vieja", message: "x", createdAt: t(5), projectedFailureAt: t(30) } });
     const fin = await prisma.workOrder.create({ data: { organizationId: orgA.id, number: "REV", title: "Al revés", assetId: a2.id, status: "COMPLETED", startedAt: t(1), completedAt: t(2) } });
 
