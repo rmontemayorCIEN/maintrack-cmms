@@ -23,6 +23,7 @@ import { formatDia, formatCurrency } from "./utils";
 import { accionesRapidasDe, puedeVerRuta, TITULO_INICIO, type AccionRapida, type Rol } from "./pantallas";
 import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./avisos/situaciones";
 import { filtroDeVencidas } from "./vencimiento";
+import { resumenDeInicio } from "./resumen-inicio";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -44,6 +45,15 @@ export type Inicio = {
   alDia: boolean;
   /** Dueño y administración, mientras la cuenta no esté lista: cuánto falta (el mismo número de /puesta-en-marcha). */
   puesta: { porcentaje: number; siguiente: string | null; estado: string } | null;
+  /**
+   * De cuándo son los indicadores y la calidad de datos que se muestran.
+   *
+   * Solo esas dos cifras vienen de un resumen guardado, que se recalcula cada
+   * cuarto de hora; lo demás del inicio se consulta en vivo. Se dice en
+   * pantalla porque una cifra sin fecha, cuando alguien acaba de cerrar
+   * órdenes y no se movió, se siente como un error del sistema.
+   */
+  calculadoEl: Date | null;
 };
 
 type Usuario = { id: string; role: string; isSuperAdmin: boolean; organizationId: string; organization: { timezone: string | null; currency: string } };
@@ -106,11 +116,20 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
     masDetalle: (armado.masDetalle ?? []).filter((d) => puedeVerRuta(rol, d.href)),
     tituloDetalle: armado.tituloDetalle ?? "Más detalle",
     alDia: bloques.length === 0, puesta,
+    calculadoEl: armado.calculadoEl ?? null,
   };
 }
 
 type Ctx = { user: Usuario; rol: Rol; zona: string; org: string; ahora: Date };
-type Armado = { resumen: Cifra[]; bloques: Bloque[]; masDetalle?: Inicio["masDetalle"]; tituloDetalle?: string };
+type Armado = {
+  resumen: Cifra[]; bloques: Bloque[]; masDetalle?: Inicio["masDetalle"]; tituloDetalle?: string;
+  /**
+   * De cuando son las cifras del resumen guardado. Solo en los inicios que lo
+   * usan: sin fecha, un numero que no se movio despues de cerrar cinco
+   * ordenes destruye la confianza mas rapido que la espera que se evito.
+   */
+  calculadoEl?: Date;
+};
 
 // ─────────────────────────────────────────── Piezas compartidas
 
@@ -180,17 +199,17 @@ async function avisosAbiertos(c: Ctx, tipos: string[]) {
 // ─────────────────────────────────────────── Propietario
 
 async function inicioPropietario(c: Ctx): Promise<Armado> {
-  const { calcularIndicadores, periodoDeLaEmpresa } = await import("./indicadores");
-  const periodo = await periodoDeLaEmpresa(c.org, 30, c.ahora);
-  const [kpi, cv, alertas, compras, agotadas, avisosAdmin] = await Promise.all([
-    calcularIndicadores(c.org, periodo, { ahora: c.ahora }),
+  const [{ datos: kpi, calculadoEl }, cv, alertas, compras, agotadas, avisosAdmin] = await Promise.all([
+    // Lo unico caro del inicio va por el resumen guardado (lib/resumen-inicio):
+    // son ventanas de 30 dias que no se mueven, y lo que SI se mueve —vencidas,
+    // criticas, agotadas, compras— se sigue consultando en vivo aqui abajo.
+    resumenDeInicio(c.org, c.ahora),
     criticasYVencidas(c),
     alertasAbiertas(c),
     comprasPorAutorizar(c),
     refaccionesCriticasAgotadas(c.org),
     avisosAbiertos(c, ["CONFIGURACION_INCOMPLETA", "INTEGRACION_CON_ERRORES", "LIMITE_PLAN_ALCANZADO", "PRUEBA_POR_TERMINAR", "PLAN_FALLO_GENERAR"]),
   ]);
-  const i = kpi.indicadores;
   const criticas: Renglon[] = [
     ...cv.criticas.map((o) => renglonOt(o, c.zona, c.ahora, { conResponsable: true })),
     ...alertas.filter((a) => a.tono === "critico"),
@@ -199,11 +218,12 @@ async function inicioPropietario(c: Ctx): Promise<Armado> {
   return {
     // Tendencias, mezcla, costo por equipo e indicadores secundarios viven en Indicadores y Reportes.
     masDetalle: [{ texto: "Indicadores y tendencias", href: "/indicadores" }, { texto: "Reportes", href: "/reports" }],
+    calculadoEl,
     resumen: [
       { etiqueta: "OT vencidas", valor: n(cv.nVencidas), tono: cv.nVencidas ? "critico" : "bien", enlace: "/work-orders?vencidas=1" },
-      { etiqueta: "Cumplimiento preventivo (30 días)", valor: pct(i.cumplimientoPreventivo.valor), tono: (i.cumplimientoPreventivo.valor ?? 100) < 80 ? "atencion" : "bien", enlace: "/indicadores" },
-      { etiqueta: "Disponibilidad (30 días)", valor: pct(i.disponibilidad.valor), tono: (i.disponibilidad.valor ?? 100) < 90 ? "atencion" : "bien", enlace: "/indicadores" },
-      { etiqueta: "Costo de mantenimiento (30 días)", valor: formatCurrency(kpi.costos.total, c.user.organization.currency), tono: "normal", enlace: "/reports" },
+      { etiqueta: "Cumplimiento preventivo (30 días)", valor: pct(kpi.cumplimiento), tono: (kpi.cumplimiento ?? 100) < 80 ? "atencion" : "bien", enlace: "/indicadores" },
+      { etiqueta: "Disponibilidad (30 días)", valor: pct(kpi.disponibilidad), tono: (kpi.disponibilidad ?? 100) < 90 ? "atencion" : "bien", enlace: "/indicadores" },
+      { etiqueta: "Costo de mantenimiento (30 días)", valor: formatCurrency(kpi.costoTotal, c.user.organization.currency), tono: "normal", enlace: "/reports" },
     ],
     bloques: [
       bloque("situacion-critica", "Situación crítica", criticas, { descripcion: "Órdenes críticas, alertas críticas y refacciones agotadas que detienen trabajo.", total: cv.nCriticas + alertas.filter((a) => a.tono === "critico").length + agotadas.filter((p) => p.detieneTrabajo).length }),
@@ -228,12 +248,13 @@ async function inicioAdministrador(c: Ctx): Promise<Armado> {
     avisosAbiertos(c, ["CONFIGURACION_INCOMPLETA", "INTEGRACION_CON_ERRORES", "LIMITE_PLAN_ALCANZADO", "PRUEBA_POR_TERMINAR"]),
     avisosAbiertos(c, ["PLAN_SIN_PROGRAMACION", "PLAN_FALLO_GENERAR", "ACTIVO_CRITICO_SIN_PLAN", "MEDIDOR_SIN_LECTURA"]),
     prisma.entregaAviso.count({ where: { organizationId: c.org, estado: "FALLIDA", createdAt: { gte: new Date(c.ahora.getTime() - 7 * DIA) } } }),
-    import("./calidad-datos").then((m) => m.revisarCalidad(c.org, c.ahora)).catch(() => []),
+    resumenDeInicio(c.org, c.ahora),
   ]);
-  const problemas = calidad.filter((r) => r.cantidad > 0).sort((a, b) => b.peso - a.peso);
+  const problemas = calidad.datos.problemas;
   const puesta = await import("./puesta-en-marcha").then((m) => m.puestaEnMarcha(c.org)).catch(() => null);
   return {
     tituloDetalle: "Administración",
+    calculadoEl: calidad.calculadoEl,
     masDetalle: [
       { texto: "Usuarios", href: "/settings?s=usuarios" }, { texto: "Configuración", href: "/settings?s=organizacion" },
       { texto: "Catálogos", href: "/catalogs" }, { texto: "Reglas de avisos", href: "/settings?s=avisos" },

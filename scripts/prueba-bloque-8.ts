@@ -323,6 +323,57 @@ async function main() {
     const cruzados = paros.filter((p) => p.organizationId !== p.asset.organizationId);
     revisar(`los ${paros.length} paros revisados coinciden con la empresa de su equipo`,
       cruzados.length === 0, cruzados.slice(0, 5).map((p) => p.id));
+
+    // ════════════════ 7. El resumen del inicio dice lo mismo que el cálculo vivo
+    //
+    // El inicio de dirección y el de administración leen un resumen guardado
+    // que se recalcula cada cuarto de hora, en vez de calcular en cada carga.
+    // Lo que NO puede pasar es que ese atajo diga otra cosa que el cálculo de
+    // verdad: seria cambiar lentitud por cifras equivocadas, que es peor.
+    console.log("\n7. El resumen del inicio no inventa cifras");
+
+    const { resumenDeInicio, olvidarResumen, FRESCURA_MINUTOS } = await import("../lib/resumen-inicio");
+    const { calcularIndicadores, periodoDeLaEmpresa } = await import("../lib/indicadores");
+    const { revisarCalidad } = await import("../lib/calidad-datos");
+
+    await olvidarResumen(org.id);
+    const ahora = new Date();
+    const primero = await resumenDeInicio(org.id, ahora);
+    const periodo30 = await periodoDeLaEmpresa(org.id, 30, ahora);
+    const vivo = await calcularIndicadores(org.id, periodo30, { ahora });
+    const calidadViva = (await revisarCalidad(org.id, ahora)).filter((r) => r.cantidad > 0);
+    revisar("las cifras guardadas son las mismas que calcula la función en vivo",
+      primero.datos.cumplimiento === vivo.indicadores.cumplimientoPreventivo.valor &&
+      primero.datos.disponibilidad === vivo.indicadores.disponibilidad.valor &&
+      primero.datos.costoTotal === vivo.costos.total &&
+      primero.datos.problemas.length === calidadViva.length,
+      { guardado: primero.datos.cumplimiento, vivo: vivo.indicadores.cumplimientoPreventivo.valor, problemas: [primero.datos.problemas.length, calidadViva.length] });
+
+    const segundo = await resumenDeInicio(org.id, new Date(ahora.getTime() + 60_000));
+    revisar("un minuto después no recalcula: entrega el mismo resumen",
+      segundo.calculadoEl.getTime() === primero.calculadoEl.getTime());
+
+    // Vencido: fuera de una petición no hay a quién contestarle primero, así
+    // que recalcula de una vez en vez de quedarse con lo viejo para siempre.
+    await prisma.resumenInicio.update({
+      where: { organizationId: org.id },
+      data: { calculadoEl: new Date(ahora.getTime() - (FRESCURA_MINUTOS + 5) * 60_000) },
+    });
+    const tercero = await resumenDeInicio(org.id);
+    revisar(`pasados ${FRESCURA_MINUTOS} min se vuelve a calcular`,
+      tercero.calculadoEl.getTime() > primero.calculadoEl.getTime());
+
+    // Y el inicio de verdad usa el resumen: lo dice la fecha que devuelve.
+    const { inicioDe } = await import("../lib/inicio");
+    const duenio = await prisma.user.findFirstOrThrow({ where: { organizationId: org.id, role: "ADMIN" } });
+    const inicio = await inicioDe({ ...duenio, organization: org } as never);
+    revisar("el inicio informa de cuándo son esas cifras", inicio.calculadoEl instanceof Date, inicio.calculadoEl);
+
+    const tecnico = await prisma.user.findFirst({ where: { organizationId: org.id, role: "TECHNICIAN" } });
+    if (tecnico) {
+      const suyo = await inicioDe({ ...tecnico, organization: org } as never);
+      revisar("el inicio del técnico no usa resumen: todo lo suyo es de ahora", suyo.calculadoEl === null);
+    }
   } finally {
     await prisma.procesoProgramado.deleteMany({ where: { clave: { startsWith: `prueba:${sello}` } } });
     await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

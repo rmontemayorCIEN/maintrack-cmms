@@ -5,6 +5,7 @@ import { inicioDe, type Bloque, type Cifra, type Renglon, type Tono } from "@/li
 import { PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
 import { IconoMenu } from "@/components/shell/iconos";
 import { cn } from "@/lib/utils";
+import { CuandoSeCalculo } from "./actualizar";
 
 export const metadata = { title: "Inicio" };
 export const dynamic = "force-dynamic";
@@ -60,6 +61,8 @@ export default async function InicioPage() {
           {inicio.resumen.map((c) => <TarjetaCifra key={c.etiqueta} cifra={c} />)}
         </section>
       ) : null}
+
+      {inicio.calculadoEl ? <CuandoSeCalculo calculadoEl={inicio.calculadoEl.toISOString()} /> : null}
 
       {inicio.alDia ? (
         <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-800">

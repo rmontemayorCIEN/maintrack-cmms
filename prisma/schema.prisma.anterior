@@ -296,6 +296,7 @@ model Organization {
   passwordResets     PasswordReset[]
   importBatches      ImportBatch[]
   downtimeEvents DowntimeEvent[]
+  resumenInicio  ResumenInicio?
 }
 
 model User {
@@ -3258,4 +3259,29 @@ model ProcesoProgramado {
 
   @@index([ultimoFin])
   @@index([organizationId])
+}
+
+/// Lo caro del inicio, ya calculado.
+///
+/// El inicio de dirección y el de administración tardaban segundos con un año
+/// de operación, y midiendo pieza por pieza resultó que el 98 % del costo eran
+/// solo dos: los indicadores del periodo y la revisión de calidad de datos.
+/// Las demás —vencidas, críticas, agotadas, compras por firmar— son conteos y
+/// cuestan milisegundos.
+///
+/// Esas dos, además, son las que NO se mueven: son ventanas de 30 y 90 días.
+/// Cerrar una orden mueve el cumplimiento menos de medio punto. Por eso se
+/// calculan cada cuarto de hora y no en cada carga, y por eso lo dinámico
+/// sigue consultándose en vivo: no hace falta congelarlo, ya es gratis.
+///
+/// Se guarda lo que el inicio DIBUJA —tres cifras y las reglas de captura
+/// incumplidas—, no el resultado completo, que trae miles de renglones de
+/// detalle que esa pantalla nunca muestra.
+model ResumenInicio {
+  organizationId String   @id
+  calculadoEl    DateTime
+  /// JSON: cumplimiento, disponibilidad, costo del periodo y reglas incumplidas.
+  datos          String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }

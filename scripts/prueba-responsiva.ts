@@ -641,12 +641,22 @@ async function main() {
     revisar("QR: la pantalla no pide la cámara al cargar; ofrece «Abrir cámara y escanear» y la captura manual", alCargar.llamadas === 0 && alCargar.boton && alCargar.manual, alCargar);
     // Ruta del lector: el del navegador si existe; si no, jsQR. Se prueba jsQR quitando el del navegador
     // (así lee un iPhone), y el nativo cuando el Chrome de la prueba lo trae.
-    const leerCon = async (quitarNativo: boolean) => {
+    /**
+     * Se intenta dos veces, y no es por tapar un defecto.
+     *
+     * La camara es un archivo de video que Chrome reproduce en bucle, y el
+     * lector tiene que atrapar un cuadro con el codigo. Si la maquina esta
+     * ocupada, el video arranca tarde y la ventana se pierde: la misma prueba
+     * paso y fallo el mismo dia sin que cambiara una linea. Si el producto no
+     * lee el codigo, fallan las dos.
+     */
+    const leerCon = async (quitarNativo: boolean, intento = 1): Promise<{ pidio: { llamadas: number; pedido: string }; llego: boolean; ruta: string; apagada: boolean }> => {
       await t.ir(`${base}/escanear`, 1000);
       if (quitarNativo) await t.evaluar(`delete window.BarcodeDetector; window.BarcodeDetector = undefined; true`);
       await tocar(t, "Abrir cámara y escanear");
       const pidio = await t.evaluar<{ llamadas: number; pedido: string }>(`({ llamadas: window.__camara.llamadas, pedido: window.__camara.pedido })`);
-      const llego = await hasta(t, `location.pathname === "/assets/${activos[0].id}"`, 15_000);
+      const llego = await hasta(t, `location.pathname === "/assets/${activos[0].id}"`, 25_000);
+      if (!llego && intento === 1) return leerCon(quitarNativo, 2);
       const apagada = await t.evaluar<boolean>(`true`); // la página ya cambió: el flujo se detuvo al leer (se revisa abajo al cancelar)
       return { pidio, llego, ruta: await t.evaluar<string>("location.pathname"), apagada };
     };

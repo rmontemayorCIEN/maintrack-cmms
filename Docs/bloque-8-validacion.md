@@ -294,9 +294,42 @@ corrigió:
   fallas y las necesitan; el cumplimiento y el backlog no. Quitarlas de esas
   dos elimina una consulta anidada y miles de renglones que nadie leía.
 
+### El inicio ya no calcula en la carga
+
+Medido pieza por pieza, el 98 % del costo del inicio eran dos cosas: los
+indicadores del periodo (617 ms) y la revisión de calidad de datos (363 ms).
+Todo lo demás —vencidas, críticas, refacciones agotadas, compras por firmar—
+cuesta entre 0 y 9 ms, porque son conteos con los índices nuevos.
+
+Y esas dos son justamente las que no se mueven: son ventanas de 30 y 90 días.
+Con quinientas órdenes juzgadas, cerrar una mueve el cumplimiento dos décimas.
+Así que ahora se calculan **cada 15 minutos** y se guardan (`ResumenInicio`);
+lo dinámico se sigue consultando en vivo, porque no hace falta congelar lo que
+ya es gratis.
+
+No lo recalcula un proceso programado sino **el propio uso**: quien abre el
+inicio y encuentra el resumen vencido no espera —se le entrega el guardado— y
+el recálculo ocurre después de contestarle. Así, una empresa que nadie abre no
+cuesta nada, el primero de la mañana ve cifras de esa mañana, y si algo falla
+la siguiente visita lo repara. La pantalla dice de cuándo son las cifras y trae
+un botón para recalcularlas al momento.
+
+| | Antes | Después |
+|---|---|---|
+| Inicio de la dirección | 687 ms | **38 ms** |
+| Inicio del administrador | 435 ms | **47 ms** |
+
+(Medido en SQLite, donde el resto ya estaba holgado; en PostgreSQL la
+proporción es la misma y la diferencia absoluta, mayor.)
+
+La prueba compara, cifra por cifra, lo guardado contra lo que calcula la
+función en vivo: cambiar lentitud por números equivocados habría sido peor que
+la lentitud.
+
 ### Lo que sigue pendiente
 
-**Los dos inicios de mando siguen sobre el límite**: 3.1 s el del
+~~**Los dos inicios de mando siguen sobre el límite**~~ — resuelto arriba. Lo
+que decía este párrafo:: 3.1 s el del
 administrador y 2.7 s el de la dirección, en frío. No es una consulta lenta:
 es que esas pantallas piden *todo* a la vez —indicadores, calidad de datos,
 críticas, vencidas, compras por autorizar, refacciones bajo mínimo, avisos y
@@ -422,6 +455,14 @@ fondo: no bloquea ninguna pantalla.
 
 **Pruebas pendientes:** dispositivos físicos (iPhone y Android reales) y
 cámara con QR real. Son las dos únicas que no se pueden automatizar aquí.
+
+**Una prueba intermitente, dicha sin adornos:** la lectura del QR con cámara
+simulada pasa unas corridas y falla otras, con el mismo código —se verificó
+pasando y fallando el mismo día—. Se le agregó un reintento y no bastó, así
+que el problema está en el arnés (un video falso que Chrome reproduce en
+bucle), no en el producto. Las otras cuatro revisiones del escáner —no pedir
+la cámara al cargar, cancelar, apagarla, y el permiso negado— pasan siempre.
+Queda como otra razón para probarlo en un teléfono de verdad.
 
 **Recomendación: listo para un piloto acompañado.** Las condiciones que
 quedan:
