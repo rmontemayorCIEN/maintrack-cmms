@@ -3,6 +3,7 @@ import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palet
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
+import { puedeVerRuta } from "@/lib/pantallas";
 import { consumoDe, PLANES, type ClavePlan } from "@/lib/planes";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { PanelSuscripcion } from "@/components/panel-suscripcion";
@@ -11,6 +12,8 @@ import { consumoIa } from "@/lib/ia/consumo";
 import { COMPLEMENTO_IA, iaDeLaOrganizacion, planDe } from "@/lib/planes";
 import { instalacionDe } from "@/lib/instalaciones";
 import { PanelApariencia } from "./apariencia";
+import { PanelVoz } from "./voz";
+import { VOCES, VOZ_POR_OMISION } from "@/lib/voz";
 import type { ClaveAcento, ClaveDensidad, ClaveEscala } from "@/lib/apariencia";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
 import { FichasPlanes } from "./planes";
@@ -200,6 +203,14 @@ export default async function SettingsPage({
           logoUrl={org.logoUrl}
           puedeEditarMarca={can(user.role, "settings:write")}
         />
+      ) : null}
+
+      {/* La voz solo le sirve a quien oye el parte, que es quien ve el
+          panorama de la empresa: el mismo criterio que protege esa ruta. */}
+      {activa === "apariencia" && puedeVerRuta(user.role, "/indicadores") ? (
+        <div className="mt-4">
+          <PanelVoz voces={VOCES} elegida={user.vozBrief ?? VOZ_POR_OMISION} />
+        </div>
       ) : null}
 
       {activa === "jornada" && jornadaDatos ? (

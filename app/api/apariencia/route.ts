@@ -1,18 +1,28 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { ok, withAuth } from "@/lib/api";
+import { VOCES } from "@/lib/voz";
+
+const CLAVES_DE_VOZ = VOCES.map((v) => v.id) as unknown as [string, ...string[]];
 
 /**
- * Preferencias de apariencia.
+ * Preferencias de como se ve —y como se oye— el sistema.
  *
- * La escala y la densidad se guardan en el usuario; el color y el logo en la
- * organizacion, y esos si piden permiso de configuracion. Nadie deberia poder
- * cambiarle el tamaño de letra a otro, ni un tecnico cambiar la identidad
- * visual de la empresa.
+ * La escala, la densidad y la voz del parte se guardan en el usuario; el color
+ * y el logo en la organizacion, y esos si piden permiso de configuracion.
+ * Nadie deberia poder cambiarle el tamaño de letra a otro, ni un tecnico
+ * cambiar la identidad visual de la empresa.
  */
 const personal = z.object({
   escalaUi: z.enum(["NORMAL", "GRANDE", "MAYOR"]).optional(),
   densidadUi: z.enum(["COMPACTA", "COMODA", "AMPLIA"]).optional(),
+  /**
+   * Con que voz oye el parte del dia. Tambien es personal: al director le
+   * puede gustar una y a su jefe de mantenimiento otra. Se valida contra el
+   * catalogo para no guardar una voz que Google no conoce —eso daria un
+   * silencio sin explicacion a la hora de escuchar—.
+   */
+  vozBrief: z.enum(CLAVES_DE_VOZ).nullable().optional(),
 });
 
 const empresa = z.object({

@@ -29,7 +29,8 @@ export async function GET() {
       organization: user.organization,
     });
     const brief = await redactarBrief(user.organization as never, guion, { userId: user.id });
-    const voz = await sintetizar(orgId, brief.texto);
+    // La voz que escogio esta persona en Configuracion. Nula = la de omision.
+    const voz = await sintetizar(orgId, brief.texto, user.vozBrief);
 
     if (!voz) {
       return new Response(null, {

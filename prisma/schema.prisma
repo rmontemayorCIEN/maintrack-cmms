@@ -334,6 +334,11 @@ model User {
   /// configurable. Va por usuario y no por organizacion porque el almacenista
   /// y el jefe de mantenimiento no miran lo mismo.
   vistasTabla       String    @default("{}")
+  /// Con que voz quiere oir el parte del dia (lib/voz.ts). Nula = la de
+  /// omision. Va por usuario y no por empresa porque es una preferencia de
+  /// oido, como la escala de letra: al director le puede gustar una y a su
+  /// jefe de mantenimiento otra.
+  vozBrief          String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

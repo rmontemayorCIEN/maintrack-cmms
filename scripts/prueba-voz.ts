@@ -8,7 +8,7 @@
  *
  *   npx tsx scripts/prueba-voz.ts
  */
-import { conPausas, huella, RITMO, VOZ } from "../lib/voz";
+import { conPausas, huella, nombreDeVoz, RITMO, VOCES, VOZ_POR_OMISION, vozValida } from "../lib/voz";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle = "") {
@@ -40,15 +40,31 @@ revisar("un punto decimal NO abre una pausa",
   !decimal.includes("99. [pause] 9") && decimal.includes("99.9"), decimal);
 
 console.log("\nLa huella del audio guardado\n");
-const a = huella("mismo texto");
-revisar("el mismo texto da la misma huella", a === huella("mismo texto"));
-revisar("otro texto da otra huella", a !== huella("otro texto"));
-revisar("la huella lleva la voz y el ritmo, para que un cambio regenere el audio",
-  huella("x").length === 32 && `${VOZ}|${RITMO}`.length > 0, `${VOZ} a ${RITMO}`);
+const voz = nombreDeVoz(VOZ_POR_OMISION);
+const a = huella("mismo texto", voz);
+revisar("el mismo texto y la misma voz dan la misma huella", a === huella("mismo texto", voz));
+revisar("otro texto da otra huella", a !== huella("otro texto", voz));
+revisar("CAMBIAR DE VOZ da otra huella: si no, se seguiría oyendo la vieja",
+  a !== huella("mismo texto", nombreDeVoz("Orus")), "Despina contra Orus");
 
-console.log("\nLa voz escogida\n");
-revisar("es una voz de español latino, no de España", VOZ.startsWith("es-US-"), VOZ);
-revisar("es una voz neuronal de las buenas", VOZ.includes("Chirp3-HD"), VOZ);
+console.log("\nEl catálogo de voces\n");
+revisar("todas son de español latino, ninguna de España",
+  VOCES.every((v) => nombreDeVoz(v.id).startsWith("es-US-")), `${VOCES.length} voces`);
+revisar("todas son neuronales de las buenas", VOCES.every((v) => nombreDeVoz(v.id).includes("Chirp3-HD")));
+revisar("hay voces de hombre y de mujer",
+  VOCES.some((v) => v.quien === "hombre") && VOCES.some((v) => v.quien === "mujer"),
+  `${VOCES.filter((v) => v.quien === "mujer").length} y ${VOCES.filter((v) => v.quien === "hombre").length}`);
+revisar("cada una dice cómo suena, para poder escoger sin oírlas todas",
+  VOCES.every((v) => v.como.length > 4));
+revisar("ninguna clave repetida", new Set(VOCES.map((v) => v.id)).size === VOCES.length);
+revisar("la de omisión está en el catálogo", vozValida(VOZ_POR_OMISION), VOZ_POR_OMISION);
+
+console.log("\nUna voz guardada que ya no ofrecemos\n");
+revisar("una clave desconocida NO se acepta", !vozValida("VozQueYaNoExiste"));
+revisar("y cae a la de omisión en vez de romper",
+  nombreDeVoz("VozQueYaNoExiste") === nombreDeVoz(VOZ_POR_OMISION), nombreDeVoz("VozQueYaNoExiste"));
+revisar("sin preferencia, también la de omisión", nombreDeVoz(null) === nombreDeVoz(VOZ_POR_OMISION));
+
 revisar("se lee más lento que lo normal", RITMO < 1, String(RITMO));
 
 console.log(`\n${fallas ? `${fallas} FALLARON` : "Todo bien"}\n`);

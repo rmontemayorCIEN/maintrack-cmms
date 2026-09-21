@@ -37,14 +37,50 @@
 import { createHash } from "crypto";
 import { guardarArchivo, leerArchivo } from "./almacenamiento";
 
-/**
- * La voz. Escogida oyendo las treinta de es-US con el parte real, no por su
- * ficha. Cambiarla es cambiar esta linea; el audio guardado lleva el nombre
- * de la voz en su huella, asi que se regenera solo.
- */
 export const PROYECTO = "maintrack-cmms-4821";
-export const VOZ = "es-US-Chirp3-HD-Despina";
 export const IDIOMA = "es-US";
+
+/**
+ * Las voces que se ofrecen, de las treinta que trae es-US.
+ *
+ * Se curaron oyendolas con el parte real, no por su ficha: la mitad de las
+ * treinta suenan igual entre si o se atoran con los codigos de equipo. Doce
+ * bien distintas sirven mas que treinta donde nadie sabe cual escoger.
+ *
+ * La descripcion es para que alguien pueda decidir SIN oirlas todas, pero el
+ * selector deja probar cada una: los nombres —Despina, Achird, Kore— no le
+ * dicen nada a nadie, y elegir voz por su nombre es elegir a ciegas.
+ */
+export const VOCES = [
+  { id: "Aoede", quien: "mujer", como: "cálida, conversacional" },
+  { id: "Despina", quien: "mujer", como: "suave, tono bajo" },
+  { id: "Kore", quien: "mujer", como: "firme, de reporte" },
+  { id: "Leda", quien: "mujer", como: "joven, ágil" },
+  { id: "Sulafat", quien: "mujer", como: "serena, con cuerpo" },
+  { id: "Achernar", quien: "mujer", como: "clara y pausada" },
+  { id: "Achird", quien: "hombre", como: "cercano, de confianza" },
+  { id: "Algieba", quien: "hombre", como: "grave y tranquilo" },
+  { id: "Charon", quien: "hombre", como: "neutro, informativo" },
+  { id: "Orus", quien: "hombre", como: "seguro, con energía" },
+  { id: "Puck", quien: "hombre", como: "ligero, despierto" },
+  { id: "Schedar", quien: "hombre", como: "formal, de junta" },
+] as const;
+
+export type ClaveVoz = (typeof VOCES)[number]["id"];
+
+/** La de omision, para quien no ha escogido. */
+export const VOZ_POR_OMISION: ClaveVoz = "Despina";
+
+/** El nombre completo que entiende Google. */
+export function nombreDeVoz(clave: string | null | undefined): string {
+  const elegida = VOCES.find((v) => v.id === clave)?.id ?? VOZ_POR_OMISION;
+  return `${IDIOMA}-Chirp3-HD-${elegida}`;
+}
+
+/** Si la clave guardada sigue siendo una voz que ofrecemos. */
+export function vozValida(clave: string | null | undefined): clave is ClaveVoz {
+  return VOCES.some((v) => v.id === clave);
+}
 
 /** Mas lento que lo normal: son cifras, y al volante no hay repetir. */
 export const RITMO = 0.95;
@@ -80,12 +116,12 @@ export function conPausas(texto: string): string {
 }
 
 /** La huella del audio: si cambia el texto, la voz o el ritmo, es otro archivo. */
-export function huella(texto: string): string {
-  return createHash("sha256").update(`${VOZ}|${RITMO}|${texto}`).digest("hex").slice(0, 32);
+export function huella(texto: string, voz: string): string {
+  return createHash("sha256").update(`${voz}|${RITMO}|${texto}`).digest("hex").slice(0, 32);
 }
 
-function rutaDe(organizationId: string, texto: string): string {
-  return `org-${organizationId}/voz/${huella(texto)}.mp3`;
+function rutaDe(organizationId: string, texto: string, voz: string): string {
+  return `org-${organizationId}/voz/${huella(texto, voz)}.mp3`;
 }
 
 export type Sintesis = {
@@ -110,9 +146,15 @@ const USD_POR_CARACTER = 30 / 1_000_000;
 export async function sintetizar(
   organizationId: string,
   texto: string,
+  /** La voz que escogio la persona. Sin ella, la de omision. */
+  clave?: string | null,
 ): Promise<Sintesis | null> {
   if (!texto.trim()) return null;
-  const ruta = rutaDe(organizationId, texto);
+  const voz = nombreDeVoz(clave);
+  // La voz entra en la huella: al cambiarla, el audio guardado deja de servir
+  // y se regenera solo. Sin esto, cambiar de voz no se oiria hasta que
+  // cambiara el texto.
+  const ruta = rutaDe(organizationId, texto, voz);
 
   // Lo guardado primero: el mismo parte se oye varias veces.
   try {
@@ -140,7 +182,7 @@ export async function sintetizar(
     const markup = conPausas(texto);
     const [respuesta] = await cliente.synthesizeSpeech({
       input: { markup },
-      voice: { languageCode: IDIOMA, name: VOZ },
+      voice: { languageCode: IDIOMA, name: voz },
       audioConfig: { audioEncoding: "MP3", speakingRate: RITMO },
     });
     const contenido = respuesta.audioContent;
