@@ -159,8 +159,27 @@ async function main() {
 
   let servidor: ChildProcess | null = null;
   let chrome: ChildProcess | null = null;
-  const base = process.env.BASE_URL ?? "http://127.0.0.1:3207";
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "start", "-p", "3207", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+
+  /**
+   * Puerto propio del SERVIDOR en cada corrida, por el mismo motivo que el de
+   * Chrome —y costo mas caro todavia—.
+   *
+   * Con el puerto fijo 3207, un `next start` de una corrida interrumpida
+   * seguia escuchando ahi. El `next start` nuevo fallaba en silencio por
+   * puerto ocupado y la prueba se conectaba AL VIEJO, que sirve el build de
+   * hace horas: el HTML pedia archivos de cliente que ese build ya no tiene,
+   * el navegador tiraba ChunkLoadError y la pantalla mostraba «Application
+   * error». Es decir, la prueba reprobaba un codigo correcto.
+   *
+   * Lo peor es como enganaba: fallaba solo en las pantallas cuyo archivo
+   * habia cambiado desde ese build, asi que parecia senalar justo lo ultimo
+   * que uno toco. Se persiguio medio dia un defecto que no existia.
+   */
+  const PUERTO_APP = 3400 + Math.floor(Math.random() * 400);
+  const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO_APP}`;
+  if (!process.env.BASE_URL) {
+    servidor = spawn("npx", ["next", "start", "-p", String(PUERTO_APP), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  }
   const perfil = join(tmpdir(), `mt-chrome-${Date.now()}`);
   /**
    * Puerto propio de esta corrida, y limpieza de lo que haya quedado vivo.
@@ -1290,7 +1309,23 @@ async function main() {
     try { execSync(`pkill -f 'user-data-dir=${perfil}' || true`, { stdio: "ignore" }); } catch { /* ya no estaba */ }
     rmSync(ARCHIVOS, { recursive: true, force: true });
     for (const id of creadas) rmSync(join(process.cwd(), ".almacen", `org-${id}`), { recursive: true, force: true });
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }
+    /**
+     * El servidor se mata a conciencia, no de compromiso.
+     *
+     * `npx next start` deja un nieto llamado `next-server` que NO muere con un
+     * SIGTERM al grupo: uno de esos sobrevivio horas ocupando el puerto y
+     * envenenando cada corrida siguiente. Primero se pide por las buenas, y
+     * lo que siga escuchando en el puerto de esta corrida se cierra a la
+     * fuerza.
+     */
+    if (servidor?.pid) {
+      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ }
+      await esperar(1500);
+      try { process.kill(-servidor.pid, "SIGKILL"); } catch { /* ya terminó */ }
+    }
+    if (!process.env.BASE_URL) {
+      try { execSync(`lsof -ti:${PUERTO_APP} | xargs kill -9 2>/dev/null || true`, { stdio: "ignore" }); } catch { /* nada escuchando */ }
+    }
   }
   console.log(fallos ? `\n${fallos} revisión(es) fallaron` : "\nTodo bien");
   await prisma.$disconnect();
