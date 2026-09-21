@@ -30,7 +30,7 @@
  *
  *   npx tsx scripts/prueba-responsiva.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { closeSync, ftruncateSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -162,6 +162,18 @@ async function main() {
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3207";
   if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "start", "-p", "3207", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
   const perfil = join(tmpdir(), `mt-chrome-${Date.now()}`);
+  /**
+   * Puerto propio de esta corrida, y limpieza de lo que haya quedado vivo.
+   *
+   * El defecto que costo medio dia: con un puerto fijo, un Chrome de una
+   * corrida interrumpida seguia escuchando en el, y la corrida siguiente se
+   * CONECTABA A ESE en vez de al suyo. Ese Chrome viejo apunta al video falso
+   * de su corrida —un archivo temporal que ya se borro—, asi que la camara
+   * simulada no entregaba un solo cuadro y la lectura del QR fallaba sin
+   * explicacion. Pasaba o no segun si habia quedado basura, que es justo la
+   * forma en que una prueba se vuelve «intermitente».
+   */
+  const PUERTO_CDP = 9400 + Math.floor(Math.random() * 400);
 
   const sello = `rs-${Date.now()}`;
   const ARCHIVOS = join(tmpdir(), `mt-archivos-${sello}`);
@@ -261,14 +273,18 @@ async function main() {
     const y4m = join(ARCHIVOS, "camara.y4m");
     writeFileSync(y4m, Buffer.concat([Buffer.from(`YUV4MPEG2 W${W} H${H} F10:1 Ip A1:1 C420jpeg\n`), ...Array(10).fill(cuadro)]));
 
-    chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=9333", `--user-data-dir=${perfil}`, "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+    // Lo que haya quedado de corridas anteriores, fuera: son procesos sueltos
+    // que nadie va a cerrar y que envenenan la siguiente.
+    try { execSync("pkill -f 'user-data-dir=.*mt-chrome-' || true", { stdio: "ignore" }); } catch { /* no habia ninguno */ }
+
+    chrome = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${PUERTO_CDP}`, `--user-data-dir=${perfil}`, "--no-first-run", "--no-default-browser-check", "--disable-extensions",
       "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-video-capture=${y4m}`, "about:blank"], { stdio: "ignore" });
 
     // ── Chrome y servidor.
     const finEspera = Date.now() + 120_000;
     let wsNavegador = "";
     while (!wsNavegador && Date.now() < finEspera) {
-      try { wsNavegador = ((await (await fetch("http://127.0.0.1:9333/json/version")).json()) as { webSocketDebuggerUrl: string }).webSocketDebuggerUrl; } catch { await esperar(500); }
+      try { wsNavegador = ((await (await fetch(`http://127.0.0.1:${PUERTO_CDP}/json/version`)).json()) as { webSocketDebuggerUrl: string }).webSocketDebuggerUrl; } catch { await esperar(500); }
     }
     for (let i = 0; i < 120; i++) { try { const r = await fetch(`${base}/login`); if (r.status < 500) break; } catch { /* aún no */ } await esperar(1000); }
     const nav = await Pestana.abrir(wsNavegador);
@@ -295,7 +311,7 @@ async function main() {
     /** Una pestaña nueva; con `contexto`, en otra sesión del navegador (otras cookies, otro almacenamiento). */
     const abrirPestana = async (contexto?: string) => {
       const { targetId } = await nav.enviar<{ targetId: string }>("Target.createTarget", { url: "about:blank", ...(contexto ? { browserContextId: contexto } : {}) });
-      const lista = (await (await fetch("http://127.0.0.1:9333/json/list")).json()) as Array<{ id: string; webSocketDebuggerUrl: string }>;
+      const lista = (await (await fetch(`http://127.0.0.1:${PUERTO_CDP}/json/list`)).json()) as Array<{ id: string; webSocketDebuggerUrl: string }>;
       const p = await Pestana.abrir(lista.find((x) => x.id === targetId)!.webSocketDebuggerUrl);
       await p.enviar("Page.enable"); await p.enviar("Runtime.enable"); await p.enviar("Network.enable"); await p.enviar("Log.enable");
       vigilar(p);
@@ -650,15 +666,33 @@ async function main() {
      * paso y fallo el mismo dia sin que cambiara una linea. Si el producto no
      * lee el codigo, fallan las dos.
      */
-    const leerCon = async (quitarNativo: boolean, intento = 1): Promise<{ pidio: { llamadas: number; pedido: string }; llego: boolean; ruta: string; apagada: boolean }> => {
+    const leerCon = async (quitarNativo: boolean, intento = 1): Promise<{ pidio: { llamadas: number; pedido: string }; llego: boolean; ruta: string; apagada: boolean; porQue?: unknown }> => {
       await t.ir(`${base}/escanear`, 1000);
       if (quitarNativo) await t.evaluar(`delete window.BarcodeDetector; window.BarcodeDetector = undefined; true`);
       await tocar(t, "Abrir cámara y escanear");
       const pidio = await t.evaluar<{ llamadas: number; pedido: string }>(`({ llamadas: window.__camara.llamadas, pedido: window.__camara.pedido })`);
       const llego = await hasta(t, `location.pathname === "/assets/${activos[0].id}"`, 25_000);
       if (!llego && intento === 1) return leerCon(quitarNativo, 2);
+      /**
+       * Si no leyo, hay que saber POR QUE sin tener que estar aqui mirando.
+       *
+       * La primera version solo decia «llego: false», y con eso no se puede
+       * distinguir entre «la camara falsa no dio un cuadro bueno», «lo leyo
+       * pero la ruta lo rechazo» y «el video ni arranco». Cada una se arregla
+       * en un lugar distinto.
+       */
+      const porQue = !llego ? await t.evaluar<{ error: string; estado: string; video: { listo: number; ancho: number } }>(`(() => {
+        const v = document.querySelector("video");
+        const texto = document.body.innerText;
+        const i = texto.indexOf("No se pudo") >= 0 ? texto.indexOf("No se pudo") : texto.indexOf("No hay conexión");
+        return {
+          error: i >= 0 ? texto.slice(i, i + 120).replace(/\\s+/g, " ") : "",
+          estado: [...document.querySelectorAll("button")].map((b) => b.textContent.trim()).join(" | ").slice(0, 80),
+          video: { listo: v ? v.readyState : -1, ancho: v ? v.videoWidth : 0 },
+        };
+      })()`) : null;
       const apagada = await t.evaluar<boolean>(`true`); // la página ya cambió: el flujo se detuvo al leer (se revisa abajo al cancelar)
-      return { pidio, llego, ruta: await t.evaluar<string>("location.pathname"), apagada };
+      return { pidio, llego, ruta: await t.evaluar<string>("location.pathname"), apagada, ...(porQue ? { porQue } : {}) };
     };
     const conJsqr = await leerCon(true);
     revisar("QR: al tocar el botón se pide la cámara UNA vez, la trasera (facingMode environment), se lee el código con jsQR y abre el activo del punto",
@@ -1251,6 +1285,9 @@ async function main() {
     if (demoId) { const { borrarDemo } = await import("../lib/demo-comercial"); await borrarDemo(demoId).catch((e) => console.error("no se borró la demo", e)); }
     for (const id of [...creadas].reverse()) await prisma.organization.delete({ where: { id } }).catch((e) => console.error("no se borró", id, e));
     try { chrome?.kill("SIGTERM"); } catch { /* ya cerró */ }
+    // El SIGTERM al padre no siempre se lleva a los procesos ayudantes, y un
+    // Chrome huerfano es exactamente lo que envenena la corrida siguiente.
+    try { execSync(`pkill -f 'user-data-dir=${perfil}' || true`, { stdio: "ignore" }); } catch { /* ya no estaba */ }
     rmSync(ARCHIVOS, { recursive: true, force: true });
     for (const id of creadas) rmSync(join(process.cwd(), ".almacen", `org-${id}`), { recursive: true, force: true });
     if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }

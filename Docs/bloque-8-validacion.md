@@ -387,7 +387,7 @@ usarlo y vuelve al papel.
 | Duplicación de órdenes, compras o movimientos | **Corregido** (hallazgos 2 y 3). Queda un residuo: no hay restricción en la base que impida dos OT abiertas del mismo plan y equipo; el candado es la defensa |
 | Restauración no comprobada | **Comprobada** el 20 de septiembre de 2026 |
 | Procesos críticos sin trazabilidad | Cubierto: bitácora inmutable, kardex, historial de avisos y ahora registro de corridas de procesos |
-| Errores frecuentes en móvil | Sin evidencia de errores, pero **no se ha probado en dispositivos físicos** |
+| Errores frecuentes en móvil | Sin evidencia de errores. **iPhone probado** el 20 de septiembre de 2026 (cámara y QR, funcionando); falta un Android real |
 | Enterarse de una falla | **Cerrado.** Cuatro alertas activas por correo, incluida la del proceso que dejó de correr |
 | Rendimiento con volumen de piloto | **Medido** en PostgreSQL del tamaño de producción — ver «Rendimiento medido» |
 | Ausencia de responsable de soporte | Rafael Montemayor, por la sección Soporte dentro del producto |
@@ -412,8 +412,9 @@ usarlo y vuelve al papel.
 
 - Pruebas con sesiones reales de cada rol: **hechas** por HTTP en
   `prueba-experiencia.ts`.
-- Dispositivos móviles físicos: **pendiente manual**.
-- Cámara y QR real: **pendiente manual** (la prueba usa una cámara simulada).
+- Dispositivos móviles físicos: **iPhone hecho**; Android pendiente.
+- Cámara y QR real: **hecho en iPhone** el 20 de septiembre de 2026, con
+  resultado correcto. Falta el mismo ejercicio en un Android.
 
 ### Bloque 7
 
@@ -453,22 +454,39 @@ fondo: no bloquea ninguna pantalla.
   entran por el mismo lugar—, pero un dato heredado con la marca desatrasada
   se corrige con `scripts/recalcular-medidores.ts`.
 
-**Pruebas pendientes:** dispositivos físicos (iPhone y Android reales) y
-cámara con QR real. Son las dos únicas que no se pueden automatizar aquí.
+**Pruebas pendientes:** un Android real. **El iPhone ya se probó**: Rafael
+leyó un QR con la cámara del teléfono el 20 de septiembre de 2026 y abrió el
+equipo sin novedad. Eso cierra la parte de cámara y QR en iOS, y de paso
+confirma que la prueba automatizada que falla a ratos es un problema del
+arnés, no del producto.
 
-**Una prueba intermitente, dicha sin adornos:** la lectura del QR con cámara
-simulada pasa unas corridas y falla otras, con el mismo código —se verificó
-pasando y fallando el mismo día—. Se le agregó un reintento y no bastó, así
-que el problema está en el arnés (un video falso que Chrome reproduce en
-bucle), no en el producto. Las otras cuatro revisiones del escáner —no pedir
-la cámara al cargar, cancelar, apagarla, y el permiso negado— pasan siempre.
-Queda como otra razón para probarlo en un teléfono de verdad.
+**La prueba intermitente del QR: encontrada y corregida.** Pasaba unas
+corridas y fallaba otras con el mismo código. El reintento no sirvió, así que
+se instrumentó el fallo para que dijera por qué en vez de solo «no llegó», y
+la primera corrida instrumentada lo delató: **no había elemento de video,
+aunque la cámara sí se había pedido**.
+
+La causa: el navegador de la prueba se lanzaba siempre en el mismo puerto de
+depuración. Un Chrome de una corrida interrumpida seguía escuchando ahí, y la
+corrida siguiente **se conectaba a ese** en vez de al suyo. Ese Chrome viejo
+apunta al video falso de su propia corrida —un archivo temporal ya borrado—,
+así que la cámara simulada no entregaba un solo cuadro. Fallaba o no según si
+había quedado basura de antes: la receta exacta de una prueba «intermitente».
+
+Ahora cada corrida usa su propio puerto, mata lo que haya quedado vivo al
+empezar y se asegura de cerrar sus procesos al terminar. Dos corridas
+seguidas, limpias.
+
+Independientemente de eso, el producto ya estaba verificado donde importa: el
+20 de septiembre se leyó un QR con la cámara de un iPhone real y abrió el
+equipo sin novedad.
 
 **Recomendación: listo para un piloto acompañado.** Las condiciones que
 quedan:
 
-1. **Probar en un iPhone y un Android reales**, incluyendo cámara y QR. Es lo
-   único del bloque que no se pudo verificar de ninguna forma.
+1. **Probar en un Android real.** El iPhone ya se probó, con la cámara y el
+   QR funcionando; falta el otro sistema, que es donde suelen aparecer las
+   diferencias de cámara y de teclado.
 2. **Definir la empresa piloto y sus personas**, y llenar el plan de arriba.
 3. Durante el piloto, **volver a medir** con los datos reales: los umbrales
    de esta auditoría salieron de datos sintéticos, y la forma de los datos de
