@@ -12,7 +12,10 @@ import { siguienteFolio } from "./numbering";
  * avisarlo, no borrarlo.
  */
 
-export class ErrorDeConteo extends Error {}
+/** Regla del conteo ciclico incumplida (ver ErrorDeAlmacen). */
+export class ErrorDeConteo extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 export const ESTADOS_CONTEO = {
   ABIERTO: "Abierto",

@@ -184,9 +184,18 @@ async function main() {
       misReportes.status === 200 && misReportes.texto.includes("Gotea producto") && aprobada.status < 300 && pasos1.every((p) => p.status < 300) && otFinal.status === "CLOSED" && otFinal.assetId === lln.id,
       pasos1.map((p) => `${p.status}${p.status >= 300 ? ` ${JSON.stringify(p.json).slice(0, 120)}` : ""}`));
     revisar("el costo (1 h + kit de empaques) queda en la OT y en el expediente del activo, con la falla", otFinal.totalCost > 1000 && Math.round(costoDespues - costoAntes) === Math.round(otFinal.totalCost) && expediente.texto.includes(otFinal.number), { costo: otFinal.totalCost, antes: costoAntes, despues: costoDespues });
+    /**
+     * El inicio muestra un resumen que se recalcula cada cuarto de hora
+     * (lib/resumen-inicio.ts), asi que cerrar una orden no mueve la cifra en
+     * el acto. Lo que se ejercita aqui es el camino completo: cerrar,
+     * actualizar —lo mismo que hace el boton «Actualizar» de la pantalla— y
+     * ver la cifra nueva.
+     */
+    const { olvidarResumen } = await import("../lib/resumen-inicio");
+    await olvidarResumen(demo.id);
     const inicio2 = await inicioDe(dueno as never) as typeof inicioDueno;
     const costoMes = (r: typeof inicioDueno) => Number((r.resumen.find((x) => x.etiqueta.startsWith("Costo"))?.valor ?? "0").replace(/[^\d.]/g, ""));
-    revisar("los indicadores se actualizan: el costo de mantenimiento del mes sube exactamente lo de la orden", Math.round(costoMes(inicio2) - costoMes(inicioDueno)) === Math.round(otFinal.totalCost), { antes: costoMes(inicioDueno), despues: costoMes(inicio2) });
+    revisar("al actualizar el inicio, el costo de mantenimiento del mes sube exactamente lo de la orden", Math.round(costoMes(inicio2) - costoMes(inicioDueno)) === Math.round(otFinal.totalCost), { antes: costoMes(inicioDueno), despues: costoMes(inicio2) });
 
     // ═══════════════════════════════════════════ 11. Historia preventiva
     console.log("\n11. Historia 2: el preventivo que se programa solo");

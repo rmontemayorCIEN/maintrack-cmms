@@ -24,7 +24,10 @@ import { avisarCompraPorAutorizar } from "./avisos/detectores";
 // envio de avisos al paquete del navegador. Ya paso una vez.
 import { ESTADOS_COMPRA, type EstadoCompra } from "./estados-compra";
 
-export class ErrorDeCompra extends Error {}
+/** Regla de compras incumplida: es del usuario, no del sistema (ver ErrorDeAlmacen). */
+export class ErrorDeCompra extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 /** Si la requisicion necesita firma segun el monto de la organizacion. */
 export function requiereAutorizacion(montoEstimado: number, umbral: number) {

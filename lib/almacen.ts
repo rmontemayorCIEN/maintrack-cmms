@@ -43,7 +43,18 @@ export type Movimiento = {
   userId?: string | null;
 };
 
-export class ErrorDeAlmacen extends Error {}
+/**
+ * Lo que el almacen rechaza por regla de negocio, no por falla del sistema.
+ *
+ * Llevaba el 409 implicito y terminaba contestando 500 —«error inesperado»—
+ * cuando alguien perdia la carrera por la ultima pieza. El dato quedaba bien,
+ * pero a la persona se le decia que el sistema se habia roto en vez de «otro
+ * la tomo primero, vuelva a intentar». 409 es exactamente eso: el registro ya
+ * cambio.
+ */
+export class ErrorDeAlmacen extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 type Cliente = PrismaClient | Prisma.TransactionClient;
 

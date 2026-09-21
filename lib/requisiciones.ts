@@ -22,7 +22,10 @@ export {
   type Motivo, type Urgencia, type Estado,
 } from "./requisiciones-datos";
 
-export class ErrorDeRequisicion extends Error {}
+/** Regla de requisiciones incumplida (ver ErrorDeAlmacen). */
+export class ErrorDeRequisicion extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 type Cliente = Prisma.TransactionClient;
 
