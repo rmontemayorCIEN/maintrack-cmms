@@ -1235,6 +1235,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Preguntar cosas como «¿qué equipo me costó más este trimestre?» o «¿qué refacciones se acabaron?»",
       "Escuchar la respuesta, con el botón de bocina de cada una",
+      "Cambiar al modo hablado, donde el sistema saluda, usted pregunta y él contesta en voz alta (plan Enterprise)",
     ],
     flujo: [
       "No inventa: consulta sus órdenes, activos, almacén y costos con herramientas de solo lectura.",
@@ -1242,6 +1243,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo que se escucha es exactamente la respuesta que está en pantalla: no se le vuelve a preguntar a la IA para leerla, así que oír y leer nunca se contradicen, y no se cobra dos veces la misma respuesta.",
       "Al decirla se traducen los importes y porcentajes a como los diría una persona —«128 mil 400 pesos», «87.5 por ciento»— sin redondear ninguna cifra. Los códigos de equipo se dicen tal cual, porque así se llaman en la planta.",
       "La voz es la que cada quien escogió en Ajustes → Apariencia.",
+      "El modo hablado es otra forma de usar lo mismo, no otra cosa: escribiendo se relee y se compara; hablando se va en el camino. Por eso se entra a propósito, con «Prefiero preguntar y escuchar», y se sale con «Volver al modo escrito».",
+      "Mientras revisa sus datos dice «déjeme revisar» en vez de quedarse callado: entre la pregunta y la respuesta pasan segundos, y un silencio largo se siente como que se descompuso.",
+      "El modo hablado NO modifica nada, a propósito: se piensa para usarse en el camino, y dictar el cierre de una orden manejando es capturar mal un dato que después nadie puede explicar.",
+      "Todo lo que se dice queda también escrito abajo, porque escuchando no hay forma de comprobar una cifra.",
+      "Cada empresa tiene un máximo de audios al mes. Al llegar, la voz se apaga y se avisa; lo escrito sigue funcionando igual.",
     ],
     botones: [
       { nombre: "Escuchar la respuesta", explica: "Lee en voz alta esa respuesta. Vuelto a tocar, la detiene. Solo suena una a la vez." },

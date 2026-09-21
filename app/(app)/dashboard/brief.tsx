@@ -130,18 +130,31 @@ export function BriefDelDia() {
    * llama caiga a la voz del aparato en vez de dejar a la persona sin parte.
    */
   async function sonarDelServidor(): Promise<boolean> {
+    /**
+     * El permiso de sonar se toma DENTRO del clic, no al volver del servidor.
+     *
+     * El navegador solo deja reproducir si el `play()` sale del gesto que lo
+     * pidio, y armar el parte tarda unos segundos: al volver, el gesto ya
+     * caduco y el `play()` se bloquea sin decir nada. Se veia como «le doy y
+     * no suena; le doy otra vez y ahi si». Por eso la pista se crea y se
+     * arranca vacia aqui, y cuando llega el audio solo se le cambia la
+     * fuente.
+     */
+    const pista = new Audio();
+    pista.onended = () => setHablando(false);
+    pista.onerror = () => setHablando(false);
+    audio.current = pista;
+    void pista.play().catch(() => undefined);
+
     try {
       const r = await fetch("/api/ia/brief/voz");
       if (r.status === 204 || !r.ok) return false;
       const blob = await r.blob();
       if (!blob.size) return false;
-      detener();
-      const pista = new Audio(URL.createObjectURL(blob));
-      pista.onended = () => setHablando(false);
-      pista.onerror = () => setHablando(false);
-      audio.current = pista;
+      if (audio.current !== pista) return true; // ya lo detuvieron
       setHablando(true);
       setDeRespaldo(false);
+      pista.src = URL.createObjectURL(blob);
       await pista.play();
       return true;
     } catch {

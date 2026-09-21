@@ -30,7 +30,7 @@ export async function GET() {
     });
     const brief = await redactarBrief(user.organization as never, guion, { userId: user.id });
     // La voz que escogio esta persona en Configuracion. Nula = la de omision.
-    const voz = await sintetizar(orgId, brief.texto, user.vozBrief);
+    const voz = await sintetizar(orgId, brief.texto, user.vozBrief, user.id, user.organization.plan);
 
     if (!voz) {
       return new Response(null, {

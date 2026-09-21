@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ArrowRight, Database, Loader2, Sparkles, Square, Volume2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { ModoVoz } from "./modo-voz";
 
 type Turno = {
   pregunta: string;
@@ -30,11 +31,22 @@ export function PanelConsulta({
   disponible,
   restantes,
   ejemplos,
+  conVoz,
 }: {
   disponible: boolean;
   restantes: number;
   ejemplos: string[];
+  /** Si esta cuenta tiene el chat con voz (solo Enterprise). */
+  conVoz: boolean;
 }) {
+  /**
+   * Escrito o hablado, y se escoge a proposito.
+   *
+   * Son dos formas distintas de usar lo mismo: escribiendo uno relee, compara
+   * y copia; hablando uno va manejando. Meter las dos en una sola pantalla
+   * dejaba el audio como un boton perdido que nadie encontraba.
+   */
+  const [modo, setModo] = useState<"escrito" | "voz">("escrito");
   const [pregunta, setPregunta] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +72,26 @@ export function PanelConsulta({
     if (sonando === i) { callar(); return; }
     callar();
     setSonando(i);
+
+    /**
+     * El permiso de sonar se pide DENTRO del clic, no despues.
+     *
+     * El navegador solo deja reproducir audio si el `play()` sale del gesto
+     * que lo pidio. Sintetizar tarda unos segundos, asi que al volver del
+     * servidor el gesto ya caduco y el `play()` se bloquea en silencio: el
+     * icono cambiaba y no se oia nada. Al segundo intento si sonaba —el audio
+     * ya estaba guardado y llegaba a tiempo—, y eso hacia ver el defecto como
+     * «hay que darle dos veces».
+     *
+     * Por eso se crea la pista aqui mismo y se arranca vacia: el permiso
+     * queda tomado, y cuando llega el audio solo se le cambia la fuente.
+     */
+    const pista = new Audio();
+    pista.onended = () => setSonando(null);
+    pista.onerror = () => setSonando(null);
+    audio.current = pista;
+    void pista.play().catch(() => undefined);
+
     try {
       const r = await fetch("/api/ia/consulta/voz", {
         method: "POST",
@@ -68,14 +100,12 @@ export function PanelConsulta({
       });
       // 204: no hay voz del sistema. No es un error que valga la pena
       // enseñar; la respuesta sigue ahi para leerse.
-      if (r.status === 204 || !r.ok) { setSonando(null); return; }
-      const pista = new Audio(URL.createObjectURL(await r.blob()));
-      pista.onended = () => setSonando(null);
-      pista.onerror = () => setSonando(null);
-      audio.current = pista;
+      if (r.status === 204 || !r.ok) { callar(); return; }
+      if (audio.current !== pista) return; // le dieron a otra mientras tanto
+      pista.src = URL.createObjectURL(await r.blob());
       await pista.play();
     } catch {
-      setSonando(null);
+      callar();
     }
   }
 
@@ -94,6 +124,10 @@ export function PanelConsulta({
     if (!res.ok) { setError(data.error ?? "No fue posible responder"); return; }
     setTurnos((prev) => [{ pregunta: q, respuesta: data.respuesta, consultas: data.consultas ?? [] }, ...prev]);
     setPregunta("");
+  }
+
+  if (disponible && conVoz && modo === "voz") {
+    return <ModoVoz ejemplos={ejemplos} onSalir={() => setModo("escrito")} />;
   }
 
   if (!disponible) {
@@ -150,6 +184,16 @@ export function PanelConsulta({
         ) : null}
 
         {error ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p> : null}
+
+        {conVoz ? (
+          <button
+            type="button"
+            onClick={() => setModo("voz")}
+            className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/60 px-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
+          >
+            <Volume2 className="h-4 w-4" /> Prefiero preguntar y escuchar
+          </button>
+        ) : null}
       </Card>
 
       {turnos.map((t, i) => (

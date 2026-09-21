@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     // Lo que se oye pasa por la misma limpieza que el parte: importes con
     // signo, porcentajes y vinetas dichos tal cual suenan a maquina.
-    const audio = await sintetizar(orgId, paraDecir(texto), user.vozBrief);
+    const audio = await sintetizar(orgId, paraDecir(texto), user.vozBrief, user.id, user.organization.plan);
     if (!audio) return new Response(null, { status: 204 });
 
     return new Response(new Uint8Array(audio.audio), {

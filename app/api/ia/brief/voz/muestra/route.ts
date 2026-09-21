@@ -15,11 +15,11 @@ import { sintetizar, vozValida, VOZ_POR_OMISION } from "@/lib/voz";
 const MUESTRA = "Buenos días. Trae abajo el compresor de la nave, y ese es criticidad A. Se le juntaron 12 órdenes vencidas.";
 
 export async function GET(request: Request) {
-  return withVista("/indicadores", async ({ orgId }) => {
+  return withVista("/indicadores", async ({ user, orgId }) => {
     const pedida = new URL(request.url).searchParams.get("voz");
     const voz = vozValida(pedida) ? pedida : VOZ_POR_OMISION;
 
-    const audio = await sintetizar(orgId, MUESTRA, voz);
+    const audio = await sintetizar(orgId, MUESTRA, voz, user.id, user.organization.plan);
     // Sin voz del servidor no hay nada que probar: la pantalla lo entiende y
     // esconde el botón en vez de dejarlo sin hacer nada.
     if (!audio) return new Response(null, { status: 204 });

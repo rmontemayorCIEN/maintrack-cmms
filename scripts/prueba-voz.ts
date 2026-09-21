@@ -94,5 +94,78 @@ revisar("el markdown que a veces cuela el modelo no se lee",
 revisar("un texto ya limpio no se estropea",
   paraDecir("La bomba falló tres veces en septiembre.") === "La bomba falló tres veces en septiembre.");
 
-console.log(`\n${fallas ? `${fallas} FALLARON` : "Todo bien"}\n`);
-process.exit(fallas ? 1 : 0);
+/**
+ * Que hablar quede registrado.
+ *
+ * Sin medicion no hay forma de poner un tope ni de saber quien gasta: el
+ * primer aviso de que alguien se emociono llegaria en la factura de Google.
+ * Se comprueba contra la base, con una sintesis de mentiras —no se llama al
+ * modelo aqui—, verificando lo que se guarda y lo que NO se descuenta.
+ */
+async function consumo() {
+  const { prisma } = await import("../lib/db");
+  const { registrarVoz } = await import("../lib/ia/consumo");
+  const { consumoIa } = await import("../lib/ia/consumo");
+
+  const sello = `voz-${Date.now()}`;
+  const org = await prisma.organization.create({
+    data: { name: sello, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", diasHabiles: "1,2,3,4,5" },
+  });
+  try {
+    console.log("\nQue hablar quede registrado\n");
+    const antes = await consumoIa(org.id);
+    await registrarVoz({ organizationId: org.id, voz: nombreDeVoz(null), caracteres: 455, costoUsd: 0.01365 });
+    const despues = await consumoIa(org.id);
+
+    revisar("el gasto de voz queda anotado", despues.llamadas === antes.llamadas + 1, `${despues.llamadas} llamadas`);
+    revisar("con su costo, para poder sumarlo",
+      Math.abs(despues.costoUsd - antes.costoUsd - 0.01365) < 0.000001, `$${despues.costoUsd.toFixed(5)}`);
+    revisar("NO descuenta operaciones del plan del cliente",
+      despues.operaciones === antes.operaciones, `${despues.operaciones} operaciones`);
+    revisar("aparece separado, con su propio renglón",
+      despues.porFuncion.some((f) => f.funcion === "VOZ"), despues.porFuncion.map((f) => f.funcion).join(", "));
+    revisar("se guardan los caracteres, que es como cobra Google",
+      despues.tokens - antes.tokens === 455, `${despues.tokens - antes.tokens}`);
+
+    console.log("\nEl tope del mes\n");
+    const { puedeHablar, TOPE_VOZ_MENSUAL, tieneChatDeVoz } = await import("../lib/voz");
+
+    const antesDelTope = await puedeHablar({ id: org.id, plan: "ENTERPRISE" });
+    revisar("con un audio generado, todavía se puede hablar", antesDelTope.puede,
+      antesDelTope.puede ? `quedan ${antesDelTope.restantes}` : "");
+
+    // Se llena la bolsa de un plan chico para ver el freno de verdad.
+    const tope = TOPE_VOZ_MENSUAL.PROFESSIONAL;
+    const { periodoActual } = await import("../lib/ia/consumo");
+    const periodo = periodoActual();
+    await prisma.aiUsage.createMany({
+      data: Array.from({ length: tope }, () => ({
+        organizationId: org.id, funcion: "VOZ", modelo: "prueba",
+        operaciones: 0, costoUsd: 0.01, periodo, ok: true,
+      })),
+    });
+    const alTope = await puedeHablar({ id: org.id, plan: "PROFESSIONAL" });
+    revisar("al llegar al máximo del mes, se frena", !alTope.puede, alTope.puede ? "" : alTope.motivo.slice(0, 60));
+    revisar("y el aviso dice que lo demás sigue igual",
+      !alTope.puede && alTope.motivo.includes("sigue igual"), alTope.puede ? "" : alTope.motivo);
+
+    const enterprise = await puedeHablar({ id: org.id, plan: "ENTERPRISE" });
+    revisar("el plan grande tiene más margen que el chico", enterprise.puede,
+      `Enterprise ${TOPE_VOZ_MENSUAL.ENTERPRISE} contra Professional ${tope}`);
+
+    console.log("\nEl chat con voz, solo donde se decidió\n");
+    revisar("Enterprise sí lo tiene", tieneChatDeVoz("ENTERPRISE"));
+    revisar("Professional NO", !tieneChatDeVoz("PROFESSIONAL"));
+    revisar("una cuenta sin plan tampoco", !tieneChatDeVoz(null));
+  } finally {
+    await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
+    await prisma.$disconnect();
+  }
+}
+
+consumo()
+  .catch((e) => { console.error(e); fallas++; })
+  .finally(() => {
+    console.log(`\n${fallas ? `${fallas} FALLARON` : "Todo bien"}\n`);
+    process.exit(fallas ? 1 : 0);
+  });

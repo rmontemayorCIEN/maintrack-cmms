@@ -130,6 +130,47 @@ export async function puedeUsarIa(
   return { permitido: true, restantes };
 }
 
+/**
+ * Lo que costo hablar.
+ *
+ * La sintesis de voz no es una «funcion de IA» del catalogo —no se vende
+ * aparte ni consume operaciones del plan, porque es barata y cobrarla por
+ * operacion haria que probar doce voces gastara doce—. Pero SI cuesta dinero,
+ * y lo que no se mide no se puede frenar: sin este registro, el primer aviso
+ * de que alguien se emociono con el modo voz llegaria en la factura de
+ * Google.
+ *
+ * Se guarda en la misma tabla que lo demas para que el consumo se vea en un
+ * solo lugar, con `funcion: "VOZ"` y cero operaciones. En `inputTokens` van
+ * los CARACTERES sintetizados, que es la unidad en la que Google cobra: es un
+ * prestamo de campo, a proposito, para no pedir una migracion por esto.
+ */
+export async function registrarVoz(datos: {
+  organizationId: string;
+  userId?: string | null;
+  voz: string;
+  caracteres: number;
+  costoUsd: number;
+}) {
+  try {
+    await prisma.aiUsage.create({
+      data: {
+        organizationId: datos.organizationId,
+        userId: datos.userId ?? null,
+        funcion: "VOZ",
+        modelo: datos.voz,
+        inputTokens: Math.round(datos.caracteres),
+        operaciones: 0,
+        costoUsd: datos.costoUsd,
+        periodo: periodoActual(),
+        ok: true,
+      },
+    });
+  } catch (error) {
+    console.error("No se pudo registrar el consumo de voz:", error);
+  }
+}
+
 /** Guarda un consumo ya ocurrido. Nunca lanza: perder el registro seria peor. */
 export async function registrarConsumo(datos: {
   organizationId: string;

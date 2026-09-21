@@ -203,6 +203,11 @@ export async function sintetizar(
   texto: string,
   /** La voz que escogio la persona. Sin ella, la de omision. */
   clave?: string | null,
+  /** Quien la pidio, para que el consumo se pueda ver por persona. */
+  userId?: string | null,
+  /** El plan, para el tope del mes. Sin el, no se topa: el parte no puede
+   *  quedarse mudo porque quien llama olvido pasarlo. */
+  plan?: string | null,
 ): Promise<Sintesis | null> {
   if (!texto.trim()) return null;
   const voz = nombreDeVoz(clave);
@@ -220,6 +225,21 @@ export async function sintetizar(
   }
 
   if (!vozConfigurada()) return null;
+
+  /**
+   * El tope se revisa DESPUES de buscar lo guardado, a proposito.
+   *
+   * Volver a oir un audio que ya existe no le cuesta nada a nadie, asi que
+   * seria absurdo negarlo por haber llegado al maximo del mes. Lo que se
+   * frena es generar audio nuevo, que es lo unico que se paga.
+   */
+  if (plan) {
+    const veredicto = await puedeHablar({ id: organizationId, plan });
+    if (!veredicto.puede) {
+      console.warn(`[voz] tope del mes alcanzado en ${organizationId}`);
+      return null;
+    }
+  }
 
   try {
     /**
@@ -248,7 +268,13 @@ export async function sintetizar(
     // proxima vez se vuelve a sintetizar. Molesto, no roto.
     await guardarArchivo(ruta, audio, TIPO).catch(() => undefined);
 
-    return { audio, origen: "nuevo", costoUsd: markup.length * USD_POR_CARACTER };
+    // Lo que costo queda registrado: sin medicion no hay forma de poner un
+    // tope, ni de saber quien gasta.
+    const costoUsd = markup.length * USD_POR_CARACTER;
+    const { registrarVoz } = await import("./ia/consumo");
+    await registrarVoz({ organizationId, userId, voz, caracteres: markup.length, costoUsd }).catch(() => undefined);
+
+    return { audio, origen: "nuevo", costoUsd };
   } catch (e) {
     /**
      * Que la voz falle NO puede tumbar el parte, pero tampoco puede quedarse
@@ -260,3 +286,88 @@ export async function sintetizar(
     return null;
   }
 }
+
+// ─────────────────────────────── Quien puede hablar, y cuanto ───────────────
+
+/**
+ * Cuantos audios al mes puede generar una empresa.
+ *
+ * El tope no existe para racionar al cliente: existe porque el costo de la
+ * voz lo paga la plataforma, no el. Una pregunta hablada cuesta centavos,
+ * pero un usuario intensivo —veinte al dia— llega a doscientos pesos al mes,
+ * la quinta parte de lo que deja el complemento. Con tres asi, deja de ser
+ * negocio.
+ *
+ * Al llegar al tope se apaga la voz y se dice; NO se apaga nada mas. Quedarse
+ * sin escuchar el parte es un inconveniente, quedarse sin ver sus ordenes
+ * seria un despropósito.
+ */
+export const TOPE_VOZ_MENSUAL: Record<string, number> = {
+  PROFESSIONAL: 300,
+  ENTERPRISE: 1500,
+};
+
+/**
+ * El chat con voz es solo de Enterprise.
+ *
+ * Es lo caro —transcribir, pensar y hablar en cada vuelta— y es donde el
+ * gasto se dispara sin que nadie lo note. El parte hablado y el boton de
+ * escuchar una respuesta no: esos ya se entregaron a todos y cuestan una
+ * fraccion.
+ */
+export const PLANES_CON_CHAT_DE_VOZ = ["ENTERPRISE"];
+
+export function tieneChatDeVoz(plan: string | null | undefined): boolean {
+  return PLANES_CON_CHAT_DE_VOZ.includes(plan ?? "");
+}
+
+export type VeredictoDeVoz =
+  | { puede: true; restantes: number }
+  | { puede: false; motivo: string; restantes: 0 };
+
+/**
+ * Si a esta empresa todavia le toca hablar este mes.
+ *
+ * Cuenta los audios que ya genero, no los caracteres: es lo que una persona
+ * entiende —«le quedan 40 de 300»— y lo que se puede enseñar en una pantalla
+ * sin explicar nada.
+ */
+export async function puedeHablar(org: { id: string; plan: string }): Promise<VeredictoDeVoz> {
+  const tope = TOPE_VOZ_MENSUAL[org.plan] ?? TOPE_VOZ_MENSUAL.PROFESSIONAL;
+  const { prisma } = await import("./db");
+  const { periodoActual } = await import("./ia/consumo");
+
+  const usados = await prisma.aiUsage.count({
+    where: { organizationId: org.id, funcion: "VOZ", periodo: periodoActual() },
+  });
+  const restantes = Math.max(tope - usados, 0);
+  if (restantes > 0) return { puede: true, restantes };
+
+  return {
+    puede: false,
+    restantes: 0,
+    motivo: `Se llegó al máximo de ${tope} audios de este mes. El siguiente mes se reinicia; lo demás del sistema sigue igual.`,
+  };
+}
+
+// ─────────────────────────────── Las frases de la conversacion ─────────────
+
+/**
+ * Lo que el sistema dice sin tener que pensarlo.
+ *
+ * El saludo y el «deme un momento» NO los escribe el modelo: son siempre lo
+ * mismo, asi que pedirselos seria pagar una operacion para que invente otra
+ * forma de decir «buenos dias». Como son texto fijo, el audio se guarda una
+ * sola vez y toda la empresa lo reusa para siempre.
+ *
+ * El acuse importa mas de lo que parece. Entre la pregunta y la respuesta
+ * pasan segundos —se transcribe, se consulta, se sintetiza— y un silencio
+ * largo se siente como que se descompuso. Decir «deme un momento» convierte
+ * la espera en alguien trabajando.
+ */
+export const FRASES = {
+  saludo: (nombre: string) => `Buen día, ${nombre.split(" ")[0]}. ¿En qué le ayudo?`,
+  pensando: "Claro, déjeme revisar sus datos.",
+  sinDatos: "No encontré con qué contestar eso. ¿Lo intentamos de otra forma?",
+  tope: "Por hoy ya no puedo hablar más. Lo escrito sigue funcionando igual.",
+} as const;
