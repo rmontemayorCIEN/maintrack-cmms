@@ -330,6 +330,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Inicio",
     que: "Lo que usted tiene que ver primero, según su rol: el dueño, el estado de la empresa; supervisión, el trabajo del día; el técnico, sus órdenes; compras, requisiciones y entregas; quien reporta, sus reportes.",
     hacer: [
+      "Escuchar el parte del día antes de entrar a la planta, o en el camino",
       "Usar las acciones rápidas de arriba para lo que hace todos los días",
       "Entrar directo a cada pendiente desde su renglón",
       "Ver de un vistazo cómo está cada área o sistema de la planta, y entrar a la que trae problema",
@@ -347,6 +348,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "«Cómo está la planta» agrupa por sistema cuando la empresa tiene sistemas armados en el mapa de sistemas, y por área cuando todavía no. Un cuadro por equipo, hasta veinte; con más equipos los cuadros se reparten, pero un estado con al menos un equipo nunca desaparece de la barra.",
       "Cada renglón dice siempre las dos cosas —cómo están sus equipos y qué trae pendiente— para que los renglones se puedan sumar. Las órdenes vencidas que no cuelgan de ningún equipo no caben en ningún área y se cuentan aparte, al pie.",
       "Los equipos dados de baja no cuentan en ningún lado de esa franja. Quien no ve activos —compras y quien solo reporta— tampoco ve la franja.",
+      "«El parte del día» dice, en menos de un minuto, lo que está fuera de servicio, las órdenes vencidas, las alertas sin atender, lo que espera su firma y las refacciones críticas agotadas. Va de lo más urgente a lo menos, y si no hay nada lo dice también.",
+      "Las cifras del parte NO las escribe la inteligencia artificial: las calcula el sistema y la IA solo las acomoda para que se oigan como una persona hablando. Al recibir la redacción se revisa número por número, y si aparece alguno que no estaba en los datos, se descarta toda la redacción y se lee la versión del sistema. Sin el complemento de IA el parte funciona igual, solo que más plano.",
+      "La voz se genera en el servidor y se guarda: la primera vez tarda unos segundos, y de ahí en adelante suena al instante sin volver a costar. Si no se puede generar —sin señal, o una falla— se usa la voz del propio aparato, que suena metálica pero dice exactamente lo mismo: más vale un parte feo que ningún parte.",
+      "El mismo parte queda escrito abajo del botón, porque escuchando no hay forma de comprobar una cifra.",
+      "El parte no modifica nada, a propósito: se piensa para oírlo en el camino, y dictar un cierre de orden manejando es capturar mal un dato que después nadie puede explicar.",
+    ],
+    botones: [
+      { nombre: "Escuchar", explica: "Arma el parte del día y lo lee en voz alta. Vuelto a tocar, lo detiene. El texto queda en pantalla aunque no se escuche." },
     ],
   },
 

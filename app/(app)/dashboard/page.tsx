@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { puedeVerRuta } from "@/lib/pantallas";
 import { inicioDe, type Bloque, type Cifra, type Renglon, type Tono } from "@/lib/inicio";
 import { PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
 import { IconoMenu } from "@/components/shell/iconos";
 import { cn } from "@/lib/utils";
 import { CuandoSeCalculo } from "./actualizar";
 import { Franja } from "./franja";
+import { BriefDelDia } from "./brief";
 
 export const metadata = { title: "Inicio" };
 export const dynamic = "force-dynamic";
@@ -26,6 +28,10 @@ export default async function InicioPage() {
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Hola, {user.name.split(" ")[0]}</p>
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{inicio.titulo}</h1>
       </header>
+
+      {/* El mismo criterio que protege la ruta: quien ve el panorama de la
+          empresa puede escuchar el resumen de ese panorama. */}
+      {puedeVerRuta(user.role, "/indicadores") ? <BriefDelDia /> : null}
 
       {inicio.acciones.length ? (
         <nav aria-label="Acciones rápidas" className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">

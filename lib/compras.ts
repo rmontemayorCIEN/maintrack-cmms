@@ -62,6 +62,18 @@ async function avisarACompras(params: {
   });
 }
 
+/**
+ * Lo que espera la firma de esta persona.
+ *
+ * El «no lo mio» no es un adorno: quien levanto la requisicion no la autoriza,
+ * y sin esa condicion el inicio —y el brief del dia— le dirian que tiene
+ * pendiente firmar lo que el mismo pidio. Vive aqui porque lo preguntan dos
+ * pantallas, y copiarlo seria garantizar que un dia dejen de coincidir.
+ */
+export function porAutorizar(organizationId: string, userId: string) {
+  return { organizationId, estado: "SOLICITADA", NOT: { solicitanteId: userId } };
+}
+
 /** Estados en los que una requisicion de compra sigue viva (cubre un faltante). */
 export const ESTADOS_COMPRA_ABIERTA = ["SOLICITADA", "AUTORIZADA", "EN_COMPRA", "RECIBIDA_PARCIAL"];
 

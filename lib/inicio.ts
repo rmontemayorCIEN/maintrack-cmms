@@ -25,6 +25,7 @@ import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCr
 import { filtroDeVencidas } from "./vencimiento";
 import { resumenDeInicio } from "./resumen-inicio";
 import { franjaDePlanta, type FranjaDePlanta } from "./planta";
+import { porAutorizar } from "./compras";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -193,7 +194,7 @@ async function alertasAbiertas(c: Ctx) {
 
 async function comprasPorAutorizar(c: Ctx) {
   const compras = await prisma.purchaseRequest.findMany({
-    where: { organizationId: c.org, estado: "SOLICITADA", NOT: { solicitanteId: c.user.id } },
+    where: porAutorizar(c.org, c.user.id),
     select: { id: true, folio: true, urgencia: true, montoEstimado: true, createdAt: true, justificacion: true },
     orderBy: { createdAt: "asc" }, take: 30,
   });

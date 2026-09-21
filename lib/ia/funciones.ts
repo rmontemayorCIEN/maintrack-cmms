@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -21,6 +21,13 @@ export type DefinicionFuncionIA = {
 };
 
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
+  BRIEF: {
+    nombre: "Brief del día, para escuchar",
+    descripcion:
+      "Lo que la dirección necesita saber hoy, contado como lo diría una persona, para oírlo en el camino. Las cifras las calcula el sistema; la IA solo las hilvana, y se verifica que no haya agregado ninguna.",
+    operaciones: 1,
+    disponible: true,
+  },
   DIAGNOSTICO: {
     nombre: "Diagnóstico semanal",
     descripcion:

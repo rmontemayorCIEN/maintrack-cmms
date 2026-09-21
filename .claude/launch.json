@@ -23,6 +23,20 @@
         "3001"
       ],
       "port": 3001
+    },
+    {
+      "name": "maintrack-con-voz",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "GOOGLE_CLOUD_PROJECT=maintrack-cmms-4821",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3002"
+      ],
+      "port": 3002
     }
   ]
 }
