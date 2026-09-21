@@ -35,23 +35,51 @@ type Turno = { pregunta: string; respuesta: string; consultas: number };
 export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: () => void }) {
   const [pregunta, setPregunta] = useState("");
   const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [estado, setEstado] = useState<"quieto" | "saludando" | "pensando" | "hablando">("quieto");
+  const [estado, setEstado] = useState<"quieto" | "saludando" | "grabando" | "oyendo" | "pensando" | "hablando">("quieto");
   const [error, setError] = useState<string | null>(null);
   const [sinVoz, setSinVoz] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
   const saludado = useRef(false);
+  const grabadora = useRef<MediaRecorder | null>(null);
+  const trozos = useRef<Blob[]>([]);
 
-  /** Suena una frase fija del sistema (saludo, acuse). No cuesta casi nada. */
-  async function decirFrase(clave: string, pista: HTMLAudioElement) {
-    const r = await fetch("/api/ia/voz/frase", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clave }),
+  /**
+   * Suena un audio y AVISA cuando termino, pase lo que pase.
+   *
+   * Aqui estaba el defecto que dejaba la pantalla en «Contestando…» para
+   * siempre: si el navegador bloquea la reproduccion —y lo hace, porque entre
+   * la pregunta y la respuesta pasan diez segundos y el permiso del clic ya
+   * caduco— nadie volvia a poner el estado en reposo. Ahora la promesa se
+   * cierra sola en los cuatro casos: termino, fallo, lo bloquearon, o se
+   * paso de largo el tiempo que podia durar.
+   */
+  function reproducir(blob: Blob, pista: HTMLAudioElement): Promise<boolean> {
+    return new Promise((listo) => {
+      let cerrado = false;
+      const cerrar = (ok: boolean) => { if (!cerrado) { cerrado = true; clearTimeout(reloj); listo(ok); } };
+      // Red de seguridad: ningun audio del sistema dura mas de dos minutos.
+      const reloj = setTimeout(() => cerrar(false), 120_000);
+
+      pista.onended = () => cerrar(true);
+      pista.onerror = () => cerrar(false);
+      pista.src = URL.createObjectURL(blob);
+      pista.play().catch(() => cerrar(false));
     });
-    if (r.status === 204 || !r.ok) { setSinVoz(true); return false; }
-    pista.src = URL.createObjectURL(await r.blob());
-    await pista.play().catch(() => undefined);
-    return true;
+  }
+
+  /** Pide una frase fija del sistema (saludo, acuse) y la suena. */
+  async function decirFrase(clave: string, pista: HTMLAudioElement) {
+    try {
+      const r = await fetch("/api/ia/voz/frase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clave }),
+      });
+      if (r.status === 204 || !r.ok) { setSinVoz(true); return false; }
+      return await reproducir(await r.blob(), pista);
+    } catch {
+      return false;
+    }
   }
 
   // Al entrar, saluda. Es lo que hace que esto se sienta una conversacion y
@@ -62,15 +90,81 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
     const pista = new Audio();
     audio.current = pista;
     setEstado("saludando");
-    pista.onended = () => setEstado("quieto");
-    pista.onerror = () => setEstado("quieto");
-    void decirFrase("saludo", pista).then((sono) => { if (!sono) setEstado("quieto"); });
+    void decirFrase("saludo", pista).finally(() => setEstado("quieto"));
     return () => { pista.pause(); };
   }, []);
 
   function callar() {
     if (audio.current) { audio.current.pause(); audio.current = null; }
     setEstado("quieto");
+  }
+
+  /**
+   * Grabar la pregunta.
+   *
+   * Se graba y se manda al servidor en vez de usar el reconocimiento del
+   * navegador porque ese NO existe en Safari de iPhone, que es justo donde
+   * esto tiene sentido. `MediaRecorder` si esta en los dos, y el formato lo
+   * detecta el servidor.
+   *
+   * Se corta solo a los treinta segundos: si alguien deja el telefono
+   * grabando en la bolsa, no se sube media hora de ruido.
+   */
+  async function grabar() {
+    if (estado === "grabando") { detenerGrabacion(); return; }
+    callar();
+    setError(null);
+    try {
+      const flujo = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(flujo);
+      trozos.current = [];
+      grabadora.current = rec;
+
+      rec.ondataavailable = (e) => { if (e.data.size) trozos.current.push(e.data); };
+      rec.onstop = async () => {
+        flujo.getTracks().forEach((t) => t.stop());
+        const audioGrabado = new Blob(trozos.current, { type: rec.mimeType });
+        trozos.current = [];
+        if (!audioGrabado.size) { setEstado("quieto"); return; }
+        await transcribir(audioGrabado);
+      };
+
+      rec.start();
+      setEstado("grabando");
+      setTimeout(() => { if (grabadora.current === rec && rec.state === "recording") detenerGrabacion(); }, 30_000);
+    } catch {
+      // Negar el microfono es una decision de la persona, no una falla: se
+      // dice que puede escribir y ya.
+      setError("No se pudo usar el micrófono. Puede escribir su pregunta.");
+      setEstado("quieto");
+    }
+  }
+
+  function detenerGrabacion() {
+    const rec = grabadora.current;
+    if (rec && rec.state === "recording") { setEstado("oyendo"); rec.stop(); }
+    grabadora.current = null;
+  }
+
+  /** Lo grabado, a palabras; y con eso se pregunta. */
+  async function transcribir(audioGrabado: Blob) {
+    setEstado("oyendo");
+    try {
+      const r = await fetch("/api/ia/voz/escuchar", { method: "POST", body: audioGrabado });
+      const data = await r.json();
+      if (!r.ok) { setError(data.error ?? "No se pudo entender el audio"); setEstado("quieto"); return; }
+      const dicho = (data.texto ?? "").trim();
+      if (dicho.length < 5) {
+        // No entender no es una falla del sistema: pasa con ruido de planta.
+        setError("No le entendí. Acérquese al teléfono o escriba la pregunta.");
+        setEstado("quieto");
+        return;
+      }
+      await preguntar(dicho);
+    } catch {
+      setError("Se perdió la conexión al mandar el audio.");
+      setEstado("quieto");
+    }
   }
 
   async function preguntar(texto: string) {
@@ -109,57 +203,72 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
         return;
       }
 
+      // La respuesta se enseña YA, aunque el audio tarde o no llegue: leerla
+      // es lo que no puede fallar.
       setTurnos((prev) => [{ pregunta: q, respuesta: data.respuesta, consultas: (data.consultas ?? []).length }, ...prev]);
 
-      // Se espera a que el acuse termine de sonar antes de contestar: si no,
-      // se encimarian las dos voces.
-      await acuse;
-      await new Promise<void>((listo) => {
-        if (pista.paused || pista.ended) return listo();
-        pista.onended = () => listo();
-        setTimeout(listo, 4000);
-      });
-      if (audio.current !== pista) return;
-
-      const voz = await fetch("/api/ia/consulta/voz", {
+      // Se pide la voz mientras el acuse todavia suena: asi la espera de la
+      // sintesis se gasta en algo que la persona ya esta oyendo.
+      const vozPedida = fetch("/api/ia/consulta/voz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: data.respuesta }),
       });
+
+      await acuse; // que no se encimen las dos voces
+      const voz = await vozPedida;
+      if (audio.current !== pista) return; // lo detuvieron mientras tanto
+
       if (voz.status === 204 || !voz.ok) { setSinVoz(true); setEstado("quieto"); return; }
       setEstado("hablando");
-      pista.onended = () => setEstado("quieto");
-      pista.src = URL.createObjectURL(await voz.blob());
-      await pista.play();
+      const sono = await reproducir(await voz.blob(), pista);
+      // Suene o no, la pantalla vuelve a reposo. Si no sono, se dice: quedarse
+      // callado sin explicacion es peor que decir «no se pudo».
+      setEstado("quieto");
+      if (!sono) setSinVoz(true);
     } catch {
       setError("Se perdió la conexión. Intente de nuevo.");
       setEstado("quieto");
     }
   }
 
-  const ocupado = estado === "pensando" || estado === "hablando" || estado === "saludando";
+  const ocupado = estado !== "quieto";
+
+  /**
+   * Si el audio no pudo sonar, se dice una sola vez y se ofrece la salida.
+   * El texto siempre esta abajo, asi que nadie se queda sin su respuesta.
+   */
 
   return (
     <div className="grid gap-4">
       <div className="rounded-2xl border border-brand-200 bg-brand-50/50 px-4 py-6 text-center">
-        <div
+        <button
+          type="button"
+          onClick={() => void grabar()}
+          disabled={estado === "oyendo" || estado === "pensando"}
+          aria-label={estado === "grabando" ? "Dejar de grabar" : "Preguntar hablando"}
           className={cn(
-            "mx-auto grid h-16 w-16 place-items-center rounded-full border-2 transition-colors",
-            ocupado ? "border-brand-500 bg-brand-100 text-brand-700" : "border-slate-200 bg-white text-slate-400",
+            "mx-auto grid h-20 w-20 place-items-center rounded-full border-2 transition-colors disabled:opacity-60",
+            estado === "grabando" ? "border-red-500 bg-red-50 text-red-600"
+              : ocupado ? "border-brand-500 bg-brand-100 text-brand-700"
+              : "border-brand-300 bg-white text-brand-700 hover:bg-brand-50",
           )}
-          aria-hidden
         >
-          {estado === "pensando" ? <Loader2 className="h-6 w-6 animate-spin" /> : <Mic className="h-6 w-6" />}
-        </div>
+          {estado === "grabando" ? <Square className="h-7 w-7" />
+            : estado === "oyendo" || estado === "pensando" ? <Loader2 className="h-7 w-7 animate-spin" />
+            : <Mic className="h-7 w-7" />}
+        </button>
 
         <p role="status" className="mt-3 text-sm font-medium text-brand-900">
           {estado === "saludando" ? "Saludando…"
+            : estado === "grabando" ? "Lo escucho… toque otra vez cuando termine"
+            : estado === "oyendo" ? "Entendiendo lo que dijo…"
             : estado === "pensando" ? "Revisando sus datos…"
             : estado === "hablando" ? "Contestando…"
-            : "Escriba su pregunta y se la contesto hablando"}
+            : "Toque el micrófono y pregunte"}
         </p>
 
-        {ocupado ? (
+        {estado === "hablando" || estado === "saludando" ? (
           <button type="button" onClick={callar} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:underline">
             <Square className="h-3 w-3" /> Detener
           </button>
@@ -174,7 +283,7 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
           className="field flex-1"
           value={pregunta}
           onChange={(e) => setPregunta(e.target.value)}
-          placeholder="¿Qué equipo me costó más este trimestre?"
+          placeholder="…o escríbala aquí"
           aria-label="Su pregunta"
           disabled={estado === "pensando"}
         />
@@ -207,7 +316,7 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
       {sinVoz ? (
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          Ahora mismo no se puede generar la voz. Las respuestas siguen aquí escritas.
+          No se pudo reproducir el audio en este aparato. Las respuestas siguen aquí escritas, completas.
         </p>
       ) : null}
 

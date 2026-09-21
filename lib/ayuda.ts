@@ -1235,7 +1235,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Preguntar cosas como «¿qué equipo me costó más este trimestre?» o «¿qué refacciones se acabaron?»",
       "Escuchar la respuesta, con el botón de bocina de cada una",
-      "Cambiar al modo hablado, donde el sistema saluda, usted pregunta y él contesta en voz alta (plan Enterprise)",
+      "Cambiar al modo hablado: toque el micrófono, haga su pregunta y el sistema contesta en voz alta (plan Enterprise)",
     ],
     flujo: [
       "No inventa: consulta sus órdenes, activos, almacén y costos con herramientas de solo lectura.",
@@ -1245,12 +1245,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "La voz es la que cada quien escogió en Ajustes → Apariencia.",
       "El modo hablado es otra forma de usar lo mismo, no otra cosa: escribiendo se relee y se compara; hablando se va en el camino. Por eso se entra a propósito, con «Prefiero preguntar y escuchar», y se sale con «Volver al modo escrito».",
       "Mientras revisa sus datos dice «déjeme revisar» en vez de quedarse callado: entre la pregunta y la respuesta pasan segundos, y un silencio largo se siente como que se descompuso.",
+      "La pregunta se graba y se entiende en el servidor, no en el teléfono: el reconocimiento de voz del navegador no existe en el iPhone, que es justo donde esto sirve. La grabación se corta sola a los 30 segundos.",
+      "Si no se entiende lo que dijo —ruido de planta, el teléfono lejos— lo dice y se puede repetir o escribir. No contesta una pregunta que usted no hizo.",
       "El modo hablado NO modifica nada, a propósito: se piensa para usarse en el camino, y dictar el cierre de una orden manejando es capturar mal un dato que después nadie puede explicar.",
       "Todo lo que se dice queda también escrito abajo, porque escuchando no hay forma de comprobar una cifra.",
       "Cada empresa tiene un máximo de audios al mes. Al llegar, la voz se apaga y se avisa; lo escrito sigue funcionando igual.",
     ],
     botones: [
       { nombre: "Escuchar la respuesta", explica: "Lee en voz alta esa respuesta. Vuelto a tocar, la detiene. Solo suena una a la vez." },
+      { nombre: "Prefiero preguntar y escuchar", explica: "Entra al modo hablado. Se sale con «Volver al modo escrito»." },
+      { nombre: "Micrófono", explica: "Toque para hablar, toque otra vez al terminar. Se corta solo a los 30 segundos. Si prefiere, el campo de abajo sigue aceptando la pregunta escrita." },
     ],
   },
 

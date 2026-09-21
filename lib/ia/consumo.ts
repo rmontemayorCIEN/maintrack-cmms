@@ -167,7 +167,10 @@ export async function registrarVoz(datos: {
       },
     });
   } catch (error) {
-    console.error("No se pudo registrar el consumo de voz:", error);
+    // Una empresa que ya no existe —o una de prueba— no es un problema que
+    // valga la pena gritar: el audio ya se entrego. Lo demas si se reporta.
+    const codigo = (error as { code?: string })?.code;
+    if (codigo !== "P2003") console.error("No se pudo registrar el consumo de voz:", error);
   }
 }
 
