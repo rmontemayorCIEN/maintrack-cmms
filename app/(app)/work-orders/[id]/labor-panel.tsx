@@ -3,7 +3,7 @@
 import { useZona } from "@/components/zona-empresa";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Avatar, Button } from "@/components/ui";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { pedir } from "@/lib/cliente/pedir";
@@ -52,6 +52,17 @@ export function LaborPanel({
     router.refresh();
   }
 
+  async function quitar(lineaId: string, quien: string, horas: number) {
+    if (loading) return;
+    if (!confirm(`¿Quitar las ${formatNumber(horas, 1)} h de ${quien} de esta orden?`)) return;
+    setLoading(true);
+    setError(null);
+    const r = await pedir(`/api/work-orders/${workOrderId}/labor?linea=${lineaId}`, { method: "DELETE" });
+    setLoading(false);
+    if (!r.ok) { setError(r.error); return; }
+    router.refresh();
+  }
+
   return (
     <div className="grid gap-3">
       {entries.length === 0 ? (
@@ -70,9 +81,22 @@ export function LaborPanel({
                   {entry.notes ? ` · ${entry.notes}` : ""}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-medium tabular-nums text-slate-700">{formatNumber(entry.hours, 1)} h</p>
-                {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(entry.cost, currency)}</p> : null}
+              <div className="flex items-center gap-1">
+                <div className="text-right">
+                  <p className="text-xs font-medium tabular-nums text-slate-700">{formatNumber(entry.hours, 1)} h</p>
+                  {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(entry.cost, currency)}</p> : null}
+                </div>
+                {editable ? (
+                  <button
+                    type="button"
+                    onClick={() => quitar(entry.id, entry.name, entry.hours)}
+                    disabled={loading}
+                    title="Quitar este registro"
+                    className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}

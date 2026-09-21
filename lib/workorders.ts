@@ -694,6 +694,108 @@ export async function consumePart(params: {
   });
 }
 
+/**
+ * Quita una refaccion de la orden y la DEVUELVE al almacen.
+ *
+ * No es borrar un renglon. Cargar una refaccion saco existencia y la escribio
+ * en el kardex; quitarla sin regresarla dejaria el almacen creyendo que hay
+ * menos de lo que hay, y el kardex sin explicacion de a donde se fue. Por eso
+ * la salida se compensa con una devolucion —el tipo RETURN existe justo para
+ * esto— y no borrando el movimiento: el kardex no se edita, se corrige con
+ * otro movimiento.
+ *
+ * Regresa al MISMO almacen del que salio. Si la salida no se encuentra (un
+ * dato viejo), al almacen general, y se dice en la referencia.
+ */
+export async function quitarRefaccion(params: {
+  organizationId: string;
+  workOrderId: string;
+  lineaId: string;
+  userId: string;
+}) {
+  const linea = await prisma.workOrderPart.findFirst({
+    where: { id: params.lineaId, workOrderId: params.workOrderId, workOrder: { organizationId: params.organizationId } },
+    select: { id: true, partId: true, quantity: true, part: { select: { code: true, name: true, unit: true } } },
+  });
+  if (!linea) throw new ErrorDeOrden("Esa refacción no es de esta orden", 404);
+
+  asegurarEditable(await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: { status: true },
+  }));
+
+  // De donde salio: la ultima salida de esta refaccion en esta orden.
+  const salida = await prisma.stockMovement.findFirst({
+    where: { organizationId: params.organizationId, workOrderId: params.workOrderId, partId: linea.partId, movementType: "OUT" },
+    orderBy: { createdAt: "desc" },
+    select: { warehouseId: true },
+  });
+  const almacen = salida?.warehouseId ?? (await almacenPorOmision(params.organizationId))?.id;
+  if (!almacen) throw new ErrorDeAlmacen("La cuenta no tiene ningún almacén activo");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workOrderPart.delete({ where: { id: linea.id } });
+    await aplicarMovimiento(
+      {
+        organizationId: params.organizationId,
+        partId: linea.partId,
+        warehouseId: almacen,
+        tipo: "RETURN",
+        cantidad: linea.quantity,
+        workOrderId: params.workOrderId,
+        userId: params.userId,
+        referencia: salida ? "Se quitó de la OT: devolución" : "Se quitó de la OT: devolución al almacén general",
+      },
+      tx,
+    );
+  });
+
+  await logAudit({
+    organizationId: params.organizationId, userId: params.userId,
+    entity: "WorkOrder", entityId: params.workOrderId, action: "UPDATED",
+    summary: `Se quitó ${linea.quantity} ${linea.part.unit} de ${linea.part.code} — ${linea.part.name} y se devolvió al almacén`,
+  });
+
+  return recalcWorkOrder(params.workOrderId);
+}
+
+/**
+ * Quita un registro de horas.
+ *
+ * Aqui si es borrar: las horas no movieron nada fuera de la orden. Lo unico
+ * que hay que rehacer es el costo, que `recalcWorkOrder` suma de cero.
+ */
+export async function quitarHoras(params: {
+  organizationId: string;
+  workOrderId: string;
+  lineaId: string;
+  userId: string;
+  /** Un tecnico solo puede quitar lo suyo; quien supervisa, cualquiera. */
+  soloPropias: boolean;
+}) {
+  const linea = await prisma.workOrderLabor.findFirst({
+    where: { id: params.lineaId, workOrderId: params.workOrderId, workOrder: { organizationId: params.organizationId } },
+    select: { id: true, hours: true, userId: true, user: { select: { name: true } } },
+  });
+  if (!linea) throw new ErrorDeOrden("Ese registro de horas no es de esta orden", 404);
+  if (params.soloPropias && linea.userId !== params.userId) {
+    throw new ErrorDeOrden("Solo puede quitar las horas que usted registró", 403);
+  }
+
+  asegurarEditable(await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: { status: true },
+  }));
+
+  await prisma.workOrderLabor.delete({ where: { id: linea.id } });
+  await logAudit({
+    organizationId: params.organizationId, userId: params.userId,
+    entity: "WorkOrder", entityId: params.workOrderId, action: "UPDATED",
+    summary: `Se quitaron ${linea.hours} h de ${linea.user.name}`,
+  });
+  return recalcWorkOrder(params.workOrderId);
+}
+
 async function consumirRefaccion(params: Parameters<typeof consumePart>[0]) {
   const part = await prisma.part.findFirst({
     where: { id: params.partId, organizationId: params.organizationId },

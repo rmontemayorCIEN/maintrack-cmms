@@ -492,6 +492,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Crear una orden correctiva a mano",
       "Filtrar por estado, tipo, prioridad o responsable",
       "Acomodar columnas, agrupar hasta en tres niveles y guardar su vista",
+      "Quitar horas, refacciones o servicios cargados por error, mientras la orden no esté cerrada",
     ],
     flujo: [
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
@@ -500,6 +501,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Una misma orden puede juntar trabajo de varios orígenes: el preventivo del mes de esa bomba, más la fuga que alguien reportó. Cada actividad conserva de dónde vino.",
       "El ciclo es Borrador → Abierta → Asignada → En proceso (con pausas En espera) → Completada → Cerrada, más Cancelada. Cada orden muestra solo las acciones válidas para su estado y para el rol de quien la ve.",
       "Completada significa que el técnico terminó el trabajo (cierre técnico). Cerrada significa que un supervisor validó horas, paro, refacciones, servicios, costos, diagnóstico, pendientes y evidencia (cierre administrativo).",
+      "Lo que se cargó por error se puede quitar mientras la orden no esté cerrada: horas, refacciones y servicios traen su botón. Quitar una refacción NO borra el movimiento del almacén: genera una devolución que lo compensa, así que la pieza vuelve a estar disponible y el kardex sigue explicando a dónde se fue cada cosa. Un técnico quita las horas que él capturó; supervisión, las de cualquiera.",
       "Para iniciar, la orden necesita responsable: quien la inicia puede tomarla; un supervisor puede iniciarla sin responsable solo con motivo.",
       "Poner en espera, cancelar, devolver a proceso, reabrir y reactivar piden motivo. Todo cambio de estado queda en «Historial de estados» con quién, cuándo y por qué, y el motivo también se anota en la bitácora de la orden.",
       "Al completarla se pide la solución aplicada; horas registradas (o por qué no hay); si requería paro, los minutos (o confirmar que no hubo paro); en fallas, código y causa raíz (o «Sin determinar» con justificación); todas las actividades hechas o enviadas al backlog, y evidencia solo si la empresa la exige para equipos críticos o de seguridad.",

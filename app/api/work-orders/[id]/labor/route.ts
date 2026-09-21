@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { actividadValida, asegurarEditable, recalcWorkOrder } from "@/lib/workorders";
+import { actividadValida, asegurarEditable, quitarHoras, recalcWorkOrder } from "@/lib/workorders";
+import { can } from "@/lib/rbac";
 import { enFila, hace } from "@/lib/repeticion";
 
 const schema = z.object({
@@ -52,5 +53,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const workOrder = await recalcWorkOrder(id);
     return ok({ workOrder }, 201);
     });
+  });
+}
+
+/**
+ * Quita un registro de horas.
+ *
+ * El tecnico puede quitar las suyas —se equivoco al capturar— y quien
+ * supervisa, cualquiera: es quien valida el trabajo antes de cerrar.
+ */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return withAuth("workorder:execute", async ({ user, orgId }) => {
+    const lineaId = new URL(request.url).searchParams.get("linea");
+    if (!lineaId) return fail("Falta el registro a quitar", 422);
+    const workOrder = await quitarHoras({
+      organizationId: orgId, workOrderId: id, lineaId, userId: user.id,
+      soloPropias: !can(user.role, "workorder:write"),
+    });
+    return ok({ workOrder });
   });
 }

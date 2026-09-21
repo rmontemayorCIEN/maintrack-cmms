@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { pedir } from "@/lib/cliente/pedir";
@@ -46,6 +46,22 @@ export function PartsPanel({
     router.refresh();
   }
 
+  /**
+   * Quitar una refaccion NO es borrar un renglon: la cantidad regresa al
+   * almacen con una devolucion, y por eso se dice en la pregunta. Quien la
+   * quita tiene que saber que la pieza vuelve a estar disponible.
+   */
+  async function quitar(lineaId: string, nombre: string, cantidad: number, unidad: string) {
+    if (loading) return;
+    if (!confirm(`¿Quitar ${formatNumber(cantidad, 2)} ${unidad} de ${nombre} de esta orden?\n\nSe devuelve al almacén y el costo de la orden se recalcula.`)) return;
+    setLoading(true);
+    setError(null);
+    const r = await pedir(`/api/work-orders/${workOrderId}/parts?linea=${lineaId}`, { method: "DELETE" });
+    setLoading(false);
+    if (!r.ok) { setError(r.error); return; }
+    router.refresh();
+  }
+
   return (
     <div className="grid gap-3">
       {used.length === 0 ? (
@@ -60,11 +76,24 @@ export function PartsPanel({
                 <p className="truncate text-xs font-medium text-slate-700">{item.name}</p>
                 <p className="text-[0.6875rem] text-slate-400">{item.code}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-medium tabular-nums text-slate-700">
-                  {formatNumber(item.quantity, 2)} {item.unit}
-                </p>
-                {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p> : null}
+              <div className="flex items-center gap-1">
+                <div className="text-right">
+                  <p className="text-xs font-medium tabular-nums text-slate-700">
+                    {formatNumber(item.quantity, 2)} {item.unit}
+                  </p>
+                  {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p> : null}
+                </div>
+                {editable ? (
+                  <button
+                    type="button"
+                    onClick={() => quitar(item.id, item.name, item.quantity, item.unit)}
+                    disabled={loading}
+                    title="Quitar y devolver al almacén"
+                    className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}

@@ -376,6 +376,49 @@ async function main() {
       requisiciones === 1 && dobleReq.map((r) => r.status).sort().join() === "201,409",
       { ot: dobleOT.map((r) => r.status), creadas, req: dobleReq.map((r) => r.status), requisiciones });
 
+    // Quitar lo que se cargó por error. Lo que de verdad importa aquí no es
+    // que desaparezca el renglón, sino que la refacción REGRESE al almacén:
+    // borrarla sin devolverla dejaría al almacén creyendo que hay menos de lo
+    // que hay, y al kardex sin explicación de a dónde se fue.
+    const antesDeQuitar = (await prisma.part.findUniqueOrThrow({ where: { id: parte.id } })).quantityOnHand;
+    const cargada = await pedir("POST", `/api/work-orders/${ot3.id}/parts`, c.TECHNICIAN, { partId: parte.id, quantity: 3 });
+    const trasCargar = (await prisma.part.findUniqueOrThrow({ where: { id: parte.id } })).quantityOnHand;
+    const linea = await prisma.workOrderPart.findFirstOrThrow({ where: { workOrderId: ot3.id, partId: parte.id, quantity: 3 } });
+    const costoConLaRefaccion = (await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } })).partsCost;
+    const quitada = await pedir("DELETE", `/api/work-orders/${ot3.id}/parts?linea=${linea.id}`, c.TECHNICIAN);
+    const trasQuitar = await prisma.part.findUniqueOrThrow({ where: { id: parte.id } });
+    const devolucion = await prisma.stockMovement.findFirst({ where: { workOrderId: ot3.id, partId: parte.id, movementType: "RETURN" } });
+    const otTrasQuitar = await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } });
+    revisar("39c. quitar una refacción cargada por error la devuelve al almacén, deja el movimiento en el kardex y recalcula el costo",
+      cargada.status === 201 && quitada.status === 200 &&
+      trasCargar === antesDeQuitar - 3 && trasQuitar.quantityOnHand === antesDeQuitar &&
+      !!devolucion && devolucion.quantity === 3 &&
+      otTrasQuitar.partsCost === costoConLaRefaccion - 3 * parte.unitCost &&
+      (await prisma.workOrderPart.count({ where: { id: linea.id } })) === 0,
+      { antes: antesDeQuitar, tras: trasQuitar.quantityOnHand, devolucion: devolucion?.quantity, costo: [costoConLaRefaccion, otTrasQuitar.partsCost] });
+
+    // Y las horas: ahí sí es borrar, porque no movieron nada fuera de la orden.
+    const horas = await pedir("POST", `/api/work-orders/${ot3.id}/labor`, c.TECHNICIAN, { hours: 2, notes: "capturada por error" });
+    const lineaHoras = await prisma.workOrderLabor.findFirstOrThrow({ where: { workOrderId: ot3.id, hours: 2 } });
+    const ajena = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${lineaHoras.id}`, c.REQUESTER);
+    const propias = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${lineaHoras.id}`, c.TECHNICIAN);
+    const otTrasHoras = await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } });
+    // Un técnico no puede borrar lo que capturó otro; quien supervisa, sí:
+    // es quien valida el trabajo antes de cerrarlo.
+    const deOtro = await prisma.workOrderLabor.create({ data: { workOrderId: ot3.id, userId: tec2.id, hours: 3, cost: 300, rate: 100, workedAt: new Date() } });
+    const deOtroPorElTecnico = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${deOtro.id}`, c.TECHNICIAN);
+    const deOtroPorSupervision = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${deOtro.id}`, c.SUPERVISOR);
+    revisar("39e. un técnico no quita las horas de otro; supervisión sí",
+      deOtroPorElTecnico.status === 403 && deOtroPorSupervision.status === 200 &&
+      (await prisma.workOrderLabor.count({ where: { id: deOtro.id } })) === 0,
+      { tecnico: deOtroPorElTecnico.status, supervision: deOtroPorSupervision.status });
+
+    revisar("39d. el técnico quita las horas que capturó por error; el costo y las horas de la orden se rehacen",
+      horas.status === 201 && ajena.status === 403 && propias.status === 200 &&
+      (await prisma.workOrderLabor.count({ where: { id: lineaHoras.id } })) === 0 &&
+      otTrasHoras.actualHours === 0.5,
+      { ajena: ajena.status, propias: propias.status, horas: otTrasHoras.actualHours });
+
     // ═══════════════════════════════════════════ 41: conflicto
     console.log("\n41. Conflicto por cambio simultáneo");
     const e1 = await pedir("PATCH", `/api/work-orders/${ot2.id}`, c.SUPERVISOR, { title: "Lubricar rodamientos", base: { title: "Lubricar" }, aceptarAdvertencias: true });

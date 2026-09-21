@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ok, withAuth } from "@/lib/api";
-import { actividadValida, consumePart } from "@/lib/workorders";
+import { fail, ok, withAuth } from "@/lib/api";
+import { actividadValida, consumePart, quitarRefaccion } from "@/lib/workorders";
 
 const schema = z.object({
   partId: z.string(),
@@ -25,5 +25,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       userId: user.id,
     });
     return ok({ workOrder }, 201);
+  });
+}
+
+/**
+ * Quita una refaccion de la orden. NO borra el movimiento de almacen: genera
+ * una devolucion que lo compensa, para que el kardex siga contando la verdad.
+ *
+ * Pide `inventory:write` igual que cargarla: quien puede sacar del almacen es
+ * quien puede regresar.
+ */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return withAuth("inventory:write", async ({ user, orgId }) => {
+    const lineaId = new URL(request.url).searchParams.get("linea");
+    if (!lineaId) return fail("Falta la refacción a quitar", 422);
+    const workOrder = await quitarRefaccion({ organizationId: orgId, workOrderId: id, lineaId, userId: user.id });
+    return ok({ workOrder });
   });
 }
