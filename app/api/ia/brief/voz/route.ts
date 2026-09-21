@@ -48,8 +48,17 @@ export async function GET() {
         // cifra, y quien quiera contrastarla necesita poder leerla.
         "X-Brief-Texto": encodeURIComponent(brief.texto),
         "X-Brief-Origen": voz.origen,
-        // Privado y corto: es informacion de la empresa y cambia sola.
-        "Cache-Control": "private, max-age=300",
+        /**
+         * El navegador NO guarda esto.
+         *
+         * Con `max-age` se lo quedaba cinco minutos y ni preguntaba: quien
+         * cambiaba de voz seguia oyendo la anterior, y quien corregia una
+         * orden seguia oyendo la cifra vieja. Parecia que el sistema no se
+         * enteraba. El ahorro de verdad esta en el guardado del SERVIDOR,
+         * que reusa el audio cuando los datos no cambiaron; el del navegador
+         * solo servia para mentir.
+         */
+        "Cache-Control": "no-store",
       },
     });
   });

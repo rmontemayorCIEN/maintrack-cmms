@@ -174,13 +174,18 @@ export function BriefDelDia() {
     if (!sono) { setDeRespaldo(true); hablar(r.datos.texto); }
   }
 
+  /**
+   * Siempre se vuelve a pedir el parte, tambien al escuchar otra vez.
+   *
+   * La primera version solo repedia el AUDIO y dejaba en pantalla el texto de
+   * la primera consulta: quien corregia una orden y volvia a darle al boton
+   * seguia leyendo —y oyendo— la cifra vieja. El parte es de este momento o
+   * no sirve; cuando los datos no cambiaron, el servidor reusa lo que ya
+   * tenia y no cuesta nada.
+   */
   async function alternar() {
     if (hablando) { detener(); return; }
-    if (!datos) { void pedirBrief(); return; }
-    setCargando(true);
-    const sono = await sonarDelServidor();
-    setCargando(false);
-    if (!sono) { setDeRespaldo(true); hablar(datos.texto); }
+    void pedirBrief();
   }
 
   return (

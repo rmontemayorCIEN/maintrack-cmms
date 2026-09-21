@@ -1234,10 +1234,17 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Preguntas en español sobre su propia operación, contestadas con sus datos reales.",
     hacer: [
       "Preguntar cosas como «¿qué equipo me costó más este trimestre?» o «¿qué refacciones se acabaron?»",
+      "Escuchar la respuesta, con el botón de bocina de cada una",
     ],
     flujo: [
       "No inventa: consulta sus órdenes, activos, almacén y costos con herramientas de solo lectura.",
       "Nunca ve datos de otra empresa: la organización la pone el servidor, no la pregunta.",
+      "Lo que se escucha es exactamente la respuesta que está en pantalla: no se le vuelve a preguntar a la IA para leerla, así que oír y leer nunca se contradicen, y no se cobra dos veces la misma respuesta.",
+      "Al decirla se traducen los importes y porcentajes a como los diría una persona —«128 mil 400 pesos», «87.5 por ciento»— sin redondear ninguna cifra. Los códigos de equipo se dicen tal cual, porque así se llaman en la planta.",
+      "La voz es la que cada quien escogió en Ajustes → Apariencia.",
+    ],
+    botones: [
+      { nombre: "Escuchar la respuesta", explica: "Lee en voz alta esa respuesta. Vuelto a tocar, la detiene. Solo suena una a la vez." },
     ],
   },
 

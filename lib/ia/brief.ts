@@ -26,10 +26,12 @@
  * falla, `textoDelBrief()` devuelve el guion concatenado y el brief se escucha
  * igual. La IA lo mejora; no lo sostiene.
  */
+import { createHash } from "crypto";
 import { z } from "zod";
 import { analizarConIa, textoIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { cifrasDe, type GuionDelDia } from "../brief";
+import { guardarArchivo, leerArchivo } from "../almacenamiento";
 
 const SISTEMA = `Eres quien le da el parte del dia a la direccion de una empresa de mantenimiento en Mexico. La persona lo va a ESCUCHAR, probablemente manejando.
 
@@ -81,6 +83,33 @@ export function cifrasInventadas(texto: string, permitidas: string[]): string[] 
   return inventadas;
 }
 
+/**
+ * La huella de los DATOS del parte, no del texto redactado.
+ *
+ * Aqui estaba el desperdicio: se guardaba el audio por el texto que salia del
+ * modelo, y el modelo redacta distinto el mismo parte cada vez —«Hoy es lunes
+ * 21…» una vez, «Hoy lunes 21, le comento…» la siguiente—. La huella nunca
+ * coincidia, asi que cada clic pagaba redaccion Y sintesis, aunque nada
+ * hubiera cambiado en la planta.
+ *
+ * Con la huella de los datos, el reuso pasa cuando tiene que pasar: si nadie
+ * cerro una orden ni cayo un equipo, se devuelve el mismo texto —y por lo
+ * tanto el mismo audio— sin gastar. Y en cuanto algo cambia, cambia la huella
+ * y se rehace. Es lo contrario de guardar por tiempo: no hay que esperar
+ * quince minutos a que se entere.
+ */
+function huellaDelGuion(guion: GuionDelDia): string {
+  const datos = JSON.stringify({
+    saludo: guion.saludo,
+    fecha: guion.fecha,
+    puntos: guion.puntos.map((p) => p.texto),
+    mas: guion.masPuntos,
+  });
+  return createHash("sha256").update(datos).digest("hex").slice(0, 32);
+}
+
+const rutaDelTexto = (organizationId: string, h: string) => `org-${organizationId}/voz/parte-${h}.txt`;
+
 export type ResultadoBrief = {
   texto: string;
   /** De donde salio el texto: la IA o el guion crudo. */
@@ -107,6 +136,16 @@ export async function redactarBrief(
   // adornar «no hay pendientes» seria cobrarle al cliente por un silencio.
   if (guion.tranquilo || guion.puntos.length < 2) {
     return { texto: plano, origen: "guion", motivo: "poco que hilvanar", costoUsd: 0 };
+  }
+
+  // Si los datos son los mismos de hace un rato, se devuelve la redaccion que
+  // ya se pago. No es guardar por tiempo: es guardar por contenido.
+  const h = huellaDelGuion(guion);
+  try {
+    const guardado = await leerArchivo(rutaDelTexto(org.id, h));
+    if (guardado?.length) return { texto: guardado.toString("utf8"), origen: "ia", costoUsd: 0 };
+  } catch {
+    // No estaba: se redacta.
   }
 
   const veredicto = await puedeUsarIa(org, "BRIEF");
@@ -148,6 +187,10 @@ export async function redactarBrief(
       costoUsd: r.costoUsd,
     };
   }
+
+  // Se guarda para que el siguiente clic no vuelva a pagarla. Si el guardado
+  // falla, se entrega igual: la persona ya tiene su parte.
+  await guardarArchivo(rutaDelTexto(org.id, h), Buffer.from(r.datos.texto, "utf8"), "text/plain").catch(() => undefined);
 
   return { texto: r.datos.texto, origen: "ia", costoUsd: r.costoUsd };
 }

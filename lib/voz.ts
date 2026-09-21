@@ -115,6 +115,61 @@ export function conPausas(texto: string): string {
     .trim();
 }
 
+/**
+ * Un numero grande, como lo diria una persona.
+ *
+ * «128,400» leido por un sintetizador sale «ciento veintiocho coma
+ * cuatrocientos». Los centavos se van: a nadie le importan al oido.
+ */
+function miles(n: number): string {
+  if (n >= 1_000_000) {
+    const millones = n / 1_000_000;
+    // «de» incluido: se dice «2.5 millones DE pesos», no «millones pesos».
+    return `${millones.toFixed(millones >= 10 ? 0 : 1).replace(".0", "")} millones de`;
+  }
+  if (n >= 1000) {
+    const m = Math.floor(n / 1000);
+    const resto = n % 1000;
+    // El resto SE DICE. Redondear «128,400» a «128 mil» es aproximar una
+    // cifra que el sistema calculo exacta, y aqui se esta contestando una
+    // pregunta sobre datos: el numero es la respuesta.
+    return resto ? `${m} mil ${resto}` : `${m} mil`;
+  }
+  return String(n);
+}
+
+/**
+ * Un texto escrito para leerse, listo para decirse.
+ *
+ * Lo que se lee bien no se oye bien. Una respuesta del sistema trae importes
+ * con signo y comas, porcentajes, guiones largos y vinetas; dichos tal cual
+ * suenan a maquina deletreando. Aqui se traducen a como los diria una
+ * persona, y vive en un solo lugar porque lo necesitan el parte del dia y
+ * las respuestas habladas.
+ *
+ * Deliberadamente NO toca los codigos de equipo —CMP-301, BOM-602—: deben
+ * oirse tal cual, porque es como se llaman en la planta.
+ */
+export function paraDecir(texto: string): string {
+  return texto
+    // Importes: $128,400.50 → 128 mil 400 pesos. Si el texto YA decia «pesos»
+    // detras, no se repite: «$45 pesos» no puede salir «45 pesos pesos».
+    .replace(/\$\s?([\d,]+)(?:\.\d+)?(\s*pesos)?/gi, (_, n: string) => `${miles(Number(n.replace(/,/g, "")))} pesos`)
+    // Porcentajes: 87.5% → 87.5 por ciento
+    .replace(/(\d)\s?%/g, "$1 por ciento")
+    // Vinetas al empezar un renglon: se oirian como «guion». Se quitan, pero
+    // el renglon se cierra con punto —si no, dos vinetas seguidas se dicen
+    // de corrido y suenan como una sola frase sin sentido.
+    .replace(/^[\s]*[-•*]\s+(.*)$/gm, (_, linea: string) => (/[.:;!?]$/.test(linea.trim()) ? linea : `${linea.trim()}.`))
+    // Guiones largos: una coma es la pausa que haria una persona.
+    .replace(/\s*[—–]\s*/g, ", ")
+    // Encabezados de markdown y negritas, que el modelo a veces cuela.
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** La huella del audio: si cambia el texto, la voz o el ritmo, es otro archivo. */
 export function huella(texto: string, voz: string): string {
   return createHash("sha256").update(`${voz}|${RITMO}|${texto}`).digest("hex").slice(0, 32);

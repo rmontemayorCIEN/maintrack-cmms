@@ -109,6 +109,27 @@ async function main() {
       cifrasInventadas(envenenado, guion.cifras).includes("37"),
       cifrasInventadas(envenenado, guion.cifras).join(", "));
 
+    // ── Que no se pague dos veces el mismo parte ──────────────────────────
+    //
+    // El modelo redacta distinto el mismo parte cada vez, asi que guardar el
+    // audio por el TEXTO no servia de nada: cada clic pagaba redaccion y
+    // sintesis aunque no hubiera cambiado nada en la planta. Ahora se guarda
+    // por los DATOS.
+    console.log("\nEl mismo parte, otra vez\n");
+    const otraVez = await redactarBrief(usuario.organization as never, guion, { userId: director.id });
+    revisar("con los mismos datos dice exactamente lo mismo", otraVez.texto === brief.texto);
+    revisar("y no se vuelve a cobrar", otraVez.costoUsd === 0, `$${otraVez.costoUsd.toFixed(5)}`);
+
+    console.log("\nEn cuanto cambia algo en la planta\n");
+    const conCambio = {
+      ...guion,
+      puntos: [...guion.puntos, { clave: "extra", peso: 9, texto: "Y se cayó otro equipo." }],
+    };
+    const rehecho = await redactarBrief(usuario.organization as never, conCambio as never, { userId: director.id });
+    revisar("se rehace el parte, sin esperar a que venza ningún tiempo",
+      rehecho.texto !== brief.texto, rehecho.texto.slice(0, 70));
+    revisar("y esa sí se cobra", rehecho.costoUsd > 0, `$${rehecho.costoUsd.toFixed(5)}`);
+
     // Y que quede registrado el consumo, que es como se cobra.
     const usos = await prisma.aiUsage.count({ where: { organizationId: org.id, funcion: "BRIEF" } });
     revisar("el consumo quedó registrado en AiUsage", usos > 0, `${usos} registro(s)`);

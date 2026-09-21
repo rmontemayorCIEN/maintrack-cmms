@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, Database, Loader2, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowRight, Database, Loader2, Sparkles, Square, Volume2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 
 type Turno = {
@@ -39,6 +39,45 @@ export function PanelConsulta({
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnos, setTurnos] = useState<Turno[]>([]);
+  /** Cual respuesta se esta oyendo. Solo una a la vez. */
+  const [sonando, setSonando] = useState<number | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+
+  function callar() {
+    if (audio.current) { audio.current.pause(); audio.current = null; }
+    setSonando(null);
+  }
+
+  /**
+   * Oir la respuesta que YA esta en pantalla.
+   *
+   * No se le vuelve a preguntar al modelo: se manda a decir el mismo texto
+   * que el usuario tiene enfrente. Asi lo que oye y lo que lee son lo mismo
+   * —si se regenerara, podrian no coincidir— y no se le cobra dos veces la
+   * misma respuesta.
+   */
+  async function escuchar(i: number, texto: string) {
+    if (sonando === i) { callar(); return; }
+    callar();
+    setSonando(i);
+    try {
+      const r = await fetch("/api/ia/consulta/voz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto }),
+      });
+      // 204: no hay voz del sistema. No es un error que valga la pena
+      // enseñar; la respuesta sigue ahi para leerse.
+      if (r.status === 204 || !r.ok) { setSonando(null); return; }
+      const pista = new Audio(URL.createObjectURL(await r.blob()));
+      pista.onended = () => setSonando(null);
+      pista.onerror = () => setSonando(null);
+      audio.current = pista;
+      await pista.play();
+    } catch {
+      setSonando(null);
+    }
+  }
 
   async function preguntar(texto: string) {
     const q = texto.trim();
@@ -115,7 +154,18 @@ export function PanelConsulta({
 
       {turnos.map((t, i) => (
         <Card key={i}>
-          <p className="mb-2 text-sm font-semibold text-slate-800">{t.pregunta}</p>
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <p className="min-w-0 text-sm font-semibold text-slate-800">{t.pregunta}</p>
+            <button
+              type="button"
+              onClick={() => escuchar(i, t.respuesta)}
+              title={sonando === i ? "Detener" : "Escuchar la respuesta"}
+              aria-label={sonando === i ? "Detener" : "Escuchar la respuesta"}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-brand-700 hover:bg-brand-50"
+            >
+              {sonando === i ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          </div>
           <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.respuesta}</div>
           {t.consultas.length ? (
             <details className="mt-3 border-t border-slate-100 pt-2">
