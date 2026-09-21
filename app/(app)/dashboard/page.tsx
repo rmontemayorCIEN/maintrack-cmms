@@ -6,6 +6,7 @@ import { PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
 import { IconoMenu } from "@/components/shell/iconos";
 import { cn } from "@/lib/utils";
 import { CuandoSeCalculo } from "./actualizar";
+import { Franja } from "./franja";
 
 export const metadata = { title: "Inicio" };
 export const dynamic = "force-dynamic";
@@ -63,6 +64,8 @@ export default async function InicioPage() {
       ) : null}
 
       {inicio.calculadoEl ? <CuandoSeCalculo calculadoEl={inicio.calculadoEl.toISOString()} /> : null}
+
+      {inicio.franja ? <Franja franja={inicio.franja} /> : null}
 
       {inicio.alDia ? (
         <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-800">

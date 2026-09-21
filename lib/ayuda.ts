@@ -332,6 +332,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Usar las acciones rápidas de arriba para lo que hace todos los días",
       "Entrar directo a cada pendiente desde su renglón",
+      "Ver de un vistazo cómo está cada área o sistema de la planta, y entrar a la que trae problema",
       "Ver los resultados del periodo (dueño)",
       "Actualizar los indicadores al momento, si acaba de cerrar trabajo",
     ],
@@ -343,6 +344,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En dirección y administración, el cumplimiento, la disponibilidad, el costo y los problemas de captura se calculan cada 15 minutos y abajo del resumen dice de cuándo son; con «Actualizar» se recalculan al momento. Son ventanas de 30 días: cerrar una orden mueve esas cifras décimas. Todo lo demás del inicio —vencidas, críticas, refacciones agotadas, compras por firmar— es de este instante.",
       "Los números salen de las órdenes y del almacén; no se capturan en ningún lado. En «Resultados», cada tarjeta de indicador abre su fórmula y los registros que la forman.",
       "Quien ejecuta no ve costos: mano de obra, refacciones y valor de equipos los ven la administración, supervisión y consulta.",
+      "«Cómo está la planta» agrupa por sistema cuando la empresa tiene sistemas armados en el mapa de sistemas, y por área cuando todavía no. Un cuadro por equipo, hasta veinte; con más equipos los cuadros se reparten, pero un estado con al menos un equipo nunca desaparece de la barra.",
+      "Cada renglón dice siempre las dos cosas —cómo están sus equipos y qué trae pendiente— para que los renglones se puedan sumar. Las órdenes vencidas que no cuelgan de ningún equipo no caben en ningún área y se cuentan aparte, al pie.",
+      "Los equipos dados de baja no cuentan en ningún lado de esa franja. Quien no ve activos —compras y quien solo reporta— tampoco ve la franja.",
     ],
   },
 

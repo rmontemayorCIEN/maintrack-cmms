@@ -24,6 +24,7 @@ import { accionesRapidasDe, puedeVerRuta, TITULO_INICIO, type AccionRapida, type
 import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./avisos/situaciones";
 import { filtroDeVencidas } from "./vencimiento";
 import { resumenDeInicio } from "./resumen-inicio";
+import { franjaDePlanta, type FranjaDePlanta } from "./planta";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -54,6 +55,12 @@ export type Inicio = {
    * órdenes y no se movió, se siente como un error del sistema.
    */
   calculadoEl: Date | null;
+  /**
+   * Como esta la planta por areas o por sistemas. Solo para quien ve equipos:
+   * a compras y a quien solo reporta no le sirve de nada saber que la nave
+   * tiene dos equipos degradados, y ocuparia el lugar de lo suyo.
+   */
+  franja: FranjaDePlanta | null;
 };
 
 type Usuario = { id: string; role: string; isSuperAdmin: boolean; organizationId: string; organization: { timezone: string | null; currency: string } };
@@ -95,6 +102,17 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
   const zona = user.organization.timezone || "America/Mexico_City";
   const org = user.organizationId;
   const ctx = { user, rol, zona, org, ahora };
+
+  /**
+   * Se lanza ANTES de armar el inicio y se espera hasta el final: no depende
+   * de nada de lo que arma cada rol, asi que esperarla en serie seria regalar
+   * su tiempo. El `catch` va aqui mismo —no en el `await`— para que una falla
+   * no quede como rechazo sin atender mientras se arma lo demas.
+   */
+  const pendienteFranja = puedeVerRuta(rol, "/assets")
+    ? franjaDePlanta(org, ahora, zona).catch(() => null)
+    : Promise.resolve(null);
+
   const armado = await (ARMADORES[rol] ?? inicioConsulta)(ctx);
   const bloques = armado.bloques.filter((b) => b.total > 0)
     // Una liga a una pantalla que el rol no abre no se ofrece.
@@ -110,6 +128,9 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
       };
     }
   }
+  // La franja no puede tumbar el inicio: si falla, el inicio sale sin ella.
+  const franja = await pendienteFranja;
+
   return {
     rol, titulo: TITULO_INICIO[rol] ?? "Inicio", resumen: armado.resumen, bloques,
     acciones: accionesRapidasDe(rol),
@@ -117,6 +138,7 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
     tituloDetalle: armado.tituloDetalle ?? "Más detalle",
     alDia: bloques.length === 0, puesta,
     calculadoEl: armado.calculadoEl ?? null,
+    franja,
   };
 }
 
