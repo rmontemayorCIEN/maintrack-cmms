@@ -91,7 +91,7 @@ teléfono.
 
 ## Pruebas automatizadas
 
-65 pruebas. Las que agregó o amplió este bloque:
+67 pruebas. Las que agregó o amplió este bloque:
 
 | Prueba | Qué protege |
 |---|---|
@@ -100,6 +100,8 @@ teléfono.
 | `verificar-restauracion.ts` (nueva) | Conteos, relaciones, kardex, usuarios con su rol, empresas con su plan, adjuntos y bitácora de una base restaurada, comparados contra producción |
 | `prueba-bloque-8.ts` (ampliada) | Que un error de Prisma no le cuente al cliente cómo está hecho el sistema y que uno de regla de negocio sí le llegue con su texto; que el logotipo ya no admita SVG; que el límite de solicitudes frene a la sexta y no afecte a otra conexión; que cada paro pertenezca a la empresa de su equipo |
 | `sembrar-volumen.ts` + `prueba-rendimiento.ts` (nuevas) | El volumen de un piloto al cabo de un año, y el cronómetro sobre las mismas funciones que llaman las pantallas |
+| `prueba-roles.ts` (nueva) | Los siete roles entrando de verdad por `/api/auth/login`: su inicio, su menú, lo que puede y lo que no, y el activo, la orden, el archivo y la compra de otra empresa escritos a mano en la barra |
+| `prueba-concurrencia.ts` (nueva) | Doce carreras con sesiones reales: doble envío, dos personas sobre la misma orden, la última pieza del almacén, autorizar dos veces, recibir dos veces |
 | `prueba-rendimiento-real.sh` (nueva) | Lo mismo, pero en PostgreSQL del tamaño de producción, en una instancia nueva y vacía que se borra al terminar |
 
 **Cómo se comprobó que las pruebas sirven:** se quitó el candado del
@@ -122,6 +124,159 @@ npm run build
 
 Las seis `*-real` necesitan `ANTHROPIC_API_KEY` (van con
 `./scripts/con-produccion.sh`). `prueba-avisos` depende de la hora del día.
+
+---
+
+## Sesiones reales por rol
+
+Ejecutado con `npx tsx scripts/prueba-roles.ts`. **99 revisiones, todas
+aprobadas**, en dos corridas seguidas con el mismo resultado.
+
+**Cómo se hizo.** Dos empresas nuevas, A y B, cada una con las siete cuentas y
+su contraseña cifrada con bcrypt. Cada rol **entra por `/api/auth/login`** con
+su correo y su contraseña, y todo lo demás viaja con la cookie que devuelve ese
+inicio de sesión. Ningún rol se simula cambiando un campo en la base: si mañana
+el inicio de sesión rechazara a un rol, esta prueba se entera. Al terminar,
+las dos empresas se borran y se comparan ocho conteos de **todas las demás**
+para comprobar que la prueba no tocó nada ajeno.
+
+**Lo que se revisó de cada rol:** que entre; que su página inicial sea la suya;
+que su menú tenga solo pantallas que puede abrir; que su inicio responda igual
+desde un teléfono; las acciones que **sí** le tocan; las que **no** le tocan; y
+las pantallas que no son suyas escritas a mano en la barra de direcciones.
+
+**Aislamiento.** Los siete roles de la empresa A intentan abrir, con la
+dirección escrita a mano, el activo, la orden, el archivo adjunto y la compra
+de la empresa B. Ninguno lo logra: 404 o pantalla de «Esta pantalla no es de su
+rol», y en ningún caso aparece el nombre del equipo, el título de la orden ni
+el folio de la compra en la respuesta. Al revés también: el dueño de B no ve
+una orden de A.
+
+**Dos correcciones a la prueba, no al sistema.** Al escribirla di por hallazgos
+dos cosas que no lo eran, y las verifiqué antes de tocar nada:
+
+- `/settings` la abre cualquiera —ahí están su cuenta, su apariencia y sus
+  avisos—, así que escribir `?s=usuarios` a mano contesta 200. Lo que importa
+  es que no dibuje la sección ni la ofrezca, y no lo hace: cae en «Mi cuenta».
+  La primera versión de la prueba buscaba la cadena `s=usuarios` en el HTML y
+  la encontraba **siempre**, porque Next refleja la dirección pedida dentro del
+  payload del servidor. Ahora busca el enlace de la pestaña, y para que el
+  detector no apruebe por ciego, el propietario comprueba lo contrario: que a
+  él sí se le ofrecen las cuatro pestañas de administración.
+- `/billing` no es la pantalla de la suscripción sino la de una nota de cobro
+  (`/billing/[id]`). La suscripción y el estado de cuenta viven en
+  Configuración, y ahí se probaron.
+
+### Matriz
+
+| Rol | Prueba | Resultado esperado | Resultado real | Evidencia | Estado |
+|---|---|---|---|---|---|
+| Propietario | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Administrador | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Supervisor | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Técnico | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Compras | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Solicitante | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Consulta | inicia sesión con su correo y contraseña | recibe cookie de sesión | HTTP 200 | cookie mt_session emitida | APROBADO |
+| Propietario | su página inicial es la que le toca | título «Estado de la empresa» | Estado de la empresa | 4 cifras · 1 bloques | APROBADO |
+| Propietario | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 31 entradas | /dashboard /board /calendar /requests /requests/puntos /alerts | APROBADO |
+| Propietario | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Administrador | su página inicial es la que le toca | título «Operación y configuración» | Operación y configuración | 4 cifras · 3 bloques | APROBADO |
+| Administrador | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 31 entradas | /dashboard /board /calendar /requests /requests/puntos /alerts | APROBADO |
+| Administrador | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Supervisor | su página inicial es la que le toca | título «El trabajo de hoy» | El trabajo de hoy | 4 cifras · 1 bloques | APROBADO |
+| Supervisor | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 28 entradas | /dashboard /board /calendar /requests /requests/puntos /alerts | APROBADO |
+| Supervisor | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Técnico | su página inicial es la que le toca | título «Mi día» | Mi día | 4 cifras · 0 bloques | APROBADO |
+| Técnico | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 18 entradas | /dashboard /board /calendar /requests /alerts /work-orders | APROBADO |
+| Técnico | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Compras | su página inicial es la que le toca | título «Compras y entregas» | Compras y entregas | 4 cifras · 1 bloques | APROBADO |
+| Compras | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 8 entradas | /dashboard /inventory /requisiciones /compras /suppliers /settings | APROBADO |
+| Compras | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Solicitante | su página inicial es la que le toca | título «Mis reportes» | Mis reportes | 3 cifras · 0 bloques | APROBADO |
+| Solicitante | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 6 entradas | /dashboard /requests /escanear /settings /soporte /glossary | APROBADO |
+| Solicitante | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Consulta | su página inicial es la que le toca | título «Consulta» | Consulta | 3 cifras · 0 bloques | APROBADO |
+| Consulta | su menú lleva solo pantallas que puede abrir | ninguna entrada del menú responde «Sin permiso» | 19 entradas | /dashboard /board /calendar /requests /alerts /work-orders | APROBADO |
+| Consulta | su inicio responde igual desde un teléfono | HTTP 200 con su contenido | HTTP 200 | User-Agent de iPhone | APROBADO |
+| Propietario | abre /settings?s=usuarios | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /settings?s=organizacion | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /settings?s=auditoria | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /settings?s=suscripcion | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /settings?s=cobranza | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /catalogs | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | abre /compras | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Propietario | Configuración le ofrece las pestañas de administración | usuarios, cobranza, auditoría y organización | 4 de 4 | usuarios, cobranza, auditoria, organizacion | APROBADO |
+| Propietario | autoriza una compra | se permite (2xx) | HTTP 200 | {"estado":"AUTORIZADA"}… | APROBADO |
+| Propietario | da de alta a una persona | se permite (2xx) | HTTP 201 | {"user":{"id":"…","name":"Nuevo","email":"nuevo-roles-1789… | APROBADO |
+| Administrador | abre /settings?s=usuarios | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Administrador | abre /catalogs | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Administrador | abre /import | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Administrador | abre /puesta-en-marcha | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Administrador | da de alta a una persona | se permite (2xx) | HTTP 201 | {"user":{"id":"…","name":"Otro","email":"otro-roles-178996… | APROBADO |
+| Administrador | escribe /settings?s=cobranza en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Administrador | cambia el plan de la empresa (reservado al propietario) | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Supervisor | crea una orden | se permite (2xx) | HTTP 201 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Supervisor | asigna una orden | se permite (2xx) | HTTP 200 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Supervisor | convierte una solicitud en orden | se permite (2xx) | HTTP 201 | {"request":{"id":"…","organizationId":"cmuaooztu0000xn6xj7… | APROBADO |
+| Supervisor | da de alta un activo | se permite (2xx) | HTTP 201 | {"asset":{"id":"…","organizationId":"cmuaooztu0000xn6xj7gy… | APROBADO |
+| Supervisor | autoriza una compra (es de dirección) | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Supervisor | da de alta a una persona | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Supervisor | escribe /settings?s=usuarios en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Técnico | abre /work-orders?mias=1 | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Técnico | acepta su orden | se permite (2xx) | HTTP 201 | {"aceptada":true}… | APROBADO |
+| Técnico | inicia su orden | se permite (2xx) | HTTP 200 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | la pone en espera | se permite (2xx) | HTTP 200 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | la reanuda | se permite (2xx) | HTTP 200 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | registra horas | se permite (2xx) | HTTP 201 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | carga una refacción | se permite (2xx) | HTTP 201 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | termina la orden | se permite (2xx) | HTTP 200 | {"workOrder":{"id":"…","organizationId":"cmuaooztu0000xn6x… | APROBADO |
+| Técnico | cierra la orden (cierre administrativo) | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Cerrar una orden lo valida un supervisor o la administración. | APROBADO |
+| Técnico | da de alta a una persona | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Técnico | autoriza una compra | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Técnico | escribe /compras en la barra de direcciones | «Esta pantalla no es de su rol» (no se abre) | HTTP 200 | «Sin permiso» | APROBADO |
+| Técnico | escribe /settings?s=usuarios en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Técnico | escribe /settings?s=auditoria en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Compras | abre /compras | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Compras | abre /suppliers | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Compras | levanta una requisición de compra | se permite (2xx) | HTTP 201 | {"id":"…","folio":"RC-000001","estado":"SOLICITADA"}… | APROBADO |
+| Compras | autoriza su propia compra | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Compras | da de alta a una persona | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Compras | escribe /work-orders en la barra de direcciones | «Esta pantalla no es de su rol» (no se abre) | HTTP 200 | «Sin permiso» | APROBADO |
+| Compras | escribe /settings?s=usuarios en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Solicitante | abre /requests | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Solicitante | levanta un reporte | se permite (2xx) | HTTP 201 | {"request":{"id":"…","organizationId":"cmuaooztu0000xn6xj7… | APROBADO |
+| Solicitante | crea una orden de trabajo | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Solicitante | consume una refacción | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Solicitante | escribe /indicadores (costos) en la barra de direcciones | «Esta pantalla no es de su rol» (no se abre) | HTTP 200 | «Sin permiso» | APROBADO |
+| Solicitante | escribe /settings?s=organizacion en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Solicitante | escribe /settings?s=usuarios en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Consulta | abre /work-orders | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Consulta | abre /indicadores | la pantalla abre con su contenido | HTTP 200 | sin «Sin permiso» | APROBADO |
+| Consulta | crea una orden | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Consulta | levanta un reporte | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Consulta | registra horas | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Consulta | mueve el almacén | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Consulta | da de alta un activo | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Consulta | cambia la configuración | se rechaza (403 o 404), sin ejecutar nada | HTTP 404 |  | APROBADO |
+| Consulta | escribe /settings?s=usuarios en la barra de direcciones | cae en «Mi cuenta»: ni ofrece la pestaña ni dibuja su contenido | HTTP 200 | sin pestaña y sin el dato de esa sección | APROBADO |
+| Consulta | pide la lista de personas por la API | se rechaza (403 o 404), sin ejecutar nada | HTTP 403 | Sin permisos suficientes | APROBADO |
+| Propietario | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 404/404/404/404 | ninguno revela contenido | APROBADO |
+| Administrador | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 404/404/404/404 | ninguno revela contenido | APROBADO |
+| Supervisor | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 404/404/404/404 | ninguno revela contenido | APROBADO |
+| Técnico | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 404/404/404/200 | ninguno revela contenido | APROBADO |
+| Compras | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 200/200/404/404 | ninguno revela contenido | APROBADO |
+| Solicitante | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 200/200/404/200 | ninguno revela contenido | APROBADO |
+| Consulta | escribe en la barra el activo, la OT, el archivo y la compra DE OTRA EMPRESA | ninguno se abre ni revela su contenido | 404/404/404/200 | ninguno revela contenido | APROBADO |
+| Otra empresa | el dueño de la empresa B abre una OT de la empresa A | no la ve | HTTP 404 | no aparece el título de la orden | APROBADO |
+| Todas | ninguna de estas pruebas tocó otra empresa | los conteos de las demás quedan idénticos | sin cambios | 8 conteos comparados | APROBADO |
+
+**Sobre la columna «móvil».** No se declara aquí una verificación aparte en
+teléfono: lo que se comprobó es que cada inicio responde 200 con su contenido
+cuando la petición trae el navegador de un iPhone —que es lo único que el
+servidor distingue—. El dibujado real en pantalla chica está verificado en
+`scripts/prueba-responsiva.ts`, que abre 62 pantallas con los 7 roles en 7
+anchos, y la lectura de QR en un iPhone físico la confirmó Rafael.
 
 ---
 
