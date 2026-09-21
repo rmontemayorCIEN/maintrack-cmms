@@ -65,6 +65,9 @@ export const GLOSARIO: TerminoGlosario[] = [
   { t: "Valor de reposición", c: "Activos", d: "Lo que costaria comprar hoy un equipo equivalente. Sirve de referencia: cuando el costo acumulado de mantener se acerca a ese valor, conviene evaluar el reemplazo." },
   { t: "Salud del equipo", c: "Activos", d: "Indice de 0 a 100 que resume el estado de los puntos de monitoreo de un activo. Cae conforme los sensores se acercan a sus umbrales." },
 
+  { t: "Sistema", c: "Activos", noAuto: true, d: "Un grupo de equipos que sirve o no sirve como un todo —la linea de produccion, el cuarto de compresores, los elevadores— y del que alguien responde. Puede cruzar areas, y es la forma en que la direccion mira la planta: no importa que bomba fallo, importa si la linea esta parada." },
+  { t: "Garantia", c: "Activos", noAuto: true, d: "El periodo en que una falla la cubre el fabricante. El sistema la vigila porque reparar por cuenta propia un equipo en garantia es pagar dos veces, y es un error que solo se descubre cuando ya se hizo." },
+
   // ──────────────────────────────────────────────────────────── Operacion
   { t: "Orden de trabajo", n: "OT", c: "Operacion", d: "El documento que autoriza, describe y registra un trabajo de mantenimiento. Concentra quien lo hizo, cuanto tardo, que refacciones consumio y cuanto costo. Sin OT no hay historial, y sin historial no hay indicadores." },
   { t: "Solicitud de servicio", c: "Operacion", d: "Reporte de falla que levanta produccion u operaciones. No es todavia un trabajo autorizado: un supervisor la revisa y decide si se convierte en orden de trabajo." },
@@ -79,6 +82,8 @@ export const GLOSARIO: TerminoGlosario[] = [
   { t: "Falla funcional", c: "Operacion", d: "Cuando el equipo deja de hacer lo que se espera de el, aunque siga encendido. Una bomba que gira pero no da presión ya fallo funcionalmente." },
   { t: "Lista de verificación", c: "Operacion", d: "Las tareas que el tecnico debe completar dentro de una orden. Las obligatorias impiden cerrarla si quedan pendientes: es lo que evita el cierre a la ligera." },
   { t: "Bitacora", c: "Operacion", noAuto: true, d: "Notas cronologicas del equipo de trabajo dentro de una orden. Sirve para dejar constancia de hallazgos que no caben en un campo estructurado." },
+
+  { t: "Escalamiento", c: "Operacion", d: "Que un aviso suba de nivel cuando nadie lo atiende en el tiempo previsto. Existe porque el aviso que no se ve es igual al aviso que no se mando: si el tecnico no responde, se le avisa a supervision." },
 
   // ───────────────────────────────────────────────────────── Programacion
   { t: "Plan de mantenimiento", c: "Programacion", d: "La regla que genera ordenes preventivas de forma automatica: que activo, con que frecuencia, que tareas y quien lo hace. Es la pieza que convierte las buenas intenciones en trabajo programado." },
@@ -102,10 +107,22 @@ export const GLOSARIO: TerminoGlosario[] = [
   { t: "Curva P-F", n: "Curva potencial-funcional", c: "Predictivo", d: "El intervalo entre el momento en que la falla empieza a ser detectable (P) y el momento en que ocurre (F). Cuanto mas temprano se detecta, mas margen hay para planear en vez de reaccionar." },
   { t: "Tendencia", c: "Predictivo", noAuto: true, d: "La direccion y velocidad con que cambia una medicion. Importa mas que el valor aislado: una vibracion de 4 mm/s estable preocupa menos que una de 3 subiendo rapido." },
 
+  { t: "Umbral", c: "Predictivo", d: "El valor a partir del cual una lectura deja de ser normal. Se define por equipo y por variable: la vibracion que es rutina en un molino es una alarma en una bomba. Un umbral mal puesto genera alertas que nadie cree, y esas se dejan de ver." },
+
   // ───────────────────────────────────────────────────────────────── Almacen
   { t: "Refaccion", c: "Almacen", noAuto: true, d: "Pieza de repuesto que se consume en los trabajos de mantenimiento. Su disponibilidad determina el MTTR tanto como la habilidad del técnico." },
   { t: "Punto de reorden", c: "Almacen", d: "Nivel de existencia que dispara la reposición. Debe cubrir el consumo esperado durante el tiempo que tarda el proveedor en surtir." },
   { t: "Stock mínimo", c: "Almacen", d: "La cantidad por debajo de la cual no debe caer una refacción. En equipos críticos se calcula por riesgo de paro, no por consumo promedio." },
+  { t: "Kardex", c: "Almacen", d: "El historial de entradas y salidas de una refaccion, renglon por renglon, con quien la movio y a que orden se cargo. Es la unica forma de explicar por que hay lo que hay: si el kardex y la existencia no coinciden, el problema es de captura, no de inventario." },
+  { t: "Requisicion de material", n: "RM", c: "Almacen", d: "Lo que un tecnico pide del almacen para hacer un trabajo. Si la refaccion esta, sale del almacen; si no, se convierte en la semilla de una compra. Sirve para que el faltante quede registrado en vez de resolverse de boca en boca." },
+  { t: "Requisicion de compra", n: "RC", c: "Almacen", d: "La peticion de comprar algo que no hay. Pasa por autorizacion antes de volverse orden de compra: es donde la direccion decide si el gasto procede, y donde queda constancia de cuanto tardo en decidirse." },
+  { t: "Orden de compra", n: "OC", c: "Almacen", d: "El compromiso formal con el proveedor: que se pidio, a que precio y para cuando. A partir de aqui el faltante ya tiene fecha, y el sistema puede avisar cuando esa fecha se vence sin que llegue nada." },
+  { t: "Recepcion", c: "Almacen", d: "La llegada de lo comprado. Es el momento en que la refaccion entra al kardex y actualiza el costo promedio; recibir menos de lo pedido deja la compra abierta, que es como se detectan los surtidos incompletos." },
+  { t: "Conteo ciclico", c: "Almacen", d: "Contar una parte del almacen cada cierto tiempo, en vez de parar todo una vez al año. Lo que se encuentra distinto se ajusta con su motivo, y ese ajuste queda en el kardex: un inventario que cuadra sin explicar los ajustes no cuadra." },
+  { t: "Traspaso", n: "TR", c: "Almacen", d: "Mover existencia de un almacen a otro sin que sea consumo. Importa porque una refaccion que esta en la bodega equivocada, para efectos de un paro, es lo mismo que no tenerla." },
+  { t: "Stock de seguridad", c: "Almacen", d: "El colchon que se guarda por encima del consumo esperado, para cubrir lo que no se puede predecir: un proveedor que se atrasa o una falla que consume mas de lo normal. En equipos criticos se dimensiona por el costo del paro, no por el de la pieza." },
+  { t: "Proveedor", c: "Almacen", noAuto: true, d: "Quien surte refacciones o servicios. Su tiempo de entrega real —no el prometido— es lo que determina el punto de reorden de todo lo que le compra." },
+
   { t: "Stock máximo", c: "Almacen", d: "Techo de inventario. Existe porque cada pieza guardada es dinero detenido que además se deteriora." },
   { t: "Rotación de inventario", c: "Almacen", d: "Cuantas veces al año se consume y repone el almacén. Una rotación muy baja indica capital dormido en piezas que quiza nunca se usen." },
   { t: "Costo promedio ponderado", c: "Almacen", d: "Metodo de valuación que recalcula el costo unitario en cada entrada, mezclando lo que ya había con lo que llega. Es el que usa este sistema." },

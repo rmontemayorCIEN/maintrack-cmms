@@ -36,6 +36,7 @@
  */
 import { createHash } from "crypto";
 import { guardarArchivo, leerArchivo } from "./almacenamiento";
+import { GLOSARIO } from "./glosario";
 
 export const PROYECTO = "maintrack-cmms-4821";
 export const IDIOMA = "es-US";
@@ -139,6 +140,131 @@ function miles(n: number): string {
 }
 
 /**
+ * Como se dicen los folios del sistema.
+ *
+ * «OT-000040» leido tal cual sale «o te guion cero cero cero cero cuatro
+ * cero», que no se entiende ni escrito. Se dice «la orden 40», que es como lo
+ * diria cualquiera en la planta.
+ *
+ * Son los nueve prefijos de lib/numbering.ts y NADA mas: los codigos de
+ * equipo —CMP-301, BOM-602— se dicen tal cual, porque asi se llaman y asi hay
+ * que buscarlos.
+ */
+const FOLIOS: Record<string, string> = {
+  OT: "la orden",
+  SS: "la solicitud",
+  TR: "el traspaso",
+  RM: "la requisición",
+  RC: "la compra",
+  RE: "la recepción",
+  OC: "la orden de compra",
+  CI: "el conteo",
+  SOP: "el caso de soporte",
+};
+
+/**
+ * Las siglas que ya estan explicadas en el glosario.
+ *
+ * El glosario es el vocabulario del sistema; tener aqui una segunda lista de
+ * siglas seria garantizar que un dia digan cosas distintas —alguien agrega
+ * un termino alla y la voz sigue deletreandolo—. Asi que se derivan de el.
+ *
+ * Ojo con los dos formatos: unas veces la sigla es el termino y el nombre es
+ * lo largo —«MTBF» / «Tiempo medio entre fallas»— y otras al reves —«Orden
+ * de trabajo» / «OT»—. Se reconoce la sigla por como se ve: corta y en
+ * mayusculas.
+ */
+function siglasDelGlosario(): Array<[RegExp, string]> {
+  /**
+   * Una sigla se reconoce por la forma: corta y casi toda en mayusculas. La
+   * «d» de «PdM» y la «e» de «MTBFe» no la descalifican —asi se escriben—,
+   * pero «Backlog» o «Disponibilidad» si: esas son palabras.
+   */
+  const esSigla = (x: string) => /^[A-Z][A-Za-z-]{1,6}$/.test(x) && x.replace(/[^A-Z]/g, "").length >= 2;
+  const pares: Array<[string, string]> = [];
+
+  for (const termino of GLOSARIO) {
+    if (!termino.n) continue;
+    if (esSigla(termino.t) && !esSigla(termino.n)) pares.push([termino.t, termino.n]);
+    else if (esSigla(termino.n) && !esSigla(termino.t)) pares.push([termino.n, termino.t]);
+  }
+
+  // Las mas largas primero: «MTTF» no debe caer dentro de otra regla antes.
+  return pares
+    .sort((a, b) => b[0].length - a[0].length)
+    .map(([sigla, largo]) => {
+      /**
+       * El articulo se corrige al sustituir.
+       *
+       * «el OEE» pasaba a «el eficiencia general de los equipos». Al cambiar
+       * una sigla por su nombre cambia el genero, y dejar el articulo viejo
+       * suena a extranjero. Se captura el articulo y se pone el que toca
+       * segun como empiece el nombre largo.
+       */
+      /**
+       * El genero se saca de la terminacion, no de una lista.
+       *
+       * Una lista de palabras femeninas se queda corta al primer termino que
+       * alguien agregue al glosario —paso con «requisicion», que salia «el
+       * requisicion»—. Las reglas del espanol cubren practicamente todo lo
+       * que aparece aqui, y lo que no, suena a masculino, que es la omision
+       * correcta.
+       */
+      const primera = largo.trim().split(/\s+/)[0].toLowerCase();
+      const femenino = /(ci[oó]n|si[oó]n|dad|tad|umbre|ez|itis|a)$/.test(primera);
+
+      return [
+        new RegExp(`(\\b([Ee]l|[Ll]a|[Uu]n|[Uu]na)\\s+)?\\b${sigla.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"),
+        (_m: string, conArticulo: string | undefined, articulo: string | undefined) => {
+          if (!conArticulo || !articulo) return largo.toLowerCase();
+          // Se respeta si era definido o indefinido: «una RM» no puede salir
+          // «la requisicion», que dice otra cosa.
+          const indefinido = /^[Uu]n/.test(articulo);
+          const mayuscula = /^[A-Z]/.test(articulo);
+          const nuevo = indefinido
+            ? (femenino ? "una" : "un")
+            : (femenino ? "la" : "el");
+          return `${mayuscula ? nuevo[0].toUpperCase() + nuevo.slice(1) : nuevo} ${largo.toLowerCase()}`;
+        },
+      ] as unknown as [RegExp, string];
+    });
+}
+
+/**
+ * Lo que el sistema escribe corto y una persona dice largo.
+ *
+ * Nadie dice «eme te be efe»: dice «tiempo medio entre fallas». Y «h.
+ * hombre» escrito es comodo, pero oido es un ruido. Van con los limites de
+ * palabra puestos para no destrozar un texto que mencione otra cosa.
+ *
+ * El orden importa: lo mas largo primero, para que «h. hombre» no se coma la
+ * «h» antes de tiempo.
+ */
+const ABREVIATURAS: Array<[RegExp, string]> = [
+  [/\bh\.?\s*hombre\b/gi, "horas hombre"],
+  [/\bHH\b/g, "horas hombre"],
+  [/\bKPI[s]?\b/gi, "indicadores"],
+  [/\bRPM\b/gi, "revoluciones por minuto"],
+  [/\bkWh?\b/g, "kilowatts"],
+  [/\bkVA\b/gi, "kilovoltamperes"],
+  [/\bHP\b/g, "caballos de fuerza"],
+  [/\bPSI\b/gi, "libras por pulgada cuadrada"],
+  [/°\s?C\b/g, " grados centígrados"],
+  [/\bN[°º]\s?/g, "número "],
+  [/\bcant\.\s*/gi, "cantidad "],
+  [/\bprom\.\s*/gi, "promedio "],
+  [/\bmáx\.\s*/gi, "máximo "],
+  [/\bmín\.\s*/gi, "mínimo "],
+  [/\baprox\.\s*/gi, "aproximadamente "],
+  [/\bp\.\s?ej\.\s*/gi, "por ejemplo "],
+  [/\betc\./gi, "etcétera"],
+  [/\bpza[s]?\b/gi, "piezas"],
+  [/\bhrs?\.?\b/gi, "horas"],
+  [/\bc\/u\b/gi, "cada uno"],
+  [/\bc\/?\s?d[ií]a\b/gi, "cada día"],
+];
+
+/**
  * Un texto escrito para leerse, listo para decirse.
  *
  * Lo que se lee bien no se oye bien. Una respuesta del sistema trae importes
@@ -151,7 +277,27 @@ function miles(n: number): string {
  * oirse tal cual, porque es como se llaman en la planta.
  */
 export function paraDecir(texto: string): string {
-  return texto
+  let t = texto;
+
+  // Los folios primero, antes de que las abreviaturas toquen sus letras.
+  //
+  // Si el texto YA trae articulo —«la OT-000040»— se conserva el suyo y solo
+  // se pone el sustantivo; si no, se pone el articulo completo. Sin esto
+  // salia «la la orden 40».
+  for (const [prefijo, comoSeDice] of Object.entries(FOLIOS)) {
+    const sustantivo = comoSeDice.replace(/^(la|el) /, "");
+    t = t.replace(
+      new RegExp(`(\\b(?:[Ll]a|[Ee]l|[Ll]as|[Ll]os|[Uu]na|[Uu]n)\\s+)?\\b${prefijo}-0*(\\d+)`, "g"),
+      (_, articulo: string | undefined, n: string) =>
+        articulo ? `${articulo}${sustantivo} ${n}` : `${comoSeDice} ${n}`,
+    );
+  }
+  // El glosario manda en el vocabulario del oficio; la lista de abajo cubre
+  // lo que no es termino sino escritura corta: unidades, «cant.», «h. hombre».
+  for (const [patron, comoSeDice] of siglasDelGlosario()) t = t.replace(patron, comoSeDice as unknown as string);
+  for (const [patron, comoSeDice] of ABREVIATURAS) t = t.replace(patron, comoSeDice);
+
+  return t
     // Importes: $128,400.50 → 128 mil 400 pesos. Si el texto YA decia «pesos»
     // detras, no se repite: «$45 pesos» no puede salir «45 pesos pesos».
     .replace(/\$\s?([\d,]+)(?:\.\d+)?(\s*pesos)?/gi, (_, n: string) => `${miles(Number(n.replace(/,/g, "")))} pesos`)

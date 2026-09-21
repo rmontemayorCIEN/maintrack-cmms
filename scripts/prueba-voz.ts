@@ -94,6 +94,34 @@ revisar("el markdown que a veces cuela el modelo no se lee",
 revisar("un texto ya limpio no se estropea",
   paraDecir("La bomba falló tres veces en septiembre.") === "La bomba falló tres veces en septiembre.");
 
+console.log("\nLas siglas del oficio, dichas completas\n");
+
+// Salen del GLOSARIO, no de una lista aparte: tener dos vocabularios seria
+// garantizar que un dia digan cosas distintas.
+revisar("MTBF se dice completo",
+  paraDecir("El MTBF subió.").includes("tiempo medio entre fallas"), paraDecir("El MTBF subió."));
+revisar("MTTR también", paraDecir("El MTTR bajó.").includes("tiempo medio de reparación"));
+revisar("y las que se escriben con minúscula dentro, como PdM",
+  paraDecir("El PdM ayuda.").includes("mantenimiento predictivo"), paraDecir("El PdM ayuda."));
+revisar("el artículo concuerda con el nombre largo",
+  paraDecir("El OEE quedó en 72%.").startsWith("La eficiencia"), paraDecir("El OEE quedó en 72%."));
+revisar("una palabra del glosario que NO es sigla se deja en paz",
+  paraDecir("El backlog creció.") === "El backlog creció.", paraDecir("El backlog creció."));
+
+console.log("\nLos folios y las abreviaturas de escritura\n");
+revisar("un folio se dice como lo diría una persona",
+  paraDecir("La OT-000040 está abierta.") === "La orden 40 está abierta.", paraDecir("La OT-000040 está abierta."));
+revisar("sin duplicar el artículo que ya traía",
+  !paraDecir("La OT-000040 está abierta.").includes("La la"));
+revisar("sin folio, se pone el artículo",
+  paraDecir("Revisar OT-000090.").includes("la orden 90"), paraDecir("Revisar OT-000090."));
+revisar("«h. hombre» se dice horas hombre",
+  paraDecir("Lleva 12 h. hombre.").includes("12 horas hombre"), paraDecir("Lleva 12 h. hombre."));
+revisar("las unidades se dicen, no se deletrean",
+  paraDecir("Motor de 50 HP a 1750 RPM.").includes("caballos de fuerza"), paraDecir("Motor de 50 HP a 1750 RPM."));
+revisar("los códigos de equipo NO se tocan: así se llaman en la planta",
+  paraDecir("Revisar CMP-301 y BOM-602.") === "Revisar CMP-301 y BOM-602.", paraDecir("Revisar CMP-301 y BOM-602."));
+
 /**
  * Que hablar quede registrado.
  *

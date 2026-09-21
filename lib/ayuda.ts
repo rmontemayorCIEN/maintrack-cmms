@@ -1235,6 +1235,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Preguntar cosas como «¿qué equipo me costó más este trimestre?» o «¿qué refacciones se acabaron?»",
       "Escuchar la respuesta, con el botón de bocina de cada una",
+      "Copiar la respuesta, para pegarla en un correo o en una junta",
       "Cambiar al modo hablado: toque el micrófono, haga su pregunta y el sistema contesta en voz alta (plan Enterprise)",
     ],
     flujo: [
@@ -1247,6 +1248,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Mientras revisa sus datos dice «déjeme revisar» en vez de quedarse callado: entre la pregunta y la respuesta pasan segundos, y un silencio largo se siente como que se descompuso.",
       "La pregunta se graba y se entiende en el servidor, no en el teléfono: el reconocimiento de voz del navegador no existe en el iPhone, que es justo donde esto sirve. La grabación se corta sola a los 30 segundos.",
       "Si no se entiende lo que dijo —ruido de planta, el teléfono lejos— lo dice y se puede repetir o escribir. No contesta una pregunta que usted no hizo.",
+      "Mientras revisa los datos se oye un pulso suave. Está a propósito: un silencio en medio de una conversación se siente como que se cortó la llamada. Se calla solo en cuanto empieza a contestar.",
       "El modo hablado NO modifica nada, a propósito: se piensa para usarse en el camino, y dictar el cierre de una orden manejando es capturar mal un dato que después nadie puede explicar.",
       "Todo lo que se dice queda también escrito abajo, porque escuchando no hay forma de comprobar una cifra.",
       "Cada empresa tiene un máximo de audios al mes. Al llegar, la voz se apaga y se avisa; lo escrito sigue funcionando igual.",
@@ -1255,6 +1257,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Escuchar la respuesta", explica: "Lee en voz alta esa respuesta. Vuelto a tocar, la detiene. Solo suena una a la vez." },
       { nombre: "Prefiero preguntar y escuchar", explica: "Entra al modo hablado. Se sale con «Volver al modo escrito»." },
       { nombre: "Micrófono", explica: "Toque para hablar, toque otra vez al terminar. Se corta solo a los 30 segundos. Si prefiere, el campo de abajo sigue aceptando la pregunta escrita." },
+      { nombre: "Copiar", explica: "Copia esa respuesta al portapapeles, tal como está escrita." },
     ],
   },
 

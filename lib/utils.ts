@@ -185,3 +185,24 @@ export function formatDia(value?: Date | string | null, opciones: { anio?: boole
     ...(esMedianocheUtc ? { timeZone: "UTC" } : opciones.zona ? { timeZone: opciones.zona } : {}),
   }).format(date);
 }
+
+/**
+ * El texto de la IA, sin las marcas de formato que a veces cuela.
+ *
+ * Al modelo se le pide que conteste en prosa, pero igual pone negritas con
+ * asteriscos y de vez en cuando un encabezado. En pantalla eso se ve como
+ * «**4 ordenes vencidas**», con los asteriscos a la vista, y peor: eso es lo
+ * que se copia al portapapeles y lo que termina pegado en un correo.
+ *
+ * Se limpia al MOSTRAR y no al guardar: el texto original es el que se dijo y
+ * el que quedo registrado; esto es solo como se enseña. Las cifras y los
+ * codigos de equipo no se tocan.
+ */
+export function sinMarcas(texto: string): string {
+  return texto
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|\s)\*(\S[^*]*?)\*(?=\s|$|[.,;:])/g, "$1$2")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^\s*[-•]\s+/gm, "• ")
+    .trim();
+}

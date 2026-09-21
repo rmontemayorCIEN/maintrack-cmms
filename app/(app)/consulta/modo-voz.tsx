@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Mic, Send, Square } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Check, Copy, Loader2, Mic, Send, Square } from "lucide-react";
+import { cn, sinMarcas } from "@/lib/utils";
 
 /**
  * Hablar con el sistema.
@@ -42,6 +42,56 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
   const saludado = useRef(false);
   const grabadora = useRef<MediaRecorder | null>(null);
   const trozos = useRef<Blob[]>([]);
+  const latido = useRef<{ parar: () => void } | null>(null);
+  const [copiado, setCopiado] = useState<number | null>(null);
+
+  /**
+   * Un latido bajito mientras revisa los datos.
+   *
+   * Entre el «dejeme revisar» y la respuesta hay varios segundos de silencio,
+   * y un silencio en una conversacion se siente como que se corto la llamada.
+   * Un pulso suave cada segundo y medio dice «sigo aqui» sin estorbar.
+   *
+   * Se genera con el propio navegador —un oscilador— en vez de descargar un
+   * archivo: no cuesta, no tarda y no hay nada que se pueda quedar a medias.
+   * Va muy bajo y con entrada y salida suaves; un pitido seco, oido en el
+   * coche, seria insoportable.
+   */
+  function empezarLatido() {
+    try {
+      const Contexto = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Contexto) return;
+      const ctx = new Contexto();
+      void ctx.resume().catch(() => undefined);
+      let vivo = true;
+
+      const pulso = () => {
+        if (!vivo) return;
+        const osc = ctx.createOscillator();
+        const vol = ctx.createGain();
+        osc.type = "sine";
+        // Grave: se oye sin picar el oido, y no compite con la voz.
+        osc.frequency.value = 320;
+        const t = ctx.currentTime;
+        vol.gain.setValueAtTime(0, t);
+        vol.gain.linearRampToValueAtTime(0.035, t + 0.06);
+        vol.gain.linearRampToValueAtTime(0, t + 0.3);
+        osc.connect(vol).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.32);
+      };
+
+      pulso();
+      const reloj = setInterval(pulso, 1500);
+      latido.current = {
+        parar: () => { vivo = false; clearInterval(reloj); void ctx.close().catch(() => undefined); latido.current = null; },
+      };
+    } catch {
+      // Sin audio del navegador, simplemente no hay latido. No es un fallo.
+    }
+  }
+
+  function pararLatido() { latido.current?.parar(); }
 
   /**
    * Suena un audio y AVISA cuando termino, pase lo que pase.
@@ -96,6 +146,7 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
   function callar() {
     if (audio.current) { audio.current.pause(); audio.current = null; }
+    pararLatido();
     setEstado("quieto");
   }
 
@@ -215,8 +266,13 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
         body: JSON.stringify({ texto: data.respuesta }),
       });
 
-      await acuse; // que no se encimen las dos voces
+      // El latido empieza cuando el acuse termina de hablar: es justo el hueco
+      // de silencio que confundia.
+      await acuse;
+      if (audio.current === pista) empezarLatido();
+
       const voz = await vozPedida;
+      pararLatido();
       if (audio.current !== pista) return; // lo detuvieron mientras tanto
 
       if (voz.status === 204 || !voz.ok) { setSinVoz(true); setEstado("quieto"); return; }
@@ -227,8 +283,20 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
       setEstado("quieto");
       if (!sono) setSinVoz(true);
     } catch {
+      pararLatido();
       setError("Se perdió la conexión. Intente de nuevo.");
       setEstado("quieto");
+    }
+  }
+
+  /** Copiar la respuesta, para pegarla en un correo o en una junta. */
+  async function copiar(i: number, texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(i);
+      setTimeout(() => setCopiado((actual) => (actual === i ? null : actual)), 2000);
+    } catch {
+      setError("Este navegador no dejó copiar. Seleccione el texto a mano.");
     }
   }
 
@@ -324,8 +392,19 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
           y quien quiera contrastarla necesita poder verla. */}
       {turnos.map((t, i) => (
         <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="mb-1.5 text-sm font-semibold text-slate-800">{t.pregunta}</p>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.respuesta}</p>
+          <div className="mb-1.5 flex items-start justify-between gap-2">
+            <p className="min-w-0 text-sm font-semibold text-slate-800">{t.pregunta}</p>
+            <button
+              type="button"
+              onClick={() => void copiar(i, sinMarcas(t.respuesta))}
+              title="Copiar la respuesta"
+              aria-label="Copiar la respuesta"
+              className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[0.6875rem] font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {copiado === i ? <><Check className="h-3.5 w-3.5 text-emerald-600" /> Copiado</> : <><Copy className="h-3.5 w-3.5" /> Copiar</>}
+            </button>
+          </div>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{sinMarcas(t.respuesta)}</p>
           {t.consultas ? (
             <p className="mt-2 border-t border-slate-100 pt-1.5 text-[0.6875rem] text-slate-400">
               Consultó {t.consultas} {t.consultas === 1 ? "fuente" : "fuentes"} de sus datos

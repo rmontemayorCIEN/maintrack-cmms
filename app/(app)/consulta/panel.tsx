@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowRight, Database, Loader2, Sparkles, Square, Volume2 } from "lucide-react";
+import { ArrowRight, Check, Copy, Database, Loader2, Sparkles, Square, Volume2 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { sinMarcas } from "@/lib/utils";
 import { ModoVoz } from "./modo-voz";
 
 type Turno = {
@@ -53,7 +54,19 @@ export function PanelConsulta({
   const [turnos, setTurnos] = useState<Turno[]>([]);
   /** Cual respuesta se esta oyendo. Solo una a la vez. */
   const [sonando, setSonando] = useState<number | null>(null);
+  const [copiado, setCopiado] = useState<number | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+
+  /** Copiar la respuesta, para pegarla en un correo o en una junta. */
+  async function copiar(i: number, texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(i);
+      setTimeout(() => setCopiado((actual) => (actual === i ? null : actual)), 2000);
+    } catch {
+      setError("Este navegador no dejó copiar. Seleccione el texto a mano.");
+    }
+  }
 
   function callar() {
     if (audio.current) { audio.current.pause(); audio.current = null; }
@@ -200,17 +213,28 @@ export function PanelConsulta({
         <Card key={i}>
           <div className="mb-2 flex items-start justify-between gap-2">
             <p className="min-w-0 text-sm font-semibold text-slate-800">{t.pregunta}</p>
-            <button
-              type="button"
-              onClick={() => escuchar(i, t.respuesta)}
-              title={sonando === i ? "Detener" : "Escuchar la respuesta"}
-              aria-label={sonando === i ? "Detener" : "Escuchar la respuesta"}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-brand-700 hover:bg-brand-50"
-            >
-              {sonando === i ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-4 w-4" />}
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void copiar(i, sinMarcas(t.respuesta))}
+                title="Copiar la respuesta"
+                aria-label="Copiar la respuesta"
+                className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 px-2 text-[0.6875rem] font-medium text-slate-600 hover:bg-slate-50"
+              >
+                {copiado === i ? <><Check className="h-3.5 w-3.5 text-emerald-600" /> Copiado</> : <><Copy className="h-3.5 w-3.5" /> Copiar</>}
+              </button>
+              <button
+                type="button"
+                onClick={() => escuchar(i, t.respuesta)}
+                title={sonando === i ? "Detener" : "Escuchar la respuesta"}
+                aria-label={sonando === i ? "Detener" : "Escuchar la respuesta"}
+                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-brand-700 hover:bg-brand-50"
+              >
+                {sonando === i ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{t.respuesta}</div>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{sinMarcas(t.respuesta)}</div>
           {t.consultas.length ? (
             <details className="mt-3 border-t border-slate-100 pt-2">
               <summary className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem] text-slate-500 hover:text-slate-700">
