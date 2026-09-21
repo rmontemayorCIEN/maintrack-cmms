@@ -1,5 +1,4 @@
-import { prisma } from "@/lib/db";
-import { fail, withVista } from "@/lib/api";
+import { withVista, fail } from "@/lib/api";
 import { guionDelDia } from "@/lib/brief";
 import { redactarBrief } from "@/lib/ia/brief";
 import { sintetizar } from "@/lib/voz";
@@ -15,20 +14,21 @@ import { sintetizar } from "@/lib/voz";
  * error: la pantalla lo entiende como «use la voz del aparato» y la persona
  * igual escucha su parte. Que se caiga la voz bonita no puede dejar a nadie
  * sin su informacion.
+ *
+ * El usuario se toma de `withAuth` y no se relee de la base, por lo mismo que
+ * se explica en la ruta de al lado: releerlo deshace la suplantacion del
+ * operador y la peticion termina en «No encontrado».
  */
 export async function GET() {
   return withVista("/indicadores", async ({ user, orgId }) => {
-    const completo = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: {
-        id: true, name: true, role: true, organizationId: true,
-        organization: { select: { id: true, timezone: true, currency: true, plan: true, iaComplemento: true, iaExtra: true, status: true } },
-      },
-    });
-    if (!completo || completo.organizationId !== orgId) return fail("No encontrado", 404);
+    if (!user.organization || user.organizationId !== orgId) return fail("No encontrado", 404);
 
-    const guion = await guionDelDia(completo);
-    const brief = await redactarBrief(completo.organization as never, guion, { userId: user.id });
+    const guion = await guionDelDia({
+      id: user.id, name: user.name, role: user.role,
+      organizationId: orgId,
+      organization: user.organization,
+    });
+    const brief = await redactarBrief(user.organization as never, guion, { userId: user.id });
     const voz = await sintetizar(orgId, brief.texto);
 
     if (!voz) {

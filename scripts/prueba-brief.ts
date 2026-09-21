@@ -11,6 +11,10 @@
 import { prisma } from "../lib/db";
 import { guionDelDia, MAX_PUNTOS } from "../lib/brief";
 import { cifrasInventadas, guionPlano } from "../lib/ia/brief";
+import { entrar, esperarServidor, levantarServidor, pedir } from "./apoyo-pruebas";
+
+const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3216";
+const CLAVE_OPERADOR = "Operador-Brief-2026";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle = "") {
@@ -147,6 +151,52 @@ async function main() {
     const tranquilo = guionPlano(gc);
     revisar("el plano dice que no hay nada, en vez de quedarse callado",
       tranquilo.includes("Pedro") && /nada|ningun|tranquil/i.test(tranquilo) && tranquilo.length > 40, tranquilo);
+
+    // ── El operador dentro de una empresa cliente ─────────────────────────
+    //
+    // Defecto real, encontrado por Rafael en produccion: el boton contestaba
+    // «No encontrado» en la empresa demostrativa. La ruta releia el usuario de
+    // la base y comparaba su empresa contra la resuelta; con una sesion normal
+    // coinciden siempre —por eso paso todas las pruebas—, pero el operador
+    // trabajando DENTRO de un cliente tiene la suya propia en la base y la del
+    // cliente en la sesion. Se prueba por HTTP porque es lo unico que ejercita
+    // esa resolucion.
+    console.log("\nEl operador de la plataforma, dentro de otra empresa\n");
+    const servidor = levantarServidor(3216);
+    try {
+      const bcrypt = (await import("bcryptjs")).default;
+      const operador = await prisma.user.create({
+        data: {
+          organizationId: B.id, email: `operador-${sello}@prueba.mx`, name: "Sofía Vela",
+          role: "OWNER", isSuperAdmin: true, passwordHash: await bcrypt.hash(CLAVE_OPERADOR, 10),
+        },
+      });
+      await esperarServidor(BASE);
+      const cab = await entrar(BASE, operador.email, CLAVE_OPERADOR);
+
+      const suyo = await pedir(BASE, "GET", "/api/ia/brief", cab);
+      revisar("en su propia empresa, el parte abre", suyo.status === 200, `HTTP ${suyo.status}`);
+
+      // El cambio de empresa emite una cookie NUEVA: hay que quedarse con ella
+      // o se sigue pidiendo el parte desde la empresa propia y la prueba no
+      // probaria nada.
+      const cambio = await fetch(`${BASE}/api/admin/switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...cab },
+        body: JSON.stringify({ organizationId: A.id }),
+        redirect: "manual",
+      });
+      revisar("el operador entra a la empresa cliente", cambio.ok, `HTTP ${cambio.status}`);
+      const nueva = cambio.headers.get("set-cookie")?.split(";")[0];
+      revisar("y recibe una sesión nueva, ya dentro del cliente", Boolean(nueva), nueva ? "cookie emitida" : "sin cookie");
+      const cabDentro = nueva ? { Cookie: nueva } : cab;
+
+      const dentro = await pedir(BASE, "GET", "/api/ia/brief", cabDentro);
+      revisar("dentro de la empresa cliente, el parte NO contesta «No encontrado»",
+        dentro.status !== 404, `HTTP ${dentro.status} · ${String(dentro.json.error ?? "").slice(0, 60)}`);
+    } finally {
+      if (servidor?.pid) { try { process.kill(-servidor.pid); } catch { /* ya cerró */ } }
+    }
 
     console.log("\nEl saludo según la hora de la EMPRESA\n");
     const manana = new Date("2026-09-21T15:00:00Z"); // 9 de la mañana en Monterrey

@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/db";
 import { fail, ok, withVista } from "@/lib/api";
 import { guionDelDia } from "@/lib/brief";
 import { redactarBrief } from "@/lib/ia/brief";
@@ -15,20 +14,27 @@ import { redactarBrief } from "@/lib/ia/brief";
  * es capturar mal un dato que despues nadie puede explicar —y en una orden el
  * cierre arrastra horas, costo y codigo de falla—. Preguntar y escuchar, si;
  * modificar, no.
+ *
+ * ── El usuario se toma de `withAuth`, NO se vuelve a consultar ──
+ *
+ * La primera version releia el usuario de la base y comparaba su empresa
+ * contra `orgId`. Con una sesion normal coincide siempre, asi que paso todas
+ * las pruebas; pero cuando el operador entra a una empresa cliente —la demo,
+ * por ejemplo—, `withAuth` ya le cambio la empresa por la del cliente y la de
+ * la base sigue siendo la suya. La comparacion fallaba y el boton contestaba
+ * «No encontrado». El usuario que entrega `withAuth` ya trae la suplantacion
+ * resuelta: volver a leerlo de la base es deshacerla.
  */
 export async function GET() {
   return withVista("/indicadores", async ({ user, orgId }) => {
-    const completo = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: {
-        id: true, name: true, role: true, organizationId: true,
-        organization: { select: { id: true, timezone: true, currency: true, plan: true, iaComplemento: true, iaExtra: true, status: true } },
-      },
-    });
-    if (!completo || completo.organizationId !== orgId) return fail("No encontrado", 404);
+    if (!user.organization || user.organizationId !== orgId) return fail("No encontrado", 404);
 
-    const guion = await guionDelDia(completo);
-    const brief = await redactarBrief(completo.organization as never, guion, { userId: user.id });
+    const guion = await guionDelDia({
+      id: user.id, name: user.name, role: user.role,
+      organizationId: orgId,
+      organization: user.organization,
+    });
+    const brief = await redactarBrief(user.organization as never, guion, { userId: user.id });
 
     return ok({
       // El texto tambien se devuelve, no solo se habla: oyendolo no hay forma
