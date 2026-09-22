@@ -1154,10 +1154,59 @@ async function main() {
     donde = "demo tecnico";
     await t.evaluar("localStorage.clear(); true").catch(() => undefined);
     await t.ir(`${base}/dashboard`, 1200);
-    const conRecorrido = await t.evaluar<{ banda: boolean; recorrido: boolean; tapa: boolean; pasos: string }>(`(() => {
+    const conRecorrido = await t.evaluar<{ banda: boolean; recorrido: boolean; tapa: boolean; cubiertos: number; pasos: string }>(`(() => {
       const r = document.querySelector('aside[aria-label="Recorrido de la demostración"]');
       const rr = r?.getBoundingClientRect();
-      return { banda: document.body.innerText.includes("Empresa demostrativa"), recorrido: !!r, tapa: !!rr && rr.height > innerHeight * 0.45, pasos: r?.innerText.match(/\d+ de \d+/)?.[0] ?? "" };
+      /*
+       * «No tapa» se medía por TAMAÑO, y eso no era medirlo.
+       *
+       * Antes bastaba con que la tarjeta no pasara del 45% del alto. Pero una
+       * tarjeta chica encima de un botón lo deja igual de intocable: medido en
+       * 1280 x 900 sobre el almacén, cubría CINCO controles de 49 y la
+       * revisión seguía en verde. Quien enseña el producto se topa con que un
+       * botón no responde, y lo que falla no es el botón.
+       *
+       * Ahora se cuentan los controles que quedan DEBAJO de la tarjeta.
+       */
+      const controles = rr ? [...document.querySelectorAll("button, a[href], input, select")].filter((el) => {
+        const q = el.getBoundingClientRect();
+        if (r.contains(el) || q.width === 0 || q.height === 0) return false;
+        if (q.top >= innerHeight || q.bottom <= 0) return false;
+        /*
+         * Tapado = NINGUN punto del control responde al toque.
+         *
+         * Mirar solo si los rectangulos se rozan daba falsas alarmas: tres
+         * pixeles de esquina no impiden pulsar nada. Y mirar solo el centro
+         * las daba al reves, con los controles grandes: un renglon de 364 x
+         * 101 seguia siendo perfectamente usable aunque la pastilla le cayera
+         * justo en el centro.
+         *
+         * Asi que se prueban cinco puntos —el centro y cuatro dentro de las
+         * esquinas— con elementFromPoint, que es lo que de verdad decide el
+         * navegador al recibir el toque. Si alguno responde, se puede usar.
+         */
+        const dx = q.width / 4;
+        const dy = q.height / 4;
+        const puntos = [
+          [q.left + q.width / 2, q.top + q.height / 2],
+          [q.left + dx, q.top + dy],
+          [q.right - dx, q.top + dy],
+          [q.left + dx, q.bottom - dy],
+          [q.right - dx, q.bottom - dy],
+        ];
+        return puntos.every(([x, y]) => {
+          if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return true;
+          const encima = document.elementFromPoint(x, y);
+          return !!encima && (encima === r || r.contains(encima));
+        });
+      }) : [];
+      return {
+        banda: document.body.innerText.includes("Empresa demostrativa"),
+        recorrido: !!r,
+        tapa: (!!rr && rr.height > innerHeight * 0.45) || controles.length > 0,
+        cubiertos: controles.length,
+        pasos: r?.innerText.match(/\d+ de \d+/)?.[0] ?? "",
+      };
     })()`);
     await captura("b7-390-demo-tecnico-recorrido");
     const m390 = await medir();
