@@ -126,7 +126,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Todo lo de Professional",
       "Activos, usuarios y sitios sin límite",
       "Monitoreo predictivo sin límite",
-      "Diagnóstico semanal y asistentes de IA",
+      "Diagnóstico semanal y asistentes de IA (detalle en la comparación)",
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
