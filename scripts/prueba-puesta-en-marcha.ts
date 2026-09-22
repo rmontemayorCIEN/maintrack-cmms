@@ -55,9 +55,9 @@ const paso = async (orgId: string, clave: string) => (await puestaEnMarcha(orgId
 
 async function main() {
   let servidor: ChildProcess | null = null;
-  const base = process.env.BASE_URL ?? "http://127.0.0.1:3203";
+  const base = process.env.BASE_URL ?? "http://127.0.0.1:3208";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3203", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = spawn("npx", ["next", "dev", "-p", "3208", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
   }
   const sello = `pem-${Date.now()}`;
   const orgs: string[] = [];

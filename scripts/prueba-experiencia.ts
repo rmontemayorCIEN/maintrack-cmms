@@ -435,7 +435,11 @@ async function main() {
     const comprasTec = await Promise.all([pagina("/compras", c.TECHNICIAN), pagina(`/compras/${compraId}`, c.TECHNICIAN)]);
     revisar("técnico: sin Compras completas (ni en el menú ni por dirección), sin configuración ni empresas cliente",
       !menuTec.includes("/compras") && comprasTec.every((r) => r.texto.includes(SIN_PERMISO)) && !menuTec.some((h) => ["/settings?s=usuarios", "/catalogs", "/clients", "/import"].includes(h)) &&
-      menuTec.includes("/escanear") && accionesRapidasDe("TECHNICIAN").some((a) => a.etiqueta === "Registrar lectura"));
+      menuTec.includes("/escanear") && accionesRapidasDe("TECHNICIAN").some((a) => a.etiqueta === "Registrar lectura"),
+      // Con detalle a proposito: sin el, una pagina que truena (500) se ve
+      // identica a una que si dejo entrar al tecnico —el texto de error tampoco
+      // trae SIN_PERMISO— y la falla acusa a los permisos sin serlo.
+      { menu: menuTec, compras: comprasTec.map((r) => ({ status: r.status, sinPermiso: r.texto.includes(SIN_PERMISO) })) });
     const admin = inicios.ADMIN;
     const auditoria = await pagina("/settings?s=auditoria", c.ADMIN);
     revisar("administrador: su inicio liga a usuarios, configuración, catálogos, calidad, puesta en marcha y auditoría, y la auditoría abre",

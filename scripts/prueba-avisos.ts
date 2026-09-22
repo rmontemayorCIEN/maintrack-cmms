@@ -338,6 +338,12 @@ async function main() {
     await prisma.preferenciaAvisos.deleteMany({ where: { userId: { in: [tec1.id] } } });
     const otP = await prisma.workOrder.create({ data: { organizationId: A.id, number: `P-${sello}`, title: "Para correo que falla", maintenanceType: "CORRECTIVE", priority: "MEDIUM", status: "ASSIGNED", siteId: sitio.id, assignedToId: tecPermanente.id } });
     await avisarNuevaOrden(A.id, otP.id);
+    // Se fuerza a que toque ya, igual que en el caso 27 de abajo: la OT es de
+    // prioridad media, asi que fuera del horario de avisos la entrega nace
+    // programada para el siguiente dia habil y `procesarEntregas` no la toma.
+    // Sin esto la prueba pasaba de dia y fallaba de noche, siempre igual de
+    // callada: decia «sin reintentos» cuando lo que pasaba es que ni se intento.
+    await prisma.entregaAviso.updateMany({ where: { organizationId: A.id, userId: tecPermanente.id, canal: "CORREO" }, data: { programadaPara: new Date() } });
     await procesarEntregas({ organizationId: A.id });
     const eP = await prisma.entregaAviso.findFirst({ where: { userId: tecPermanente.id, canal: "CORREO" } });
     revisar("26. el correo falla y la operación no: la orden existe, el aviso quedó en la campana", Boolean(await prisma.workOrder.findUnique({ where: { id: otP.id } })) && (await avisosDe(tecPermanente.id, "OT_ASIGNADA")).length === 1 && Boolean(eP));
