@@ -437,17 +437,44 @@ async function main() {
         donde = `${rol} ${etiqueta} menú`;
         await t.ir(`${base}/dashboard`);
         const esperado = menuDe(rol).flatMap((g) => g.items.map((i) => i.href));
-        const visto = await t.evaluar<{ ligas: string[]; cerrado: boolean; ruta: string; abierto: boolean }>(`(async () => {
+        const visto = await t.evaluar<{ ligas: string[]; cerrado: boolean; ruta: string; abierto: boolean; hayBarra: boolean; hayBoton: boolean; titulo: string }>(`(async () => {
+          // Se ESPERA a que el elemento aparezca, no se cuentan milisegundos.
+          //
+          // Antes habia un setTimeout de 350 ms fijos tras abrir el cajon, y en
+          // escritorio se leia el aside justo al llegar. Con la maquina cargada
+          // —correr la suite completa basta— ni uno ni otro habian aparecido
+          // todavia: la caja salia null, las ligas vacias, y la prueba lo
+          // reportaba como «al menu de este rol le faltan TODAS sus pantallas».
+          // Trece fallas y una excepcion que tumbaba el resto de la corrida,
+          // por una interfaz que estaba perfecta.
+          const esperar = async (fn, ms = 8000) => {
+            const t0 = Date.now();
+            for (;;) {
+              const v = fn();
+              if (v) return v;
+              if (Date.now() - t0 > ms) return null;
+              await new Promise((r) => setTimeout(r, 50));
+            }
+          };
           const movil = innerWidth < 1024;
-          let caja = document.querySelector("aside");
+          const barra = await esperar(() => document.querySelector('nav[aria-label="Accesos principales"]'));
+          const boton = barra ? [...barra.querySelectorAll("button")].find((b) => b.textContent.includes("Menú")) : null;
+          let caja = movil ? null : await esperar(() => document.querySelector("aside"));
           if (movil) {
-            [...document.querySelectorAll('nav[aria-label="Accesos principales"] button')].find((b) => b.textContent.includes("Menú"))?.click();
-            await new Promise((r) => setTimeout(r, 350));
-            caja = document.querySelector('[role="dialog"][aria-label="Menú"]');
+            boton?.click();
+            caja = await esperar(() => document.querySelector('[role="dialog"][aria-label="Menú"]'));
           }
+          // Abierta pero todavia sin pintar sus ligas es el mismo defecto con
+          // otra cara: tambien se espera a que tenga algo dentro.
+          if (caja) await esperar(() => caja.querySelectorAll("nav a").length > 0);
           const ligas = caja ? [...caja.querySelectorAll("nav a")].map((a) => a.getAttribute("href")) : [];
-          return { ligas, abierto: !!caja, cerrado: true, ruta: location.pathname };
+          return { ligas, abierto: !!caja, cerrado: true, ruta: location.pathname, hayBarra: !!barra, hayBoton: !!boton, titulo: document.title };
         })()`);
+        // Diagnostico: sin esto, «faltan todas las pantallas» se ve igual si el
+        // menu perdio sus ligas que si la sesion no entro y esto es el login.
+        if (!visto.abierto || !visto.ligas.length) {
+          console.log(`  info  menú vacío · rol=${rol} tam=${etiqueta} ruta=${visto.ruta} titulo="${visto.titulo}" barra=${visto.hayBarra} boton=${visto.hayBoton} aside=${visto.abierto}`);
+        }
         if (ancho < 1024) {
           if (rol === "OWNER" || rol === "TECHNICIAN") await captura(`${etiqueta}-${rol.toLowerCase()}-menu-abierto`);
           await t.evaluar(`(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); await new Promise((r) => setTimeout(r, 300)); })()`);
@@ -515,16 +542,29 @@ async function main() {
     donde = "menu";
     await t.ir(`${base}/requests`);
     const menu = await t.evaluar<{ abierto: boolean; ligas: string[]; cerrado: boolean; conserva: boolean }>(`(async () => {
+      const esperar = async (fn, ms = 8000) => {
+        const t0 = Date.now();
+        for (;;) {
+          const v = fn();
+          if (v) return v;
+          if (Date.now() - t0 > ms) return null;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      };
       const campo = document.querySelector("main input, main textarea");
-      const barra = document.querySelector('nav[aria-label="Accesos principales"]');
-      [...barra.querySelectorAll("button")].find((b) => b.textContent.includes("Menú")).click();
-      await new Promise((r) => setTimeout(r, 300));
-      const cajon = document.querySelector('[role="dialog"][aria-label="Menú"]');
+      // Se espera la barra en vez de darla por hecha: si no esta todavia, antes
+      // reventaba aqui con «Cannot read properties of null» y se llevaba por
+      // delante todos los pasos que faltaban.
+      const barra = await esperar(() => document.querySelector('nav[aria-label="Accesos principales"]'));
+      if (!barra) return { abierto: false, ligas: [], cerrado: false, conserva: false, sinBarra: true, ruta: location.pathname };
+      [...barra.querySelectorAll("button")].find((b) => b.textContent.includes("Menú"))?.click();
+      const cajon = await esperar(() => document.querySelector('[role="dialog"][aria-label="Menú"]'));
+      if (cajon) await esperar(() => cajon.querySelectorAll("a").length > 0);
       const ligas = cajon ? [...cajon.querySelectorAll("a")].map((a) => a.getAttribute("href")) : [];
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-      await new Promise((r) => setTimeout(r, 300));
-      return { abierto: !!cajon, ligas, cerrado: !document.querySelector('[role="dialog"][aria-label="Menú"]'), conserva: location.pathname === "/requests" };
+      const cerrado = await esperar(() => !document.querySelector('[role="dialog"][aria-label="Menú"]'), 3000);
+      return { abierto: !!cajon, ligas, cerrado: cerrado === true, conserva: location.pathname === "/requests" };
     })()`);
     revisar("16. el botón «Menú» de la barra abre el cajón con solo las pantallas del rol, y Escape lo cierra sin salir de la pantalla",
       menu.abierto && menu.cerrado && menu.conserva && !menu.ligas.some((h) => ["/inventory", "/compras", "/work-orders"].includes(h)), menu);
