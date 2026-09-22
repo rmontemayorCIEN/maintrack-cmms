@@ -107,6 +107,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "API para integrar sistemas externos y sensores",
       "100 GB para fotos, videos y documentos",
       "Diagnóstico semanal con inteligencia artificial",
+      "El inicio y el almacén con su franja: se ve el estado antes de leerlo",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
@@ -122,7 +123,8 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Todo lo de Professional",
       "Activos, usuarios y sitios sin límite",
       "Monitoreo predictivo sin límite",
-      "Diagnóstico semanal y asistentes de IA (detalle en la comparación)",
+      "Diagnóstico semanal y asistentes de IA",
+      "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
     ia: { operaciones: 80, funciones: ["DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200 },

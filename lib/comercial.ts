@@ -75,6 +75,8 @@ export const DIFERENCIADORES: Array<{ titulo: string; texto: string }> = [
   { titulo: "Mantenimiento, inventario y compras conectados", texto: "La orden pide la refacción, el almacén la surte o la requisición la compra, y el costo regresa a la orden." },
   { titulo: "Condición, medidores y alertas", texto: "Lecturas y sensores que disparan trabajo antes de la falla." },
   { titulo: "Multiempresa", texto: "Varios sitios en una misma cuenta y, para quien da servicio, varias empresas cliente separadas por completo." },
+  { titulo: "El sistema le habla", texto: "El parte del día cuenta en voz alta lo que hay que saber hoy, para oírlo camino a la planta; y se le puede preguntar hablando, como a un jefe de mantenimiento." },
+  { titulo: "Se entiende antes de leerlo", texto: "El inicio y el almacén abren con una franja donde cada cuadro es un equipo o una refacción: en un segundo se ve qué área está parada y qué familia está sufriendo." },
 ];
 
 export const MODULOS: Array<{ nombre: string; texto: string }> = [
@@ -83,10 +85,10 @@ export const MODULOS: Array<{ nombre: string; texto: string }> = [
   { nombre: "Solicitudes", texto: "Cualquier persona reporta una falla, también sin cuenta desde el QR del equipo." },
   { nombre: "Preventivo", texto: "Planes por calendario o por medidor que generan sus órdenes." },
   { nombre: "Medidores y predictivo", texto: "Lecturas, umbrales, tendencias y vida útil remanente." },
-  { nombre: "Almacén", texto: "Existencias por almacén, kardex, costo promedio y mínimos." },
+  { nombre: "Almacén", texto: "Existencias por almacén, kardex, costo promedio y mínimos, con una franja que dice de un vistazo qué familia está sufriendo y dónde está parado el dinero." },
   { nombre: "Compras", texto: "Requisiciones, autorización, órdenes de compra, proveedores y recepción." },
   { nombre: "Indicadores y reportes", texto: "Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog y paros." },
-  { nombre: "Avisos", texto: "En la campana y en el celular, sin costo por mensaje." },
+  { nombre: "Avisos", texto: "En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega." },
 ];
 
 /** Un recorrido real del sistema, en el orden en que pasa en la planta. */
@@ -178,6 +180,20 @@ export function comparacion(): Fila[] {
     {
       grupo: "Inteligencia artificial", concepto: "Funciones de IA",
       celdas: porPlan((p) => ({ tipo: "limite", valor: `${PLANES[p].ia.funciones.length} de ${iaTotal}` })),
+    },
+    {
+      // El parte del dia se escucha en los dos planes; preguntarle HABLANDO y
+      // que conteste es de Enterprise, porque transcribir y sintetizar se
+      // cobran por caracter y hay un tope mensual por empresa.
+      grupo: "Inteligencia artificial", concepto: "El parte del día, hablado",
+      celdas: ambos({ tipo: "incluido" }),
+    },
+    {
+      grupo: "Inteligencia artificial", concepto: "Preguntarle hablando y que conteste",
+      celdas: {
+        PROFESSIONAL: { tipo: "configuracion", nota: "El parte del día sí se escucha; preguntar hablando es de Enterprise" },
+        ENTERPRISE: { tipo: "incluido", nota: "Para quien ve el panorama, con tope mensual por empresa" },
+      },
     },
     {
       grupo: "Inteligencia artificial", concepto: COMPLEMENTO_IA.nombre,

@@ -50,7 +50,7 @@ export type Diapositiva = {
 };
 
 /** Las funciones de IA que se enseñan: las que ya operan y se ven en la demo. */
-const IA_EN_LA_DEMO: ClaveFuncionIA[] = ["DIAGNOSTICO", "CIERRE_OT", "PLAN", "TRIAGE", "BUSQUEDA", "AYUDA"];
+const IA_EN_LA_DEMO: ClaveFuncionIA[] = ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "TRIAGE", "AYUDA"];
 
 const miles = (n: number) => (n === Infinity ? "sin límite" : n.toLocaleString("es-MX"));
 
@@ -141,6 +141,40 @@ export function armarPresentacion(ligasPorHistoria: Record<string, Liga[]> = {})
         { tipo: "parrafo", texto: `Se cobra en operaciones al mes, no en tokens: ${PLANES.PROFESSIONAL.nombre} incluye ${PLANES.PROFESSIONAL.ia.operaciones} y ${PLANES.ENTERPRISE.nombre} ${PLANES.ENTERPRISE.ia.operaciones}. El complemento «${COMPLEMENTO_IA.nombre}» agrega ${COMPLEMENTO_IA.operaciones} más y todas las funciones, por ${precio(COMPLEMENTO_IA.precioMensual)} al mes. La ayuda del sistema trae su propia bolsa: preguntar cómo se usa no consume las operaciones del plan.` },
       ],
       ligas: [{ etiqueta: "Diagnóstico con IA", href: "/diagnostico" }, { etiqueta: "Consulta en lenguaje natural", href: "/consulta" }],
+    },
+    {
+      clave: "voz", seccion: "Cómo se trabaja",
+      titulo: "El sistema habla, y también escucha",
+      entradilla: "Lo que un director alcanza a revisar mientras maneja a la planta.",
+      bloques: [
+        {
+          tipo: "tarjetas", columnas: 2, items: [
+            {
+              titulo: "El parte del día",
+              texto: "En el inicio hay un botón que lo cuenta en voz alta: qué está parado, qué se venció, qué alerta hay y qué compra espera su firma. Con pausas, como lo diría el jefe de mantenimiento por teléfono.",
+              // Lo que es cierto HOY: BRIEF no esta en las funciones de ningun
+              // plan (lib/planes.ts), asi que solo se activa con el complemento.
+              // Si algun dia entra en los planes, cambiar aqui tambien.
+              pie: "Con el complemento IA Avanzada.",
+            },
+            {
+              titulo: "Prefiero preguntar y escuchar",
+              texto: "En «Pregunte a sus datos» se toca el micrófono y se pregunta hablando —«¿cuántas órdenes tengo vencidas?»—. El sistema consulta, contesta en voz alta y deja la respuesta escrita para copiarla.",
+              pie: "Enterprise, para quien ve el panorama, con tope mensual por empresa.",
+            },
+          ],
+        },
+        {
+          tipo: "destacado", titulo: "Las cifras no las dice la IA",
+          texto: "Los totales, los conteos y las tendencias los calcula el sistema y se le entregan ya resueltos; la IA solo los hilvana para que suenen como los diría una persona. Antes de hablar se verifica que no haya agregado ninguna cifra que no estuviera.",
+        },
+        {
+          tipo: "parrafo",
+          texto: "Cada quien elige la voz que prefiere en Ajustes, y se puede probar antes de guardarla. Lo hablado pasa por los mismos permisos que lo escrito: nadie oye lo que no podría ver en pantalla.",
+        },
+      ],
+      ligas: [{ etiqueta: "El parte del día", href: "/dashboard" }, { etiqueta: "Preguntar hablando", href: "/consulta" }],
+      nota: "Si hay bocina, reprodúzcalo. Es lo que más se recuerda de la demo, y no se explica: se oye.",
     },
     {
       clave: "seguridad", seccion: "Cómo se trabaja",

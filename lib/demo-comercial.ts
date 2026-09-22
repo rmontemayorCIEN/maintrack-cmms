@@ -102,6 +102,48 @@ const REFACCIONES = [
   { code: "GRS-ALI", familia: "Lubricantes", name: "Grasa grado alimenticio (cartucho 400 g)", unit: "pza", costo: 210, min: 10, inicial: 16, prov: "rod" },
   { code: "EMP-TAP", familia: "Sellos y empaques", name: "Juego de empaques para cabezal de taponadora", unit: "jgo", costo: 1600, min: 2, inicial: 3, prov: "rod" },
   { code: "FUS-30", familia: "Eléctrico", name: "Fusible 30 A clase J", unit: "pza", costo: 180, min: 6, inicial: 10, prov: "elec" },
+
+  // ── Rodamientos ──
+  { code: "ROD-6206", familia: "Rodamientos", name: "Rodamiento 6206-2RS", unit: "pza", costo: 165, min: 6, inicial: 14, prov: "rod" },
+  { code: "ROD-6308", familia: "Rodamientos", name: "Rodamiento 6308-2Z", unit: "pza", costo: 340, min: 4, inicial: 0, prov: "rod" },
+  { code: "CHU-35", familia: "Rodamientos", name: "Chumacera de pie 35 mm", unit: "pza", costo: 680, min: 3, inicial: 12, prov: "rod" },
+
+  // ── Transmisión ──
+  { code: "CAD-50", familia: "Transmisión", name: "Cadena de rodillos ASA 50 (tramo de 3 m)", unit: "m", costo: 1250, min: 2, inicial: 7, prov: "rod" },
+  { code: "MTR-RED", familia: "Transmisión", name: "Motorreductor 1 HP para transportador", unit: "pza", costo: 8900, min: 1, inicial: 1, prov: "rod" },
+  { code: "BND-V75", familia: "Transmisión", name: "Banda en V perfil B-75", unit: "pza", costo: 240, min: 4, inicial: 2, prov: "rod" },
+
+  // ── Eléctrico ──
+  { code: "RES-ETQ", familia: "Eléctrico", name: "Resistencia de 2 kW para túnel de manga", unit: "pza", costo: 890, min: 3, inicial: 1, prov: "elec" },
+  { code: "CNT-40", familia: "Eléctrico", name: "Contactor 40 A con bobina de 24 V", unit: "pza", costo: 1450, min: 2, inicial: 4, prov: "elec" },
+  { code: "VAR-3K", familia: "Eléctrico", name: "Variador de frecuencia 3 kW", unit: "pza", costo: 12800, min: 1, inicial: 0, prov: "elec" },
+
+  // ── Filtros ──
+  { code: "FIL-AIR", familia: "Filtros", name: "Filtro de aire para compresor", unit: "pza", costo: 620, min: 3, inicial: 5, prov: "aire" },
+  { code: "FIL-SEC", familia: "Filtros", name: "Filtro coalescente para secador", unit: "pza", costo: 980, min: 2, inicial: 1, prov: "aire" },
+  { code: "FIL-AGU", familia: "Filtros", name: "Cartucho de filtro de agua de 10 pulgadas", unit: "pza", costo: 320, min: 6, inicial: 24, prov: "frio" },
+
+  // ── Lubricantes ──
+  { code: "ACE-RED", familia: "Lubricantes", name: "Aceite para reductores ISO 220 (cubeta 20 L)", unit: "pza", costo: 2400, min: 2, inicial: 3, prov: "rod" },
+  { code: "REF-410", familia: "Lubricantes", name: "Refrigerante R-410A (cilindro de 11 kg)", unit: "pza", costo: 5600, min: 1, inicial: 2, prov: "frio" },
+
+  // ── Sellos y empaques ──
+  { code: "SEL-BOM", familia: "Sellos y empaques", name: "Sello mecánico para bomba de 15 HP", unit: "pza", costo: 1850, min: 2, inicial: 1, prov: "rod" },
+  { code: "ORN-KIT", familia: "Sellos y empaques", name: "Juego surtido de o-rings de nitrilo", unit: "jgo", costo: 380, min: 3, inicial: 6, prov: "rod" },
+  { code: "EMP-CAL", familia: "Sellos y empaques", name: "Empaque de tapa de registro para caldera", unit: "pza", costo: 740, min: 2, inicial: 2, prov: "aire" },
+
+  // ── Neumática e hidráulica ──
+  { code: "VAL-LLN", familia: "Neumática e hidráulica", name: "Válvula de llenado completa", unit: "pza", costo: 4200, min: 2, inicial: 3, prov: "rod" },
+  { code: "CIL-NEU", familia: "Neumática e hidráulica", name: "Cilindro neumático 32 x 100 mm", unit: "pza", costo: 1350, min: 2, inicial: 0, prov: "aire" },
+  { code: "ELV-52", familia: "Neumática e hidráulica", name: "Electroválvula 5/2 vías de 24 V", unit: "pza", costo: 980, min: 3, inicial: 5, prov: "aire" },
+  // Sin minimo a proposito: un almacen real siempre trae algo sin capturar, y
+  // la franja lo señala en gris —«no se sabe»— en vez de pintarlo de sano.
+  { code: "MNG-AIR", familia: "Neumática e hidráulica", name: "Manguera de aire de 3/8 de pulgada (rollo de 15 m)", unit: "rollo", costo: 890, min: 0, inicial: 2, prov: "aire" },
+
+  // ── Instrumentación ──
+  { code: "MAN-16", familia: "Instrumentación", name: "Manómetro con glicerina 0-16 bar", unit: "pza", costo: 420, min: 4, inicial: 6, prov: "elec" },
+  { code: "TRM-PT100", familia: "Instrumentación", name: "Termopar PT100 con vaina", unit: "pza", costo: 1680, min: 2, inicial: 2, prov: "elec" },
+  { code: "SND-NIV", familia: "Instrumentación", name: "Sonda de nivel capacitiva", unit: "pza", costo: 3200, min: 0, inicial: 1, prov: "elec" },
 ];
 
 // Clave interna → código del catálogo. Se usan los genéricos que trae toda empresa
