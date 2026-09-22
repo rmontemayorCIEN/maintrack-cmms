@@ -22,6 +22,8 @@ export type FilaRefaccion = {
   quantityOnHand: number; minQuantity: number; maxQuantity: number;
   /** Folios de compras abiertas que ya traen esta refaccion en camino. */
   enCompra?: string[];
+  /** Las compras ya colocadas que traen esta refaccion, para ir a recibirlas. */
+  comprasPorRecibir?: Array<{ id: string; folio: string }>;
   bin: string | null; supplierId: string | null; proveedor: string | null;
   moneda: string;
   adjuntos: Adjunto[]; enlaces: Enlace[];
@@ -169,7 +171,7 @@ export function TablaRefacciones({
       ejemploFiltro='Filtrar: "balero", "agotada", "filtro"…'
       // Solo el movimiento rapido: la ficha se abre desde la clave.
       acciones={editable ? (p) => (
-        <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} />
+        <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} compras={p.comprasPorRecibir ?? []} />
       ) : undefined}
     />
   );

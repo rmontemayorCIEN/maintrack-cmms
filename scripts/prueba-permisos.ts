@@ -129,7 +129,7 @@ async function main() {
       "dar de alta un activo": (c) => pedir("POST", "/api/assets", c, { code: `A-${++n}`, name: `Equipo ${n}`, siteId: sitio.id }),
       "crear un plan de mantenimiento": (c) => pedir("POST", "/api/plans", c, { name: `Plan ${++n}`, assetId: activo.id, intervalDays: 30, maintenanceType: "PREVENTIVE" }),
       "levantar una solicitud": (c) => pedir("POST", "/api/requests", c, { title: `Reporte ${++n} de prueba`, assetId: activo.id, priority: "MEDIUM" }),
-      "mover existencia en el almacén": (c) => pedir("POST", "/api/parts/movements", c, { partId: refaccion.id, warehouseId: almacen.id, movementType: "IN", quantity: 1, unitCost: 50 }),
+      "mover existencia en el almacén": (c) => pedir("POST", "/api/parts/movements", c, { partId: refaccion.id, warehouseId: almacen.id, movementType: "IN", quantity: 1, unitCost: 50, reference: "Sobrante de obra" }),
       "dar de alta un proveedor": (c) => pedir("POST", "/api/suppliers", c, { name: `Proveedor ${++n}` }),
       "dar de alta un usuario": (c) => pedir("POST", "/api/users", c, { name: `Persona ${++n}`, email: `nueva${n}-${sello}@t.mx`, password: "clavelarga123", role: "TECHNICIAN" }),
       "cambiar la configuración de la empresa": (c) => pedir("PATCH", "/api/work-orders/config", c, { agruparPorEquipo: true }),

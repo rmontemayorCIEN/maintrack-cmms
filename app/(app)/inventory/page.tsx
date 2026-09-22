@@ -152,15 +152,28 @@ export default async function InventoryPage({
       partId: { not: null },
       request: { organizationId: user.organizationId, estado: { in: ESTADOS_COMPRA_ABIERTA } },
     },
-    select: { partId: true, request: { select: { folio: true } } },
+    select: { partId: true, request: { select: { id: true, folio: true, estado: true } } },
   });
   const foliosPorParte = new Map<string, string[]>();
+  // Con el id, no solo el folio: al dar entrada se ofrece ir a recibir ESA
+  // compra, que es donde la entrada queda ligada a su documento.
+  const comprasPorParte = new Map<string, Array<{ id: string; folio: string }>>();
   for (const l of enCamino) {
     const previos = foliosPorParte.get(l.partId!) ?? [];
     if (!previos.includes(l.request.folio)) previos.push(l.request.folio);
     foliosPorParte.set(l.partId!, previos);
+    // Solo las que ya se colocaron: una requisicion sin orden todavia no tiene
+    // material en camino que recibir.
+    if (["EN_COMPRA", "RECIBIDA_PARCIAL"].includes(l.request.estado)) {
+      const lista = comprasPorParte.get(l.partId!) ?? [];
+      if (!lista.some((c) => c.id === l.request.id)) lista.push({ id: l.request.id, folio: l.request.folio });
+      comprasPorParte.set(l.partId!, lista);
+    }
   }
-  for (const f of filas) f.enCompra = foliosPorParte.get(f.id) ?? [];
+  for (const f of filas) {
+    f.enCompra = foliosPorParte.get(f.id) ?? [];
+    f.comprasPorRecibir = comprasPorParte.get(f.id) ?? [];
+  }
 
   const bajoMinimoSinPedir = filas.filter((f) => estaBajoMinimo(f) && !f.enCompra?.length).length;
   const lowCount = filas.filter((f) => estaBajoMinimo(f)).length;
