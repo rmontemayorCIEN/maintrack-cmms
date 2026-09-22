@@ -31,6 +31,7 @@ import { prisma } from "./db";
 import { estadoDe, type EstadoConjunto } from "./conjuntos";
 import { OT_ACTIVAS } from "./avisos/situaciones";
 import { filtroDeVencidas } from "./vencimiento";
+import { alertaAbierta } from "./alertas";
 
 /** Un equipo dado de baja no es parte de la planta viva y no cuenta en nada. */
 const FUERA = "RETIRED";
@@ -189,7 +190,7 @@ export async function franjaDePlanta(
       select: { id: true, assetId: true, dueDate: true },
     }),
     prisma.predictiveAlert.findMany({
-      where: { organizationId, status: "OPEN" },
+      where: { organizationId, ...alertaAbierta() },
       select: { assetId: true },
     }),
   ]);

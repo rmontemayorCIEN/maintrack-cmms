@@ -14,6 +14,7 @@ import { detectar } from "./avisos/detectores";
 import { configDe } from "./avisos/config";
 import { logAudit } from "./audit";
 import { sembrarCatalogosEstandar } from "./catalogos-estandar";
+import { alertaAbierta } from "./alertas";
 
 /**
  * La empresa demostrativa (Bloque 7).
@@ -509,7 +510,7 @@ export async function resumenDemo(orgId: string) {
     prisma.asset.count({ where: w }), prisma.maintenancePlan.count({ where: w }), prisma.workOrder.count({ where: w }),
     prisma.workOrder.count({ where: { ...w, status: { notIn: ["CLOSED", "CANCELLED"] } } }), prisma.workRequest.count({ where: w }),
     prisma.part.count({ where: w }), prisma.purchaseRequest.count({ where: w }), prisma.meterReading.count({ where: w }),
-    prisma.predictiveAlert.count({ where: { ...w, status: "OPEN" } }), prisma.user.count({ where: w }),
+    prisma.predictiveAlert.count({ where: { ...w, ...alertaAbierta() } }), prisma.user.count({ where: w }),
   ]);
   return { activos, planes, ordenes, abiertas, solicitudes, refacciones, compras, lecturas, alertas, usuarios };
 }

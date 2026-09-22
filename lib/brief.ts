@@ -30,6 +30,7 @@ import { porAutorizar } from "./compras";
 import { verCostos } from "./pantallas";
 import { can } from "./rbac";
 import { formatCurrency } from "./utils";
+import { alertaAbierta } from "./alertas";
 
 /** Cuantos puntos se dicen, como maximo. Arriba de esto ya nadie escucha. */
 export const MAX_PUNTOS = 5;
@@ -152,7 +153,7 @@ export async function guionDelDia(user: Usuario, ahora = new Date()): Promise<Gu
       take: 50,
     }),
     prisma.predictiveAlert.findMany({
-      where: { organizationId: org, status: "OPEN" },
+      where: { organizationId: org, ...alertaAbierta() },
       select: { severity: true, title: true, createdAt: true, asset: { select: { code: true, name: true } } },
       orderBy: [{ severity: "asc" }, { createdAt: "asc" }],
       take: 20,

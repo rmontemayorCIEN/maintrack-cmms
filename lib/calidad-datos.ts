@@ -20,6 +20,7 @@
 import { prisma } from "./db";
 import { filtrosDelProceso, DIAS_PARA_CERRAR } from "./saneamiento-ot";
 import { motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "./reglas-ot";
+import { alertaAbierta } from "./alertas";
 
 const DIA = 86_400_000;
 
@@ -259,7 +260,7 @@ export async function revisarCalidad(organizationId: string, ahora = new Date())
     }),
 
     prisma.predictiveAlert.findMany({
-      where: { organizationId, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+      where: { organizationId, ...alertaAbierta() },
       select: { id: true, title: true, createdAt: true, projectedFailureAt: true, fechaCruceCritico: true, fechaCruceAdvertencia: true },
     }),
 

@@ -26,6 +26,7 @@ import { filtroDeVencidas } from "./vencimiento";
 import { resumenDeInicio } from "./resumen-inicio";
 import { franjaDePlanta, type FranjaDePlanta } from "./planta";
 import { porAutorizar } from "./compras";
+import { alertaAbierta } from "./alertas";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -181,7 +182,7 @@ async function criticasYVencidas(c: Ctx) {
 
 async function alertasAbiertas(c: Ctx) {
   const alertas = await prisma.predictiveAlert.findMany({
-    where: { organizationId: c.org, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+    where: { organizationId: c.org, ...alertaAbierta() },
     select: { id: true, title: true, severity: true, status: true, asset: { select: { code: true, name: true } } },
     orderBy: [{ severity: "desc" }, { createdAt: "desc" }], take: 20,
   });
