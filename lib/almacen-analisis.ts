@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { estaBajoMinimo } from "./almacen-estado";
 
 /**
  * Analisis del almacen a partir de los datos propios.
@@ -173,7 +174,7 @@ export async function analizarAlmacen(organizationId: string): Promise<AnalisisA
     const requeridoAqui = requeridoPorParte.get(p.id);
 
     // ── Lo que ya esta por debajo de su propio minimo ─────────────────
-    if (p.minQuantity > 0 && p.quantityOnHand < p.minQuantity) {
+    if (estaBajoMinimo(p)) {
       const faltante = p.minQuantity - p.quantityOnHand;
       bajoMinimo.push({
         partId: p.id, codigo: p.code, nombre: p.name, unidad: p.unit,

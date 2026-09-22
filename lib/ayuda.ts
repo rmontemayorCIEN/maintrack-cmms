@@ -764,11 +764,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Almacén de refacciones",
     que: "Qué hay, en qué almacén, cuánto vale y qué está por acabarse.",
     hacer: [
+      "Ver de un vistazo qué familia está sufriendo, en la franja de arriba",
       "Registrar entradas, salidas y ajustes",
       "Ver la existencia de un almacén específico con el selector de arriba",
       "Entrar al kardex, a los traspasos, a los conteos y a los indicadores",
     ],
     flujo: [
+      "La franja de arriba dice cómo está el almacén por familia: un cuadro por refacción, y el color dice si hay de menos, de más, o si nadie ha dicho cuánto debería haber. Cada renglón lleva a esa familia.",
+      "El gris de «sin mínimo» no es un término medio entre bien y mal: es que esa refacción no tiene mínimo capturado, así que no hay contra qué compararla. Capturarlo es lo que hace que el almacén se pueda vigilar solo.",
+      "«Bajo mínimo» quiere decir lo mismo aquí, en la franja y en el análisis del almacén: hay menos de lo que se dijo que debía haber. Las agotadas van incluidas.",
+      "Si no se han capturado familias, la franja se ve en un solo renglón y lo dice: al ponerle familia a cada refacción se abre por familia.",
       "La clave abre el expediente de la refacción: existencia por almacén, últimos movimientos, en qué equipos se ha ido, compras, planes que la piden, equivalentes y fichas técnicas. Editar se hace ahí mismo.",
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Cada refacción puede tener equivalentes: la misma pieza de otra marca, o un sustituto que sirve cuando la original no llega. Se registran con el botón «Equivalentes» del renglón.",

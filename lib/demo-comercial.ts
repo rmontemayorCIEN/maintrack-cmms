@@ -88,17 +88,20 @@ const PROVEEDORES = [
 ];
 
 // inicial: lo que había hace 90 días. El resto lo mueve la historia.
+// Con familia a proposito: la franja del almacen agrupa por familia, y una
+// demo sin familias la enseñaba en un solo renglon mudo. Es la primera
+// pantalla de almacen que ve un prospecto.
 const REFACCIONES = [
-  { code: "KIT-VLL", name: "Kit de empaques para válvula de llenado", unit: "pza", costo: 850, min: 4, inicial: 8, prov: "rod" },
-  { code: "ROD-6205", name: "Rodamiento 6205-2RS", unit: "pza", costo: 120, min: 6, inicial: 5, prov: "rod" },
-  { code: "BND-TRN", name: "Banda modular para transportador (tramo de 1 m)", unit: "m", costo: 1450, min: 2, inicial: 4, prov: "rod" },
-  { code: "SEN-FOT", name: "Sensor fotoeléctrico difuso 24 V", unit: "pza", costo: 1980, min: 1, inicial: 2, prov: "elec" },
-  { code: "FIL-ACE", name: "Filtro de aceite para compresor", unit: "pza", costo: 1150, min: 2, inicial: 3, prov: "aire" },
-  { code: "FIL-SEP", name: "Elemento separador aire-aceite", unit: "pza", costo: 4800, min: 1, inicial: 0, prov: "aire" }, // agotado: historia 4
-  { code: "ACE-CMP", name: "Aceite sintético para compresor (cubeta 20 L)", unit: "pza", costo: 3900, min: 2, inicial: 3, prov: "aire" },
-  { code: "GRS-ALI", name: "Grasa grado alimenticio (cartucho 400 g)", unit: "pza", costo: 210, min: 10, inicial: 16, prov: "rod" },
-  { code: "EMP-TAP", name: "Juego de empaques para cabezal de taponadora", unit: "jgo", costo: 1600, min: 2, inicial: 3, prov: "rod" },
-  { code: "FUS-30", name: "Fusible 30 A clase J", unit: "pza", costo: 180, min: 6, inicial: 10, prov: "elec" },
+  { code: "KIT-VLL", familia: "Sellos y empaques", name: "Kit de empaques para válvula de llenado", unit: "pza", costo: 850, min: 4, inicial: 8, prov: "rod" },
+  { code: "ROD-6205", familia: "Rodamientos", name: "Rodamiento 6205-2RS", unit: "pza", costo: 120, min: 6, inicial: 5, prov: "rod" },
+  { code: "BND-TRN", familia: "Transmisión", name: "Banda modular para transportador (tramo de 1 m)", unit: "m", costo: 1450, min: 2, inicial: 4, prov: "rod" },
+  { code: "SEN-FOT", familia: "Eléctrico", name: "Sensor fotoeléctrico difuso 24 V", unit: "pza", costo: 1980, min: 1, inicial: 2, prov: "elec" },
+  { code: "FIL-ACE", familia: "Filtros", name: "Filtro de aceite para compresor", unit: "pza", costo: 1150, min: 2, inicial: 3, prov: "aire" },
+  { code: "FIL-SEP", familia: "Filtros", name: "Elemento separador aire-aceite", unit: "pza", costo: 4800, min: 1, inicial: 0, prov: "aire" }, // agotado: historia 4
+  { code: "ACE-CMP", familia: "Lubricantes", name: "Aceite sintético para compresor (cubeta 20 L)", unit: "pza", costo: 3900, min: 2, inicial: 3, prov: "aire" },
+  { code: "GRS-ALI", familia: "Lubricantes", name: "Grasa grado alimenticio (cartucho 400 g)", unit: "pza", costo: 210, min: 10, inicial: 16, prov: "rod" },
+  { code: "EMP-TAP", familia: "Sellos y empaques", name: "Juego de empaques para cabezal de taponadora", unit: "jgo", costo: 1600, min: 2, inicial: 3, prov: "rod" },
+  { code: "FUS-30", familia: "Eléctrico", name: "Fusible 30 A clase J", unit: "pza", costo: 180, min: 6, inicial: 10, prov: "elec" },
 ];
 
 // Clave interna → código del catálogo. Se usan los genéricos que trae toda empresa
@@ -295,7 +298,7 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   }
   const parte: Contexto["parte"] = {};
   for (const x of REFACCIONES) {
-    const pt = await prisma.part.create({ data: { organizationId: orgId, supplierId: prov[x.prov], code: x.code, name: x.name, unit: x.unit, unitCost: x.costo, minQuantity: x.min, maxQuantity: x.min * 3 } });
+    const pt = await prisma.part.create({ data: { organizationId: orgId, supplierId: prov[x.prov], code: x.code, name: x.name, category: x.familia, unit: x.unit, unitCost: x.costo, minQuantity: x.min, maxQuantity: x.min * 3 } });
     await prisma.partStock.create({ data: { organizationId: orgId, partId: pt.id, warehouseId: almacen.id, quantity: 0, minQuantity: x.min, maxQuantity: x.min * 3 } });
     parte[x.code] = { id: pt.id, costo: x.costo };
   }

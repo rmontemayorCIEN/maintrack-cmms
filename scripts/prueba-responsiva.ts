@@ -32,7 +32,7 @@
  */
 import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { closeSync, ftruncateSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SignJWT } from "jose";
@@ -177,6 +177,31 @@ async function main() {
    */
   const PUERTO_APP = 3400 + Math.floor(Math.random() * 400);
   const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO_APP}`;
+
+  /**
+   * Sin build de produccion esto NO puede correr, y hay que decirlo aqui.
+   *
+   * Esta prueba sirve la aplicacion con `next start`, que necesita el build de
+   * produccion. Cualquier `next dev` posterior reescribe `.next` y se lleva el
+   * BUILD_ID por delante —y la suite completa levanta trece servidores de
+   * desarrollo—, asi que correr `npm run build` y despues la suite deja esto
+   * sin nada que servir.
+   *
+   * Cuando pasaba, `next start` no levantaba, el navegador se quedaba en su
+   * pagina de error de conexion, y la prueba reportaba TRECE fallas de
+   * interfaz: «al menu de este rol le faltan todas sus pantallas». Se
+   * persiguieron cuatro hipotesis falsas antes de mirar si habia build. La
+   * interfaz estaba perfecta las cuatro veces.
+   *
+   * Una linea diciendo la verdad vale mas que trece fallas inventadas.
+   */
+  if (!process.env.BASE_URL && !existsSync(join(process.cwd(), ".next", "BUILD_ID"))) {
+    console.error("\n  No hay build de produccion en .next, y esta prueba sirve la aplicacion con `next start`.");
+    console.error("  Corra `npm run build` y vuelva a intentar.");
+    console.error("  Ojo con el orden: un `next dev` posterior —o la suite completa, que levanta trece— lo borra.\n");
+    process.exit(1);
+  }
+
   if (!process.env.BASE_URL) {
     servidor = spawn("npx", ["next", "start", "-p", String(PUERTO_APP), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
   }

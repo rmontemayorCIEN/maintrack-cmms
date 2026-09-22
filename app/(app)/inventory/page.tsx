@@ -13,6 +13,9 @@ import { vistaGuardada } from "@/lib/vistas";
 import { MovementForm } from "./movement-form";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
 import { contiene } from "@/lib/busqueda-texto";
+import { franjaDeAlmacen } from "@/lib/almacen-vista";
+import { FranjaAlmacen } from "./franja-almacen";
+import { estaBajoMinimo } from "@/lib/almacen-estado";
 
 export const metadata = { title: "Almacén" };
 export const dynamic = "force-dynamic";
@@ -20,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; low?: string; almacen?: string }>;
+  searchParams: Promise<{ q?: string; low?: string; almacen?: string; categoria?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -36,6 +39,11 @@ export default async function InventoryPage({
   // viene de la barra de direcciones y no se puede creer.
   const almacenActivo = almacenes.find((a) => a.id === params.almacen) ?? null;
 
+  // La franja mira SIEMPRE el almacen completo, aunque la tabla de abajo este
+  // filtrada: es el panorama, y un panorama que cambia con el filtro deja de
+  // servir para saber donde hay que mirar.
+  const franja = await franjaDeAlmacen(user.organizationId);
+
   const [parts, suppliers, familias, unidades] = await Promise.all([
     prisma.part.findMany({
       where: {
@@ -45,7 +53,17 @@ export default async function InventoryPage({
         // Bajo minimo se decide en la base y no despues del tope: con 300
         // refacciones traidas, la que estaba bajo minimo en el lugar 350 no
         // aparecia nunca, y la pantalla decia que no habia ninguna.
-        ...(params.low === "1" ? { quantityOnHand: { lte: prisma.part.fields.minQuantity } } : {}),
+        // Bajo minimo se decide con el criterio unico (lib/almacen-estado.ts):
+        // hace falta que haya minimo capturado. Antes era `lte` sin exigirlo,
+        // asi que una refaccion en cero y SIN minimo salia como «bajo minimo»
+        // aqui y no salia en el analisis del almacen: dos numeros para la misma
+        // pregunta. Sin minimo no se sabe, y eso se dice aparte.
+        ...(params.low === "1"
+          ? { minQuantity: { gt: 0 }, quantityOnHand: { lt: prisma.part.fields.minQuantity } }
+          : {}),
+        // Familia: es a donde lleva cada renglon de la franja de arriba. Sin
+        // esto los renglones no tenian a donde ir.
+        ...(params.categoria ? { category: params.categoria } : {}),
       },
       include: {
         supplier: { select: { name: true } },
@@ -143,8 +161,8 @@ export default async function InventoryPage({
   }
   for (const f of filas) f.enCompra = foliosPorParte.get(f.id) ?? [];
 
-  const bajoMinimoSinPedir = filas.filter((f) => f.quantityOnHand <= f.minQuantity && !f.enCompra?.length).length;
-  const lowCount = filas.filter((f) => f.quantityOnHand <= f.minQuantity).length;
+  const bajoMinimoSinPedir = filas.filter((f) => estaBajoMinimo(f) && !f.enCompra?.length).length;
+  const lowCount = filas.filter((f) => estaBajoMinimo(f)).length;
   const outOfStock = filas.filter((f) => f.quantityOnHand === 0).length;
   const inventoryValue = filas.reduce((sum, f) => sum + f.quantityOnHand * f.unitCost, 0);
 
@@ -234,6 +252,15 @@ export default async function InventoryPage({
               {a.name}
             </Link>
           ))}
+        </div>
+      ) : null}
+
+      {franja ? <FranjaAlmacen franja={franja} moneda={currency} /> : null}
+
+      {params.categoria ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-800">
+          <span>Viendo solo la familia <strong>{params.categoria}</strong>.</span>
+          <Link href="/inventory" className="font-medium underline">Ver todas</Link>
         </div>
       ) : null}
 

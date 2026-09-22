@@ -32,6 +32,7 @@ import { estadoDe, type EstadoConjunto } from "./conjuntos";
 import { OT_ACTIVAS } from "./avisos/situaciones";
 import { filtroDeVencidas } from "./vencimiento";
 import { alertaAbierta } from "./alertas";
+import { repartirEnCuadros } from "./barra";
 
 /** Un equipo dado de baja no es parte de la planta viva y no cuenta en nada. */
 const FUERA = "RETIRED";
@@ -261,40 +262,20 @@ export async function franjaDePlanta(
   };
 }
 
-/** Cuantos cuadros tiene la barra de una fila, como maximo. */
-export const SEGMENTOS = 20;
+export { SEGMENTOS } from "./barra";
 
 export type Segmento = "abajo" | "aMedias" | "reserva" | "operando";
 
 /**
  * La barra de una fila, como lista de cuadros.
  *
- * Hasta veinte equipos hay un cuadro por equipo y la barra se cuenta. Arriba
- * de eso se reparten proporcionalmente, PERO redondeando hacia arriba lo malo:
- * con doscientos equipos y uno fuera de servicio, el reparto exacto da 0.1 de
- * cuadro y el equipo parado desaparece de la barra. Un tablero que esconde el
- * unico equipo caido es peor que no tener tablero, asi que todo estado con al
- * menos un equipo se lleva al menos un cuadro, y el sobrante se le quita a lo
- * que esta operando, que es lo unico que puede perderlo sin mentir.
+ * El reparto vive en `lib/barra.ts` porque el almacen dibuja lo mismo. Ahi
+ * esta explicado por que lo malo nunca desaparece de la barra.
  */
 export function barraDe(f: Pick<FilaDePlanta, "equipos" | "abajo" | "aMedias" | "reserva" | "operando">): Segmento[] {
-  const partes: Array<[Segmento, number]> = [
-    ["abajo", f.abajo], ["aMedias", f.aMedias], ["reserva", f.reserva], ["operando", f.operando],
-  ];
-  if (f.equipos <= SEGMENTOS) {
-    return partes.flatMap(([clave, n]) => Array.from({ length: n }, () => clave));
-  }
-
-  const cuadros = partes.map(([clave, n]): [Segmento, number] => [
-    clave, n === 0 ? 0 : Math.max(1, Math.round((n / f.equipos) * SEGMENTOS)),
-  ]);
-  let sobran = cuadros.reduce((s, [, n]) => s + n, 0) - SEGMENTOS;
-  // Lo que sobra se le quita a «operando», nunca a lo que pide atencion.
-  const operando = cuadros.find(([c]) => c === "operando");
-  if (operando && sobran > 0) {
-    const quitar = Math.min(sobran, Math.max(operando[1] - 1, 0));
-    operando[1] -= quitar;
-    sobran -= quitar;
-  }
-  return cuadros.flatMap(([clave, n]) => Array.from({ length: n }, () => clave));
+  return repartirEnCuadros<Segmento>(
+    [["abajo", f.abajo], ["aMedias", f.aMedias], ["reserva", f.reserva], ["operando", f.operando]],
+    f.equipos,
+    "operando",
+  );
 }
