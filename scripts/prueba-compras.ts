@@ -92,12 +92,28 @@ async function main() {
   revisar("costo promedio ponderado tras recibir",
     (await prisma.part.findUnique({ where: { id: part.id }, select: { unitCost: true } }))!.unitCost, 245);
 
+  // Lo parcial NO avisa «ya llego»: seria mentira, todavia falta material. Lo
+  // que falta ya tiene su propio aviso, ese para compras y almacen.
+  revisar("con recepcion parcial todavia no se avisa que llego",
+    await prisma.notification.count({ where: { organizationId: org.id, tipo: "COMPRA_RECIBIDA" } }), 0);
+
   await recibir({
     organizationId: org.id, userId: firma.id, purchaseRequestId: rc.id, warehouseId: alm.id,
     remision: "R-4488",
     renglones: [{ requestLineId: linea.id, partId: part.id, cantidad: 4, costoUnitario: 260, conforme: false, observacion: "Empaque golpeado" }],
   });
   revisar("estado tras completar", (await prisma.purchaseRequest.findUnique({ where: { id: rc.id }, select: { estado: true } }))!.estado, "RECIBIDA");
+
+  // El hueco que se tapo: quien pidio se enteraba de que le autorizaron la
+  // compra y nunca de que el material ya estaba en el almacen.
+  const llego = await prisma.notification.findMany({
+    where: { organizationId: org.id, tipo: "COMPRA_RECIBIDA" },
+    select: { userId: true, title: true, kind: true },
+  });
+  revisar("al completar se avisa que ya llego", llego.length, 1);
+  revisar("le llega a quien la pidio", llego[0]?.userId, pide.id);
+  revisar("el aviso nombra el folio de la compra", llego[0]?.title.includes(rc.folio), true);
+
   revisar("el almacen quedo en 12", await saldo(), 12);
   revisar("lo no conforme se recibio y quedo senalado",
     await prisma.goodsReceiptLine.count({ where: { conforme: false } }), 1);
@@ -106,6 +122,36 @@ async function main() {
     "R-4471,R-4488");
   revisar("las entradas quedaron en el kardex",
     await prisma.stockMovement.count({ where: { organizationId: org.id, movementType: "IN" } }), 2);
+  // ── La otra mitad: la orden que estaba esperando la pieza ──────────────
+  //
+  // Quien pide la refaccion y quien tiene la orden detenida casi nunca son la
+  // misma persona. Si el aviso solo llegara al solicitante, el tecnico seguiria
+  // sin saber que ya puede trabajar.
+  console.log("\nLA ORDEN QUE ESPERABA\n");
+  const tec = await prisma.user.create({ data: { organizationId: org.id, email: `t${Date.now()}@x.com`, name: "Tecnico", passwordHash: "x", role: "TECHNICIAN" } });
+  const ot = await prisma.workOrder.create({
+    data: { organizationId: org.id, number: `OT-${Date.now()}`, title: "Cambiar balero", status: "ON_HOLD", assignedToId: tec.id },
+  });
+  const mr = await prisma.materialRequest.create({
+    data: { organizationId: org.id, folio: `RM-${Date.now()}`, warehouseId: alm.id, workOrderId: ot.id, solicitanteId: tec.id },
+  });
+  const rc2 = await crearRequisicionDeCompra({
+    organizationId: org.id, userId: pide.id, warehouseId: alm.id, urgencia: "NORMAL", materialRequestId: mr.id,
+    renglones: [{ partId: part.id, descripcion: "Balero 6205", cantidadSolicitada: 2, costoEstimado: 100 }],
+  });
+  const linea2 = (await prisma.purchaseRequestLine.findFirst({ where: { requestId: rc2.id } }))!;
+  await recibir({
+    organizationId: org.id, userId: firma.id, purchaseRequestId: rc2.id, warehouseId: alm.id,
+    renglones: [{ requestLineId: linea2.id, partId: part.id, cantidad: 2, costoUnitario: 100, conforme: true }],
+  });
+  const aviso2 = await prisma.notification.findMany({
+    where: { organizationId: org.id, tipo: "COMPRA_RECIBIDA", entidadId: rc2.id },
+    select: { userId: true, body: true },
+  });
+  revisar("tambien se entera el responsable de la orden",
+    aviso2.some((a) => a.userId === tec.id), true);
+  revisar("y el aviso le dice cual orden puede seguir",
+    aviso2.some((a) => a.body?.includes(ot.number) === true), true);
 
   await prisma.$transaction([
     prisma.stockMovement.deleteMany({ where: { organizationId: org.id } }),
@@ -114,6 +160,8 @@ async function main() {
     prisma.purchaseRequestLine.deleteMany({ where: { request: { organizationId: org.id } } }),
     prisma.purchaseRequest.deleteMany({ where: { organizationId: org.id } }),
     prisma.notification.deleteMany({ where: { organizationId: org.id } }),
+    prisma.materialRequest.deleteMany({ where: { organizationId: org.id } }),
+    prisma.workOrder.deleteMany({ where: { organizationId: org.id } }),
     prisma.partStock.deleteMany({ where: { organizationId: org.id } }),
     prisma.part.deleteMany({ where: { organizationId: org.id } }),
     prisma.warehouse.deleteMany({ where: { organizationId: org.id } }),

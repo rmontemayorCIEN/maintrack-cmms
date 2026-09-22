@@ -373,6 +373,7 @@ export async function recibir(params: {
   try {
     const recepcion = await registrarRecepcion(params, folio, utiles);
     await reconciliarRecepcion(params);
+    await avisarSiYaLlego(params);
     return recepcion;
   } catch (e) {
     /**
@@ -407,6 +408,57 @@ async function reconciliarRecepcion(params: Parameters<typeof recibir>[0]) {
     for (const o of ordenes) await reconciliar({ organizationId, entidadId: o.id, origen: "FLUJO", actorId: params.userId, evento });
   }
   await reconciliar({ organizationId, tipos: ["REFACCION_BAJO_MINIMO", "REFACCION_CRITICA_AGOTADA"], origen: "FLUJO", actorId: params.userId, evento });
+}
+
+/**
+ * «Ya llego lo que pidio».
+ *
+ * Era el hueco del flujo de compras. A quien pedia una refaccion se le avisaba
+ * que su solicitud se habia autorizado —y nada mas—. Lo unico que de verdad
+ * estaba esperando, que el material llegara, tenia que ir a buscarlo a mano; y
+ * muchas veces hay una orden detenida por esa pieza, asi que el aviso tambien
+ * va al responsable de esa orden, que casi nunca es la misma persona.
+ *
+ * Solo cuando llega COMPLETA. Lo parcial ya tiene su propio aviso, ese a
+ * compras y almacen, que son quienes tienen que hacer algo con la diferencia.
+ *
+ * Va DESPUES de la transaccion y con su propio try: un fallo al avisar no
+ * puede deshacer una entrada de almacen que ya se asento.
+ */
+async function avisarSiYaLlego(params: Parameters<typeof recibir>[0]) {
+  if (!params.purchaseRequestId) return;
+  try {
+    const req = await prisma.purchaseRequest.findFirst({
+      where: { id: params.purchaseRequestId, organizationId: params.organizationId },
+      select: { id: true, folio: true, estado: true, solicitanteId: true, materialRequestId: true },
+    });
+    if (!req || req.estado !== "RECIBIDA") return;
+
+    // La orden que espera el material, si la compra nacio de una.
+    const orden = req.materialRequestId
+      ? await prisma.materialRequest.findFirst({
+        where: { id: req.materialRequestId, organizationId: params.organizationId },
+        select: { workOrder: { select: { id: true, number: true, assignedToId: true } } },
+      })
+      : null;
+    const ot = orden?.workOrder ?? null;
+
+    await emitirAviso({
+      organizationId: params.organizationId, tipo: "COMPRA_RECIBIDA", entidad: "PurchaseRequest", entidadId: req.id,
+      version: "RECIBIDA", prioridad: "MEDIA", kind: "SUCCESS",
+      titulo: `Ya llegó lo de la compra ${req.folio}`,
+      cuerpo: ot ? `Con esto se puede seguir la orden ${ot.number}.` : undefined,
+      enlace: `/compras/${req.id}`,
+      contexto: { solicitanteId: req.solicitanteId, responsableId: ot?.assignedToId ?? null },
+      tag: req.folio,
+      datos: { folio: req.folio, estado: "RECIBIDA", ordenDeTrabajo: ot?.number ?? null },
+    });
+  } catch (e) {
+    // Que no se pueda avisar no puede tumbar la recepcion: la mercancia ya
+    // entro y el kardex ya esta escrito. Queda en el registro para que no se
+    // vuelva mudo sin que nadie lo note.
+    console.error("[compras] no se pudo avisar que llego la compra:", e instanceof Error ? e.message : e);
+  }
 }
 
 async function registrarRecepcion(

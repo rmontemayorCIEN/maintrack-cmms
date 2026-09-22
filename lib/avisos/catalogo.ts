@@ -256,6 +256,14 @@ export const EVENTOS = {
     modulo: "COMPRAS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: true,
     destinatarios: [["COMPRAS"], ["ALMACEN"]], quien: "Compras y almacén.", webhook: true,
   }),
+  COMPRA_RECIBIDA: d({
+    titulo: "Ya llegó lo que pidió", descripcion: "El material de su solicitud de compra llegó completo al almacén.",
+    modulo: "COMPRAS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: false,
+    // Los dos en el mismo eslabon: le llega a quien la pidio Y a quien tiene la
+    // orden detenida esperandola, que muchas veces no son la misma persona.
+    destinatarios: [["SOLICITANTE", "RESPONSABLE"]],
+    quien: "Quien la pidió y quien tiene la orden esperándola.", webhook: true,
+  }),
 
   // ───────────────────────────────────────────── Administración
   USUARIO_NUEVO: d({
