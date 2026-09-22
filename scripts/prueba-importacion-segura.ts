@@ -15,6 +15,7 @@ import { prisma } from "../lib/db";
 import { ErrorDeImportacion, ejecutarImportacion, validarImportacion } from "../lib/importacion-motor";
 import { diagnosticarReversion, revertirLote, ErrorDeLote } from "../lib/lotes";
 import * as N from "../lib/normalizar";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -309,7 +310,7 @@ async function main() {
   } finally {
     for (const o of [org, otra]) await prisma.organization.delete({ where: { id: o.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3202);
     }
   }
 

@@ -16,6 +16,7 @@ import { puestaEnMarcha, avancePuestaEnMarcha } from "../lib/puesta-en-marcha";
 import { catalogosPara, sembrarCatalogosEstandar } from "../lib/catalogos-estandar";
 import { hayDemo, iniciarEmpresa, quitarDemo, vistaPreviaQuitarDemo, MARCA_DEMO } from "../lib/demo";
 import { comenzarAOperar, declararModulo } from "../lib/puesta-en-marcha-acciones";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -244,7 +245,7 @@ async function main() {
   } finally {
     for (const id of orgs) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3208);
     }
   }
 

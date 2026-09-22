@@ -17,6 +17,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { SignJWT } from "jose";
+import { apagarServidor } from "./apagar-servidor";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -532,7 +533,7 @@ async function main() {
         await borrarDemo(id).catch((e) => console.error("no se borró", id, e));
       }
     }
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }
+    await apagarServidor(servidor, 3209);
   }
 
   console.log("\nAislamiento de la prueba");

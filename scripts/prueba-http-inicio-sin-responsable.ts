@@ -17,6 +17,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -153,7 +154,7 @@ async function main() {
   } finally {
     await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3197);
     }
   }
 

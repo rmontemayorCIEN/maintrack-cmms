@@ -17,6 +17,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
+import { apagarServidor } from "./apagar-servidor";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -474,7 +475,7 @@ async function main() {
     revisar("El proceso programado corre completo para la empresa sin errores", typeof corrida === "object", corrida);
   } finally {
     for (const id of [...creadas].reverse()) await prisma.organization.delete({ where: { id } }).catch((e) => console.error("no se borró", id, e));
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }
+    await apagarServidor(servidor, 3205);
   }
 
   console.log("\nAislamiento de la prueba");

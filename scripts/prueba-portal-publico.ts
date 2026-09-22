@@ -12,6 +12,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { prisma } from "../lib/db";
 import { seguroParaHoja, textoDeFuera, telefonoDeFuera, imagenDeVerdad } from "../lib/texto-publico";
 import { toCsv } from "../lib/utils";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -182,7 +183,7 @@ async function main() {
     await prisma.accessAttempt.deleteMany({ where: { email: { contains: "portal-origen:203.0.113.77" } } }).catch(() => undefined);
     await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3201);
     }
   }
 

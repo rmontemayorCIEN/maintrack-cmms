@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { aplicarMovimiento } from "../lib/almacen";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -163,7 +164,7 @@ async function main() {
     revisar("otra empresa no puede pedir contra esta orden", r.status === 404, r);
   } finally {
     for (const id of [org.id, orgB.id]) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ } }
+    await apagarServidor(servidor, 3196);
   }
 
   console.log(fallos ? `\n${fallos} revisión(es) fallaron` : "\nTodo bien");

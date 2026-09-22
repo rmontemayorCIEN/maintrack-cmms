@@ -14,6 +14,7 @@ import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { hashPassword } from "../lib/auth";
 import { FALLOS_MAXIMOS } from "../lib/acceso";
+import { apagarServidor } from "./apagar-servidor";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -231,7 +232,7 @@ async function main() {
     await prisma.accessAttempt.deleteMany({ where: { email: { contains: sello } } }).catch(() => undefined);
     await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3200);
     }
   }
 
