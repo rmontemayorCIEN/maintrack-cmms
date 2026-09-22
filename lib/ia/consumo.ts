@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { iaDeLaOrganizacion } from "../planes";
-import { FUNCIONES_IA, type ClaveFuncionIA } from "./funciones";
+import { CON_BOLSA_PROPIA, FUNCIONES_IA, type ClaveFuncionIA } from "./funciones";
 import { costoUsd, type UsoTokens } from "./precios";
 
 /**
@@ -40,10 +40,15 @@ export async function consumoIa(organizationId: string, periodo = periodoActual(
   });
 
   const porFuncion = new Map<string, { operaciones: number; costoUsd: number; llamadas: number }>();
-  let operaciones = 0, costo = 0, tokens = 0, fallidas = 0;
+  let operaciones = 0, delPlan = 0, costo = 0, tokens = 0, fallidas = 0;
 
   for (const r of registros) {
     operaciones += r.operaciones;
+    // Lo que tiene bolsa propia no gasta ademas la del plan. Antes sumaba en
+    // las dos: la ayuda no se validaba contra la bolsa del plan —eso estaba
+    // bien— pero si se la iba consumiendo, que es justo lo que su comentario
+    // dice que no debia pasar.
+    if (!CON_BOLSA_PROPIA.includes(r.funcion as ClaveFuncionIA)) delPlan += r.operaciones;
     costo += r.costoUsd;
     tokens += r.inputTokens + r.outputTokens + r.cacheReadTokens + r.cacheWriteTokens;
     if (!r.ok) fallidas += 1;
@@ -57,7 +62,10 @@ export async function consumoIa(organizationId: string, periodo = periodoActual(
 
   return {
     periodo,
+    /** Todo lo consumido, para enseñar el uso y el costo. */
     operaciones,
+    /** Lo que descuenta de la bolsa del plan: sin lo que tiene bolsa aparte. */
+    operacionesDelPlan: delPlan,
     costoUsd: costo,
     tokens,
     llamadas: registros.length,
@@ -117,8 +125,37 @@ export async function puedeUsarIa(
     return { permitido: true, restantes: quedan };
   }
 
-  const { operaciones } = await consumoIa(org.id);
-  const restantes = entitlement.operaciones - operaciones;
+  /**
+   * El parte del dia tambien tiene bolsa propia, por el mismo motivo que la
+   * ayuda y con mas razon.
+   *
+   * Se escucha a diario y se regenera cuando cambian los datos: medido en
+   * produccion, tres veces por dia de uso, unas 66 al mes. La bolsa de
+   * Professional son 20, asi que compartiendo se agotaba en una semana y el
+   * director se encontraba con «se agotaron las operaciones» en la funcion que
+   * mas se presume.
+   *
+   * Y es la funcion mas barata que hay: 0.0092 dolares por llamada, nueve
+   * veces menos que una pregunta de ayuda. Racionarla para que compita con
+   * levantamientos y procedimientos —diez veces mas caros— no tenia sentido.
+   */
+  if (funcion === "BRIEF") {
+    const usadas = await prisma.aiUsage.count({
+      where: { organizationId: org.id, funcion: "BRIEF", periodo: periodoActual(), ok: true },
+    });
+    const quedan = entitlement.operacionesBrief - usadas;
+    if (quedan <= 0) {
+      return {
+        permitido: false,
+        motivoCorto: "AGOTADO",
+        motivo: `Se agotaron los partes del dia de este mes (${entitlement.operacionesBrief}). Se renuevan el dia 1. Lo que dice el parte sigue en el inicio, escrito.`,
+      };
+    }
+    return { permitido: true, restantes: quedan };
+  }
+
+  const { operacionesDelPlan } = await consumoIa(org.id);
+  const restantes = entitlement.operaciones - operacionesDelPlan;
   if (restantes < definicion.operaciones) {
     return {
       permitido: false,

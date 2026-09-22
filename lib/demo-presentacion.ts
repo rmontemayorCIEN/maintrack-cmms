@@ -138,7 +138,7 @@ export function armarPresentacion(ligasPorHistoria: Record<string, Liga[]> = {})
       bloques: [
         { tipo: "tarjetas", columnas: 3, items: IA_EN_LA_DEMO.map((c) => ({ titulo: FUNCIONES_IA[c].nombre, texto: FUNCIONES_IA[c].descripcion })) },
         { tipo: "destacado", titulo: "La aritmética no es de la IA", texto: "Disponibilidad, cumplimiento, costos, MTBF y MTTR los calcula el sistema con lo registrado, y cada indicador muestra su fórmula. La IA lee esos números ya calculados para explicar y proponer; nunca los suma ella." },
-        { tipo: "parrafo", texto: `Se cobra en operaciones al mes, no en tokens: ${PLANES.PROFESSIONAL.nombre} incluye ${PLANES.PROFESSIONAL.ia.operaciones} y ${PLANES.ENTERPRISE.nombre} ${PLANES.ENTERPRISE.ia.operaciones}. El complemento «${COMPLEMENTO_IA.nombre}» agrega ${COMPLEMENTO_IA.operaciones} más y todas las funciones, por ${precio(COMPLEMENTO_IA.precioMensual)} al mes. La ayuda del sistema trae su propia bolsa: preguntar cómo se usa no consume las operaciones del plan.` },
+        { tipo: "parrafo", texto: `Se cobra en operaciones al mes, no en tokens: ${PLANES.PROFESSIONAL.nombre} incluye ${PLANES.PROFESSIONAL.ia.operaciones} y ${PLANES.ENTERPRISE.nombre} ${PLANES.ENTERPRISE.ia.operaciones}. El complemento «${COMPLEMENTO_IA.nombre}» agrega ${COMPLEMENTO_IA.operaciones} más y todas las funciones, por ${precio(COMPLEMENTO_IA.precioMensual)} al mes. Dos cosas tienen su propia bolsa y no gastan las operaciones del plan: preguntar cómo se usa el sistema, y el parte del día. Son de uso diario, y racionarlas seria empujar a no usarlas.` },
       ],
       ligas: [{ etiqueta: "Diagnóstico con IA", href: "/diagnostico" }, { etiqueta: "Consulta en lenguaje natural", href: "/consulta" }],
     },
@@ -152,10 +152,7 @@ export function armarPresentacion(ligasPorHistoria: Record<string, Liga[]> = {})
             {
               titulo: "El parte del día",
               texto: "En el inicio hay un botón que lo cuenta en voz alta: qué está parado, qué se venció, qué alerta hay y qué compra espera su firma. Con pausas, como lo diría el jefe de mantenimiento por teléfono.",
-              // Lo que es cierto HOY: BRIEF no esta en las funciones de ningun
-              // plan (lib/planes.ts), asi que solo se activa con el complemento.
-              // Si algun dia entra en los planes, cambiar aqui tambien.
-              pie: "Con el complemento IA Avanzada.",
+              pie: "En los dos planes.",
             },
             {
               titulo: "Prefiero preguntar y escuchar",

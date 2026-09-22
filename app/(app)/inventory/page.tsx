@@ -13,9 +13,10 @@ import { vistaGuardada } from "@/lib/vistas";
 import { MovementForm } from "./movement-form";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
 import { contiene } from "@/lib/busqueda-texto";
-import { franjaDeAlmacen } from "@/lib/almacen-vista";
+import { franjaDeAlmacen, resumenDeLaFranja } from "@/lib/almacen-vista";
 import { FranjaAlmacen } from "./franja-almacen";
 import { estaBajoMinimo } from "@/lib/almacen-estado";
+import { FranjaPlegable } from "./franja-plegable";
 
 export const metadata = { title: "Almacén" };
 export const dynamic = "force-dynamic";
@@ -255,7 +256,11 @@ export default async function InventoryPage({
         </div>
       ) : null}
 
-      {franja ? <FranjaAlmacen franja={franja} moneda={currency} /> : null}
+      {franja ? (
+        <FranjaPlegable resumen={resumenDeLaFranja(franja)}>
+          <FranjaAlmacen franja={franja} moneda={currency} />
+        </FranjaPlegable>
+      ) : null}
 
       {params.categoria ? (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-800">

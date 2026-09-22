@@ -55,6 +55,8 @@ export type DefinicionPlan = {
      * se va. Por eso hasta los planes sin IA la traen.
      */
     operacionesAyuda: number;
+    /** El parte del dia, aparte: se escucha a diario y cuesta centavos. */
+    operacionesBrief: number;
   };
 };
 
@@ -107,11 +109,12 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "API para integrar sistemas externos y sensores",
       "100 GB para fotos, videos y documentos",
       "Diagnóstico semanal con inteligencia artificial",
+      "El parte del día, para escucharlo camino a la planta",
       "El inicio y el almacén con su franja: se ve el estado antes de leerlo",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
-    ia: { operaciones: 20, funciones: ["DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 60 },
+    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 60, operacionesBrief: 90 },
   },
   ENTERPRISE: {
     nombre: "Enterprise",
@@ -127,7 +130,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200 },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200, operacionesBrief: 90 },
   },
 };
 
@@ -155,6 +158,8 @@ export function iaDeLaOrganizacion(org: { plan: string; iaComplemento: boolean; 
     operaciones: base.operaciones + (org.iaComplemento ? COMPLEMENTO_IA.operaciones : 0) + (org.iaExtra ?? 0),
     /** La bolsa de ayuda no la altera el complemento: ya viene generosa. */
     operacionesAyuda: base.operacionesAyuda,
+    /** La del parte tampoco: tres al dia es mas de lo que nadie escucha. */
+    operacionesBrief: base.operacionesBrief,
     funciones: [...funciones],
     /** Si el plan por si solo no da IA, el complemento es la unica via. */
     soloPorComplemento: base.operaciones === 0,

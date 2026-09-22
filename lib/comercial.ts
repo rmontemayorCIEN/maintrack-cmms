@@ -186,7 +186,7 @@ export function comparacion(): Fila[] {
       // que conteste es de Enterprise, porque transcribir y sintetizar se
       // cobran por caracter y hay un tope mensual por empresa.
       grupo: "Inteligencia artificial", concepto: "El parte del día, hablado",
-      celdas: ambos({ tipo: "incluido" }),
+      celdas: ambos({ tipo: "incluido", nota: "Con su propia bolsa: no gasta las operaciones del plan" }),
     },
     {
       grupo: "Inteligencia artificial", concepto: "Preguntarle hablando y que conteste",

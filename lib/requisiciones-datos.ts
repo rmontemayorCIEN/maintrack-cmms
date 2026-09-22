@@ -87,6 +87,27 @@ export function motivoDeRenglones(tipos: Array<string | null>, sinOrden?: Motivo
  * Se calcula, no se captura: un estado escrito a mano se desincroniza del
  * primer surtido parcial que alguien registre sin acordarse de moverlo.
  */
+/**
+ * Cuando una requisicion de material sigue abierta: le falta por surtir.
+ *
+ * El criterio estaba escrito a mano en la pantalla de requisiciones. En
+ * cuanto una segunda pantalla pregunta lo mismo —el Inicio del almacenista,
+ * que dice cuanto hay por surtir— la unica forma de que las dos digan igual
+ * es que las dos pregunten aqui. Es la misma leccion de `lib/alertas.ts` y
+ * `lib/almacen-estado.ts`.
+ */
+export const ESTADOS_REQUISICION_ABIERTA = ["SOLICITADA", "PARCIAL"] as const;
+
+/** El filtro de Prisma, para no repetir el arreglo en cada consulta. */
+export function requisicionAbierta() {
+  return { estado: { in: [...ESTADOS_REQUISICION_ABIERTA] } };
+}
+
+/** Si una requisicion ya leida sigue abierta. */
+export function estaPorSurtir(estado: string): boolean {
+  return (ESTADOS_REQUISICION_ABIERTA as readonly string[]).includes(estado);
+}
+
 export function estadoSegunRenglones(
   renglones: Array<{ cantidadSolicitada: number; cantidadSurtida: number }>,
 ): Estado {

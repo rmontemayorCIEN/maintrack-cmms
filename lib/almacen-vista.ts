@@ -169,6 +169,25 @@ export async function franjaDeAlmacen(organizationId: string): Promise<FranjaDeA
   };
 }
 
+/**
+ * Lo que dice la franja cuando esta plegada, en una linea.
+ *
+ * Plegar no puede volverla muda: esconder por completo que hay tres agotadas
+ * es lo contrario de para lo que existe. Se dice lo que necesita atencion, y
+ * si no hay nada, se dice eso.
+ */
+export function resumenDeLaFranja(f: FranjaDeAlmacen): string {
+  const agotadas = f.filas.reduce((s, x) => s + x.agotadas, 0);
+  const bajas = f.filas.reduce((s, x) => s + x.bajoMinimo, 0);
+  const partes = [
+    agotadas ? `${agotadas} ${agotadas === 1 ? "agotada" : "agotadas"}` : null,
+    bajas ? `${bajas} bajo mínimo` : null,
+    f.sinControl ? `${f.sinControl} sin mínimo` : null,
+  ].filter(Boolean);
+  const cabeza = `${f.refacciones} ${f.refacciones === 1 ? "refacción" : "refacciones"}`;
+  return partes.length ? `${cabeza} · ${partes.join(" · ")}` : `${cabeza} · todo en nivel`;
+}
+
 /** La barra de un renglon, un cuadro por refaccion mientras quepan. */
 export function barraDeAlmacen(f: Pick<FilaDeAlmacen, "refacciones" | "agotadas" | "bajoMinimo" | "sinControl" | "excedidas" | "sanas">): EstadoRefaccion[] {
   return repartirEnCuadros<EstadoRefaccion>(

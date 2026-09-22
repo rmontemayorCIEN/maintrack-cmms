@@ -19,6 +19,7 @@
  * inicio que manda a «Sin permiso» es peor que no tenerlo.
  */
 import { prisma } from "./db";
+import { requisicionAbierta } from "./requisiciones-datos";
 import { formatDia, formatCurrency } from "./utils";
 import { accionesRapidasDe, puedeVerRuta, TITULO_INICIO, type AccionRapida, type Rol } from "./pantallas";
 import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./avisos/situaciones";
@@ -320,6 +321,7 @@ async function inicioSupervisor(c: Ctx): Promise<Armado> {
   const manana = new Date(c.ahora.getTime() + DIA);
   const pasado = new Date(c.ahora.getTime() + 2 * DIA);
   const hace30 = new Date(c.ahora.getTime() - 30 * DIA);
+  const almacen = await porSurtirYRecibir(c);
   const [sinAsignar, cv, proximas, detenidas, revision, hoy, solicitudes, alertas, bloqueadas, tecnicos, carga, prevs] = await Promise.all([
     ordenes(c.org, { assignedToId: null }, 30),
     criticasYVencidas(c),
@@ -368,6 +370,8 @@ async function inicioSupervisor(c: Ctx): Promise<Armado> {
         fecha: `Recibida ${formatDia(s.createdAt, { zona: c.zona })}`, tono: s.riesgo === "ALTO" || s.priority === "CRITICAL" ? "critico" : "atencion",
         enlace: `/requests/${s.id}`, accion: { texto: "Clasificar", enlace: `/requests/${s.id}` },
       })), { verTodo: { texto: "Ver solicitudes", enlace: "/requests" } }),
+      bloque("por-surtir", "Material por surtir", almacen.surtir, { verTodo: { texto: "Ver requisiciones", enlace: "/requisiciones" } }),
+      bloque("por-recibir", "Compras por recibir", almacen.recibir, { verTodo: { texto: "Ver compras", enlace: "/compras" } }),
       bloque("bloqueos", "Refacciones que bloquean trabajo", bloqueadas.map<Renglon>((t) => ({
         id: t.id, folio: t.workOrder.number, titulo: t.title, detalle: t.bloqueadaPor ? `Falta ${t.bloqueadaPor.code} · ${t.bloqueadaPor.name} (hay ${t.bloqueadaPor.quantityOnHand} ${t.bloqueadaPor.unit})` : undefined,
         tono: "atencion", enlace: `/work-orders/${t.workOrder.id}`,
@@ -411,6 +415,69 @@ async function inicioTecnico(c: Ctx): Promise<Armado> {
       bloque("avisos", "Avisos de mi trabajo", avisos, { verTodo: { texto: "Ver avisos", enlace: "/notificaciones" } }),
     ],
   };
+}
+
+/**
+ * El trabajo del almacen: lo que hay que surtir y lo que hay que recibir.
+ *
+ * Esto faltaba. Quien atiende el almacen tenia su trabajo repartido en dos
+ * pantallas —las requisiciones de material por un lado, las compras por
+ * otro— y su Inicio no le decia ninguna de las dos, asi que cada mañana
+ * tenia que ir a preguntar a las dos si habia algo.
+ *
+ * No es una pantalla nueva a proposito: la lista de refacciones ya existe y
+ * duplicarla solo garantiza que los dos numeros se separen. Lo que hacia
+ * falta era que el dia se viera de un vistazo, con el boton que lleva
+ * directo a hacerlo.
+ *
+ * El criterio de «abierta» sale de `lib/requisiciones-datos.ts`, el mismo que
+ * usa la pantalla de requisiciones.
+ */
+async function porSurtirYRecibir(c: Ctx) {
+  const [requisiciones, compras] = await Promise.all([
+    prisma.materialRequest.findMany({
+      where: { organizationId: c.org, ...requisicionAbierta() },
+      select: {
+        id: true, folio: true, urgencia: true, estado: true, createdAt: true,
+        workOrder: { select: { number: true } },
+        solicitante: { select: { name: true } },
+      },
+      orderBy: [{ createdAt: "asc" }],
+      take: 50,
+    }),
+    // Lo que ya se compro y todavia no entra al almacen. Lo que aun no tiene
+    // orden de compra es trabajo del comprador, no del almacenista.
+    prisma.purchaseRequest.findMany({
+      where: { organizationId: c.org, estado: { in: ["EN_COMPRA", "RECIBIDA_PARCIAL"] } },
+      select: { id: true, folio: true, estado: true, ordenCompra: true, createdAt: true },
+      orderBy: [{ createdAt: "asc" }],
+      take: 50,
+    }),
+  ]);
+
+  const paro = requisiciones.filter((r) => r.urgencia === "PARO");
+  const surtir = requisiciones.map<Renglon>((r) => ({
+    id: r.id,
+    folio: r.folio,
+    titulo: r.workOrder?.number ? `Para la orden ${r.workOrder.number}` : "Material solicitado",
+    detalle: [r.solicitante?.name, r.estado === "PARCIAL" ? "surtida en parte" : null, r.urgencia === "PARO" ? "equipo parado" : null]
+      .filter(Boolean).join(" · ") || undefined,
+    tono: r.urgencia === "PARO" ? "critico" : "atencion",
+    enlace: `/requisiciones/${r.id}`,
+    accion: { texto: "Surtir", enlace: `/requisiciones/${r.id}` },
+  }));
+
+  const recibir = compras.map<Renglon>((x) => ({
+    id: x.id,
+    folio: x.folio,
+    titulo: x.ordenCompra ? `Orden de compra ${x.ordenCompra}` : "Compra colocada",
+    detalle: x.estado === "RECIBIDA_PARCIAL" ? "llegó una parte" : undefined,
+    tono: "normal",
+    enlace: `/compras/${x.id}`,
+    accion: { texto: "Recibir", enlace: `/compras/${x.id}` },
+  }));
+
+  return { surtir, recibir, paro: paro.length };
 }
 
 // ─────────────────────────────────────────── Compras

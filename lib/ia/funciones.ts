@@ -20,6 +20,19 @@ export type DefinicionFuncionIA = {
   disponible: boolean;
 };
 
+/**
+ * Las que tienen bolsa propia y NO gastan la del plan.
+ *
+ * Las dos son de uso cotidiano y baratas, y las dos dejarian de usarse si
+ * compitieran con el trabajo: nadie pregunta como se usa el sistema si eso le
+ * quita un levantamiento, ni escucha el parte del dia si eso le quita un
+ * diagnostico. Lo que la bolsa del plan raciona es lo caro y lo puntual.
+ *
+ * Quien agregue una funcion aqui tiene que darle su cupo en los dos planes
+ * (`lib/planes.ts`) y su caso en `puedeUsarIa`, o se quedara sin limite.
+ */
+export const CON_BOLSA_PROPIA: ClaveFuncionIA[] = ["AYUDA", "BRIEF"];
+
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
   BRIEF: {
     nombre: "Brief del día, para escuchar",
