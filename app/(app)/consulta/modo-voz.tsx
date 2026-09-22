@@ -155,19 +155,25 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
     });
   }
 
-  /** Pide una frase fija del sistema (saludo, acuse) y la suena. */
-  async function decirFrase(clave: string, pista: HTMLAudioElement) {
+  /** Trae el audio de una frase fija del sistema. Puede tardar la primera vez. */
+  async function pedirFrase(clave: string): Promise<Blob | null> {
     try {
       const r = await fetch("/api/ia/voz/frase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clave }),
       });
-      if (r.status === 204 || !r.ok) { setSinVoz(true); return false; }
-      return await reproducir(await r.blob(), pista);
+      if (r.status === 204 || !r.ok) { setSinVoz(true); return null; }
+      return await r.blob();
     } catch {
-      return false;
+      return null;
     }
+  }
+
+  /** Pide una frase fija del sistema y la suena. */
+  async function decirFrase(clave: string, pista: HTMLAudioElement) {
+    const blob = await pedirFrase(clave);
+    return blob ? reproducir(blob, pista) : false;
   }
 
   // Al entrar, saluda. Es lo que hace que esto se sienta una conversacion y
@@ -292,9 +298,30 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
     void pista.play().catch(() => undefined);
 
     setEstado("pensando");
-    // El acuse va primero y no se espera a que termine: mientras se oye, la
-    // consulta ya va corriendo.
-    const acuse = decirFrase("pensando", pista);
+
+    /**
+     * El pulso arranca YA, no despues del acuse.
+     *
+     * La primera version lo empezaba cuando el «dejeme revisar» terminaba de
+     * hablar, y se olvidaba del silencio de ANTES: entre el toque y esa frase
+     * hay que pedirla al servidor, que la primera vez la sintetiza. Rafael lo
+     * oyo: quince segundos de nada antes del primer pulso.
+     *
+     * Ahora suena desde el primer instante y se calla solo mientras alguien
+     * habla —no tendria sentido latir encima de la voz—. Asi no queda un solo
+     * hueco de silencio sin explicar.
+     */
+    empezarLatido();
+
+    const acuse = (async () => {
+      const blob = await pedirFrase("pensando");
+      if (!blob || audio.current !== pista) return false;
+      pararLatido();
+      const sono = await reproducir(blob, pista);
+      // Al terminar de hablar vuelve el pulso: la consulta sigue corriendo.
+      if (audio.current === pista) empezarLatido();
+      return sono;
+    })();
 
     try {
       const res = await fetch("/api/ia/consulta", {
@@ -304,8 +331,11 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
       });
       const data = await res.json();
       if (!res.ok) {
+        // `callar()` y no solo `pararLatido()`: soltar la pista es lo que
+        // desarma el acuse. Si se queda vivo, al terminar reanuda el pulso y
+        // lo deja latiendo para siempre con el error ya en pantalla.
+        callar();
         setError(data.error ?? "No fue posible responder");
-        setEstado("quieto");
         return;
       }
 
@@ -321,11 +351,7 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
         body: JSON.stringify({ texto: data.respuesta }),
       });
 
-      // El latido empieza cuando el acuse termina de hablar: es justo el hueco
-      // de silencio que confundia.
-      await acuse;
-      if (audio.current === pista) empezarLatido();
-
+      await acuse; // que no se encimen las dos voces
       const voz = await vozPedida;
       pararLatido();
       if (audio.current !== pista) return; // lo detuvieron mientras tanto
@@ -338,9 +364,8 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
       setEstado("quieto");
       if (!sono) setSinVoz(true);
     } catch {
-      pararLatido();
+      callar(); // misma razon: el acuse pendiente reviviria el pulso
       setError("Se perdió la conexión. Intente de nuevo.");
-      setEstado("quieto");
     }
   }
 
