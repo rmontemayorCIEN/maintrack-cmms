@@ -219,8 +219,25 @@ async function main() {
     // ═══════════════════════════════════════════ 12. Historia por condición
     console.log("\n12. Historia 3: por uso y por condición");
     const alerta = await prisma.predictiveAlert.findFirstOrThrow({ where: { ...w, status: "OPEN" }, include: { sensor: true } });
+    // Se fuerza el cruce critico a un SABADO a proposito.
+    //
+    // La orden que nace de una alerta tomaba esa fecha tal cual, asi que podia
+    // nacer venciendo en sabado: nadie la hace ese dia, el lunes ya sale en
+    // rojo, y ademas el propio sistema bloqueaba su asignacion —«el sabado 10
+    // de oct no es dia laborable»— por una fecha que habia puesto el mismo.
+    // Sin forzarlo, esto solo se caia cuando el calendario queria: la prueba
+    // pasaba entre semana y fallaba cuando la proyeccion caia en fin de semana.
+    const sabado = new Date();
+    sabado.setDate(sabado.getDate() + ((6 - sabado.getDay() + 7) % 7 || 7));
+    sabado.setHours(12, 0, 0, 0);
+    await prisma.predictiveAlert.update({ where: { id: alerta.id }, data: { fechaCruceCritico: sabado } });
+
     const conOT = await pedir("POST", `/api/alerts/${alerta.id}`, c.supervision, { action: "CREATE_WORK_ORDER" });
     const otA = await prisma.workOrder.findFirstOrThrow({ where: { id: (await prisma.predictiveAlert.findUniqueOrThrow({ where: { id: alerta.id } })).workOrderId! }, include: { tasks: true } });
+    revisar("la orden que nace de una alerta no vence en día no laborable",
+      Boolean(otA.dueDate) && ![0, 6].includes((otA.dueDate as Date).getDay()),
+      { cruce: sabado.toISOString().slice(0, 10), vence: otA.dueDate?.toISOString().slice(0, 10) });
+
     const pasos3 = [
       await pedir("PATCH", `/api/work-orders/${otA.id}`, c.supervision, { assignedToId: du.mecanico.id, base: { assignedToId: otA.assignedToId ?? "" } }),
       await pedir("POST", `/api/work-orders/${otA.id}/status`, c.mecanico, { status: "IN_PROGRESS" }),
