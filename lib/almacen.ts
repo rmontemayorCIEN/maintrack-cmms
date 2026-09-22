@@ -40,6 +40,9 @@ export type Movimiento = {
   goodsReceiptId?: string | null;
   /// A quien se le entrego fisicamente. Solo aplica en salidas y devoluciones.
   entregadoA?: string | null;
+  /// Por que entro o se ajusto, del catalogo de `lib/motivos-movimiento.ts`.
+  /// Solo lo piden las entradas y los ajustes: lo demas ya trae su documento.
+  motivo?: string | null;
   userId?: string | null;
 };
 
@@ -155,6 +158,7 @@ export async function aplicarMovimiento(m: Movimiento, tx?: Cliente): Promise<nu
       materialRequestId: m.materialRequestId ?? null,
       goodsReceiptId: m.goodsReceiptId ?? null,
       entregadoA: m.entregadoA ?? null,
+      motivo: m.motivo ?? null,
       userId: m.userId ?? null,
       movementType: m.tipo,
       quantity: cantidad,

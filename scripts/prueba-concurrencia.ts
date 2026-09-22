@@ -187,8 +187,8 @@ async function main() {
 
     // ═══════════════════════════════ 6. Dos ajustes simultáneos de inventario
     const ajustes = await aLaVez(
-      () => pedir(BASE, "POST", "/api/parts/movements", c.OWNER, { partId: parte.id, warehouseId: almacen.id, movementType: "ADJUST", quantity: 7, reference: "Conteo A" }),
-      () => pedir(BASE, "POST", "/api/parts/movements", c.ADMIN, { partId: parte.id, warehouseId: almacen.id, movementType: "ADJUST", quantity: 9, reference: "Conteo B" }),
+      () => pedir(BASE, "POST", "/api/parts/movements", c.OWNER, { partId: parte.id, warehouseId: almacen.id, movementType: "ADJUST", quantity: 7, motivo: "CONTEO_FISICO", reference: "Conteo A" }),
+      () => pedir(BASE, "POST", "/api/parts/movements", c.ADMIN, { partId: parte.id, warehouseId: almacen.id, movementType: "ADJUST", quantity: 9, motivo: "CONTEO_FISICO", reference: "Conteo B" }),
     );
     const trasAjuste = await prisma.partStock.findFirstOrThrow({ where: { partId: parte.id, warehouseId: almacen.id } });
     const kardex = await prisma.stockMovement.findMany({

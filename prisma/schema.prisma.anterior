@@ -1494,6 +1494,16 @@ model StockMovement {
   /// pasa por el material— y por eso no basta con el solicitante de la
   /// requisicion. Es texto libre porque el que recoge no siempre es usuario.
   entregadoA        String?
+  /// Por que entro o se ajusto, del catalogo de `lib/motivos-movimiento.ts`.
+  ///
+  /// Va aparte de `reference` porque con texto libre no se puede agrupar, y la
+  /// pregunta que hay que poder contestar es «cuanto material entro sin venir
+  /// de una compra, y por que». `reference` sigue guardando el detalle que
+  /// ningun catalogo captura —cual proyecto, cual obra—.
+  ///
+  /// Opcional porque los movimientos anteriores a esto no lo tienen, y porque
+  /// las salidas y los traspasos no lo piden: ya traen su documento.
+  motivo            String?
   /// IN | OUT | ADJUST | RETURN | TRANSFER_IN | TRANSFER_OUT
   ///
   /// RETURN es la devolucion de lo que el tecnico pidio y no uso. Se separa de

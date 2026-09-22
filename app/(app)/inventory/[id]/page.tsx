@@ -14,6 +14,7 @@ import { Adjuntos } from "@/components/adjuntos";
 import { PasarRegistros } from "@/components/paso-registros";
 import { PartDialog } from "../part-dialog";
 import { MovementForm } from "../movement-form";
+import { nombreDeMotivo } from "@/lib/motivos-movimiento";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function RefaccionPage({ params }: { params: Promise<{ id: 
       orderBy: { createdAt: "desc" },
       take: 25,
       select: {
-        id: true, movementType: true, quantity: true, unitCost: true, balanceAfter: true, reference: true, entregadoA: true, createdAt: true,
+        id: true, movementType: true, quantity: true, unitCost: true, balanceAfter: true, reference: true, motivo: true, entregadoA: true, createdAt: true,
         warehouse: { select: { name: true } }, user: { select: { name: true } },
         workOrder: { select: { id: true, number: true, asset: { select: { code: true, name: true } } } },
         materialRequest: { select: { id: true, folio: true } },
@@ -210,7 +211,7 @@ export default async function RefaccionPage({ params }: { params: Promise<{ id: 
                         <td>{m.movementType}{m.warehouse ? ` · ${m.warehouse.name}` : ""}</td>
                         <td className="text-right tabular-nums">{signo}{formatNumber(m.quantity, 2)}</td>
                         <td className="text-right tabular-nums">{formatNumber(m.balanceAfter, 2)}</td>
-                        <td>{doc ? <Link href={doc.href} className="text-brand-600 hover:underline">{doc.texto}</Link> : m.reference ?? "—"}</td>
+                        <td>{doc ? <Link href={doc.href} className="text-brand-600 hover:underline">{doc.texto}</Link> : ([nombreDeMotivo(m.motivo), m.reference].filter(Boolean).join(" · ") || "—")}</td>
                         <td>{quienRecibio(m) ?? m.user?.name ?? "—"}</td>
                       </tr>
                     );

@@ -92,11 +92,17 @@ const crearColumnas = (zona: string): Columna<FilaKardex>[] => [
     texto: (m) => formatCurrency(m.cantidad * m.costoUnitario, m.moneda),
   },
   {
+    // Sin documento cae al motivo, que responde la misma pregunta: de donde
+    // vino ese movimiento. Antes quedaba un guion, y esta columna es la que
+    // todos miran —«Referencia» no viene de fabrica—, asi que el motivo no se
+    // veia por ningun lado.
     id: "documento", etiqueta: "Documento",
-    texto: (m) => m.documento?.texto ?? "—",
+    texto: (m) => m.documento?.texto ?? m.referencia ?? "—",
     pinta: (m) => m.documento
       ? <Link href={m.documento.href} className="text-brand-600 hover:underline">{m.documento.texto}</Link>
-      : <span className="text-slate-300">—</span>,
+      : m.referencia
+        ? <span className="text-slate-600">{m.referencia}</span>
+        : <span className="text-slate-300">—</span>,
   },
   { id: "referencia", etiqueta: "Referencia", texto: (m) => guion(m.referencia) },
   { id: "entregadoA", etiqueta: "Recibió", agrupable: true, texto: (m) => guion(m.entregadoA) },

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "@/lib/almacen";
+import { motivoValido, motivosDe, nombreDeMotivo, pideNota, TIPOS_CON_MOTIVO } from "@/lib/motivos-movimiento";
 
 const schema = z.object({
   partId: z.string(),
@@ -9,6 +10,7 @@ const schema = z.object({
   quantity: z.coerce.number(),
   unitCost: z.coerce.number().min(0).optional(),
   reference: z.string().optional(),
+  motivo: z.string().optional().nullable(),
 });
 
 /** Lo minimo para que un motivo sirva de algo dentro de seis meses. */
@@ -49,11 +51,22 @@ export async function POST(request: Request) {
 
     // El motivo se exige aqui, no solo en la pantalla: por la ruta entran
     // tambien la API publica y las integraciones.
-    if (input.movementType === "IN" && (input.reference ?? "").trim().length < MOTIVO_MINIMO) {
-      return fail(
-        "Diga de dónde viene la entrada. Si el material llegó de una compra, recíbalo en la compra para que quede ligado a ella; si no, escriba el motivo.",
-        422,
-      );
+    const nota = (input.reference ?? "").trim();
+    if (TIPOS_CON_MOTIVO.includes(input.movementType)) {
+      if (!motivoValido(input.movementType, input.motivo)) {
+        const cuales = motivosDe(input.movementType).map((m) => m.nombre).join(", ");
+        return fail(
+          input.movementType === "IN"
+            ? `Diga de dónde viene la entrada. Si el material llegó de una compra, recíbalo en la compra para que quede ligado a ella; si no, elija el motivo: ${cuales}.`
+            : `Diga por qué se ajusta: ${cuales}.`,
+          422,
+        );
+      }
+      // Hay motivos que no se explican solos: «otro», una compra sin orden, un
+      // prestamo de otra planta, algo que se perdio. En esos la nota es el dato.
+      if (pideNota(input.motivo) && nota.length < MOTIVO_MINIMO) {
+        return fail(`Con «${nombreDeMotivo(input.motivo)}» hace falta explicar brevemente qué pasó.`, 422);
+      }
     }
 
     const warehouseId = input.warehouseId || (await almacenPorOmision(orgId))?.id;
@@ -68,6 +81,7 @@ export async function POST(request: Request) {
         cantidad: input.quantity,
         costoUnitario: input.unitCost,
         referencia: input.reference,
+        motivo: input.motivo ?? null,
         userId: user.id,
       });
       return ok({ balance }, 201);

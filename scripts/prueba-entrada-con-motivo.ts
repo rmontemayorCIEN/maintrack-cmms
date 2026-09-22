@@ -85,36 +85,70 @@ async function main() {
     const sinMotivo = await mover({ movementType: "IN", quantity: 3 });
     revisar("una entrada sin motivo se rechaza", sinMotivo.status === 422, { status: sinMotivo.status });
     revisar("y el mensaje dice qué hacer, no solo que está mal",
-      String(sinMotivo.json.error ?? "").includes("recíbalo en la compra"), sinMotivo.json.error);
+      String(sinMotivo.json.error ?? "").includes("recíbalo en la compra"), String(sinMotivo.json.error).slice(0, 90));
 
-    const vacio = await mover({ movementType: "IN", quantity: 3, reference: "   " });
-    revisar("un motivo en blanco tampoco cuenta", vacio.status === 422, { status: vacio.status });
-    const corto = await mover({ movementType: "IN", quantity: 3, reference: "x" });
-    revisar("ni una letra suelta, que dentro de seis meses no dice nada", corto.status === 422, { status: corto.status });
+    // Texto libre SIN motivo del catalogo ya no basta: con texto suelto no se
+    // puede agrupar, que es justo lo que el catalogo vino a resolver.
+    const soloTexto = await mover({ movementType: "IN", quantity: 3, reference: "Sobrante de obra" });
+    revisar("un texto suelto, sin motivo del catálogo, no basta", soloTexto.status === 422, { status: soloTexto.status });
 
-    const conMotivo = await mover({ movementType: "IN", quantity: 3, reference: "Sobrante del proyecto de la línea 2" });
-    revisar("con motivo entra", conMotivo.status === 201, { status: conMotivo.status, saldo: conMotivo.json.balance });
+    const inventado = await mover({ movementType: "IN", quantity: 3, motivo: "PORQUE_SI" });
+    revisar("un motivo que no existe se rechaza", inventado.status === 422, { status: inventado.status });
+
+    // Cada motivo sirve para SU tipo: uno de ajuste no vale para una entrada.
+    const cruzado = await mover({ movementType: "IN", quantity: 3, motivo: "MERMA" });
+    revisar("un motivo de ajuste no sirve para una entrada", cruzado.status === 422, { status: cruzado.status });
+
+    const conMotivo = await mover({ movementType: "IN", quantity: 3, motivo: "DEVOLUCION_OBRA", reference: "Sobrante del proyecto de la línea 2" });
+    revisar("con motivo del catálogo entra", conMotivo.status === 201, { status: conMotivo.status, saldo: conMotivo.json.balance });
+
+    console.log("\nHay motivos que no se explican solos\n");
+    const sinExplicar = await mover({ movementType: "IN", quantity: 1, motivo: "OTRO_ENTRADA" });
+    revisar("«Otro» sin explicación se rechaza", sinExplicar.status === 422, { status: sinExplicar.status });
+    revisar("y lo dice nombrando el motivo elegido",
+      String(sinExplicar.json.error ?? "").includes("Otro"), String(sinExplicar.json.error).slice(0, 80));
+    const explicado = await mover({ movementType: "IN", quantity: 1, motivo: "OTRO_ENTRADA", reference: "Donación de un proveedor" });
+    revisar("«Otro» explicado sí entra", explicado.status === 201, { status: explicado.status });
+    const claro = await mover({ movementType: "IN", quantity: 1, motivo: "GARANTIA" });
+    revisar("y un motivo que se explica solo no pide nota", claro.status === 201, { status: claro.status });
+
+    console.log("\nEl ajuste también dice por qué\n");
+    const ajusteSinMotivo = await mover({ movementType: "ADJUST", quantity: 7 });
+    revisar("un ajuste sin motivo se rechaza", ajusteSinMotivo.status === 422, { status: ajusteSinMotivo.status });
+    const ajusteMerma = await mover({ movementType: "ADJUST", quantity: 7, motivo: "MERMA" });
+    revisar("con motivo se ajusta", ajusteMerma.status === 201, { status: ajusteMerma.status });
+    const ajusteCruzado = await mover({ movementType: "ADJUST", quantity: 7, motivo: "GARANTIA" });
+    revisar("un motivo de entrada no sirve para un ajuste", ajusteCruzado.status === 422, { status: ajusteCruzado.status });
 
     console.log("\nLo que ya estaba bien no se estorba\n");
     const salida = await mover({ movementType: "OUT", quantity: 1 });
     revisar("una salida sigue de un toque, sin motivo", salida.status === 201, { status: salida.status });
-    const ajuste = await mover({ movementType: "ADJUST", quantity: 5 });
-    revisar("un ajuste también", ajuste.status === 201, { status: ajuste.status });
     const devolucion = await mover({ movementType: "RETURN", quantity: 1 });
     revisar("y una devolución también", devolucion.status === 201, { status: devolucion.status });
 
     console.log("\nLo que queda escrito en el kardex\n");
     const movs = await prisma.stockMovement.findMany({
       where: { organizationId: org.id },
-      select: { movementType: true, reference: true, quantity: true },
+      select: { movementType: true, reference: true, motivo: true, quantity: true },
       orderBy: { createdAt: "asc" },
     });
     const entrada = movs.find((m) => m.movementType === "IN");
-    revisar("la entrada guarda el motivo tal cual se escribió",
+    revisar("la entrada guarda el motivo del catálogo, para poder agruparlo",
+      entrada?.motivo === "DEVOLUCION_OBRA", entrada?.motivo);
+    revisar("y la nota con el detalle que el catálogo no captura",
       entrada?.reference === "Sobrante del proyecto de la línea 2", entrada?.reference);
-    revisar("no se coló ninguna entrada sin motivo",
-      movs.filter((m) => m.movementType === "IN").every((m) => (m.reference ?? "").trim().length >= 4),
-      movs.filter((m) => m.movementType === "IN").map((m) => m.reference));
+    revisar("no se coló ninguna entrada ni ajuste sin motivo",
+      movs.filter((m) => ["IN", "ADJUST"].includes(m.movementType)).every((m) => !!m.motivo),
+      movs.filter((m) => ["IN", "ADJUST"].includes(m.movementType)).map((m) => m.motivo));
+
+    // Lo que el catalogo hace posible y el texto libre no: agrupar.
+    const porMotivo = await prisma.stockMovement.groupBy({
+      by: ["motivo"],
+      where: { organizationId: org.id, motivo: { not: null } },
+      _count: { id: true },
+    });
+    revisar("se puede preguntar cuánto entró por cada motivo",
+      porMotivo.length >= 3, porMotivo.map((x) => `${x.motivo}×${x._count.id}`).join(" "));
 
     console.log("\nLo que NO debe pasar\n");
     revisar("la regla vive en la ruta, no solo en la pantalla: por aquí entra también la API",
@@ -127,7 +161,7 @@ async function main() {
     const cruzada = await fetch(`${base}/api/parts/movements`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: `mt_session=${jwt}` },
-      body: JSON.stringify({ partId: ajena.id, warehouseId: alm.id, movementType: "IN", quantity: 1, reference: "Con motivo y todo" }),
+      body: JSON.stringify({ partId: ajena.id, warehouseId: alm.id, movementType: "IN", quantity: 1, motivo: "GARANTIA" }),
     });
     // 4xx, NO 5xx: un 500 tambien "falla", pero es una excepcion sin atender
     // que no le dice nada a quien la recibe. Aceptar cualquier >= 400 se

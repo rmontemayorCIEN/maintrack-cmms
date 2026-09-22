@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { motivosDe, pideNota } from "@/lib/motivos-movimiento";
 
 type Compra = { id: string; folio: string };
 
@@ -30,14 +31,20 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
   const [error, setError] = useState<string | null>(null);
   const [preguntando, setPreguntando] = useState(false);
   const [motivo, setMotivo] = useState("");
+  const [nota, setNota] = useState("");
 
-  async function aplicar(referencia: string) {
+  const opciones = motivosDe(type);
+  const elegido = opciones.find((o) => o.clave === motivo) ?? null;
+  // Con «otro», una compra sin orden o algo que se perdio, la nota ES el dato.
+  const faltaNota = pideNota(motivo) && nota.trim().length < 4;
+
+  async function aplicar(referencia: string, clave?: string) {
     setLoading(true);
     setError(null);
     const res = await fetch("/api/parts/movements", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ partId, warehouseId: warehouseId ?? null, movementType: type, quantity: Number(quantity), reference: referencia }),
+      body: JSON.stringify({ partId, warehouseId: warehouseId ?? null, movementType: type, quantity: Number(quantity), reference: referencia, motivo: clave ?? null }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -47,6 +54,7 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
     }
     setQuantity("");
     setMotivo("");
+    setNota("");
     setPreguntando(false);
     router.refresh();
   }
@@ -54,9 +62,10 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!quantity) return;
-    // La entrada se detiene aqui y pregunta; lo demas sigue de un toque.
-    if (type === "IN") { setError(null); setPreguntando(true); return; }
-    await aplicar(type === "ADJUST" ? "Ajuste manual" : "Salida manual");
+    // Entrada y ajuste se detienen aqui y preguntan por que; la salida sigue
+    // de un toque, que ya lleva su documento.
+    if (type === "IN" || type === "ADJUST") { setError(null); setMotivo(""); setNota(""); setPreguntando(true); return; }
+    await aplicar("Salida manual");
   }
 
   /*
@@ -80,17 +89,21 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="De dónde viene la entrada"
+        aria-label={type === "IN" ? "De dónde viene la entrada" : "Por qué se ajusta"}
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 text-left"
         onClick={(e) => { if (e.target === e.currentTarget) setPreguntando(false); }}
       >
         <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
-          <p className="text-sm font-semibold text-slate-900">¿De dónde viene esta entrada?</p>
+          <p className="text-sm font-semibold text-slate-900">
+            {type === "IN" ? "¿De dónde viene esta entrada?" : "¿Por qué se ajusta?"}
+          </p>
           <p className="mt-1 text-xs text-slate-500">
-            Entran {quantity} {unit}. Lo que llegó de una compra se recibe en la compra, para que quede ligado a ella.
+            {type === "IN"
+              ? <>Entran {quantity} {unit}. Lo que llegó de una compra se recibe en la compra, para que quede ligado a ella.</>
+              : <>El saldo queda en {quantity} {unit}. Separar el motivo permite saber después cuánto se fue en mermas y cuánto era un error de captura.</>}
           </p>
 
-          {compras.length ? (
+          {type === "IN" && compras.length ? (
             <div className="mt-3">
               <p className="text-xs font-medium text-slate-700">Compras en camino con esta refacción</p>
               <div className="mt-1.5 grid gap-1.5">
@@ -110,17 +123,38 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
 
           <div className="mt-3">
             <label htmlFor={`motivo-${partId}`} className="text-xs font-medium text-slate-700">
-              {compras.length ? "O si no viene de una compra, diga por qué entra" : "Diga por qué entra"}
+              {type === "IN" && compras.length ? "O si no viene de una compra, elija el motivo" : "Motivo"}
             </label>
-            <input
+            {/* Lista cerrada para poder agrupar despues, y nota para lo que la
+                lista no captura. Es el mismo par que el codigo de falla y la
+                resolucion al cerrar una orden. */}
+            <select
               id={`motivo-${partId}`}
               className="field mt-1"
-              placeholder="Devolución de obra, sobrante de proyecto, donación…"
               value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              maxLength={120}
+              onChange={(e) => { setMotivo(e.target.value); setError(null); }}
               autoFocus
-            />
+            >
+              <option value="">Elija el motivo…</option>
+              {opciones.map((o) => <option key={o.clave} value={o.clave}>{o.nombre}</option>)}
+            </select>
+            {elegido ? <p className="mt-1 text-[0.6875rem] text-slate-500">{elegido.ayuda}</p> : null}
+
+            {motivo ? (
+              <div className="mt-2">
+                <label htmlFor={`nota-${partId}`} className="text-xs font-medium text-slate-700">
+                  {pideNota(motivo) ? "Explique brevemente qué pasó" : "Detalle (opcional)"}
+                </label>
+                <input
+                  id={`nota-${partId}`}
+                  className="field mt-1"
+                  placeholder="Sobrante del proyecto de la línea 2…"
+                  value={nota}
+                  onChange={(e) => setNota(e.target.value)}
+                  maxLength={120}
+                />
+              </div>
+            ) : null}
           </div>
 
           {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
@@ -135,12 +169,12 @@ export function MovementForm({ partId, unit, warehouseId, compras = [] }: { part
             </button>
             <button
               type="button"
-              disabled={loading || motivo.trim().length < 4}
-              onClick={() => aplicar(motivo.trim())}
+              disabled={loading || !motivo || faltaNota}
+              onClick={() => aplicar(nota.trim() || (elegido?.nombre ?? ""), motivo)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Registrar la entrada
+              {type === "IN" ? "Registrar la entrada" : "Registrar el ajuste"}
             </button>
           </div>
         </div>
