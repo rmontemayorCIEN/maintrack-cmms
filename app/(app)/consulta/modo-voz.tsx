@@ -43,6 +43,18 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
   const grabadora = useRef<MediaRecorder | null>(null);
   const trozos = useRef<Blob[]>([]);
   const latido = useRef<{ parar: () => void } | null>(null);
+  /** El contexto de audio, abierto DENTRO del toque para que iOS lo permita. */
+  const contexto = useRef<AudioContext | null>(null);
+  /**
+   * El microfono queda reservado mientras se esta en el modo voz.
+   *
+   * Antes se soltaba al terminar cada grabacion, y varios navegadores vuelven
+   * a preguntar «¿permite usar el microfono?» la siguiente vez: preguntar en
+   * cada pregunta es insoportable. Se reserva una vez, se reusa, y se suelta
+   * al salir del modo voz —no se queda escuchando cuando uno ya se fue, que
+   * seria peor que preguntar de mas—.
+   */
+  const microfono = useRef<MediaStream | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
 
   /**
@@ -57,11 +69,36 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
    * Va muy bajo y con entrada y salida suaves; un pitido seco, oido en el
    * coche, seria insoportable.
    */
-  function empezarLatido() {
+  /**
+   * Se abre el audio del navegador en el MISMO toque, aunque todavia no haya
+   * nada que sonar.
+   *
+   * iOS arranca el contexto «suspendido» y solo deja reanudarlo dentro de un
+   * gesto de la persona. El latido empieza diez segundos despues —cuando el
+   * acuse termina de hablar— y para entonces ya no hay permiso: el contexto
+   * se queda suspendido y no se oye nada, sin un solo error. Por eso se abre
+   * aqui y luego solo se le programan pulsos.
+   */
+  function prepararAudio() {
     try {
+      if (contexto.current && contexto.current.state !== "closed") {
+        void contexto.current.resume().catch(() => undefined);
+        return;
+      }
       const Contexto = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Contexto) return;
       const ctx = new Contexto();
+      void ctx.resume().catch(() => undefined);
+      contexto.current = ctx;
+    } catch {
+      // Sin audio del navegador simplemente no hay latido.
+    }
+  }
+
+  function empezarLatido() {
+    try {
+      const ctx = contexto.current;
+      if (!ctx || ctx.state === "closed") return;
       void ctx.resume().catch(() => undefined);
       let vivo = true;
 
@@ -74,8 +111,9 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
         osc.frequency.value = 320;
         const t = ctx.currentTime;
         vol.gain.setValueAtTime(0, t);
-        vol.gain.linearRampToValueAtTime(0.035, t + 0.06);
-        vol.gain.linearRampToValueAtTime(0, t + 0.3);
+        // Se oye, pero no manda. Tan bajo que no se notaba no servia de nada.
+        vol.gain.linearRampToValueAtTime(0.12, t + 0.05);
+        vol.gain.linearRampToValueAtTime(0, t + 0.35);
         osc.connect(vol).connect(ctx.destination);
         osc.start(t);
         osc.stop(t + 0.32);
@@ -83,9 +121,9 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
       pulso();
       const reloj = setInterval(pulso, 1500);
-      latido.current = {
-        parar: () => { vivo = false; clearInterval(reloj); void ctx.close().catch(() => undefined); latido.current = null; },
-      };
+      // El contexto NO se cierra al parar: cerrarlo obliga a pedir permiso
+      // otra vez, y la siguiente pregunta se quedaria sin latido.
+      latido.current = { parar: () => { vivo = false; clearInterval(reloj); latido.current = null; } };
     } catch {
       // Sin audio del navegador, simplemente no hay latido. No es un fallo.
     }
@@ -141,7 +179,17 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
     audio.current = pista;
     setEstado("saludando");
     void decirFrase("saludo", pista).finally(() => setEstado("quieto"));
-    return () => { pista.pause(); };
+    return () => {
+      pista.pause();
+      latido.current?.parar();
+      void contexto.current?.close().catch(() => undefined);
+      contexto.current = null;
+      // Al salir del modo voz se suelta el microfono. Dejarlo tomado seria
+      // dejar el indicador de grabacion encendido en el telefono, y eso
+      // asusta con razon.
+      microfono.current?.getTracks().forEach((t) => t.stop());
+      microfono.current = null;
+    };
   }, []);
 
   function callar() {
@@ -164,16 +212,22 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
   async function grabar() {
     if (estado === "grabando") { detenerGrabacion(); return; }
     callar();
+    prepararAudio(); // tocar el microfono tambien abre el audio
     setError(null);
     try {
-      const flujo = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Se pide UNA vez por sesion del modo voz; despues se reusa el mismo.
+      if (!microfono.current || !microfono.current.active) {
+        microfono.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      const flujo = microfono.current;
       const rec = new MediaRecorder(flujo);
       trozos.current = [];
       grabadora.current = rec;
 
       rec.ondataavailable = (e) => { if (e.data.size) trozos.current.push(e.data); };
       rec.onstop = async () => {
-        flujo.getTracks().forEach((t) => t.stop());
+        // El flujo NO se cierra aqui: cerrarlo obliga a volver a pedir
+        // permiso en la siguiente pregunta.
         const audioGrabado = new Blob(trozos.current, { type: rec.mimeType });
         trozos.current = [];
         if (!audioGrabado.size) { setEstado("quieto"); return; }
@@ -232,6 +286,7 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
      * despues, no sonaria nada y habria que darle dos veces.
      */
     callar();
+    prepararAudio(); // el permiso se toma aqui, dentro del gesto
     const pista = new Audio();
     audio.current = pista;
     void pista.play().catch(() => undefined);

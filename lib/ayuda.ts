@@ -1247,6 +1247,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El modo hablado es otra forma de usar lo mismo, no otra cosa: escribiendo se relee y se compara; hablando se va en el camino. Por eso se entra a propósito, con «Prefiero preguntar y escuchar», y se sale con «Volver al modo escrito».",
       "Mientras revisa sus datos dice «déjeme revisar» en vez de quedarse callado: entre la pregunta y la respuesta pasan segundos, y un silencio largo se siente como que se descompuso.",
       "La pregunta se graba y se entiende en el servidor, no en el teléfono: el reconocimiento de voz del navegador no existe en el iPhone, que es justo donde esto sirve. La grabación se corta sola a los 30 segundos.",
+      "El permiso del micrófono se pide una sola vez por visita, no en cada pregunta. Si el teléfono lo vuelve a pedir cada vez que entra, es Safari: instale MainTrack en la pantalla de inicio —Compartir → Agregar a inicio— y el permiso se queda guardado, además de que abre sin barra del navegador.",
+      "Al salir del modo hablado se suelta el micrófono, para que no quede el indicador de grabación encendido en el teléfono.",
       "Si no se entiende lo que dijo —ruido de planta, el teléfono lejos— lo dice y se puede repetir o escribir. No contesta una pregunta que usted no hizo.",
       "Mientras revisa los datos se oye un pulso suave. Está a propósito: un silencio en medio de una conversación se siente como que se cortó la llamada. Se calla solo en cuanto empieza a contestar.",
       "El modo hablado NO modifica nada, a propósito: se piensa para usarse en el camino, y dictar el cierre de una orden manejando es capturar mal un dato que después nadie puede explicar.",
