@@ -103,6 +103,7 @@ export function VozNavegar() {
           className="fixed right-3 top-14 z-30 max-w-[calc(100vw-1.5rem)] rounded-md bg-slate-900 px-2 py-1 text-[0.625rem] text-white shadow-lg sm:absolute sm:right-0 sm:top-full sm:mt-1 sm:max-w-none sm:whitespace-nowrap"
         >
           Escuchando… diga a dónde ir{g.restantes <= 10 ? ` · ${g.restantes} s` : ""}
+          {g.cortaSolo ? <span className="ml-1 opacity-70">(se corta solo)</span> : null}
         </span>
       ) : null}
 

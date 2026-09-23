@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MAXIMO_SEGUNDOS_DICTADO } from "@/lib/dictado";
+import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS } from "@/lib/deteccion-voz";
 
 /**
  * Grabar con el microfono: la mecanica, sin la pantalla.
@@ -31,7 +32,25 @@ import { MAXIMO_SEGUNDOS_DICTADO } from "@/lib/dictado";
 
 export type EstadoGrabacion = "quieto" | "grabando" | "trabajando";
 
-export function usarGrabadora({ alTerminar }: { alTerminar: (audio: Blob) => Promise<void> }) {
+/** Cada cuanto se mide el nivel del microfono. */
+const MUESTRA_MS = 100;
+
+export function usarGrabadora({
+  alTerminar,
+  silencioMs = SILENCIO_COMANDO_MS,
+  cortarSolo = true,
+}: {
+  alTerminar: (audio: Blob) => Promise<void>;
+  /**
+   * Cuanto silencio se espera antes de cortar solo.
+   *
+   * Distinto segun lo que se haga: un comando es corto y urgente, un cierre de
+   * orden se dicta a pausas. Ver `lib/deteccion-voz.ts`.
+   */
+  silencioMs?: number;
+  /** En falso, solo corta quien toque el boton. */
+  cortarSolo?: boolean;
+}) {
   const [estado, setEstado] = useState<EstadoGrabacion>("quieto");
   const [segundos, setSegundos] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +68,8 @@ export function usarGrabadora({ alTerminar }: { alTerminar: (audio: Blob) => Pro
   const trozos = useRef<Blob[]>([]);
   const corte = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloj = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Lo que escucha el nivel del microfono para saber cuando se dejo de hablar. */
+  const escucha = useRef<{ ctx: AudioContext; medidor: ReturnType<typeof setInterval> } | null>(null);
   /** Para no tocar el estado de algo que ya se fue de la pantalla. */
   const vivo = useRef(true);
 
@@ -66,12 +87,62 @@ export function usarGrabadora({ alTerminar }: { alTerminar: (audio: Blob) => Pro
       try {
         if (grabadora.current?.state === "recording") grabadora.current.stop();
       } catch { /* ya se habia detenido */ }
+      cerrarEscucha();
       microfono.current?.getTracks().forEach((t) => t.stop());
       microfono.current = null;
     };
   }, []);
 
+  /**
+   * Suelta lo que mide el nivel.
+   *
+   * El contexto de audio se cierra SIEMPRE, aunque la grabacion haya acabado
+   * por el camino que sea: dejarlo abierto mantiene el microfono tomado y el
+   * punto rojo del telefono encendido despues de terminar.
+   */
+  function cerrarEscucha() {
+    if (!escucha.current) return;
+    clearInterval(escucha.current.medidor);
+    void escucha.current.ctx.close().catch(() => undefined);
+    escucha.current = null;
+  }
+
+  /**
+   * Escucha el nivel y corta cuando la persona termino de hablar.
+   *
+   * Si el navegador no tiene audio, simplemente no se corta solo y queda el
+   * boton: es una comodidad, no un requisito.
+   */
+  function escucharParaCortar(flujo: MediaStream) {
+    if (!cortarSolo) return;
+    try {
+      const Contexto = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Contexto) return;
+      const ctx = new Contexto();
+      const fuente = ctx.createMediaStreamSource(flujo);
+      const analizador = ctx.createAnalyser();
+      analizador.fftSize = 512;
+      fuente.connect(analizador);
+      const datos = new Float32Array(analizador.fftSize);
+      const detector = crearDetectorDeSilencio({ silencioMs, muestraMs: MUESTRA_MS });
+
+      const medidor = setInterval(() => {
+        analizador.getFloatTimeDomainData(datos);
+        // Valor eficaz: el volumen de verdad, no el pico. Un golpe seco no
+        // cuenta como voz y una voz sostenida no se pierde entre picos.
+        let suma = 0;
+        for (const v of datos) suma += v * v;
+        if (detector.alNivel(Math.sqrt(suma / datos.length)) === "cortar") detener();
+      }, MUESTRA_MS);
+
+      escucha.current = { ctx, medidor };
+    } catch {
+      // Sin medicion se sigue pudiendo grabar; solo hay que tocar el botón.
+    }
+  }
+
   function detener() {
+    cerrarEscucha();
     if (corte.current) { clearTimeout(corte.current); corte.current = null; }
     if (reloj.current) { clearInterval(reloj.current); reloj.current = null; }
     const rec = grabadora.current;
@@ -110,6 +181,7 @@ export function usarGrabadora({ alTerminar }: { alTerminar: (audio: Blob) => Pro
       };
 
       rec.start();
+      escucharParaCortar(microfono.current);
       setSegundos(0);
       setEstado("grabando");
       reloj.current = setInterval(() => setSegundos((s) => s + 1), 1000);
@@ -131,6 +203,8 @@ export function usarGrabadora({ alTerminar }: { alTerminar: (audio: Blob) => Pro
     puedeGrabar,
     alternar,
     detener,
+    /** Si esta corta sola o hay que tocar el boton. Para decirlo en pantalla. */
+    cortaSolo: cortarSolo,
     /** Para que quien lo use no toque el estado despues de desmontarse. */
     sigueVivo: () => vivo.current,
   };

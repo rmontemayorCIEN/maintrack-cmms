@@ -242,9 +242,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "También se puede decir a dónde ir, sin escribir: el micrófono de la barra de arriba lleva a donde usted pida —«llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3»—. Lo que se dice se interpreta con reglas, así que es inmediato; si no lo entiende, le enseña lo que oyó y ejemplos de lo que sí puede decir. Nunca lleva a una pantalla que su perfil no puede abrir.",
     ],
     botones: [
-      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Diga a dónde quiere ir y lo lleva. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
+      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Diga a dónde quiere ir y lo lleva. Se corta solo cuando usted termina de hablar; no hace falta volver a tocarlo. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
     ],
     noPuedo: [
+      { sintoma: "Se cortó antes de que yo terminara", porque: "Hizo una pausa larga y lo tomó por el final. Vuelva a tocar el micrófono: en el dictado, lo nuevo se agrega a lo anterior y no se pierde nada." },
       { sintoma: "No veo el micrófono en la barra de arriba", porque: "El navegador no puede grabar, o el plan no incluye los comandos de voz. La búsqueda y el menú hacen lo mismo escribiendo." },
       { sintoma: "Dije una pantalla y me contesta que no está disponible para mi perfil", porque: "Es correcto: la voz no abre nada que su rol no pueda ver. Es la misma regla del menú." },
       { sintoma: "Me llevó a la búsqueda en vez de al equipo que dije", porque: "Lo que dijo coincide con más de un registro. Preferimos que usted elija a llevarlo al equivocado sin que se note." },
@@ -278,7 +279,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     botones: [
       { nombre: "Empezar recorrido", explica: "Abre un recorrido nuevo. Si ya tenía uno a medias, lo continúa en vez de abrir otro." },
-      { nombre: "Dictar", explica: "Graba lo que usted dice y lo escribe en la observación de la parada. Pensado para el piso, con las manos ocupadas." },
+      { nombre: "Dictar", explica: "Graba lo que usted dice y lo escribe en la observación de la parada. Se corta solo al terminar de hablar, y aguanta las pausas de quien se acuerda de algo a media frase. Pensado para el piso, con las manos ocupadas." },
       { nombre: "Escanear punto", explica: "Lee el código QR del punto de reporte. Es la forma más confiable de saber dónde está: no se equivoca nunca." },
       { nombre: "Anotar parada", explica: "Guarda lo que vio. Si hace falta saber de qué equipo era, se le pregunta enseguida." },
       { nombre: "Tomar foto / Elegir archivo", explica: "Agrega fotos a la parada. Se ven antes de subirlas y se puede quitar la que salió mal. Se suben al anotar la parada." },
@@ -612,7 +613,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Generar requisición (en preventivas)", explica: "Arma la requisición sola con las refacciones que el plan pide y que todavía no se han pedido ni consumido. Solo hay que revisar, ajustar y enviar." },
       { nombre: "Pedir otra cosa", explica: "Requisición manual desde la misma orden, para lo que el técnico descubre que hace falta y no estaba en el plan." },
       { nombre: "Generar procedimiento (en correctivas)", explica: "Propone cómo asegurar el equipo, los pasos en orden, qué medir y contra qué, y qué refacciones del catálogo llevar. Al aplicarlo, los pasos se vuelven actividades que el técnico va palomeando." },
-      { nombre: "Dictar (al completar la orden)", explica: "Graba lo que usted dice y lo escribe en «Solución aplicada». Hasta un minuto por vez, y se puede dictar varias veces: cada una se agrega a lo anterior. Revise el texto antes de completar." },
+      { nombre: "Dictar (al completar la orden)", explica: "Graba lo que usted dice y lo escribe en «Solución aplicada». Se corta solo cuando usted termina, aguantando las pausas de quien piensa a media frase. Hasta un minuto por vez, y se puede dictar varias veces: cada una se agrega a lo anterior. Revise el texto antes de completar." },
       { nombre: "Codificar con IA (al completar la orden)", explica: "Lee lo que usted escribió o dictó y propone código de falla, causa raíz y las refacciones que sugiere cargar. Usted acepta o corrige; no se guarda nada por su cuenta." },
       { nombre: "Exportar CSV", explica: "Baja lo que esta viendo, con los filtros aplicados, para llevarlo a una hoja de cálculo." },
       { nombre: "Los cuatro desplegables de arriba", explica: "Filtran contra la base de datos, no solo lo que ve. Sirven para acotar antes de trabajar." },

@@ -3,6 +3,7 @@
 import { Loader2, Mic, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usarGrabadora } from "./usar-grabadora";
+import { SILENCIO_DICTADO_MS } from "@/lib/deteccion-voz";
 
 export { unirDictado } from "@/lib/dictado";
 
@@ -37,6 +38,10 @@ export function BotonDictado({
   className?: string;
 }) {
   const g = usarGrabadora({
+    // Mas margen que un comando: quien dicta un cierre se acuerda de la
+    // refaccion a media frase, y cortarle ahi seria pelearse con quien está
+    // trabajando.
+    silencioMs: SILENCIO_DICTADO_MS,
     alTerminar: async (audio) => {
       try {
         const r = await fetch("/api/ia/voz/dictar", { method: "POST", body: audio });
@@ -111,7 +116,7 @@ export function BotonDictado({
       </button>
       {grabando ? (
         <p className="basis-full text-[0.625rem] text-slate-500" role="status">
-          Diga qué encontró y qué hizo. Toque «Listo» al terminar.
+          Diga qué encontró y qué hizo. Se corta solo al terminar, o toque «Listo».
         </p>
       ) : null}
       {g.error ? (

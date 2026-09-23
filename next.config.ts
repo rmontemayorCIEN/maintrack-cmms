@@ -34,8 +34,27 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           // No se filtra la ruta interna al salir hacia un sitio externo.
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // Se apagan capacidades del navegador que la aplicacion no usa.
-          { key: "Permissions-Policy", value: "geolocation=(), microphone=(), payment=(), usb=()" },
+          /**
+           * Se apagan las capacidades del navegador que la aplicacion no usa.
+           *
+           * El microfono SI se usa, y esta linea decia lo contrario: la
+           * aplicacion se pedia a si misma no poder grabar. Era cierto cuando
+           * se escribio y dejo de serlo el dia que se construyo el chat de
+           * voz; nadie volvio a mirarla.
+           *
+           * Lo escondido del defecto: Safari de iPhone no aplica esta politica
+           * al microfono, asi que dictar funcionaba en el telefono y fallaba
+           * en la laptop con Chrome —con un «no se pudo usar el microfono» que
+           * parecia un permiso del sistema operativo—. Tres funciones estaban
+           * afectadas: el chat de voz, el dictado del tecnico y los comandos
+           * de voz.
+           *
+           * `(self)` deja grabar a la propia aplicacion y lo sigue negando a
+           * cualquier cosa que la incruste. La camara no se lista: lo que no
+           * se nombra se queda en el valor por omision del navegador, que ya
+           * es «solo el propio origen», y de eso vive el escaner de QR.
+           */
+          { key: "Permissions-Policy", value: "geolocation=(), microphone=(self), payment=(), usb=()" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
         ],
       },
