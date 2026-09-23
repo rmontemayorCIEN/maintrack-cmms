@@ -47,3 +47,33 @@ export function unirDictado(previo: string, dictado: string): string {
   if (!antes) return nuevo;
   return /[.!?…,:;]$/.test(antes) ? `${antes} ${nuevo}` : `${antes}. ${nuevo}`;
 }
+
+/**
+ * Por que no se pudo, en palabras y con que hacer.
+ *
+ * Son cinco problemas distintos con cinco soluciones distintas, y estaban
+ * todos bajo el mismo «no se pudo usar el microfono». Con ese mensaje, un
+ * bloqueo del servidor mandaba a la gente a revisar los ajustes de su Mac —y
+ * ahi no habia nada que arreglar—.
+ *
+ * El nombre del error lo da el navegador y esta estandarizado; lo que cambia
+ * entre navegadores es el texto, que no se usa.
+ */
+export function porQueNoSePudo(e: unknown): string {
+  const nombre = (e as { name?: string })?.name ?? "";
+  switch (nombre) {
+    case "NotAllowedError":
+    case "SecurityError":
+      // La causa mas comun, y la unica que la persona puede arreglar sola.
+      return "No dio permiso para el micrófono. Tóquelo en el candado de la barra de direcciones y recargue. Si aun así no deja, revise que su sistema permita al navegador usar el micrófono.";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "Este equipo no tiene micrófono disponible.";
+    case "NotReadableError":
+    case "AbortError":
+      // Clasico: una videollamada abierta en otra pestaña.
+      return "Otro programa está usando el micrófono. Ciérrelo e intente de nuevo.";
+    default:
+      return "No se pudo usar el micrófono.";
+  }
+}

@@ -217,6 +217,21 @@ async function main() {
       bCodigo.find((g) => g.tipo === "activo")?.resultados[0]?.id === equipo.id && bSerie.some((g) => g.resultados.some((r) => r.id === equipo.id)) &&
       bCodigo.every((g) => new Set(g.resultados.map((r) => r.id)).size === g.resultados.length));
 
+    /**
+     * Los equipos salen ANTES que las órdenes.
+     *
+     * Se busca por nombre de equipo mucho más seguido que por folio, y quien
+     * busca una orden concreta escribe su folio completo —que sale primero
+     * dentro de su propio grupo de todos modos—. Nadie vigilaba este orden, y
+     * en una lista de cinco grupos el primero es casi el único que se mira.
+     */
+    const conAmbos = await buscar(await aU("SUPERVISOR"), "valvula");
+    const tipos = conAmbos.map((g) => g.tipo);
+    const iEquipos = tipos.indexOf("activo");
+    const iOrdenes = tipos.indexOf("orden");
+    revisar("    y los equipos salen antes que las órdenes de trabajo",
+      iEquipos >= 0 && (iOrdenes < 0 || iEquipos < iOrdenes), tipos.join(" → "));
+
     // ═══════════════════════════════════════════ 19-26: el técnico desde el teléfono
     console.log("\n19-26. La orden completa del técnico");
     const r19 = await pedir("POST", `/api/work-orders/${ot.id}/status`, c.TECHNICIAN, { status: "IN_PROGRESS" });

@@ -417,7 +417,24 @@ async function main() {
     const cred = await pedir("POST", "/api/integraciones/credenciales", cAdmin, { nombre: "Pasarela sensores", alcances: ["lecturas:crear", "solicitudes:crear", "activos:leer"] });
     const sec = cred.json.secreto as string;
     const lista = await pedir("GET", "/api/integraciones/credenciales", cAdmin);
-    revisar("31. la credencial se crea y su secreto se ve UNA vez", cred.status === 201 && /^mt_[a-z0-9]{10}_/.test(sec) && !JSON.stringify(lista.json).includes(sec.split("_")[2]));
+    /**
+     * La parte secreta es TODO lo que va despues del prefijo, no el primer
+     * trozo entre guiones bajos.
+     *
+     * Con `split("_")[2]` esta revision fallaba sola cada tantas corridas y
+     * parecia la intermitencia de la suite. No lo era: el secreto aleatorio
+     * trae un guion bajo la mitad de las veces —es base64url— y entonces ese
+     * trozo quedaba en unos pocos caracteres, que aparecen por casualidad
+     * entre los identificadores y las fechas de la lista. Medido: 9 de cada
+     * 100 secretos dejan un trozo de menos de seis caracteres.
+     *
+     * Lo que se quiere comprobar es que el secreto no se puede volver a leer,
+     * y para eso hay que buscarlo entero.
+     */
+    const parteSecreta = sec.split("_").slice(2).join("_");
+    revisar("31. la credencial se crea y su secreto se ve UNA vez",
+      cred.status === 201 && /^mt_[a-z0-9]{10}_/.test(sec)
+        && parteSecreta.length >= 20 && !JSON.stringify(lista.json).includes(parteSecreta));
     const bearer = { Authorization: `Bearer ${sec}` };
     const act = await pedir("GET", "/api/v1/activos", bearer);
     revisar("   con ella se consulta la API, solo lo de su empresa y sin costos", act.status === 200 && (act.json.datos as Array<{ codigo: string; costoAdquisicion?: number }>).every((a) => ["CR-1", "BO-1"].includes(a.codigo) && !("costoAdquisicion" in a)));

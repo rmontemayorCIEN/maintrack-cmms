@@ -16,6 +16,7 @@
  *   npx tsx scripts/prueba-deteccion-voz.ts
  */
 import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS, SILENCIO_DICTADO_MS } from "../lib/deteccion-voz";
+import { porQueNoSePudo } from "../lib/dictado";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle: unknown = "") {
@@ -96,6 +97,25 @@ function main() {
   // Y al revés: alguien que no para de hablar tampoco se corta.
   const sinParar = [...repetir(0.002, 5), ...voz(100, 0.3)];
   revisar("quien no para de hablar no se corta a media frase", correr(sinParar) === null);
+
+  console.log("\nCuando el micrófono no se puede usar, decir POR QUÉ\n");
+  /**
+   * Cinco problemas distintos con cinco soluciones distintas estaban bajo el
+   * mismo «no se pudo usar el micrófono». Con ese mensaje, un bloqueo del
+   * SERVIDOR mandaba a la gente a revisar los ajustes de su Mac, donde no
+   * había nada que arreglar. Costó un día.
+   */
+  const porPermiso = porQueNoSePudo({ name: "NotAllowedError" });
+  revisar("permiso denegado: dice dónde darlo", porPermiso.includes("candado"), porPermiso.slice(0, 60));
+  const sinAparato = porQueNoSePudo({ name: "NotFoundError" });
+  revisar("sin micrófono: lo dice sin mandar a buscar permisos",
+    sinAparato.includes("no tiene micrófono") && !sinAparato.includes("candado"), sinAparato);
+  const ocupado = porQueNoSePudo({ name: "NotReadableError" });
+  revisar("lo tiene otro programa: dice que lo cierre", ocupado.includes("Otro programa"), ocupado);
+  // Cada causa tiene que decir algo DISTINTO, o volvemos al cajón único.
+  const todos = ["NotAllowedError", "NotFoundError", "NotReadableError", "LoQueSea"].map((n) => porQueNoSePudo({ name: n }));
+  revisar("cada causa dice algo distinto", new Set(todos).size === todos.length, `${new Set(todos).size} de ${todos.length}`);
+  revisar("y lo desconocido no inventa una causa", porQueNoSePudo({ name: "LoQueSea" }) === "No se pudo usar el micrófono.");
 
   console.log(`\n${fallas ? `${fallas} revisión(es) fallaron` : "Todo bien"}\n`);
   process.exit(fallas ? 1 : 0);

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MAXIMO_SEGUNDOS_DICTADO } from "@/lib/dictado";
 import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS } from "@/lib/deteccion-voz";
+import { porQueNoSePudo } from "@/lib/dictado";
 
 /**
  * Grabar con el microfono: la mecanica, sin la pantalla.
@@ -31,6 +32,8 @@ import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS } from "@/lib/deteccion-vo
  */
 
 export type EstadoGrabacion = "quieto" | "grabando" | "trabajando";
+
+
 
 /** Cada cuanto se mide el nivel del microfono. */
 const MUESTRA_MS = 100;
@@ -161,6 +164,24 @@ export function usarGrabadora({
 
     setError(null);
     try {
+      /**
+       * Primero se le pregunta al navegador si esta aplicacion PUEDE grabar.
+       *
+       * No es una comprobacion de mas: la aplicacion se estuvo prohibiendo a
+       * si misma el microfono durante meses con una cabecera
+       * `Permissions-Policy: microphone=()`, y el unico sintoma era un «no se
+       * pudo usar el microfono» idéntico al de un permiso denegado. La gente
+       * lo fue a buscar a los ajustes del sistema operativo.
+       *
+       * Preguntando aqui, ese caso se distingue del resto y se dice lo que es.
+       */
+      const politica = (document as unknown as { featurePolicy?: { allowsFeature: (f: string) => boolean } }).featurePolicy;
+      if (politica && !politica.allowsFeature("microphone")) {
+        setError("Esta instalación tiene el micrófono bloqueado por su configuración de seguridad. No es su equipo: hay que corregirlo del lado del servidor.");
+        setEstado("quieto");
+        return;
+      }
+
       if (!microfono.current || !microfono.current.active) {
         microfono.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
@@ -187,9 +208,8 @@ export function usarGrabadora({
       reloj.current = setInterval(() => setSegundos((s) => s + 1), 1000);
       // Red de seguridad: el telefono en la bolsa no sube media hora de ruido.
       corte.current = setTimeout(detener, MAXIMO_SEGUNDOS_DICTADO * 1000);
-    } catch {
-      // Negar el microfono es una decision de la persona, no una falla.
-      setError("No se pudo usar el micrófono.");
+    } catch (e) {
+      setError(porQueNoSePudo(e));
       setEstado("quieto");
     }
   }
