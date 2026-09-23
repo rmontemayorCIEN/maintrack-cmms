@@ -18,7 +18,7 @@ import { prisma } from "../lib/db";
 import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 import {
   identificarParada, pistasDelDictado, hayQuePreguntar, iniciarRondin,
-  terminarRondin, rondinEnCurso,
+  terminarRondin, rondinEnCurso, guardarHallazgos, resolverHallazgo, agregarParada,
 } from "../lib/rondin";
 
 let fallas = 0;
@@ -258,6 +258,93 @@ async function main() {
     });
     revisar("una cuenta de solo lectura no le cuelga fotos", sinPermiso.status === 403, { status: sinPermiso.status });
 
+    console.log("\nLo que la IA propone: nada se crea solo\n");
+    // Se cierra el de las fotos ANTES de abrir este. `iniciarRondin` reanuda
+    // el que esté abierto de esa persona —que es lo correcto—, así que sin
+    // esto las paradas se numeraban seguidas del anterior y los hallazgos de
+    // «parada 1» caían en una parada que no era. Mismo cuidado que pide la
+    // regla de acotar siempre: aquí el estado compartido es el rondín abierto.
+    await pedir(deJefe, "PATCH", `/api/rondines/${rid2}`, {});
+    const paraIa = await iniciarRondin(org.id, jefe.id, { siteId: sitio.id, locationId: linea2.id });
+    const p1 = await agregarParada(org.id, paraIa.rondin.id, { dicho: "aquí en la bomba tres se ve mojado el piso" });
+    const p2 = await agregarParada(org.id, paraIa.rondin.id, { dicho: "el extintor está tapado con tarimas" });
+    revisar("hay dos paradas para colgarles hallazgos", p1.ok && p2.ok);
+
+    await guardarHallazgos(org.id, paraIa.rondin.id, [
+      { parada: 1, categoria: "FUGA", titulo: "Posible fuga de aceite",
+        baseVisual: "Mancha oscura de unos 40 cm bajo la brida derecha", detalle: null, certeza: "PROBABLE" },
+      { parada: 2, categoria: "SEGURIDAD", titulo: "Extintor obstruido",
+        baseVisual: "Dos tarimas de madera delante del extintor", detalle: "Despejar el acceso", certeza: "SEGURO" },
+      // Uno que el modelo no pudo atribuir a ninguna parada: se guarda igual,
+      // sin equipo, en vez de colgarselo a la primera que haya.
+      { parada: 0, categoria: "ORDEN", titulo: "Desorden general",
+        baseVisual: "Herramienta en el piso", detalle: null, certeza: "DUDOSO" },
+    ]);
+
+    const guardados = await prisma.rondinHallazgo.findMany({
+      where: { organizationId: org.id, rondinId: paraIa.rondin.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, titulo: true, estado: true, assetId: true, rondinParadaId: true, categoria: true },
+    });
+    revisar("se guardaron los tres", guardados.length === 3, { n: guardados.length });
+    revisar("todos nacen PROPUESTOS: nada entra al sistema sin que alguien lo vea",
+      guardados.every((h) => h.estado === "PROPUESTO"));
+    // El equipo se HEREDA de la parada; la IA no lo decide.
+    const deLaUno = guardados.find((h) => h.titulo.includes("fuga"));
+    revisar("el equipo se hereda de la parada, no lo decide la IA",
+      deLaUno?.assetId === bomba2.id, { heredado: deLaUno?.assetId === bomba2.id });
+    const huerfano = guardados.find((h) => h.titulo.includes("Desorden"));
+    revisar("el que no se pudo atribuir queda sin parada y sin equipo",
+      huerfano?.rondinParadaId === null && huerfano?.assetId === null);
+
+    console.log("\nAceptar levanta una solicitud; descartar no crea nada\n");
+    const antesSol = await prisma.workRequest.count({ where: { organizationId: org.id } });
+    const aceptado = await resolverHallazgo(org.id, deLaUno!.id, jefe.id, "ACEPTADO");
+    revisar("aceptar levanta una solicitud", aceptado.ok && !!aceptado.solicitud, aceptado.ok ? aceptado.solicitud?.numero : "");
+    const sol = await prisma.workRequest.findFirst({
+      where: { organizationId: org.id, id: aceptado.ok ? aceptado.solicitud!.id : "" },
+      select: { title: true, description: true, priority: true, assetId: true },
+    });
+    // Lo que se VE viaja con la solicitud: quien la reciba tiene que poder ir
+    // a la foto y contradecirla, no creerle a ciegas.
+    revisar("la solicitud lleva en qué se basó, no solo la conclusión",
+      (sol?.description ?? "").includes("Mancha oscura"), (sol?.description ?? "").slice(0, 60));
+    revisar("   y de qué recorrido salió", (sol?.description ?? "").includes("RD-"));
+    revisar("   y el equipo de la parada", sol?.assetId === bomba2.id);
+
+    const seguridad = guardados.find((h) => h.categoria === "SEGURIDAD");
+    const aceptado2 = await resolverHallazgo(org.id, seguridad!.id, jefe.id, "ACEPTADO");
+    const sol2 = await prisma.workRequest.findFirst({
+      where: { id: aceptado2.ok ? aceptado2.solicitud!.id : "" }, select: { priority: true },
+    });
+    // Lo de seguridad no espera a que alguien lo acomode en su cola.
+    revisar("un hallazgo de seguridad entra con prioridad alta", sol2?.priority === "HIGH", sol2?.priority);
+
+    const descartado = await resolverHallazgo(org.id, huerfano!.id, jefe.id, "DESCARTADO");
+    revisar("descartar no crea nada", descartado.ok && descartado.solicitud === null);
+    const ahoraSol = await prisma.workRequest.count({ where: { organizationId: org.id } });
+    revisar("   y solo se crearon las dos aceptadas", ahoraSol === antesSol + 2, { antes: antesSol, ahora: ahoraSol });
+
+    const yaResuelto = await resolverHallazgo(org.id, deLaUno!.id, jefe.id, "ACEPTADO");
+    revisar("resolver dos veces no duplica la solicitud", !yaResuelto.ok, yaResuelto.ok ? "" : yaResuelto.motivo);
+
+    console.log("\nVolver a revisar respeta lo que una persona ya decidió\n");
+    await guardarHallazgos(org.id, paraIa.rondin.id, [
+      { parada: 1, categoria: "DETERIORO", titulo: "Pintura descarapelada",
+        baseVisual: "Óxido en la base", detalle: null, certeza: "DUDOSO" },
+    ]);
+    const tras = await prisma.rondinHallazgo.findMany({
+      where: { organizationId: org.id, rondinId: paraIa.rondin.id },
+      select: { titulo: true, estado: true },
+    });
+    // Lo resuelto es una decision de una persona: no se borra por volver a
+    // preguntarle a la maquina.
+    revisar("lo aceptado y lo descartado siguen ahí",
+      tras.filter((h) => h.estado !== "PROPUESTO").length === 3, tras.map((h) => `${h.estado}`).join(" "));
+    revisar("y lo propuesto anterior se reemplazó, no se acumuló",
+      tras.filter((h) => h.estado === "PROPUESTO").length === 1,
+      tras.filter((h) => h.estado === "PROPUESTO").map((h) => h.titulo).join(" | "));
+
     console.log("\nNo se cruza con la empresa de al lado\n");
     const otraOrg = await prisma.organization.create({
       data: { name: `${sello}-c`, slug: `${sello}-c`, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" },
@@ -273,6 +360,9 @@ async function main() {
     revisar("ni se le anotan paradas", metido.status === 409, { status: metido.status });
     const areaAjena = await pedir(deVecino, "POST", "/api/rondines", { locationId: linea2.id });
     revisar("ni se empieza un recorrido en un área ajena", areaAjena.status === 404, { status: areaAjena.status });
+    const hallazgoAjeno = await resolverHallazgo(otraOrg.id, deLaUno!.id, vecino.id, "ACEPTADO");
+    revisar("no se resuelve un hallazgo de otra empresa", !hallazgoAjeno.ok, hallazgoAjeno.ok ? "" : hallazgoAjeno.motivo);
+
     const fotoAjena = await pedir(deVecino, "POST", "/api/attachments", {
       rondinParadaId: paradaId, name: "colada.jpg", mimeType: "image/jpeg", size: 1000,
     });
@@ -280,6 +370,8 @@ async function main() {
     revisar("ni se le cuelgan fotos a la parada de otra empresa", fotoAjena.status === 404, { status: fotoAjena.status });
   } finally {
     for (const id of creadas) {
+      await prisma.rondinHallazgo.deleteMany({ where: { organizationId: id } });
+      await prisma.workRequest.deleteMany({ where: { organizationId: id } });
       await prisma.rondinParada.deleteMany({ where: { organizationId: id } });
       await prisma.rondin.deleteMany({ where: { organizationId: id } });
       await prisma.reportPoint.deleteMany({ where: { organizationId: id } });

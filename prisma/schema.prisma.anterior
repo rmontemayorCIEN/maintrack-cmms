@@ -292,6 +292,7 @@ model Organization {
   reportPoints       ReportPoint[]
   rondines           Rondin[]
   rondinParadas      RondinParada[]
+  rondinHallazgos    RondinHallazgo[]
   festivos           DiaFestivo[]
   equivalencias      EquivalenciaRefaccion[]
   asignacionesPlan   PlanAsset[]
@@ -380,6 +381,7 @@ model User {
   purchaseOrders       PurchaseOrder[]
   inventoryCounts      InventoryCount[]
   rondines      Rondin[]
+  rondinHallazgos RondinHallazgo[]
   reportPoints         ReportPoint[]
   tareasLiberadas      WorkOrderTask[]         @relation("TareaLiberadaPor")
   /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
@@ -717,6 +719,7 @@ model Asset {
   downtimes        DowntimeEvent[]
   requisiciones    MaterialRequest[]
   rondinParadas RondinParada[]
+  rondinHallazgos RondinHallazgo[]
   attachments      Attachment[]
   links            ReferenceLink[]
   reportPoints     ReportPoint[]
@@ -1397,6 +1400,7 @@ model WorkRequest {
   location     Location?       @relation(fields: [locationId], references: [id])
   requestedBy  User?           @relation("RequestAuthor", fields: [requestedById], references: [id])
   reportPoint  ReportPoint?    @relation(fields: [reportPointId], references: [id])
+  rondinHallazgos RondinHallazgo[]
   attachments  Attachment[]
   reviewedBy   User?           @relation("RequestReviewer", fields: [reviewedById], references: [id])
   workOrder    WorkOrder?      @relation(fields: [workOrderId], references: [id])
@@ -3343,6 +3347,12 @@ model Rondin {
   terminadoEn    DateTime?
   /// Lo que se dijo del recorrido completo, no de una parada.
   nota           String?
+  /// Cuando se revisaron las fotos con IA. Nulo: todavia no se han revisado.
+  ///
+  /// Se guarda para no volver a pagar el analisis cada vez que alguien abre
+  /// el recorrido, y para poder decir en pantalla si lo que se ve ya paso por
+  /// ahi o no.
+  analizadoEn    DateTime?
   createdAt      DateTime  @default(now())
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3350,6 +3360,7 @@ model Rondin {
   location     Location?      @relation(fields: [locationId], references: [id])
   iniciadoPor  User?          @relation(fields: [iniciadoPorId], references: [id])
   paradas      RondinParada[]
+  hallazgos    RondinHallazgo[]
 
   @@unique([organizationId, numero])
   @@index([organizationId])
@@ -3389,8 +3400,64 @@ model RondinParada {
   asset        Asset?       @relation(fields: [assetId], references: [id])
   location     Location?    @relation(fields: [locationId], references: [id])
   adjuntos     Attachment[]
+  hallazgos    RondinHallazgo[]
 
   @@index([organizationId])
   @@index([rondinId])
   @@index([organizationId, assetId])
+}
+
+/// Lo que la IA vio en las fotos de un rondin, para que una persona decida.
+///
+/// ── Por que se guardan como propuesta y no como trabajo ──
+///
+/// El modo de fallar de esto es afirmar una fuga donde hay una mancha vieja.
+/// Si de ahi salieran ordenes solas, el sistema se llenaria de trabajo que no
+/// existe, la gente dejaria de creerle, y entonces tampoco atenderia lo que si
+/// es real. Por eso un hallazgo nace PROPUESTO y alguien lo acepta o lo
+/// descarta; aceptarlo levanta una solicitud, que es el camino que ya existe
+/// para lo que hay que atender.
+///
+/// ── Por que se guarda en que se baso ──
+///
+/// `baseVisual` es lo que el modelo dice que VE —«un charco oscuro bajo la
+/// brida»— separado de lo que concluye. Quien revisa puede mirar la foto y
+/// juzgar si eso esta ahi, que es la unica forma de que una persona pueda
+/// contradecir a la maquina con fundamento en vez de por corazonada.
+model RondinHallazgo {
+  id             String   @id @default(cuid())
+  organizationId String
+  rondinId       String
+  /// De que parada salio. Nulo si el modelo no pudo atribuirlo a ninguna.
+  rondinParadaId String?
+  /// El equipo, heredado de la parada. La IA NO lo decide.
+  assetId        String?
+
+  /// FUGA | SEGURIDAD | ORDEN | DETERIORO | OBSTRUCCION | OTRO
+  categoria      String   @default("OTRO")
+  titulo         String
+  detalle        String?
+  /// En que se basa, mirando la foto. Se separa de la conclusion a proposito.
+  baseVisual     String?
+  /// SEGURO | PROBABLE | DUDOSO. Lo dudoso se enseña, pero se ve distinto.
+  certeza        String   @default("DUDOSO")
+
+  /// PROPUESTO | ACEPTADO | DESCARTADO
+  estado         String   @default("PROPUESTO")
+  /// La solicitud que se levanto al aceptarlo.
+  workRequestId  String?
+  resueltoPorId  String?
+  resueltoEn     DateTime?
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rondin       Rondin        @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  parada       RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: SetNull)
+  asset        Asset?        @relation(fields: [assetId], references: [id])
+  workRequest  WorkRequest?  @relation(fields: [workRequestId], references: [id])
+  resueltoPor  User?         @relation(fields: [resueltoPorId], references: [id])
+
+  @@index([organizationId])
+  @@index([rondinId])
+  @@index([organizationId, estado])
 }

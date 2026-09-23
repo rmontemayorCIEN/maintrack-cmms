@@ -139,7 +139,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000 } },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR", "RONDIN"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000 } },
   },
 };
 

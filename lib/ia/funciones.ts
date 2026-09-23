@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -51,6 +51,13 @@ export function tieneBolsaPropia(clave: string): clave is ClaveConBolsa {
 }
 
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
+  RONDIN: {
+    nombre: "Revisar las fotos del rondín",
+    descripcion:
+      "Mira las fotos del recorrido por la planta y señala lo que un jefe de mantenimiento notaría al pasar: fugas, guardas faltantes, pasillos obstruidos, deterioro. Propone; nada se crea solo, y cada hallazgo dice en qué se basa para que usted lo pueda contradecir mirando la foto.",
+    operaciones: 2,
+    disponible: true,
+  },
   NAVEGAR: {
     nombre: "Navegar hablando",
     descripcion:

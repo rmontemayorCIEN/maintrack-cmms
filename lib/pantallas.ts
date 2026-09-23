@@ -153,7 +153,7 @@ const MENU: GrupoMenu[] = [
   },
   {
     seccion: "Lo que llega", clave: "entradas", items: [
-      { href: "/requests", etiqueta: "Solicitudes", icono: "solicitudes" },
+      { href: "/requests", etiqueta: "Solicitudes de servicio", icono: "solicitudes" },
       { href: "/requests/puntos", etiqueta: "Puntos de reporte QR", icono: "qr" },
       // El rondin va junto a las solicitudes y los puntos QR porque es lo
       // mismo por otro camino: una fuente de hallazgos. Y comparte con los

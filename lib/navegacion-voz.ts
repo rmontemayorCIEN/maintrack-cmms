@@ -74,6 +74,23 @@ export function quitarVerbo(frase: string): string {
   return t.replace(/^(el|la|los|las|un|una)\s+/, "").trim();
 }
 
+/**
+ * Palabras que anuncian a que se refiere, pero no son parte del nombre.
+ *
+ * «Abre el equipo compresor de tornillo» no busca un equipo que se llame
+ * «equipo compresor de tornillo»: busca el compresor. Lo mismo con «la orden
+ * 124». Se quitan SOLO si queda algo despues —«ordenes» a secas si es un
+ * destino, y no hay que dejar la frase vacia—.
+ */
+const ANUNCIOS = ["equipo", "activo", "maquina", "orden", "ot", "solicitud", "reporte", "refaccion", "parte"];
+
+/** Quita el anuncio de la cabeza, si deja algo util detras. */
+export function quitarAnuncio(texto: string): string {
+  const palabras = texto.split(" ");
+  if (palabras.length > 1 && ANUNCIOS.includes(palabras[0])) return palabras.slice(1).join(" ").trim();
+  return texto;
+}
+
 export type Destino = {
   ruta: string;
   /** Como se le dice en pantalla al confirmar: «Lo llevo a Almacén». */
@@ -94,9 +111,9 @@ export type Destino = {
  * solo se les ponen nombres. Cual ve cada quien lo decide esa tabla, no esta.
  */
 export const DESTINOS: Destino[] = [
-  { ruta: "/dashboard", titulo: "Inicio", nombres: ["inicio", "tablero", "dashboard", "principal", "mi dia", "pantalla principal"] },
+  { ruta: "/dashboard", titulo: "Inicio", nombres: ["inicio", "tablero", "dashboard", "principal", "mi dia", "pantalla principal", "el parte del dia", "parte del dia"] },
   { ruta: "/work-orders", titulo: "Órdenes de trabajo", nombres: ["ordenes", "ordenes de trabajo", "ots", "trabajos", "ordenes de servicio"] },
-  { ruta: "/requests", titulo: "Solicitudes", nombres: ["solicitudes", "reportes", "reportes de falla", "peticiones"] },
+  { ruta: "/requests", titulo: "Solicitudes", nombres: ["solicitudes", "solicitudes de servicio", "reportes", "reportes de falla", "peticiones"] },
   { ruta: "/assets", titulo: "Activos", nombres: ["activos", "equipos", "maquinas", "maquinaria", "inventario de equipos"] },
   { ruta: "/plans", titulo: "Planes de mantenimiento", nombres: ["planes", "planes de mantenimiento", "preventivos", "programa de mantenimiento"] },
   { ruta: "/inventory", titulo: "Almacén", nombres: ["almacen", "refacciones", "inventario", "existencias", "partes"] },
@@ -115,7 +132,7 @@ export const DESTINOS: Destino[] = [
   { ruta: "/backlog", titulo: "Trabajo pendiente", nombres: ["pendiente", "trabajo pendiente", "backlog", "rezago"] },
   { ruta: "/equipo", titulo: "Equipo de trabajo", nombres: ["equipo", "personal", "mi gente", "cuadrilla", "tecnicos"] },
   { ruta: "/conjuntos", titulo: "Mapa de líneas", nombres: ["mapa de lineas", "conjuntos", "lineas", "mapa"] },
-  { ruta: "/consulta", titulo: "Pregúntale a tus datos", nombres: ["consulta", "preguntale a tus datos", "preguntar"] },
+  { ruta: "/consulta", titulo: "Pregúntale a tus datos", nombres: ["consulta", "preguntale a tus datos", "pregunte a sus datos", "preguntar a mis datos", "preguntar"] },
   { ruta: "/notificaciones", titulo: "Avisos", nombres: ["avisos", "notificaciones", "campana"] },
   { ruta: "/settings", titulo: "Ajustes", nombres: ["ajustes", "configuracion", "preferencias", "mi cuenta"] },
   { ruta: "/catalogs", titulo: "Catálogos", nombres: ["catalogos", "codigos de falla", "causas"] },
@@ -177,17 +194,86 @@ export function intencionDeOrden(frase: string): Intencion | null {
  * mejor decir que no se entendio que llevar a alguien al lugar equivocado con
  * seguridad.
  */
-export function destinoDe(frase: string): { ruta: string; titulo: string } | null {
-  const t = quitarVerbo(frase);
-  if (!t) return null;
+function palabras(t: string): string[] {
+  return t.split(" ").filter((p) => p.length > 2 && !["del", "las", "los", "una", "con", "por"].includes(p));
+}
 
-  for (const a of ATAJOS) {
-    if (a.frases.includes(t)) return { ruta: a.ruta, titulo: a.titulo };
+/**
+ * Si lo dicho corresponde a este nombre, sin exigir que sea palabra por
+ * palabra.
+ *
+ * Empezo siendo coincidencia literal, y se quedo corta en cuanto alguien la
+ * uso de verdad: «abre solicitudes de servicio» no encontraba «solicitudes»,
+ * y «pregunte a sus datos» no encontraba «preguntale a tus datos». Nadie dice
+ * los nombres exactos de las pantallas, y menos dictando.
+ *
+ * Ahora basta con que todas las palabras con peso del nombre esten en lo
+ * dicho. «Solicitudes de servicio» contiene «solicitudes»; «pregunte a sus
+ * datos» contiene «datos» del nombre «preguntale a tus datos»... y ahi esta
+ * el limite: por eso el que gana es el nombre MAS LARGO que encaje, para que
+ * una coincidencia de una palabra no le arrebate el destino a una de tres.
+ */
+function encaja(dicho: string, nombre: string): boolean {
+  if (dicho === nombre) return true;
+  const suyas = palabras(nombre);
+  if (!suyas.length) return false;
+  const dichas = palabras(dicho);
+  if (!dichas.length) return false;
+  return suyas.every((p) => dichas.some((q) => q === p || q.startsWith(p) || p.startsWith(q)));
+}
+
+/**
+ * Cuando se esta nombrando algo concreto y no una pantalla.
+ *
+ * «Abre el equipo compresor de tornillo» pide EL compresor, no la pantalla de
+ * equipos; «abre la orden 124» pide esa orden, no la lista. Aflojar la
+ * coincidencia sin esto los mandaba a la lista, que es peor que no encontrar:
+ * la persona llega a una pantalla que se ve bien, no es la que pidio, y a
+ * veces ni lo nota.
+ *
+ * Se distingue por las palabras SOBRANTES: en «orden de trabajo» todo lo dicho
+ * cabe en el nombre de la pantalla; en «equipo compresor de tornillo» sobran
+ * «compresor» y «tornillo», y eso es justo lo que se esta nombrando.
+ */
+function nombraAlgoConcreto(dicho: string, nombre: string): boolean {
+  const suyas = palabras(nombre);
+  return palabras(dicho).some((q) => !suyas.some((p) => q === p || q.startsWith(p) || p.startsWith(q)));
+}
+
+export function destinoDe(frase: string): { ruta: string; titulo: string } | null {
+  const crudo = quitarVerbo(frase);
+  if (!crudo) return null;
+
+  const anuncia = crudo !== quitarAnuncio(crudo);
+  // «La orden 124» con un numero de por medio es siempre un registro, nunca
+  // una pantalla: se manda derecho a la busqueda.
+  if (anuncia && /\d/.test(crudo)) return null;
+
+  const formas = [crudo, quitarAnuncio(crudo)].filter((v, i, a) => v && a.indexOf(v) === i);
+
+  let mejor: { ruta: string; titulo: string; peso: number } | null = null;
+  const tomar = () => mejor as { ruta: string; titulo: string; peso: number } | null;
+  const proponer = (ruta: string, titulo: string, nombre: string) => {
+    const peso = palabras(nombre).length * 10 + nombre.length;
+    if (!mejor || peso > mejor.peso) mejor = { ruta, titulo, peso };
+  };
+
+  for (const t of formas) {
+    // Los atajos primero y con ventaja: «mis ordenes» tiene que ganarle a
+    // «ordenes», o el filtro que la persona pidio se pierde en silencio.
+    for (const a of ATAJOS) {
+      for (const f of a.frases) {
+        if (encaja(t, f) && !(anuncia && nombraAlgoConcreto(t, f))) proponer(a.ruta, a.titulo, `${f} ${f}`);
+      }
+    }
+    for (const d of DESTINOS) {
+      for (const n of d.nombres) {
+        if (encaja(t, n) && !(anuncia && nombraAlgoConcreto(t, n))) proponer(d.ruta, d.titulo, n);
+      }
+    }
   }
-  for (const d of DESTINOS) {
-    if (d.nombres.includes(t)) return { ruta: d.ruta, titulo: d.titulo };
-  }
-  return null;
+  const m = tomar();
+  return m ? { ruta: m.ruta, titulo: m.titulo } : null;
 }
 
 /** Ejemplos para cuando no se entendio, para no dejar a nadie adivinando. */

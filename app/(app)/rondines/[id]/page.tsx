@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { Adjuntos } from "@/components/adjuntos";
 import { can } from "@/lib/rbac";
+import { iaDeLaOrganizacion } from "@/lib/planes";
+import { Hallazgos } from "./hallazgos";
 import { NOMBRE_IDENTIFICACION, type ComoSeIdentifico } from "@/lib/rondin";
 import { formatDateTime } from "@/lib/utils";
 
@@ -26,9 +28,19 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
   const rondin = await prisma.rondin.findFirst({
     where: { id, organizationId: user.organizationId },
     select: {
-      id: true, numero: true, estado: true, iniciadoEn: true, terminadoEn: true, nota: true,
+      id: true, numero: true, estado: true, iniciadoEn: true, terminadoEn: true, nota: true, analizadoEn: true,
       location: { select: { name: true } },
       iniciadoPor: { select: { name: true } },
+      hallazgos: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true, categoria: true, titulo: true, detalle: true, baseVisual: true,
+          certeza: true, estado: true,
+          parada: { select: { orden: true } },
+          asset: { select: { code: true, name: true } },
+          workRequest: { select: { id: true, number: true } },
+        },
+      },
       paradas: {
         orderBy: { orden: "asc" },
         select: {
@@ -52,6 +64,8 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
   // Quien puede seguir agregando fotos a una parada: el mismo permiso que
   // anotarla. Consulta mira el recorrido, no lo completa.
   const editable = can(user.role, "workorder:execute");
+  const conIa = iaDeLaOrganizacion(user.organization).funciones.includes("RONDIN");
+  const hayFotos = rondin.paradas.some((p) => p.adjuntos.length > 0);
 
   return (
     <div className="space-y-5">
@@ -67,6 +81,21 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
       {rondin.nota ? (
         <Card><p className="text-xs text-slate-700">{rondin.nota}</p></Card>
       ) : null}
+
+      <Hallazgos
+        rondinId={rondin.id}
+        hayFotos={hayFotos}
+        disponible={conIa}
+        puedeResolver={editable}
+        analizadoEn={rondin.analizadoEn?.toISOString() ?? null}
+        hallazgos={rondin.hallazgos.map((h) => ({
+          id: h.id, categoria: h.categoria, titulo: h.titulo, detalle: h.detalle,
+          baseVisual: h.baseVisual, certeza: h.certeza, estado: h.estado,
+          parada: h.parada?.orden ?? null,
+          equipo: h.asset ? `${h.asset.code} — ${h.asset.name}` : null,
+          solicitud: h.workRequest ? { id: h.workRequest.id, number: h.workRequest.number } : null,
+        }))}
+      />
 
       {rondin.paradas.length === 0 ? (
         <Card><p className="text-xs text-slate-600">Este recorrido no tiene paradas.</p></Card>

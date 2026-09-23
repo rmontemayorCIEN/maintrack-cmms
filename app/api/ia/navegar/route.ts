@@ -4,7 +4,9 @@ import { escuchar, MAXIMO_SEGUNDOS_DICTADO, USD_POR_SEGUNDO } from "@/lib/escuch
 import { puedeUsarIa, registrarEscucha } from "@/lib/ia/consumo";
 import { buscar } from "@/lib/busqueda";
 import { OPEN_STATUSES, REQUEST_OPEN_STATUSES } from "@/lib/constants";
-import { destinoDe, intencionDeOrden, quitarVerbo, EJEMPLOS } from "@/lib/navegacion-voz";
+import { destinoDe, intencionDeOrden, quitarAnuncio, quitarVerbo, DESTINOS, ATAJOS, EJEMPLOS } from "@/lib/navegacion-voz";
+import { adivinarDestino } from "@/lib/ia/navegar";
+import { iaConfigurada } from "@/lib/ia/cliente";
 import { puedeVerRuta } from "@/lib/pantallas";
 
 /**
@@ -158,7 +160,12 @@ export async function POST(request: Request) {
 
     // 3. Un equipo, un folio, una refaccion: lo resuelve la busqueda general,
     //    que ya acota por empresa y por rol. No se reimplementa aqui.
-    const termino = quitarVerbo(dicho);
+    /**
+     * Tambien se le quita el anuncio: «abre el equipo compresor de tornillo»
+     * busca «compresor de tornillo». Ningun activo se llama «equipo compresor
+     * de tornillo», asi que dejarlo puesto hacia que no se encontrara nada.
+     */
+    const termino = quitarAnuncio(quitarVerbo(dicho));
     if (termino.length >= 2) {
       const grupos = await buscar(
         { id: user.id, role: user.role, isSuperAdmin: user.isSuperAdmin, organizationId: orgId },
@@ -179,6 +186,36 @@ export async function POST(request: Request) {
        */
       if (encontrados.length > 1) {
         return llevar(`/search?q=${encodeURIComponent(termino)}`, `Resultados de «${termino}»`);
+      }
+    }
+
+    /**
+     * 4. Ultimo recurso: preguntarle al modelo.
+     *
+     * Hasta aqui no se gasto nada mas que oir, y nueve de cada diez comandos
+     * ya salieron. Este entra solo cuando la alternativa es decir «no encontre
+     * eso», y por eso se puede permitir tardar un segundo mas.
+     *
+     * Se le pasan UNICAMENTE las pantallas que este rol ve, y lo que conteste
+     * se vuelve a comprobar: elegir de una lista corta y verificar lo elegido
+     * es lo que impide que una frase rara abra algo que no le toca.
+     *
+     * Consume un dictado mas de la bolsa —el de oir y el de pensar—, y es
+     * justo: costo mas. Solo pasa cuando las reglas ya no pudieron.
+     */
+    if (iaConfigurada() && !escrito) {
+      const puedeUsar = await puedeUsarIa(org, "NAVEGAR");
+      if (puedeUsar.permitido) {
+        const opciones = [
+          ...DESTINOS.map((d) => ({ ruta: d.ruta, titulo: d.titulo })),
+          ...ATAJOS.map((a) => ({ ruta: a.ruta, titulo: a.titulo })),
+        ].filter((o) => puedeVerRuta(user.role, o.ruta, contexto));
+
+        const sugerido = await adivinarDestino(org, { dicho, opciones, userId: user.id });
+        if (sugerido) {
+          const cual = opciones.find((o) => o.ruta === sugerido.ruta);
+          return llevar(sugerido.ruta, cual?.titulo ?? sugerido.ruta);
+        }
       }
     }
 

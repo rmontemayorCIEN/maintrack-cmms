@@ -1,6 +1,8 @@
 import { prisma } from "./db";
 import { normalizar } from "./busqueda";
-import { siguienteFolio } from "./numbering";
+import { nextRequestNumber, siguienteFolio } from "./numbering";
+import { avisarSolicitudNueva } from "./avisos/detectores";
+import type { HallazgoPropuesto } from "./ia/rondin";
 
 /**
  * El rondin: el recorrido por la planta, con sus paradas.
@@ -423,4 +425,134 @@ export async function terminarRondin(organizationId: string, rondinId: string, n
     },
   });
   return { ok: true as const, paradas: r._count.paradas, vacio: r._count.paradas === 0 };
+}
+
+// ─────────────────────────────────────────────── Lo que la IA propone ──────
+
+/**
+ * Guarda lo que la revision de fotos propuso.
+ *
+ * Nace PROPUESTO, siempre. Nada de lo que sale de mirar una foto entra al
+ * sistema sin que una persona lo haya visto: el modo de fallar de eso es
+ * afirmar una fuga donde hay una mancha vieja, y un sistema lleno de trabajo
+ * que no existe deja de merecer confianza para lo que si existe.
+ *
+ * El equipo NO lo decide la IA: se hereda de la parada, que ya lo resolvio con
+ * el codigo QR, con el area o preguntandole a quien estuvo ahi. Cualquiera de
+ * esas tres es mas firme que una deduccion sobre una imagen.
+ *
+ * Se reemplaza lo anterior al volver a revisar: dos juegos de hallazgos del
+ * mismo recorrido serian dos listas que dicen casi lo mismo, y nadie sabria
+ * cual mirar. Lo ya resuelto —aceptado o descartado— se respeta: eso es una
+ * decision de una persona y no se borra por volver a preguntarle a la maquina.
+ */
+export async function guardarHallazgos(
+  organizationId: string,
+  rondinId: string,
+  propuestos: HallazgoPropuesto[],
+) {
+  const paradas = await prisma.rondinParada.findMany({
+    where: { organizationId, rondinId },
+    select: { id: true, orden: true, assetId: true },
+  });
+  const porOrden = new Map(paradas.map((p) => [p.orden, p]));
+
+  await prisma.rondinHallazgo.deleteMany({
+    where: { organizationId, rondinId, estado: "PROPUESTO" },
+  });
+
+  if (propuestos.length) {
+    await prisma.rondinHallazgo.createMany({
+      data: propuestos.map((h) => {
+        const parada = porOrden.get(h.parada);
+        return {
+          organizationId,
+          rondinId,
+          rondinParadaId: parada?.id ?? null,
+          assetId: parada?.assetId ?? null,
+          categoria: h.categoria,
+          titulo: h.titulo,
+          detalle: h.detalle,
+          baseVisual: h.baseVisual,
+          certeza: h.certeza,
+        };
+      }),
+    });
+  }
+
+  await prisma.rondin.update({ where: { id: rondinId }, data: { analizadoEn: new Date() } });
+}
+
+/**
+ * Aceptar o descartar un hallazgo.
+ *
+ * Aceptarlo levanta una solicitud, que es el camino que ya existe para lo que
+ * hay que atender: de ahi sale una orden si alguien la autoriza. No se crea la
+ * orden directo a proposito —eso se saltaria la revision que el sistema ya
+ * tiene— y no se inventa un camino nuevo para lo que viene del rondin.
+ *
+ * La solicitud lleva la base visual, no solo la conclusion. Quien la reciba
+ * tiene que poder juzgar si eso esta en la foto; si solo llegara «hay una
+ * fuga», estaria creyendo a ciegas.
+ */
+export async function resolverHallazgo(
+  organizationId: string,
+  hallazgoId: string,
+  userId: string,
+  decision: "ACEPTADO" | "DESCARTADO",
+) {
+  const h = await prisma.rondinHallazgo.findFirst({
+    where: { id: hallazgoId, organizationId },
+    select: {
+      id: true, estado: true, titulo: true, detalle: true, baseVisual: true, categoria: true, certeza: true,
+      assetId: true,
+      rondin: { select: { numero: true, siteId: true } },
+      parada: { select: { orden: true, locationId: true } },
+      asset: { select: { siteId: true, locationId: true } },
+    },
+  });
+  if (!h) return { ok: false as const, motivo: "El hallazgo no existe." };
+  if (h.estado !== "PROPUESTO") return { ok: false as const, motivo: "Ese hallazgo ya se había resuelto." };
+
+  if (decision === "DESCARTADO") {
+    await prisma.rondinHallazgo.update({
+      where: { id: h.id },
+      data: { estado: "DESCARTADO", resueltoPorId: userId, resueltoEn: new Date() },
+    });
+    return { ok: true as const, solicitud: null };
+  }
+
+  const numero = await nextRequestNumber(organizationId);
+  const solicitud = await prisma.workRequest.create({
+    data: {
+      organizationId,
+      number: numero,
+      title: h.titulo,
+      // De donde salio y en que se baso, con palabras. Quien revisa tiene que
+      // poder ir a mirar la foto y contradecirlo.
+      description: [
+        h.detalle,
+        h.baseVisual ? `Lo que se ve en la foto: ${h.baseVisual}` : null,
+        `Origen: recorrido ${h.rondin.numero}${h.parada ? `, parada ${h.parada.orden}` : ""}.`,
+      ].filter(Boolean).join("\n"),
+      // La seguridad entra con prioridad alta: es lo unico del rondin que no
+      // puede esperar a que alguien la acomode en su cola.
+      priority: h.categoria === "SEGURIDAD" ? "HIGH" : "MEDIUM",
+      assetId: h.assetId,
+      siteId: h.asset?.siteId ?? h.rondin.siteId ?? null,
+      locationId: h.asset?.locationId ?? h.parada?.locationId ?? null,
+      requestedById: userId,
+    },
+  });
+
+  await prisma.rondinHallazgo.update({
+    where: { id: h.id },
+    data: { estado: "ACEPTADO", workRequestId: solicitud.id, resueltoPorId: userId, resueltoEn: new Date() },
+  });
+
+  // El aviso va por donde van todos: quien revisa solicitudes se entera igual
+  // que si alguien la hubiera levantado a mano.
+  await avisarSolicitudNueva(organizationId, solicitud, { cuerpo: h.titulo }).catch(() => undefined);
+
+  return { ok: true as const, solicitud: { id: solicitud.id, numero } };
 }

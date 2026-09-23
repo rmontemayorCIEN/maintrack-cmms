@@ -211,6 +211,16 @@ export function comparacion(): Fila[] {
       },
     },
     {
+      // El rondin captura en todos los planes; lo que va con el complemento es
+      // que una maquina mire esas fotos. La distincion importa al venderlo: no
+      // se esta cobrando por caminar la planta, se cobra por la revision.
+      grupo: "Inteligencia artificial", concepto: "Revisar las fotos del rondín",
+      celdas: {
+        PROFESSIONAL: { tipo: "complemento", nota: "Con IA Avanzada. El rondín y sus fotos funcionan sin él" },
+        ENTERPRISE: { tipo: "incluido", nota: "Propone hallazgos; usted acepta o descarta" },
+      },
+    },
+    {
       grupo: "Inteligencia artificial", concepto: COMPLEMENTO_IA.nombre,
       celdas: ambos({ tipo: "complemento", nota: `Las ${iaTotal} funciones y ${COMPLEMENTO_IA.operaciones} operaciones más al mes, por ${precio(COMPLEMENTO_IA.precioMensual)} al mes` }),
     },

@@ -74,6 +74,24 @@ async function main() {
     revisar("«las vencidas» lleva al filtro de vencidas", destinoDe("las vencidas")?.ruta === "/work-orders?vencidas=1", destinoDe("las vencidas")?.ruta);
     revisar("«órdenes» a secas sí es la lista completa", destinoDe("órdenes")?.ruta === "/work-orders");
 
+    console.log("\nComo habla la gente de verdad\n");
+    // Estos seis salieron del registro de lo que NO se entendio la primera vez
+    // que alguien lo uso. Nadie dice los nombres exactos de las pantallas.
+    revisar("«abre solicitudes de servicio» —el nombre del menú— llega",
+      destinoDe("Abre solicitudes de servicio")?.ruta === "/requests", destinoDe("Abre solicitudes de servicio")?.ruta);
+    revisar("«pregunte a sus datos» encuentra «pregúntale a tus datos»",
+      destinoDe("Abre pregunte a sus datos")?.ruta === "/consulta", destinoDe("Abre pregunte a sus datos")?.ruta);
+    revisar("«escuchar el parte del día» lleva al inicio, que es donde está",
+      destinoDe("Escuchar el parte del día")?.ruta === "/dashboard", destinoDe("Escuchar el parte del día")?.ruta);
+    // Y lo contrario: nombrar algo concreto NO puede llevar a la lista. Llegar
+    // a una pantalla que se ve bien pero no es la pedida es peor que no llegar.
+    revisar("«el equipo compresor de tornillo» NO cae en la lista de activos",
+      destinoDe("Abre el equipo compresor de tornillo") === null, destinoDe("Abre el equipo compresor de tornillo")?.ruta);
+    revisar("«la orden 124» NO cae en la lista de órdenes",
+      destinoDe("abre la orden 124") === null, destinoDe("abre la orden 124")?.ruta);
+    revisar("   pero «la orden de trabajo», sin número, sí es la lista",
+      destinoDe("abre la orden de trabajo")?.ruta === "/work-orders", destinoDe("abre la orden de trabajo")?.ruta);
+
     console.log("\nLo que NO se reconoce se dice, no se adivina\n");
     // «Ordenes de compra» empieza igual que «ordenes de trabajo» pero NO es lo
     // mismo, y la coincidencia es contra el nombre completo justamente por
@@ -114,18 +132,18 @@ async function main() {
     });
 
     const vieja = await prisma.workOrder.create({
-      data: { organizationId: org.id, number: `V-${sello}`, title: "La más vieja", maintenanceType: "CORRECTIVE",
+      data: { organizationId: org.id, number: "OT-000101", title: "La más vieja", maintenanceType: "CORRECTIVE",
         priority: "MEDIUM", status: "OPEN", siteId: sitio.id, createdAt: new Date(Date.now() - 90 * 86_400_000) },
     });
     await prisma.workOrder.create({
-      data: { organizationId: org.id, number: `N-${sello}`, title: "La de ayer", maintenanceType: "CORRECTIVE",
+      data: { organizationId: org.id, number: "OT-000102", title: "La de ayer", maintenanceType: "CORRECTIVE",
         priority: "MEDIUM", status: "OPEN", siteId: sitio.id, createdAt: new Date(Date.now() - 86_400_000) },
     });
     // Una orden cerrada MAS vieja todavia: no debe ganar, porque «la más
     // antigua» quiere decir «la que lleva más tiempo esperando», no la más
     // vieja de la historia.
     await prisma.workOrder.create({
-      data: { organizationId: org.id, number: `C-${sello}`, title: "Cerrada hace años", maintenanceType: "CORRECTIVE",
+      data: { organizationId: org.id, number: "OT-000103", title: "Cerrada hace años", maintenanceType: "CORRECTIVE",
         priority: "MEDIUM", status: "CLOSED", siteId: sitio.id, createdAt: new Date(Date.now() - 900 * 86_400_000) },
     });
 
@@ -167,6 +185,22 @@ async function main() {
     const suya = await navegar(deMirona, "llévame a los activos");
     revisar("pero lo que sí ve, sí se le abre", suya.json.ruta === "/assets", { ruta: suya.json.ruta });
 
+    console.log("\nLo concreto llega a lo concreto, no a la lista\n");
+    const equipo = await prisma.asset.create({
+      data: { organizationId: org.id, siteId: sitio.id, code: "CMP-77", name: "Compresor de tornillo", criticality: "B" },
+    });
+    const alEquipo = await navegar(deJefa, "abre el equipo compresor de tornillo");
+    revisar("«abre el equipo compresor de tornillo» abre el compresor",
+      alEquipo.json.ruta === `/assets/${equipo.id}`, { ruta: alEquipo.json.ruta });
+    const alFolio = await navegar(deJefa, "abre la orden 101");
+    revisar("«abre la orden <folio>» abre esa orden",
+      alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, folio: vieja.number });
+    // El folio ajeno seguia llevando el sello y por eso no chocaba; ahora que
+    // todos son cortos, se comprueba explicitamente que el de la otra empresa
+    // no aparece aunque su numero se parezca.
+    revisar("   y un folio parecido de otra empresa no se cuela",
+      !String(alFolio.json.ruta ?? "").includes("900"));
+
     console.log("\nCuando no entiende\n");
     const perdida = await navegar(deJefa, "llévame a la luna");
     revisar("no inventa un destino", perdida.json.ruta === null, { ruta: perdida.json.ruta });
@@ -182,7 +216,7 @@ async function main() {
     creadas.push(otra.id);
     const sitioAjeno = await prisma.site.create({ data: { organizationId: otra.id, name: "Ajena", code: "AJ" } });
     const ajena = await prisma.workOrder.create({
-      data: { organizationId: otra.id, number: `AJENA-${sello}`, title: "De otra empresa", maintenanceType: "CORRECTIVE",
+      data: { organizationId: otra.id, number: "OT-000900", title: "De otra empresa", maintenanceType: "CORRECTIVE",
         priority: "MEDIUM", status: "OPEN", siteId: sitioAjeno.id, createdAt: new Date(Date.now() - 400 * 86_400_000) },
     });
     const cruzada = await navegar(deJefa, `llévame a ${ajena.number}`);
@@ -201,6 +235,7 @@ async function main() {
   } finally {
     for (const id of creadas) {
       await prisma.workOrder.deleteMany({ where: { organizationId: id } });
+      await prisma.asset.deleteMany({ where: { organizationId: id } });
       await prisma.site.deleteMany({ where: { organizationId: id } });
       await prisma.user.deleteMany({ where: { organizationId: id } });
       await prisma.aiUsage.deleteMany({ where: { organizationId: id } });

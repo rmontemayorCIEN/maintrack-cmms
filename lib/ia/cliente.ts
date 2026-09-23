@@ -150,6 +150,18 @@ export async function analizarConIa<T extends z.ZodType>(params: {
   esfuerzo?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Imagen a analizar, en base64 y con su tipo. */
   imagen?: { base64: string; tipo: "image/jpeg" | "image/png" | "image/webp" };
+  /**
+   * Varias imagenes de una vez, cada una con su etiqueta.
+   *
+   * La etiqueta va como texto JUSTO ANTES de su imagen, y no es adorno: sin
+   * ella el modelo ve un monton de fotos sueltas y no puede decir cual es
+   * cual. Con ella puede contestar «en la foto de la parada 3», que es lo
+   * unico que hace el hallazgo util para quien lo lee.
+   *
+   * Cada imagen cuesta del orden de mil seiscientos tokens de entrada, asi
+   * que quien llame acota cuantas manda: no es lo mismo doce que doscientas.
+   */
+  imagenes?: Array<{ base64: string; tipo: "image/jpeg" | "image/png" | "image/webp"; etiqueta: string }>;
 }): Promise<ResultadoIa<z.infer<T>>> {
   const modelo = params.modelo ?? MODELO_PREDETERMINADO;
   const client = obtenerCliente();
@@ -177,15 +189,41 @@ export async function analizarConIa<T extends z.ZodType>(params: {
       model: modelo,
       max_tokens: params.maxTokens ?? 16000,
       system: params.sistema,
-      thinking: { type: "adaptive" },
+      /**
+       * Haiku no admite ni pensamiento adaptativo ni nivel de esfuerzo: la
+       * API contesta 400 y la llamada se pierde entera. Los dos rechazos son
+       * distintos y aparecen uno tras otro, asi que quien lo descubra por las
+       * malas lo va a descubrir dos veces.
+       *
+       * Se detecta aqui y no en cada funcion a proposito: quien elija Haiku
+       * para una tarea barata no tiene por que saber esto, y si dependiera de
+       * acordarse, el primer olvido seria una funcion que nunca contesta. Y el
+       * fallo se disfraza de otra cosa: quien la llame ve un «no se pudo»
+       * normal, no un modelo mal configurado.
+       */
+      ...(modelo.includes("haiku") ? {} : { thinking: { type: "adaptive" as const } }),
       output_config: {
-        effort: params.esfuerzo ?? "high",
+        // El esfuerzo va solo donde se admite; ver la nota de arriba.
+        ...(modelo.includes("haiku") ? {} : { effort: params.esfuerzo ?? "high" }),
         format: { type: "json_schema", schema: esquemaJson },
       },
       messages: [
         {
           role: "user",
-          content: params.imagen
+          content: params.imagenes?.length
+            ? [
+                // Cada foto anunciada por su etiqueta, y el encargo al final:
+                // asi el modelo ya vio todo cuando lee que tiene que hacer.
+                ...params.imagenes.flatMap((img) => [
+                  { type: "text" as const, text: img.etiqueta },
+                  {
+                    type: "image" as const,
+                    source: { type: "base64" as const, media_type: img.tipo, data: img.base64 },
+                  },
+                ]),
+                { type: "text" as const, text: mensaje },
+              ]
+            : params.imagen
             ? [
                 {
                   type: "image" as const,
