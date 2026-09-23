@@ -55,6 +55,8 @@ export function PanelConsulta({
   /** Cual respuesta se esta oyendo. Solo una a la vez. */
   const [sonando, setSonando] = useState<number | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
+  /** Si se enseñan las sugerencias cuando ya hubo preguntas. */
+  const [verEjemplos, setVerEjemplos] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
 
   /** Copiar la respuesta, para pegarla en un correo o en una junta. */
@@ -160,6 +162,18 @@ export function PanelConsulta({
   return (
     <div className="grid gap-4">
       <Card>
+        {/**
+          * Escribir o hablar, uno al lado del otro.
+          *
+          * El boton de voz estaba al FINAL, debajo de los ejemplos: una fila de
+          * sugerencias que ocupa dos o tres renglones lo empujaba fuera de la
+          * vista, y ademas cambiaba de sitio —los ejemplos desaparecian tras la
+          * primera pregunta y el boton subia de golpe—. Un control que se mueve
+          * es un control que no se encuentra.
+          *
+          * Elegir como preguntar se hace ANTES de preguntar, no despues de leer
+          * sugerencias. Por eso van juntos y en un lugar fijo.
+          */}
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             className="field"
@@ -170,43 +184,73 @@ export function PanelConsulta({
             maxLength={500}
             disabled={cargando || restantes < 1}
           />
-          <Button onClick={() => preguntar(pregunta)} disabled={cargando || pregunta.trim().length < 5 || restantes < 1}>
-            {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-            {cargando ? "Consultando…" : "Preguntar"}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            {conVoz ? (
+              <button
+                type="button"
+                onClick={() => setModo("voz")}
+                disabled={restantes < 1}
+                title="Preguntar hablando y escuchar la respuesta"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/60 px-3 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+              >
+                <Volume2 className="h-4 w-4" aria-hidden />
+                <span className="sm:hidden">Hablar</span>
+                <span className="hidden sm:inline">Hablar y escuchar</span>
+              </button>
+            ) : null}
+            <Button onClick={() => preguntar(pregunta)} disabled={cargando || pregunta.trim().length < 5 || restantes < 1}>
+              {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              {cargando ? "Consultando…" : "Preguntar"}
+            </Button>
+          </div>
         </div>
 
         {restantes < 1 ? (
           <p className="mt-2 text-[0.6875rem] text-amber-700">
             Se agotaron las operaciones de IA de este mes. Se renuevan el dia 1.
           </p>
-        ) : turnos.length === 0 ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {ejemplos.map((e) => (
+        ) : (
+          /**
+           * Las sugerencias siguen estando despues de la primera pregunta.
+           *
+           * Antes desaparecian para siempre, y quien ya habia preguntado algo
+           * se quedaba sin ideas justo cuando empezaba a entender que se le
+           * podia pedir. Se recogen en un renglon que se abre, para que no
+           * estorben a quien ya sabe que preguntar.
+           */
+          <div className="mt-3">
+            {turnos.length > 0 ? (
               <button
-                key={e}
                 type="button"
-                onClick={() => preguntar(e)}
-                disabled={cargando}
-                className="rounded-full border border-slate-200 px-2.5 py-1 text-[0.6875rem] text-slate-600 hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50"
+                onClick={() => setVerEjemplos((v) => !v)}
+                className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-brand-700 hover:underline"
               >
-                {e}
+                {verEjemplos ? "Ocultar ejemplos" : "¿Qué más le puedo preguntar?"}
               </button>
-            ))}
+            ) : (
+              <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-400">
+                Puede preguntar cosas como
+              </p>
+            )}
+            {turnos.length === 0 || verEjemplos ? (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {ejemplos.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => preguntar(e)}
+                    disabled={cargando}
+                    className="rounded-full border border-slate-200 px-2.5 py-1 text-[0.6875rem] text-slate-600 hover:border-brand-300 hover:bg-brand-50 disabled:opacity-50"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
 
         {error ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p> : null}
-
-        {conVoz ? (
-          <button
-            type="button"
-            onClick={() => setModo("voz")}
-            className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/60 px-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
-          >
-            <Volume2 className="h-4 w-4" /> Prefiero preguntar y escuchar
-          </button>
-        ) : null}
       </Card>
 
       {turnos.map((t, i) => (

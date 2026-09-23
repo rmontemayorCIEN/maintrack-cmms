@@ -5,7 +5,7 @@ import { useZona } from "@/components/zona-empresa";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Plus, Search } from "lucide-react";
+import { Bell, LogOut, MessageCircleQuestion, Plus, Search } from "lucide-react";
 import { BotonAyuda } from "./ayuda";
 import { VozNavegar } from "./voz-navegar";
 import { Avatar } from "@/components/ui";
@@ -19,12 +19,15 @@ export function Topbar({
   user,
   empresa,
   vozNavegar = false,
+  consulta = false,
 }: {
   user: { name: string; email: string; role: string; color: string };
   /** La empresa activa: en el teléfono el menú lateral no se ve y hay que decirla aquí. */
   empresa: string;
   /** Si el plan trae «llévame a…». */
   vozNavegar?: boolean;
+  /** Si esta persona puede preguntarle a sus datos. */
+  consulta?: boolean;
 }) {
   const zona = useZona();
   const router = useRouter();
@@ -123,6 +126,20 @@ export function Topbar({
             dónde ir en vez de escribirlo. En todas las pantallas, porque
             moverse se hace desde donde uno está. */}
         {vozNavegar ? <VozNavegar /> : null}
+        {/* Preguntarle a los datos es buscar con palabras: vive junto a la
+            lupa y al micrófono, no enterrado en la sexta sección del menú.
+            Y no pertenece a ninguna sección: sirve para lo de hoy —«cuántas
+            vencidas tengo»— y para lo del mes pasado. */}
+        {consulta ? (
+          <Link
+            href="/consulta"
+            aria-label="Pregúntele a sus datos"
+            title="Pregúntele a sus datos"
+            className="grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100"
+          >
+            <MessageCircleQuestion className="h-4 w-4 text-slate-600" />
+          </Link>
+        ) : null}
         {/* Solo a quien puede crear ordenes: al solicitante o al tecnico el boton
             los llevaba a un formulario que el servidor les rechaza al guardar. */}
         {can(user.role, "workorder:write") ? (

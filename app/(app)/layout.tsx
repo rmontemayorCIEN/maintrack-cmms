@@ -53,6 +53,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           /* El micrófono de «llévame a…» solo si el plan lo trae. No depende
              de la llave del modelo: interpretar lo dicho no pasa por él. */
           vozNavegar={iaDeLaOrganizacion(user.organization).funciones.includes("NAVEGAR")}
+          /* Solo a quien de verdad puede abrirla: la misma tabla que el menú,
+             para no ofrecer un atajo que acabe en «Sin permiso». */
+          consulta={puedeVerRuta(user.role, "/consulta", { esSuperAdmin: user.isSuperAdmin, esDemo })}
         />
         {esDemo ? <BandaDemo /> : null}
         <EstadoConexion />

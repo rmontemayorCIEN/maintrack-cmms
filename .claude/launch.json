@@ -37,6 +37,20 @@
         "3002"
       ],
       "port": 3002
+    },
+    {
+      "name": "maintrack-pantallas-ia",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ANTHROPIC_API_KEY=sk-ant-solover",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3003"
+      ],
+      "port": 3003
     }
   ]
 }

@@ -195,11 +195,19 @@ async function main() {
     const alFolio = await navegar(deJefa, "abre la orden 101");
     revisar("«abre la orden <folio>» abre esa orden",
       alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, folio: vieja.number });
-    // El folio ajeno seguia llevando el sello y por eso no chocaba; ahora que
-    // todos son cortos, se comprueba explicitamente que el de la otra empresa
-    // no aparece aunque su numero se parezca.
-    revisar("   y un folio parecido de otra empresa no se cuela",
-      !String(alFolio.json.ruta ?? "").includes("900"));
+    /**
+     * Que no sea la orden de la otra empresa: se compara contra SU
+     * identificador, no contra su número.
+     *
+     * Buscar «900» dentro de la ruta fallaba sola cada tantas corridas: la
+     * ruta lleva un identificador aleatorio de veinticinco caracteres, y de
+     * vez en cuando contiene «900» por pura casualidad. Es el mismo error que
+     * la revisión del secreto de las credenciales —comprobar un fragmento de
+     * texto contra un valor aleatorio— y se ve igual de raro: una prueba que
+     * pasa casi siempre y un día no.
+     */
+    revisar("   y es exactamente esa orden, no otra que se le parezca",
+      alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, esperada: `/work-orders/${vieja.id}` });
 
     console.log("\nCuando no entiende\n");
     const perdida = await navegar(deJefa, "llévame a la luna");
