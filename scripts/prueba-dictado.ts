@@ -20,13 +20,13 @@
  *
  *   npx tsx scripts/prueba-dictado.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { unirDictado, MAXIMO_SEGUNDOS_DICTADO } from "../lib/dictado";
 import { iaDeLaOrganizacion } from "../lib/planes";
 import { puedeUsarIa } from "../lib/ia/consumo";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 const PUERTO = 3217;
 const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO}`;
@@ -55,7 +55,7 @@ const periodo = () => new Date().toISOString().slice(0, 7);
 async function main() {
   let servidor: ChildProcess | null = null;
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", String(PUERTO), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: PUERTO });
   }
 
   const sello = `dic-${Date.now()}`;

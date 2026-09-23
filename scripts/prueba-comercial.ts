@@ -13,11 +13,11 @@
  * Al terminar borra lo que creó y comprueba que las demás empresas quedaron
  * exactamente como estaban.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { SignJWT } from "jose";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -59,7 +59,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3209";
   // Con el alta abierta, para probar la contratación que crea la cuenta. La cerrada se prueba aparte, llamando a la ruta.
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "dev", "-p", "3209", "-H", "127.0.0.1"], { stdio: "ignore", detached: true, env: { ...process.env, ALLOW_PUBLIC_SIGNUP: "true" } });
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: 3209, env: { ALLOW_PUBLIC_SIGNUP: "true" } });
 
   const sello = `pc-${Date.now()}`;
   const dominio = `${sello}.prueba.mx`;

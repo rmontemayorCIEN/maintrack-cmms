@@ -9,7 +9,8 @@
  * Nada de esto toca produccion: levanta su propio servidor contra la base de
  * desarrollo y trabaja con empresas que crea y borra.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
+import { levantarServidor as arrancar } from "./servidor-de-prueba";
 import { readFileSync } from "node:fs";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/db";
@@ -45,9 +46,17 @@ export async function esperarServidor(base: string, limiteMs = 240_000) {
   throw new Error(`El servidor no respondió en ${limiteMs / 1000} s`);
 }
 
+/**
+ * Levanta el servidor, o no lo levanta si ya hay uno al que apuntar.
+ *
+ * Delega en `servidor-de-prueba` en vez de hacer su propio `spawn`: ahi es
+ * donde se guarda lo que el servidor escribe. Tenia el suyo con
+ * `stdio: "ignore"`, asi que las tres pruebas que pasan por aqui eran tres
+ * mas sin log cuando hacia falta.
+ */
 export function levantarServidor(puerto: number): ChildProcess | null {
   if (process.env.BASE_URL) return null;
-  return spawn("npx", ["next", "dev", "-p", String(puerto), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  return arrancar({ puerto });
 }
 
 export type Respuesta = { status: number; json: Record<string, unknown>; texto: string };

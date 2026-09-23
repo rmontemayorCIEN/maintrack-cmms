@@ -14,10 +14,10 @@
  *
  *   npx tsx scripts/prueba-avisos-atendidos.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -66,7 +66,7 @@ async function main() {
 
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3205";
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "dev", "-p", "3205", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: 3205 });
 
   const sello = `at-${Date.now()}`;
   const creadas: string[] = [];

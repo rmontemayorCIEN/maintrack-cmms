@@ -36,6 +36,7 @@ import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SignJWT } from "jose";
+import { levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -203,7 +204,7 @@ async function main() {
   }
 
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "start", "-p", String(PUERTO_APP), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: PUERTO_APP, modo: "start" });
   }
   const perfil = join(tmpdir(), `mt-chrome-${Date.now()}`);
   /**

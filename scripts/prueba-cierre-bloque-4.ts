@@ -15,7 +15,7 @@
  *
  *   npx tsx scripts/prueba-cierre-bloque-4.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
@@ -31,7 +31,7 @@ import { catalogosIndispensables, catalogosPara, sitioInicialPara } from "../lib
 import { puestaEnMarcha } from "../lib/puesta-en-marcha";
 import { comenzarAOperar } from "../lib/puesta-en-marcha-acciones";
 import { asignarPlan } from "../lib/asignaciones";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -89,7 +89,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3203";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3203", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3203 });
   }
 
   const sello = `b4c-${Date.now()}`;

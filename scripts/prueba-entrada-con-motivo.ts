@@ -18,10 +18,10 @@
  *
  *   npx tsx scripts/prueba-entrada-con-motivo.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 const PUERTO = 3195;
 const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO}`;
@@ -48,7 +48,7 @@ async function esperarServidor(limiteMs = 120_000) {
 async function main() {
   let servidor: ChildProcess | null = null;
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", String(PUERTO), "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: PUERTO });
   }
 
   const sello = `mot-${Date.now()}`;

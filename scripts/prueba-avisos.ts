@@ -11,11 +11,11 @@
  *
  *   npx tsx scripts/prueba-avisos.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { SignJWT } from "jose";
-import { apagarServidor } from "./apagar-servidor";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -76,7 +76,7 @@ async function main() {
 
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3204";
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "dev", "-p", "3204", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: 3204 });
 
   // Receptor de webhooks local: responde lo que se le pida, guarda lo que llega.
   const recibidos: Array<{ headers: Record<string, string>; cuerpo: string }> = [];
