@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { BotonAyuda } from "./ayuda";
+import { VozNavegar } from "./voz-navegar";
 import { Avatar } from "@/components/ui";
 import { ROLE_LABELS } from "@/lib/constants";
 import { PuntoPrioridad, EstadoAviso, type AvisoVista } from "@/components/avisos/aviso";
@@ -17,10 +18,13 @@ type Notification = AvisoVista;
 export function Topbar({
   user,
   empresa,
+  vozNavegar = false,
 }: {
   user: { name: string; email: string; role: string; color: string };
   /** La empresa activa: en el teléfono el menú lateral no se ve y hay que decirla aquí. */
   empresa: string;
+  /** Si el plan trae «llévame a…». */
+  vozNavegar?: boolean;
 }) {
   const zona = useZona();
   const router = useRouter();
@@ -115,6 +119,10 @@ export function Topbar({
         <Link href="/search" aria-label="Buscar" className="grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100 md:hidden">
           <Search className="h-4 w-4 text-slate-600" />
         </Link>
+        {/* Junto a la búsqueda, que es lo mismo por otro camino: se dice a
+            dónde ir en vez de escribirlo. En todas las pantallas, porque
+            moverse se hace desde donde uno está. */}
+        {vozNavegar ? <VozNavegar /> : null}
         {/* Solo a quien puede crear ordenes: al solicitante o al tecnico el boton
             los llevaba a un formulario que el servidor les rechaza al guardar. */}
         {can(user.role, "workorder:write") ? (

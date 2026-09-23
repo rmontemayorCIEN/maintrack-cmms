@@ -184,6 +184,16 @@ export const REQUEST_STATUS_LABELS: Record<string, string> = {
   REJECTED: "Rechazada",
   CONVERTED: "Convertida en OT",
 };
+/**
+ * Las solicitudes que siguen esperando algo de alguien.
+ *
+ * Rechazada y Convertida ya terminaron su vida: la primera porque se decidio
+ * que no, la segunda porque ya es una orden de trabajo y el seguimiento pasa
+ * a la orden. Vive aqui, junto a las etiquetas, para que nadie vuelva a
+ * escribir la lista a mano en una consulta.
+ */
+export const REQUEST_OPEN_STATUSES = ["PENDING", "APPROVED"];
+
 export const REQUEST_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800 border-amber-200",
   APPROVED: "bg-blue-100 text-blue-700 border-blue-200",

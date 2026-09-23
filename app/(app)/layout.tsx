@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { puedeVerRuta } from "@/lib/pantallas";
+import { iaDeLaOrganizacion } from "@/lib/planes";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 import { BarraMovil } from "@/components/shell/barra-movil";
@@ -49,6 +50,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Topbar
           user={{ name: user.name, email: user.email, role: user.role, color: user.color }}
           empresa={user.organization.name}
+          /* El micrófono de «llévame a…» solo si el plan lo trae. No depende
+             de la llave del modelo: interpretar lo dicho no pasa por él. */
+          vozNavegar={iaDeLaOrganizacion(user.organization).funciones.includes("NAVEGAR")}
         />
         {esDemo ? <BandaDemo /> : null}
         <EstadoConexion />

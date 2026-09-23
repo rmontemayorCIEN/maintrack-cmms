@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -31,7 +31,7 @@ export type DefinicionFuncionIA = {
  * Quien agregue una funcion aqui tiene que darle su cupo en los dos planes
  * (`lib/planes.ts`) y su caso en `puedeUsarIa`, o se quedara sin limite.
  */
-export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO"] as const;
+export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO", "NAVEGAR"] as const;
 
 /**
  * Las funciones con bolsa propia, como tipo.
@@ -51,6 +51,13 @@ export function tieneBolsaPropia(clave: string): clave is ClaveConBolsa {
 }
 
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
+  NAVEGAR: {
+    nombre: "Navegar hablando",
+    descripcion:
+      "Decir a dónde quiere ir y que el sistema lo lleve: «llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3». Lo que se dice se interpreta con reglas, no con el modelo: es instantáneo y solo cuesta oír.",
+    operaciones: 1,
+    disponible: true,
+  },
   DICTADO: {
     nombre: "Dictado del técnico",
     descripcion:

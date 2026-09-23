@@ -101,6 +101,8 @@ const AL_AGOTARSE: Record<ClaveConBolsa, (cupo: number) => string> = {
     `Se agotaron las preguntas de ayuda de este mes (${cupo}). Se renuevan el dia 1. La ayuda escrita de cada pantalla sigue disponible sin limite.`,
   BRIEF: (cupo) =>
     `Se agotaron los partes del dia de este mes (${cupo}). Se renuevan el dia 1. Lo que dice el parte sigue en el inicio, escrito.`,
+  NAVEGAR: (cupo) =>
+    `Se agotaron los comandos de voz de este mes (${cupo}). Se renuevan el dia 1. El menu y la busqueda siguen igual.`,
   DICTADO: (cupo) =>
     `Se agotaron los dictados de este mes (${cupo}). Se renuevan el dia 1. Puede escribir el cierre a mano, y la codificacion con IA sigue funcionando igual.`,
 };
@@ -204,10 +206,15 @@ export async function registrarVoz(datos: {
 }
 
 /**
- * Lo que costo oir.
+ * Lo que costo oir. Sirve para el dictado y para los comandos de voz.
  *
- * Gemelo de `registrarVoz`, con una diferencia que importa: el dictado SI
- * consume bolsa —la suya, no la del plan—, asi que este registro no es solo
+ * Lleva `funcion` porque son dos bolsas distintas y tienen que serlo: el
+ * tecnico que dicta cierres no puede quedarse sin poder navegar, ni al reves.
+ * Era una funcion sola para el dictado y al llegar la navegacion iba a ser la
+ * segunda copia.
+ *
+ * Gemelo de `registrarVoz`, con una diferencia que importa: esto SI consume
+ * bolsa —la suya, no la del plan—, asi que el registro no es solo
  * contabilidad, es lo que cuenta `puedeUsarIa`. Si no se guarda, el cupo no
  * baja nunca.
  *
@@ -223,32 +230,43 @@ export async function registrarVoz(datos: {
  * ya escucho— pero no se le descuenta al cliente. Cobrarle el ruido de la
  * planta seria cobrarle por nada.
  */
-export async function registrarDictado(datos: {
+export async function registrarEscucha(datos: {
   organizationId: string;
   userId?: string | null;
+  funcion: "DICTADO" | "NAVEGAR";
   segundos: number;
   costoUsd: number;
   ok: boolean;
+  /**
+   * Que se dijo, cuando no se pudo con ello.
+   *
+   * Solo se guarda en el caso fallido, y es lo que despues dice si hacen falta
+   * mas formas de pedir las cosas o si de plano conviene un modelo de
+   * respaldo. Sin esto, «no le entendi» seria un callejon sin salida: nadie
+   * sabria nunca QUE fue lo que no se entendio.
+   */
+  noSeEntendio?: string | null;
 }) {
   try {
     await prisma.aiUsage.create({
       data: {
         organizationId: datos.organizationId,
         userId: datos.userId ?? null,
-        funcion: "DICTADO",
+        funcion: datos.funcion,
         modelo: "speech-v2",
         inputTokens: Math.round(datos.segundos),
-        operaciones: datos.ok ? FUNCIONES_IA.DICTADO.operaciones : 0,
+        operaciones: datos.ok ? FUNCIONES_IA[datos.funcion].operaciones : 0,
         costoUsd: datos.costoUsd,
         periodo: periodoActual(),
         ok: datos.ok,
+        error: datos.ok ? null : (datos.noSeEntendio ?? null)?.slice(0, 500) ?? null,
       },
     });
   } catch (error) {
     // Mismo criterio que la voz: una empresa de prueba que ya no existe no
     // vale un grito. Lo demas si se reporta.
     const codigo = (error as { code?: string })?.code;
-    if (codigo !== "P2003") console.error("No se pudo registrar el dictado:", error);
+    if (codigo !== "P2003") console.error("No se pudo registrar lo que se oyo:", error);
   }
 }
 

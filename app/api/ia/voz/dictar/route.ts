@@ -1,6 +1,6 @@
 import { fail, ok, withAuth } from "@/lib/api";
 import { escuchar, MAXIMO_SEGUNDOS_DICTADO, USD_POR_SEGUNDO } from "@/lib/escucha";
-import { puedeUsarIa, registrarDictado } from "@/lib/ia/consumo";
+import { puedeUsarIa, registrarEscucha } from "@/lib/ia/consumo";
 
 /**
  * El cierre de la orden, dictado.
@@ -96,8 +96,9 @@ export async function POST(request: Request) {
      * le toca. Si falla, `registrarDictado` lo reporta y no lanza.
      */
     const segundos = oido.segundosFacturados;
-    void registrarDictado({
+    void registrarEscucha({
       organizationId: orgId,
+      funcion: "DICTADO",
       userId: user.id,
       // Cuando Google no reporta la duracion se guarda cero y se ve como tal
       // en la consola. Es preferible a repartir un promedio inventado sobre

@@ -239,6 +239,15 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Solo aparece lo que su rol puede abrir, y siempre de su empresa: quien reporta encuentra sus reportes, no los de otros.",
       "El folio exacto sale primero. Cada registro aparece una sola vez.",
       "Para preguntas en lenguaje natural, use Pregunte a sus datos.",
+      "También se puede decir a dónde ir, sin escribir: el micrófono de la barra de arriba lleva a donde usted pida —«llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3»—. Lo que se dice se interpreta con reglas, así que es inmediato; si no lo entiende, le enseña lo que oyó y ejemplos de lo que sí puede decir. Nunca lleva a una pantalla que su perfil no puede abrir.",
+    ],
+    botones: [
+      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Diga a dónde quiere ir y lo lleva. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo el micrófono en la barra de arriba", porque: "El navegador no puede grabar, o el plan no incluye los comandos de voz. La búsqueda y el menú hacen lo mismo escribiendo." },
+      { sintoma: "Dije una pantalla y me contesta que no está disponible para mi perfil", porque: "Es correcto: la voz no abre nada que su rol no pueda ver. Es la misma regla del menú." },
+      { sintoma: "Me llevó a la búsqueda en vez de al equipo que dije", porque: "Lo que dijo coincide con más de un registro. Preferimos que usted elija a llevarlo al equivocado sin que se note." },
     ],
   },
 

@@ -118,11 +118,12 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Diagnóstico semanal con inteligencia artificial",
       "El parte del día, para escucharlo camino a la planta",
       "El técnico cierra la orden dictándola, con el teléfono y las manos ocupadas",
+      "Decir a dónde ir y que el sistema lo lleve, desde cualquier pantalla",
       "El inicio y el almacén con su franja: se ve el estado antes de leerlo",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
-    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200 } },
+    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200, NAVEGAR: 1200 } },
   },
   ENTERPRISE: {
     nombre: "Enterprise",
@@ -138,7 +139,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000 } },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000 } },
   },
 };
 
