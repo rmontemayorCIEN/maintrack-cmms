@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -31,9 +31,33 @@ export type DefinicionFuncionIA = {
  * Quien agregue una funcion aqui tiene que darle su cupo en los dos planes
  * (`lib/planes.ts`) y su caso en `puedeUsarIa`, o se quedara sin limite.
  */
-export const CON_BOLSA_PROPIA: ClaveFuncionIA[] = ["AYUDA", "BRIEF"];
+export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO"] as const;
+
+/**
+ * Las funciones con bolsa propia, como tipo.
+ *
+ * Sale de la lista de arriba a proposito, y no es un detalle de estilo: con
+ * esto `lib/planes.ts` esta OBLIGADO a darle cupo a cada una en los dos
+ * planes, porque el tipo del mapa de bolsas se deriva de aqui. Antes eran dos
+ * campos sueltos —`operacionesAyuda`, `operacionesBrief`— y agregar una
+ * tercera sin su cupo compilaba: quedaba sin limite ninguno y nadie se
+ * enteraba hasta la factura.
+ */
+export type ClaveConBolsa = (typeof CON_BOLSA_PROPIA)[number];
+
+/** Si esta funcion se raciona aparte y NO toca la bolsa del plan. */
+export function tieneBolsaPropia(clave: string): clave is ClaveConBolsa {
+  return (CON_BOLSA_PROPIA as readonly string[]).includes(clave);
+}
 
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
+  DICTADO: {
+    nombre: "Dictado del técnico",
+    descripcion:
+      "El técnico cierra la orden hablándole al teléfono, en el piso y con las manos sucias, en vez de escribir. Lo que dicta se transcribe y queda en el texto del cierre, que es de donde sale todo lo demás.",
+    operaciones: 1,
+    disponible: true,
+  },
   BRIEF: {
     nombre: "Brief del día, para escuchar",
     descripcion:

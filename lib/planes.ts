@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { FUNCIONES_IA, type ClaveFuncionIA } from "./ia/funciones";
+import { FUNCIONES_IA, type ClaveConBolsa, type ClaveFuncionIA } from "./ia/funciones";
 
 /**
  * Catalogo comercial: que incluye cada plan y hasta donde llega.
@@ -47,16 +47,23 @@ export type DefinicionPlan = {
     operaciones: number;
     funciones: ClaveFuncionIA[];
     /**
-     * Bolsa aparte para la ayuda con IA.
+     * Las bolsas que NO salen de las operaciones del plan.
      *
-     * No sale de las operaciones del plan a proposito: preguntar como se usa
-     * el sistema no debe competir con generar un plan de mantenimiento, y un
-     * usuario que se atora y no puede preguntar no compra el plan de arriba,
-     * se va. Por eso hasta los planes sin IA la traen.
+     * La ayuda va aparte porque preguntar como se usa el sistema no debe
+     * competir con generar un plan de mantenimiento: un usuario que se atora y
+     * no puede preguntar no compra el plan de arriba, se va. Por eso hasta los
+     * planes sin IA la traen.
+     *
+     * El parte del dia y el dictado del tecnico van aparte por lo mismo, y el
+     * dictado con mas razon todavia: es la funcion que hace que el sistema se
+     * llene de datos. Si dictar el cierre le quitara un diagnostico al jefe,
+     * el tecnico volveria a escribir con el pulgar —o a no escribir—, que es
+     * el problema que vino a resolver.
+     *
+     * El mapa lo exige el tipo: agregar una funcion a `CON_BOLSA_PROPIA` sin
+     * darle cupo aqui ya no compila.
      */
-    operacionesAyuda: number;
-    /** El parte del dia, aparte: se escucha a diario y cuesta centavos. */
-    operacionesBrief: number;
+    bolsas: Record<ClaveConBolsa, number>;
   };
 };
 
@@ -110,11 +117,12 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "100 GB para fotos, videos y documentos",
       "Diagnóstico semanal con inteligencia artificial",
       "El parte del día, para escucharlo camino a la planta",
+      "El técnico cierra la orden dictándola, con el teléfono y las manos ocupadas",
       "El inicio y el almacén con su franja: se ve el estado antes de leerlo",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
-    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 60, operacionesBrief: 90 },
+    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200 } },
   },
   ENTERPRISE: {
     nombre: "Enterprise",
@@ -130,7 +138,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200, operacionesBrief: 90 },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000 } },
   },
 };
 
@@ -156,10 +164,12 @@ export function iaDeLaOrganizacion(org: { plan: string; iaComplemento: boolean; 
   }
   return {
     operaciones: base.operaciones + (org.iaComplemento ? COMPLEMENTO_IA.operaciones : 0) + (org.iaExtra ?? 0),
-    /** La bolsa de ayuda no la altera el complemento: ya viene generosa. */
-    operacionesAyuda: base.operacionesAyuda,
-    /** La del parte tampoco: tres al dia es mas de lo que nadie escucha. */
-    operacionesBrief: base.operacionesBrief,
+    /**
+     * Las bolsas propias NO las altera el complemento, y es deliberado: ya
+     * vienen generosas, y el complemento se vende por lo caro y puntual
+     * —planes, levantamientos, procedimientos—, no por poder dictar mas.
+     */
+    bolsas: base.bolsas,
     funciones: [...funciones],
     /** Si el plan por si solo no da IA, el complemento es la unica via. */
     soloPorComplemento: base.operaciones === 0,

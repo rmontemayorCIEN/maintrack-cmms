@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BotonDictado, unirDictado } from "@/components/boton-dictado";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Pause, Play, Sparkles } from "lucide-react";
 import { Dialogo } from "@/components/ui/dialogo";
@@ -28,6 +29,7 @@ export function WorkOrderActions({
   esOrdenDeFalla,
   puedeGestionarCatalogos = false,
   iaDisponible = false,
+  dictadoDisponible = false,
   rol,
   iniciada,
   conResponsable,
@@ -94,6 +96,7 @@ export function WorkOrderActions({
   puedeGestionarCatalogos?: boolean;
   /** Si el plan de la empresa incluye el asistente de cierre. */
   iaDisponible?: boolean;
+  dictadoDisponible?: boolean;
 }) {
   const router = useRouter();
   function clavesDeFalla() {
@@ -618,8 +621,21 @@ export function WorkOrderActions({
               ) : null}
 
               <div>
-                <div className="mb-1 flex items-end justify-between gap-2">
+                <div className="mb-1 flex flex-col items-start gap-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
                   <label className="label mb-0">Solución aplicada o resumen del trabajo *</label>
+                  <div className="flex flex-wrap items-end gap-2">
+                  {/* Dictar va PRIMERO porque es lo primero que se hace:
+                      se cuenta lo que paso y despues se codifica. Y va
+                      antes que «Codificar con IA» tambien porque ese boton
+                      esta apagado hasta que haya texto, asi que el orden de
+                      la pantalla es el orden del trabajo. */}
+                  {dictadoDisponible ? (
+                    <BotonDictado
+                      onTexto={(t) =>
+                        setCloseForm((f) => ({ ...f, resolution: unirDictado(f.resolution, t) }))
+                      }
+                    />
+                  ) : null}
                   {iaDisponible ? (
                     <button
                       type="button"
@@ -630,12 +646,16 @@ export function WorkOrderActions({
                           ? "Escriba primero que hizo, aunque sea en pocas palabras"
                           : "La IA propone código de falla, causa raiz y refacciones"
                       }
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[0.6875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-40"
+                      /* `min-h-9` para que empareje con «Dictar» y, sobre todo,
+                         para que se pueda tocar con guante: los dos se usan en
+                         el mismo momento y desde el mismo teléfono. */
+                      className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[0.6875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-40"
                     >
                       {sugiriendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                       {sugiriendo ? "Analizando…" : "Codificar con IA"}
                     </button>
                   ) : null}
+                  </div>
                 </div>
                 <textarea
                   aria-label="Solución aplicada o resumen del trabajo"

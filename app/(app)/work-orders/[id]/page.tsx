@@ -432,6 +432,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               {puedeAceptar ? <AceptarOrden workOrderId={wo.id} /> : null}
               {hayAcciones ? <WorkOrderActions
               iaDisponible={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("CIERRE_OT")}
+              /* El dictado NO depende de `iaConfigurada()`: eso mira la llave
+                 del modelo, y transcribir no pasa por el modelo. Amarrarlos
+                 dejaria al tecnico sin microfono por una llave que no usa. */
+              dictadoDisponible={iaDeLaOrganizacion(user.organization).funciones.includes("DICTADO")}
                 workOrderId={wo.id}
                 status={wo.status}
                 failureCodes={failureCodes}

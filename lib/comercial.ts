@@ -182,6 +182,21 @@ export function comparacion(): Fila[] {
       celdas: porPlan((p) => ({ tipo: "limite", valor: `${PLANES[p].ia.funciones.length} de ${iaTotal}` })),
     },
     {
+      /**
+       * El dictado va en los dos planes, y es deliberado aunque sea lo
+       * contrario de lo que se hizo con el chat de voz.
+       *
+       * El chat de voz es para quien ve el panorama —uno o dos por empresa— y
+       * cada vuelta cuesta transcribir, pensar y hablar. El dictado es para
+       * el tecnico en el piso, solo transcribe, y es de donde sale el dato
+       * con el que funciona todo lo demas que el cliente ya paga: sin cierre
+       * bien contado no hay causa raiz, ni MTTR, ni costo por equipo.
+       * Racionarlo por plan seria cobrar por que el sistema sirva.
+       */
+      grupo: "Inteligencia artificial", concepto: "Dictar el cierre de la orden",
+      celdas: ambos({ tipo: "incluido", nota: "Con su propia bolsa: no gasta las operaciones del plan" }),
+    },
+    {
       // El parte del dia se escucha en los dos planes; preguntarle HABLANDO y
       // que conteste es de Enterprise, porque transcribir y sintetizar se
       // cobran por caracter y hay un tope mensual por empresa.

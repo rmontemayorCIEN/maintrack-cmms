@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { iaDeLaOrganizacion } from "../planes";
-import { CON_BOLSA_PROPIA, FUNCIONES_IA, type ClaveFuncionIA } from "./funciones";
+import { FUNCIONES_IA, tieneBolsaPropia, type ClaveConBolsa, type ClaveFuncionIA } from "./funciones";
 import { costoUsd, type UsoTokens } from "./precios";
 
 /**
@@ -48,7 +48,7 @@ export async function consumoIa(organizationId: string, periodo = periodoActual(
     // las dos: la ayuda no se validaba contra la bolsa del plan —eso estaba
     // bien— pero si se la iba consumiendo, que es justo lo que su comentario
     // dice que no debia pasar.
-    if (!CON_BOLSA_PROPIA.includes(r.funcion as ClaveFuncionIA)) delPlan += r.operaciones;
+    if (!tieneBolsaPropia(r.funcion)) delPlan += r.operaciones;
     costo += r.costoUsd;
     tokens += r.inputTokens + r.outputTokens + r.cacheReadTokens + r.cacheWriteTokens;
     if (!r.ok) fallidas += 1;
@@ -79,6 +79,33 @@ export type Veredicto =
   | { permitido: false; motivo: string; motivoCorto: "SIN_PLAN" | "AGOTADO" | "NO_DISPONIBLE" };
 
 /**
+ * Las bolsas propias: cuanto cabe y que decir cuando se acaba.
+ *
+ * ── Por que un solo bloque y no uno por funcion ──
+ *
+ * Eran dos copias casi identicas —la ayuda y el parte del dia— y al llegar el
+ * dictado iban a ser tres. Tres copias de la misma decision es como se
+ * desincronizan: la del medio se corrige y las otras se quedan. El criterio
+ * vive aqui una sola vez, y el tipo obliga a que cada funcion con bolsa
+ * propia tenga su mensaje.
+ *
+ * ── Por que cada mensaje dice algo distinto ──
+ *
+ * Porque lo que le queda a la persona es distinto en cada caso, y eso es lo
+ * unico que de verdad le importa cuando se topa con un limite. «Se agoto» a
+ * secas deja a alguien parado sin saber que hacer; decirle con que sigue
+ * trabajando, no.
+ */
+const AL_AGOTARSE: Record<ClaveConBolsa, (cupo: number) => string> = {
+  AYUDA: (cupo) =>
+    `Se agotaron las preguntas de ayuda de este mes (${cupo}). Se renuevan el dia 1. La ayuda escrita de cada pantalla sigue disponible sin limite.`,
+  BRIEF: (cupo) =>
+    `Se agotaron los partes del dia de este mes (${cupo}). Se renuevan el dia 1. Lo que dice el parte sigue en el inicio, escrito.`,
+  DICTADO: (cupo) =>
+    `Se agotaron los dictados de este mes (${cupo}). Se renuevan el dia 1. Puede escribir el cierre a mano, y la codificacion con IA sigue funcionando igual.`,
+};
+
+/**
  * Revisa plan, disponibilidad de la funcion y bolsa restante.
  *
  * `operador` es el operador de la plataforma trabajando dentro de la empresa
@@ -107,49 +134,14 @@ export async function puedeUsarIa(
     };
   }
 
-  // La ayuda tiene su propia bolsa y su propio conteo: si compartiera la del
-  // plan, una cuenta que gasto sus operaciones en levantamientos se quedaria
-  // sin poder preguntar como se usa el sistema.
-  if (funcion === "AYUDA") {
+  if (tieneBolsaPropia(funcion)) {
+    const cupo = entitlement.bolsas[funcion];
     const usadas = await prisma.aiUsage.count({
-      where: { organizationId: org.id, funcion: "AYUDA", periodo: periodoActual(), ok: true },
+      where: { organizationId: org.id, funcion, periodo: periodoActual(), ok: true },
     });
-    const quedan = entitlement.operacionesAyuda - usadas;
+    const quedan = cupo - usadas;
     if (quedan <= 0) {
-      return {
-        permitido: false,
-        motivoCorto: "AGOTADO",
-        motivo: `Se agotaron las preguntas de ayuda de este mes (${entitlement.operacionesAyuda}). Se renuevan el dia 1. La ayuda escrita de cada pantalla sigue disponible sin limite.`,
-      };
-    }
-    return { permitido: true, restantes: quedan };
-  }
-
-  /**
-   * El parte del dia tambien tiene bolsa propia, por el mismo motivo que la
-   * ayuda y con mas razon.
-   *
-   * Se escucha a diario y se regenera cuando cambian los datos: medido en
-   * produccion, tres veces por dia de uso, unas 66 al mes. La bolsa de
-   * Professional son 20, asi que compartiendo se agotaba en una semana y el
-   * director se encontraba con «se agotaron las operaciones» en la funcion que
-   * mas se presume.
-   *
-   * Y es la funcion mas barata que hay: 0.0092 dolares por llamada, nueve
-   * veces menos que una pregunta de ayuda. Racionarla para que compita con
-   * levantamientos y procedimientos —diez veces mas caros— no tenia sentido.
-   */
-  if (funcion === "BRIEF") {
-    const usadas = await prisma.aiUsage.count({
-      where: { organizationId: org.id, funcion: "BRIEF", periodo: periodoActual(), ok: true },
-    });
-    const quedan = entitlement.operacionesBrief - usadas;
-    if (quedan <= 0) {
-      return {
-        permitido: false,
-        motivoCorto: "AGOTADO",
-        motivo: `Se agotaron los partes del dia de este mes (${entitlement.operacionesBrief}). Se renuevan el dia 1. Lo que dice el parte sigue en el inicio, escrito.`,
-      };
+      return { permitido: false, motivoCorto: "AGOTADO", motivo: AL_AGOTARSE[funcion](cupo) };
     }
     return { permitido: true, restantes: quedan };
   }
@@ -208,6 +200,55 @@ export async function registrarVoz(datos: {
     // valga la pena gritar: el audio ya se entrego. Lo demas si se reporta.
     const codigo = (error as { code?: string })?.code;
     if (codigo !== "P2003") console.error("No se pudo registrar el consumo de voz:", error);
+  }
+}
+
+/**
+ * Lo que costo oir.
+ *
+ * Gemelo de `registrarVoz`, con una diferencia que importa: el dictado SI
+ * consume bolsa —la suya, no la del plan—, asi que este registro no es solo
+ * contabilidad, es lo que cuenta `puedeUsarIa`. Si no se guarda, el cupo no
+ * baja nunca.
+ *
+ * `segundos` son los que Google dice que facturo, no los que duro la
+ * grabacion ni los que el navegador reporto. Es la unica cifra que coincide
+ * con el recibo, y contar por nuestra cuenta seria inventar un numero preciso
+ * que no cuadra con nada.
+ *
+ * Viaja en `inputTokens`, el mismo prestamo de campo que usa la voz para los
+ * caracteres, por no pedir una migracion para esto.
+ *
+ * Un audio que no se entendio se guarda con `ok: false`: cuesta igual —Google
+ * ya escucho— pero no se le descuenta al cliente. Cobrarle el ruido de la
+ * planta seria cobrarle por nada.
+ */
+export async function registrarDictado(datos: {
+  organizationId: string;
+  userId?: string | null;
+  segundos: number;
+  costoUsd: number;
+  ok: boolean;
+}) {
+  try {
+    await prisma.aiUsage.create({
+      data: {
+        organizationId: datos.organizationId,
+        userId: datos.userId ?? null,
+        funcion: "DICTADO",
+        modelo: "speech-v2",
+        inputTokens: Math.round(datos.segundos),
+        operaciones: datos.ok ? FUNCIONES_IA.DICTADO.operaciones : 0,
+        costoUsd: datos.costoUsd,
+        periodo: periodoActual(),
+        ok: datos.ok,
+      },
+    });
+  } catch (error) {
+    // Mismo criterio que la voz: una empresa de prueba que ya no existe no
+    // vale un grito. Lo demas si se reporta.
+    const codigo = (error as { code?: string })?.code;
+    if (codigo !== "P2003") console.error("No se pudo registrar el dictado:", error);
   }
 }
 
