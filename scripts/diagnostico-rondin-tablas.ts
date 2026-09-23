@@ -15,8 +15,12 @@ async function main() {
   // La columna nueva de Attachment: si falta, adjuntar una foto al rondin
   // reventaria, y eso no se ve hasta que alguien lo intenta.
   const conColumna = await prisma.attachment.count({ where: { rondinParadaId: null } });
+  // La segunda migracion: los hallazgos y la marca de cuando se revisaron.
+  const hallazgos = await prisma.rondinHallazgo.count();
+  const revisados = await prisma.rondin.count({ where: { analizadoEn: { not: null } } });
   console.log(`\n  Rondin: ${rondines} · RondinParada: ${paradas} · Attachment legible: ${conColumna}`);
-  console.log("  Las tablas y la columna existen: la migración se aplicó.\n");
+  console.log(`  RondinHallazgo: ${hallazgos} · recorridos ya revisados: ${revisados}`);
+  console.log("  Las tablas y las columnas existen: las dos migraciones se aplicaron.\n");
 }
 
 main()
