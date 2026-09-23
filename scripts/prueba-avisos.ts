@@ -51,6 +51,7 @@ async function esperarServidor(base: string, limiteMs: number) {
 }
 
 const MIN = 60_000;
+const DIA = 24 * 60 * MIN;
 
 async function main() {
   const { prisma } = await import("../lib/db");
@@ -331,8 +332,41 @@ async function main() {
     const env = await enviarResumenes(A.id, cA, lunes8);
     const env2 = await enviarResumenes(A.id, cA, new Date(lunes8.getTime() + 10 * MIN));
     revisar("   se manda una vez por persona por día; quien no tiene nada no recibe", env.diarios > 0 && env2.diarios === 0 && env.vacios > 0, { env, env2 });
+    /**
+     * El resumen semanal mira la semana ANTERIOR a `lunes8`, o sea del 14 al
+     * 21 de septiembre de 2026. Las ordenes que esta prueba crea nacen con la
+     * fecha de HOY, que casi nunca cae ahi: la revision pasaba mientras el
+     * calendario real anduvo dentro de esa semana y empezo a fallar el lunes
+     * 21, sin que nadie hubiera tocado nada.
+     *
+     * Es el mismo defecto del caso 27 de mas abajo con otra cara —una prueba
+     * que depende del dia en que se corre— y el mismo arreglo: sembrar los
+     * datos DENTRO de la ventana que se va a consultar, en vez de confiar en
+     * que la ventana alcance a los datos.
+     *
+     * Van ya completadas a proposito: asi suman a las cifras de la semana sin
+     * aparecer como pendientes ni como vencidas en las revisiones que siguen,
+     * que usan esta misma empresa.
+     */
+    const enLaSemana = (dias: number) => new Date(lunes8.getTime() - dias * DIA);
+    await prisma.workOrder.createMany({
+      data: [1, 2].map((n) => ({
+        organizationId: A.id, number: `SEM-${n}-${sello}`, title: `Trabajo de la semana pasada ${n}`,
+        maintenanceType: "CORRECTIVE", priority: "MEDIUM", status: "COMPLETED", siteId: sitio.id,
+        createdAt: enLaSemana(5), completedAt: enLaSemana(3),
+      })),
+    });
+
     const rSem = await resumenSemanal(A.id, { id: sup.id, role: "SUPERVISOR", name: "Sup" }, cA, lunes8);
-    revisar("25. resumen semanal: la semana anterior completa, con su comparación y pendientes", rSem.periodo.startsWith("Semana del") && titulos(rSem).includes("Órdenes de la semana"), titulos(rSem));
+    const semanal = rSem.secciones.find((x) => x.titulo === "Órdenes de la semana");
+    revisar("25. resumen semanal: la semana anterior completa, con su comparación y pendientes",
+      rSem.periodo.startsWith("Semana del") && !!semanal, titulos(rSem));
+    // Que la seccion exista no basta: existiria igual con las cifras en cero.
+    // Lo que se sembro tiene que aparecer contado.
+    revisar("   y las cifras son las de esa semana, no las de hoy",
+      !!semanal && semanal.items.some((i) => i.texto.startsWith("Creadas: 2"))
+        && semanal.items.some((i) => i.texto.startsWith("Completadas: 2")),
+      semanal?.items.map((i) => i.texto).join(" | "));
 
     // ─────────────────────────────────────────── 26-30 Canales
     console.log("\n26-30. Correo y navegador");

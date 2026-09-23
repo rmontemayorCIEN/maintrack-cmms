@@ -54,6 +54,53 @@ async function main() {
 
   revisar("entiende al menos tres de cuatro", entendidas >= 3, `${entendidas} de ${PREGUNTAS.length}`);
 
+  /**
+   * Una pregunta larga, cerca del tope que el chat permite.
+   *
+   * Aqui arriba todas las preguntas son de tres o cuatro segundos, asi que
+   * nunca se supo que pasa cerca de los treinta que el chat acepta. Y hay
+   * motivo para preguntarselo: midiendo el dictado se vio que este mismo
+   * modelo, con un audio de cuarenta y nueve segundos, entrego 76 %, 38 % y
+   * 76 % en tres corridas, facturando solo la parte que proceso.
+   *
+   * Si aqui se queda corto, el chat lleva tiempo contestando preguntas a las
+   * que les falta la mitad, y **sin dar error**: contesta bien a una pregunta
+   * que nadie hizo. Es de los que no se anuncian.
+   *
+   * Tres corridas porque el corte no es constante: una sola pasada puede
+   * tocarle de las buenas y decir que todo esta bien.
+   */
+  console.log(`\nUna pregunta larga, cerca del tope del chat (${MAXIMO_SEGUNDOS} s)\n`);
+  const LARGA = [
+    "Oye, necesito que me digas cómo vamos con el mantenimiento preventivo de la planta,",
+    "sobre todo en la línea dos, porque el mes pasado se nos cayó dos veces el compresor",
+    "y quiero saber si las órdenes preventivas de ese equipo se están haciendo a tiempo",
+    "o si se están recorriendo, y de paso cuánto llevamos gastado en refacciones de esa línea",
+    "en lo que va del trimestre comparado con el anterior.",
+  ].join(" ");
+
+  const audioLargo = await sintetizar("prueba-escucha", LARGA, "Kore");
+  if (!audioLargo) {
+    revisar("sintetizar la pregunta larga", false, "no se pudo");
+  } else {
+    const vueltas: Array<{ pct: number; seg: number }> = [];
+    for (let i = 0; i < 3; i++) {
+      const r = await escuchar(audioLargo.audio);
+      vueltas.push({
+        pct: Math.round(((r?.texto.length ?? 0) / LARGA.length) * 100),
+        seg: Math.round(r?.segundosFacturados ?? 0),
+      });
+    }
+    console.log(`  ${LARGA.length} caracteres dichos`);
+    console.log(`  entendido: ${vueltas.map((v) => `${v.pct}% (${v.seg}s)`).join("   ")}`);
+
+    // El criterio es el mismo del dictado: que NINGUNA corrida se quede
+    // corta. Un promedio bueno con una mala sigue siendo una pregunta
+    // contestada a medias para alguien.
+    revisar("una pregunta larga se entiende COMPLETA las tres veces",
+      vueltas.every((v) => v.pct > 70), vueltas.map((v) => `${v.pct}%`).join(" "));
+  }
+
   console.log("\nLo que NO debe pasar\n");
   const vacio = await escuchar(Buffer.alloc(0));
   revisar("con audio vacío devuelve nada, sin reventar", vacio === null);

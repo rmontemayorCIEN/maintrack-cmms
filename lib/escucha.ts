@@ -68,6 +68,18 @@ export const USD_POR_SEGUNDO = 0.016 / 60;
  * salio igual de bien y se concluyo que el modelo largo sobraba. Estaba mal:
  * esa corrida le toco de las buenas.
  *
+ * ── Y el chat de voz esta bien con el corto: tambien esta medido ──
+ *
+ * Lo de arriba levanto la sospecha de que el chat llevara tiempo oyendo
+ * preguntas a medias, porque acepta hasta 30 segundos. Se midio con una
+ * pregunta larga de verdad —23 segundos facturados, cerca de su tope— y tres
+ * corridas: **99 % las tres veces**. El corto se rompe pasados los 40
+ * segundos, donde el chat no llega nunca porque su propio tope lo frena.
+ *
+ * O sea que NO hay que cambiarle el modelo al chat. Queda dicho aqui porque
+ * la advertencia de arriba, leida sola, invita a hacerlo. La medicion esta en
+ * `scripts/prueba-escucha-real.ts`.
+ *
  * La medicion esta en `scripts/prueba-dictado-real.ts` y se repite en un
  * minuto. Antes de volver a un solo modelo, correrla varias veces de cada
  * lado: una sola corrida por lado fue justo lo que llevo a la conclusion
