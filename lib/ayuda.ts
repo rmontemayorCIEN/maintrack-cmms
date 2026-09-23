@@ -251,6 +251,44 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/rondines": {
+    titulo: "Rondines",
+    que: "El recorrido por la planta: lo que se ve, dónde y cuándo. Lo que hoy se queda en el pasillo o en una libreta que nadie vuelve a leer.",
+    hacer: [
+      "Empezar un recorrido, diciendo qué área va a caminar",
+      "Anotar cada parada dictando lo que ve",
+      "Escanear el código del punto, si lo tiene",
+      "Decir de qué equipo era cuando el sistema no lo puede saber solo",
+    ],
+    flujo: [
+      "Se empieza eligiendo el área. No es un trámite: es lo que después permite saber de qué equipo habla aunque no haya códigos pegados. Dentro de la línea 2, «la bomba 3» es una sola; en toda la planta pueden ser cuatro.",
+      "En cada parada se dicta lo que se ve. El equipo se resuelve después, y muchas veces solo.",
+      "De qué equipo se trata se busca en este orden: el código QR del punto, el equipo que usted elija, lo que se dictó, y el área. Solo cuando ninguno alcanza se le pregunta.",
+      "Cuando se le pregunta, no viene nada marcado: hay que elegir. Es a propósito — una respuesta ya puesta se acepta sin leerla.",
+      "«Ninguno: no es de un equipo en particular» es una respuesta válida y a veces la correcta. Un charco en un pasillo no es de ninguna máquina, y atribuírselo a la de al lado ensucia el historial de esa máquina para siempre.",
+      "Si el recorrido se interrumpe —se bloquea el teléfono, se cae la señal— al volver a entrar se continúa el mismo, no se abre otro.",
+      "Un recorrido sin ninguna parada se cancela solo: no hubo recorrido que guardar.",
+      "En cada parada queda registrado CÓMO se supo de qué equipo era. Una identificada por su código vale distinto que una deducida de lo que se oyó, y quien lo lea un mes después tiene derecho a saberlo.",
+    ],
+    botones: [
+      { nombre: "Empezar recorrido", explica: "Abre un recorrido nuevo. Si ya tenía uno a medias, lo continúa en vez de abrir otro." },
+      { nombre: "Dictar", explica: "Graba lo que usted dice y lo escribe en la observación de la parada. Pensado para el piso, con las manos ocupadas." },
+      { nombre: "Escanear punto", explica: "Lee el código QR del punto de reporte. Es la forma más confiable de saber dónde está: no se equivoca nunca." },
+      { nombre: "Anotar parada", explica: "Guarda lo que vio. Si hace falta saber de qué equipo era, se le pregunta enseguida." },
+      { nombre: "Terminar", explica: "Cierra el recorrido. Lo que anotó queda para comparar con el siguiente." },
+    ],
+    noPuedo: [
+      { sintoma: "No me deja anotar paradas, solo ver", porque: "Registrar un recorrido pide el mismo permiso que ejecutar trabajo. Consulta entra a mirar." },
+      { sintoma: "Escaneé el código y no lo reconoce", porque: "El punto no existe, está dado de baja, o el código es de otra empresa. Puede anotar la parada dictando y decir de qué equipo era." },
+      { sintoma: "Me pregunta de qué equipo es y yo no sé", porque: "Elija «Ninguno». Un hallazgo sin equipo sirve igual para que alguien vaya a verlo, y es mejor que atribuírselo al equipo equivocado." },
+      { sintoma: "No aparece mi recorrido en la lista", porque: "Los que se cerraron sin ninguna parada se cancelan y no se listan." },
+    ],
+    preguntas: [
+      { pregunta: "¿Para qué sirve hacer rondines si ya los hago a ojo?", respuesta: "Para poder comparar. Un recorrido suelto vale poco; dos del mismo punto separados por un mes contestan la pregunta que hoy nadie puede contestar: si aquella mancha creció, si la corrosión avanzó, si lo que se reportó se atendió." },
+      { pregunta: "¿Y si la planta no tiene códigos QR pegados?", respuesta: "Se puede recorrer igual: basta decir el área al empezar y dictar lo que ve. Los códigos se imprimen desde «Puntos de reporte QR» cuando quiera, y a partir de ahí cada parada es de un toque." },
+    ],
+  },
+
   "/escanear": {
     titulo: "Escanear QR",
     que: "Leer con la cámara el código QR de un equipo, de un punto de reporte o de una orden, y abrir lo que corresponde con su usuario.",

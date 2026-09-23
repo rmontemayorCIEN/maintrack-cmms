@@ -2,7 +2,7 @@ import { LifeBuoy, Presentation,
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList,
   Cpu, Factory, Flame, Gauge, Home, Inbox, KanbanSquare, Library, LineChart, ListChecks, MessageCircleQuestion,
   PackageX, PauseCircle, Plus, QrCode, Rocket, ScanLine, Search, Settings, ShoppingCart, Sparkles, Truck, Upload,
-  UsersRound, Waypoints, Wrench,
+  UsersRound, Waypoints, Wrench, Footprints,
 } from "lucide-react";
 
 /**
@@ -16,7 +16,7 @@ const ICONOS: Record<string, React.ComponentType<{ className?: string }>> = {
   predictivo: Activity, almacen: Boxes, requisiciones: ClipboardList, compras: ShoppingCart, proveedores: Truck,
   indicadores: LineChart, paros: Flame, reportes: BarChart3, consulta: MessageCircleQuestion, diagnostico: Sparkles,
   puesta: Rocket, catalogos: Library, importar: Upload, glosario: BookOpen, soporte: LifeBuoy, demo: Presentation, ajustes: Settings, clientes: Building2,
-  avisos: Bell, nueva: Plus, buscar: Search, revisar: ClipboardCheck, bloqueo: PauseCircle, panel: Gauge,
+  rondin: Footprints, avisos: Bell, nueva: Plus, buscar: Search, revisar: ClipboardCheck, bloqueo: PauseCircle, panel: Gauge,
 };
 
 export function IconoMenu({ nombre, className = "h-4 w-4" }: { nombre: string; className?: string }) {

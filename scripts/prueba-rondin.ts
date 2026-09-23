@@ -12,7 +12,10 @@
  *
  *   npx tsx scripts/prueba-rondin.ts
  */
+import { type ChildProcess } from "node:child_process";
+import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 import {
   identificarParada, pistasDelDictado, hayQuePreguntar, iniciarRondin,
   terminarRondin, rondinEnCurso,
@@ -25,7 +28,25 @@ function revisar(que: string, bien: boolean, detalle: unknown = "") {
   if (!bien) fallas++;
 }
 
+const PUERTO = 3219;
+const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO}`;
+
+async function esperarServidor(limiteMs = 120_000) {
+  const hasta = Date.now() + limiteMs;
+  while (Date.now() < hasta) {
+    try {
+      const r = await fetch(`${base}/login`, { signal: AbortSignal.timeout(8000) });
+      if (r.status < 500) return;
+    } catch { /* todavia no */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error(`El servidor no respondió en ${limiteMs / 1000} s`);
+}
+
 async function main() {
+  let servidor: ChildProcess | null = null;
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: PUERTO });
+
   const sello = `ron-${Date.now()}`;
   const creadas: string[] = [];
 
@@ -46,13 +67,12 @@ async function main() {
       pistasDelDictado("aquí hay un charco").join(" ") === "charco",
       pistasDelDictado("aquí hay un charco").join(" "));
 
-    console.log("\nCuándo se da por bueno y cuándo se pregunta\n");
-    revisar("un QR no se pregunta", !hayQuePreguntar("QR"));
-    revisar("lo que eligió la persona tampoco", !hayQuePreguntar("ELEGIDO"));
-    // Lo dicho NO basta: la transcripcion se equivoca justo con numeros y
-    // nombres propios, que es de lo que estan hechos los codigos de equipo.
-    revisar("lo deducido de la voz SÍ se pregunta", hayQuePreguntar("DICHO"));
-    revisar("solo el área también", hayQuePreguntar("AREA"));
+    console.log("\nCuándo se pregunta\n");
+    // Se pregunta cuando NO hay equipo, no cuando el dato es menos firme:
+    // confirmar algo que el sistema ya resolvio bien es como se ensenia a la
+    // gente a tocar «si» sin leer.
+    revisar("con equipo resuelto no se pregunta", !hayQuePreguntar({ assetId: "algo" }));
+    revisar("sin equipo sí se pregunta", hayQuePreguntar({ assetId: null }));
 
     // ───────────────────────────────────────── Contra la base de verdad ────
     const org = await prisma.organization.create({
@@ -99,6 +119,22 @@ async function main() {
     revisar("   diciendo por qué pregunta", ambiguo.explicacion.includes("2 equipos"), ambiguo.explicacion);
 
     // Con el area declarada al empezar, la misma frase se resuelve sola.
+    // Como se habla de verdad en un rondin: el equipo Y el sintoma en la misma
+    // frase. Exigir que todas las palabras coincidieran no identificaba nunca.
+    const comoSeHabla = await identificarParada(org.id, {
+      dicho: "aquí en la bomba tres se oye un rechinido feo y está goteando",
+      locationId: linea2.id,
+    });
+    revisar("una frase real —equipo y síntoma juntos— sí identifica",
+      comoSeHabla.assetId === bomba2.id, { asset: comoSeHabla.assetId === bomba2.id, como: comoSeHabla.como });
+    // Y al reves: una frase que solo describe un problema no debe pegarle a
+    // ningun equipo por casualidad.
+    const soloSintoma = await identificarParada(org.id, {
+      dicho: "se oye un rechinido feo y está goteando", locationId: linea2.id,
+    });
+    revisar("   y una que solo describe el problema, no inventa equipo",
+      soloSintoma.assetId === null, { asset: soloSintoma.assetId });
+
     const conArea = await identificarParada(org.id, { dicho: "aquí en la bomba tres", locationId: linea2.id });
     revisar("dentro del área declarada, la misma frase resuelve sola",
       conArea.como === "DICHO" && conArea.assetId === bomba2.id,
@@ -152,6 +188,63 @@ async function main() {
     revisar("ni se puede elegir un equipo de otra empresa", equipoAjeno.assetId === null, { asset: equipoAjeno.assetId });
     const dichoAjeno = await identificarParada(otra.id, { dicho: "aquí en la bomba tres" });
     revisar("ni encontrarlo por lo dictado", dichoAjeno.assetId === null && dichoAjeno.candidatos.length === 0);
+    // ────────────────────────────────────── Por donde entra de verdad ────
+    console.log("\nLas rutas: quién puede y de quién es\n");
+    await esperarServidor();
+    const secreto = new TextEncoder().encode(process.env.AUTH_SECRET!);
+    const credencial = (u: { id: string; email: string; name: string; role: string }, org: string) =>
+      new SignJWT({ userId: u.id, organizationId: org, email: u.email, name: u.name, role: u.role })
+        .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2h").sign(secreto);
+
+    const mirona = await prisma.user.create({
+      data: { organizationId: org.id, email: `v-${sello}@t.mx`, name: "Consulta", role: "VIEWER", passwordHash: "x" },
+    });
+    const deJefe = await credencial(jefe, org.id);
+    const deMirona = await credencial(mirona, org.id);
+
+    const pedir = async (jwt: string, metodo: string, ruta: string, cuerpo?: unknown) => {
+      const r = await fetch(`${base}${ruta}`, {
+        method: metodo,
+        headers: { "Content-Type": "application/json", Cookie: `mt_session=${jwt}` },
+        body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+      });
+      return { status: r.status, json: await r.json().catch(() => ({})) as Record<string, unknown> };
+    };
+
+    const abierto = await pedir(deJefe, "POST", "/api/rondines", { locationId: linea2.id });
+    revisar("un supervisor empieza un recorrido", abierto.status === 201, { status: abierto.status });
+    const rid = (abierto.json.rondin as { id: string })?.id;
+
+    // Consulta mira, no camina: anotar es del mismo permiso que ejecutar.
+    const deLaMirona = await pedir(deMirona, "POST", `/api/rondines/${rid}/paradas`, { dicho: "algo" });
+    revisar("una cuenta de solo lectura no anota paradas", deLaMirona.status === 403, { status: deLaMirona.status });
+
+    const anotada = await pedir(deJefe, "POST", `/api/rondines/${rid}/paradas`,
+      { dicho: "aquí en la bomba tres se oye raro" });
+    revisar("con el área declarada, la parada sale identificada sin preguntar",
+      anotada.status === 201 && anotada.json.hayQuePreguntar === false,
+      { status: anotada.status, pregunta: anotada.json.hayQuePreguntar });
+
+    const cerrado = await pedir(deJefe, "PATCH", `/api/rondines/${rid}`, {});
+    revisar("se cierra", cerrado.status === 200, { status: cerrado.status });
+    const otraVezCerrado = await pedir(deJefe, "POST", `/api/rondines/${rid}/paradas`, { dicho: "tarde" });
+    revisar("y ya no acepta paradas: 409, no un 500", otraVezCerrado.status === 409, { status: otraVezCerrado.status });
+
+    console.log("\nNo se cruza con la empresa de al lado\n");
+    const otraOrg = await prisma.organization.create({
+      data: { name: `${sello}-c`, slug: `${sello}-c`, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" },
+    });
+    creadas.push(otraOrg.id);
+    const vecino = await prisma.user.create({
+      data: { organizationId: otraOrg.id, email: `x-${sello}@t.mx`, name: "Vecino", role: "ADMIN", passwordHash: "x" },
+    });
+    const deVecino = await credencial(vecino, otraOrg.id);
+    const espiado = await pedir(deVecino, "GET", `/api/rondines/${rid}`);
+    revisar("el recorrido de otra empresa no se ve", espiado.status === 404, { status: espiado.status });
+    const metido = await pedir(deVecino, "POST", `/api/rondines/${rid}/paradas`, { dicho: "me colé" });
+    revisar("ni se le anotan paradas", metido.status === 409, { status: metido.status });
+    const areaAjena = await pedir(deVecino, "POST", "/api/rondines", { locationId: linea2.id });
+    revisar("ni se empieza un recorrido en un área ajena", areaAjena.status === 404, { status: areaAjena.status });
   } finally {
     for (const id of creadas) {
       await prisma.rondinParada.deleteMany({ where: { organizationId: id } });
@@ -163,6 +256,7 @@ async function main() {
       await prisma.user.deleteMany({ where: { organizationId: id } });
       await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     }
+    await apagarServidor(servidor, PUERTO);
   }
 
   console.log(`\n${fallas ? `${fallas} revisión(es) fallaron` : "Todo bien"}\n`);

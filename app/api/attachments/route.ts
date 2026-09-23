@@ -16,6 +16,7 @@ const destino = z.object({
   assetId: z.string().optional().nullable(),
   workRequestId: z.string().optional().nullable(),
   partId: z.string().optional().nullable(),
+  rondinParadaId: z.string().optional().nullable(),
 });
 
 const solicitud = destino.extend({
@@ -41,6 +42,7 @@ function contextoDe(d: z.infer<typeof destino>) {
   if (d.assetId) return { carpeta: "activos", clave: "assetId" as const, id: d.assetId };
   if (d.workRequestId) return { carpeta: "solicitudes", clave: "workRequestId" as const, id: d.workRequestId };
   if (d.partId) return { carpeta: "refacciones", clave: "partId" as const, id: d.partId };
+  if (d.rondinParadaId) return { carpeta: "rondines", clave: "rondinParadaId" as const, id: d.rondinParadaId };
   return null;
 }
 
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
     const tablas = {
       workOrderId: prisma.workOrder, assetId: prisma.asset,
       workRequestId: prisma.workRequest, partId: prisma.part,
+      rondinParadaId: prisma.rondinParada,
     };
     const existe = await (tablas[ctx.clave] as { findFirst: Function }).findFirst({
       where: { id: ctx.id, organizationId: orgId },

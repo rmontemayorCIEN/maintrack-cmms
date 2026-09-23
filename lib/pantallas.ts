@@ -44,6 +44,10 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/calendar", roles: OPERACION },
   // Solicitudes: el solicitante y el técnico ven las suyas; quien revisa, todas.
   { ruta: "/requests", roles: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN", "REQUESTER", "VIEWER"] },
+  // El rondin lo camina quien pasa por la planta —supervision y tecnicos— y
+  // lo consulta quien analiza. Anotar paradas exige ademas workorder:execute,
+  // asi que consulta entra a mirar, no a escribir.
+  { ruta: "/rondines", roles: OPERACION },
   { ruta: "/requests/puntos", roles: MANDO },
   { ruta: "/alerts", roles: OPERACION },
   { ruta: "/predictive", roles: OPERACION },
@@ -151,6 +155,10 @@ const MENU: GrupoMenu[] = [
     seccion: "Lo que llega", clave: "entradas", items: [
       { href: "/requests", etiqueta: "Solicitudes", icono: "solicitudes" },
       { href: "/requests/puntos", etiqueta: "Puntos de reporte QR", icono: "qr" },
+      // El rondin va junto a las solicitudes y los puntos QR porque es lo
+      // mismo por otro camino: una fuente de hallazgos. Y comparte con los
+      // puntos el codigo pegado en la pared.
+      { href: "/rondines", etiqueta: "Rondines", icono: "rondin" },
       { href: "/alerts", etiqueta: "Alertas", icono: "alertas" },
     ],
   },

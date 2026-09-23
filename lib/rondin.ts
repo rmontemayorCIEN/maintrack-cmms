@@ -43,16 +43,26 @@ import { siguienteFolio } from "./numbering";
 export type ComoSeIdentifico = "QR" | "ELEGIDO" | "PLACA" | "DICHO" | "AREA" | "NINGUNO";
 
 /**
- * Si se puede dar por bueno sin preguntar.
+ * Se pregunta cuando NO hay respuesta, no cuando la respuesta es menos firme.
  *
- * `DICHO` NO es suficiente por si solo: la transcripcion se equivoca con los
- * nombres propios y con los numeros, que es justo de lo que estan hechos los
- * codigos de equipo. Se usa para PROPONER candidatos, no para decidir.
+ * La primera version preguntaba segun de donde saliera el dato: el QR y lo
+ * elegido pasaban, y lo deducido de la voz se confirmaba siempre. Suena
+ * prudente y esta mal. Si la persona dijo «la bomba tres», hay UNA bomba tres
+ * en el area que declaro, y el sistema la encontro, preguntarle «¿es la bomba
+ * tres?» es exactamente la confirmacion automatica que se queria evitar: se
+ * toca que si sin leer, y encima se corta el paso en cada parada.
+ *
+ * Asi que se pregunta cuando la parada quedo SIN equipo. Entonces la pregunta
+ * tiene contenido —hay algo que solo la persona sabe— y siempre se puede
+ * contestar, aunque sea con «ninguno».
+ *
+ * Lo deducido de la voz entra sin preguntar, pero queda marcado como DICHO y
+ * la pantalla lo dice —«Deducido de lo que dijo»—, que es la señal de que ese
+ * dato es menos firme que un codigo escaneado. Se ve, se puede corregir, y no
+ * estorba mientras se camina.
  */
-export const SE_DA_POR_BUENO: ComoSeIdentifico[] = ["QR", "ELEGIDO", "PLACA"];
-
-export function hayQuePreguntar(como: ComoSeIdentifico): boolean {
-  return !SE_DA_POR_BUENO.includes(como);
+export function hayQuePreguntar(identificado: { assetId: string | null }): boolean {
+  return identificado.assetId === null;
 }
 
 /** Como se lee en pantalla, para que se vea de donde salio el dato. */
@@ -172,10 +182,35 @@ export async function identificarParada(
       select: { id: true, code: true, name: true, location: { select: { name: true } } },
       take: 400,
     });
-    const coinciden = equipos.filter((e) => {
-      const texto = normalizar(`${e.code} ${e.name}`);
-      return pistas.every((p) => texto.includes(p));
-    });
+    /**
+     * Se busca por PEDAZOS de lo dicho, no por la frase entera.
+     *
+     * Exigir que todas las palabras coincidieran no identificaba casi nunca, y
+     * la razon es obvia en cuanto se oye a alguien recorriendo: en la misma
+     * frase va el equipo Y el problema. «Aqui en la bomba tres se oye raro»
+     * tiene dos palabras del equipo y tres del sintoma; ningun equipo del
+     * catalogo se llama «bomba 3 oye raro».
+     *
+     * Asi que se prueban los grupos de palabras seguidas, de mas largo a mas
+     * corto: «bomba 3 oye», «bomba 3», «3 oye»… El primer grupo que encuentre
+     * algo manda, y por eso van los largos primero: «bomba 3» distingue, y
+     * «bomba» sola encontraria las cinco bombas de la planta.
+     *
+     * De una sola palabra solo se aceptan las que parecen clave de equipo
+     * —traen digito o guion, como «BOM-3» o «CNC201»—. Una palabra suelta
+     * cualquiera es demasiado ancha para decidir con ella.
+     */
+    const grupos: string[] = [];
+    for (const largo of [3, 2]) {
+      for (let i = 0; i + largo <= pistas.length; i++) grupos.push(pistas.slice(i, i + largo).join(" "));
+    }
+    for (const p of pistas) if (/[\d-]/.test(p)) grupos.push(p);
+
+    let coinciden: typeof equipos = [];
+    for (const grupo of grupos) {
+      const halla = equipos.filter((e) => normalizar(`${e.code} ${e.name}`).includes(grupo));
+      if (halla.length) { coinciden = halla; break; }
+    }
 
     if (coinciden.length === 1) {
       const e = coinciden[0];
@@ -239,6 +274,104 @@ export async function iniciarRondin(
       _count: { select: { paradas: true } } },
   });
   return { rondin, reanudado: false };
+}
+
+/**
+ * Anota una parada del recorrido.
+ *
+ * La identificacion se resuelve aqui y NO se le pide a quien llama: si cada
+ * pantalla decidiera por su cuenta de que equipo se trata, acabarian con
+ * criterios distintos y el mismo QR daria resultados diferentes segun por
+ * donde se entrara.
+ *
+ * Devuelve la parada junto con si hay que preguntar y los candidatos, para que
+ * la pantalla sepa si seguir de largo o detenerse a preguntar. La parada se
+ * crea igual: lo que se vio no se pierde porque falte saber de que equipo era.
+ * Despues se le puede poner el equipo; volver a caminar el pasillo, no.
+ */
+export async function agregarParada(
+  organizationId: string,
+  rondinId: string,
+  entrada: {
+    tokenQr?: string | null;
+    assetIdElegido?: string | null;
+    dicho?: string | null;
+  },
+) {
+  const rondin = await prisma.rondin.findFirst({
+    where: { id: rondinId, organizationId },
+    select: { id: true, estado: true, locationId: true, _count: { select: { paradas: true } } },
+  });
+  if (!rondin) return { ok: false as const, motivo: "El recorrido no existe." };
+  if (rondin.estado !== "EN_CURSO") {
+    return { ok: false as const, motivo: "Ese recorrido ya se cerró. Empiece uno nuevo." };
+  }
+
+  const id = await identificarParada(organizationId, { ...entrada, locationId: rondin.locationId });
+
+  const parada = await prisma.rondinParada.create({
+    data: {
+      organizationId,
+      rondinId: rondin.id,
+      orden: rondin._count.paradas + 1,
+      reportPointId: id.reportPointId,
+      assetId: id.assetId,
+      locationId: id.locationId,
+      comoSeIdentifico: id.como,
+      observacion: entrada.dicho?.trim() || null,
+    },
+    select: { id: true, orden: true, assetId: true, locationId: true, comoSeIdentifico: true, observacion: true },
+  });
+
+  return {
+    ok: true as const,
+    parada,
+    hayQuePreguntar: hayQuePreguntar(id),
+    candidatos: id.candidatos,
+    explicacion: id.explicacion,
+  };
+}
+
+/**
+ * Le pone el equipo a una parada que quedo sin el.
+ *
+ * Es la conciliacion: la persona mira la foto y dice de que equipo era. Queda
+ * como ELEGIDO, que es el escalon mas confiable junto al QR, porque lo decidio
+ * alguien que estuvo ahi.
+ *
+ * `assetId` en nulo es una respuesta valida y se guarda como tal: significa
+ * «no es de ningun equipo», que es distinto de «todavia no se sabe».
+ */
+export async function conciliarParada(
+  organizationId: string,
+  paradaId: string,
+  assetId: string | null,
+) {
+  const parada = await prisma.rondinParada.findFirst({
+    where: { id: paradaId, organizationId },
+    select: { id: true, rondin: { select: { estado: true } } },
+  });
+  if (!parada) return { ok: false as const, motivo: "La parada no existe." };
+
+  let locationId: string | null = null;
+  if (assetId) {
+    const a = await prisma.asset.findFirst({
+      where: { id: assetId, organizationId },
+      select: { id: true, locationId: true },
+    });
+    if (!a) return { ok: false as const, motivo: "Ese equipo no existe en su empresa." };
+    locationId = a.locationId;
+  }
+
+  await prisma.rondinParada.update({
+    where: { id: parada.id },
+    data: {
+      assetId,
+      comoSeIdentifico: assetId ? "ELEGIDO" : "NINGUNO",
+      ...(locationId ? { locationId } : {}),
+    },
+  });
+  return { ok: true as const };
 }
 
 /** Cierra el recorrido. Uno sin paradas se cancela: no hubo recorrido. */
