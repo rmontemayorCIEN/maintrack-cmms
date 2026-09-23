@@ -4,6 +4,8 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, PageHeader } from "@/components/ui";
+import { Adjuntos } from "@/components/adjuntos";
+import { can } from "@/lib/rbac";
 import { NOMBRE_IDENTIFICACION, type ComoSeIdentifico } from "@/lib/rondin";
 import { formatDateTime } from "@/lib/utils";
 
@@ -34,11 +36,22 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
           asset: { select: { id: true, code: true, name: true } },
           location: { select: { name: true } },
           reportPoint: { select: { nombre: true } },
+          adjuntos: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true, name: true, kind: true, size: true, mimeType: true, createdAt: true,
+              uploadedBy: { select: { name: true } },
+            },
+          },
         },
       },
     },
   });
   if (!rondin) notFound();
+
+  // Quien puede seguir agregando fotos a una parada: el mismo permiso que
+  // anotarla. Consulta mira el recorrido, no lo completa.
+  const editable = can(user.role, "workorder:execute");
 
   return (
     <div className="space-y-5">
@@ -70,6 +83,21 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
                   {p.asset ? `${p.asset.code}` : "Sin equipo"}
                 </Badge>
               </div>
+              {/* Las fotos de la parada. Se pueden agregar después: en el
+                  recorrido a veces no da tiempo, y volver a caminar el
+                  pasillo para una foto no lo hace nadie. */}
+              <div className="mt-3">
+                <Adjuntos
+                  destino={{ rondinParadaId: p.id }}
+                  adjuntos={p.adjuntos.map((a) => ({
+                    id: a.id, name: a.name, kind: a.kind, size: a.size, mimeType: a.mimeType,
+                    createdAt: a.createdAt.toISOString(), subidoPor: a.uploadedBy?.name ?? null,
+                  }))}
+                  editable={editable}
+                  titulo="Fotos de esta parada"
+                />
+              </div>
+
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] text-slate-500">
                 {p.asset ? <span>{p.asset.name}</span> : null}
                 {p.reportPoint ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden />{p.reportPoint.nombre}</span> : null}

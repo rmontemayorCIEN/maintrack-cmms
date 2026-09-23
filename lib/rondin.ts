@@ -212,6 +212,37 @@ export async function identificarParada(
       if (halla.length) { coinciden = halla; break; }
     }
 
+    /**
+     * Ultimo recurso: las palabras sueltas, solo para ACOTAR la pregunta.
+     *
+     * Si nada mas encajo, «fuga de aceite bajo el compresor» no identifica
+     * ninguno —ningun equipo se llama asi— y sin esto se le preguntaba a la
+     * persona con los catorce equipos de la planta en la lista. Con la palabra
+     * suelta quedan los dos compresores, que es una pregunta que se contesta
+     * de un vistazo en un telefono.
+     *
+     * NO decide, aunque encuentre uno solo: una palabra comun como «bomba» o
+     * «aceite» es demasiado ancha para atribuirle un hallazgo a un equipo. De
+     * aqui salen candidatos y nada mas; por eso se descarta si son demasiados,
+     * que querria decir que la palabra no acoto nada.
+     */
+    if (!coinciden.length) {
+      const sueltas = equipos.filter((e) => {
+        const texto = normalizar(`${e.code} ${e.name}`);
+        return pistas.some((p) => texto.includes(p));
+      });
+      if (sueltas.length && sueltas.length <= 8) {
+        return {
+          ...vacio,
+          como: entrada.locationId ? "AREA" : "NINGUNO",
+          candidatos: sueltas.map((e) => ({ id: e.id, code: e.code, name: e.name, ubicacion: e.location?.name ?? null })),
+          explicacion: sueltas.length === 1
+            ? "¿Es este equipo?"
+            : `Podría ser uno de estos ${sueltas.length}. ¿Cuál es?`,
+        };
+      }
+    }
+
     if (coinciden.length === 1) {
       const e = coinciden[0];
       return { ...vacio, assetId: e.id, como: "DICHO",

@@ -263,6 +263,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Se empieza eligiendo el área. No es un trámite: es lo que después permite saber de qué equipo habla aunque no haya códigos pegados. Dentro de la línea 2, «la bomba 3» es una sola; en toda la planta pueden ser cuatro.",
       "En cada parada se dicta lo que se ve. El equipo se resuelve después, y muchas veces solo.",
+      "Las fotos se toman antes de anotar la parada —se ve algo, se fotografía y se cuenta— y se suben cuando la parada queda guardada. Si alguna no sube por falta de señal, la parada se guarda igual y la foto queda con su botón de reintentar: no hay que volver a caminar el pasillo.",
+      "También se pueden agregar fotos después, desde el detalle del recorrido. En el rondín no siempre da tiempo.",
       "De qué equipo se trata se busca en este orden: el código QR del punto, el equipo que usted elija, lo que se dictó, y el área. Solo cuando ninguno alcanza se le pregunta.",
       "Cuando se le pregunta, no viene nada marcado: hay que elegir. Es a propósito — una respuesta ya puesta se acepta sin leerla.",
       "«Ninguno: no es de un equipo en particular» es una respuesta válida y a veces la correcta. Un charco en un pasillo no es de ninguna máquina, y atribuírselo a la de al lado ensucia el historial de esa máquina para siempre.",
@@ -275,12 +277,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Dictar", explica: "Graba lo que usted dice y lo escribe en la observación de la parada. Pensado para el piso, con las manos ocupadas." },
       { nombre: "Escanear punto", explica: "Lee el código QR del punto de reporte. Es la forma más confiable de saber dónde está: no se equivoca nunca." },
       { nombre: "Anotar parada", explica: "Guarda lo que vio. Si hace falta saber de qué equipo era, se le pregunta enseguida." },
+      { nombre: "Tomar foto / Elegir archivo", explica: "Agrega fotos a la parada. Se ven antes de subirlas y se puede quitar la que salió mal. Se suben al anotar la parada." },
       { nombre: "Terminar", explica: "Cierra el recorrido. Lo que anotó queda para comparar con el siguiente." },
     ],
     noPuedo: [
       { sintoma: "No me deja anotar paradas, solo ver", porque: "Registrar un recorrido pide el mismo permiso que ejecutar trabajo. Consulta entra a mirar." },
       { sintoma: "Escaneé el código y no lo reconoce", porque: "El punto no existe, está dado de baja, o el código es de otra empresa. Puede anotar la parada dictando y decir de qué equipo era." },
       { sintoma: "Me pregunta de qué equipo es y yo no sé", porque: "Elija «Ninguno». Un hallazgo sin equipo sirve igual para que alguien vaya a verlo, y es mejor que atribuírselo al equipo equivocado." },
+      { sintoma: "Una foto se quedó en rojo y no subió", porque: "Se cayó la señal a media nave. La parada sí se guardó. Toque «Reintentar las fotos» cuando tenga señal, o agréguela después desde el detalle del recorrido." },
       { sintoma: "No aparece mi recorrido en la lista", porque: "Los que se cerraron sin ninguna parada se cancelan y no se listan." },
     ],
     preguntas: [

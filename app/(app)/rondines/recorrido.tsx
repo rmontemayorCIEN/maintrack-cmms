@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Footprints, Loader2, MapPin, QrCode, X } from "lucide-react";
 import { BotonDictado, unirDictado } from "@/components/boton-dictado";
+import { FotosPorSubir, subirPendientes, type PorSubir } from "@/components/fotos-por-subir";
 import { Escaner } from "../escanear/escaner";
 
 /**
@@ -36,6 +37,7 @@ type Parada = {
   observacion: string | null;
   comoSeIdentifico: string;
   equipo: string | null;
+  fotos: number;
 };
 type Candidato = { id: string; code: string; name: string; ubicacion: string | null };
 type Area = { id: string; name: string };
@@ -66,6 +68,22 @@ export function Recorrido({
   const [pendiente, setPendiente] = useState<{ paradaId: string; candidatos: Candidato[]; explicacion: string } | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
+  /**
+   * Las fotos se eligen ANTES de anotar, porque es como pasa: se ve algo, se
+   * fotografia y despues se cuenta. La parada todavia no existe, asi que
+   * esperan en memoria y se suben en cuanto hay a que colgarlas.
+   */
+  const [fotos, setFotos] = useState<PorSubir[]>([]);
+  /**
+   * A que parada iban las fotos que no subieron.
+   *
+   * Sin esto, una foto que fallo por señal se quedaba sin destino: la parada
+   * ya se creo y el boton de reintentar no sabria a donde mandarla. En una
+   * planta la señal se cae a media nave; que la foto se pierda por eso seria
+   * volver a caminar hasta alla.
+   */
+  const [paradaDeLasFotos, setParadaDeLasFotos] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
   const [tokenQr, setTokenQr] = useState<string | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,11 +116,25 @@ export function Recorrido({
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error ?? "No se pudo anotar la parada."); return; }
 
+      const paradaId = d.parada.id as string;
+      const cuantas = fotos.filter((f) => f.estado !== "subida").length;
       setParadas((p) => [...p, {
-        id: d.parada.id, orden: d.parada.orden, observacion: d.parada.observacion,
-        comoSeIdentifico: d.parada.comoSeIdentifico, equipo: null,
+        id: paradaId, orden: d.parada.orden, observacion: d.parada.observacion,
+        comoSeIdentifico: d.parada.comoSeIdentifico, equipo: null, fotos: cuantas,
       }]);
       setTexto(""); setTokenQr(null);
+
+      // Las fotos se suben DESPUES de que la parada existe, que es cuando ya
+      // hay a que colgarlas. La parada queda anotada aunque la subida falle:
+      // perder el texto por una foto seria el peor de los dos males.
+      if (cuantas) {
+        setParadaDeLasFotos(paradaId);
+        setSubiendo(true);
+        const fallidas = await subirPendientes({ rondinParadaId: paradaId }, fotos, setFotos);
+        setSubiendo(false);
+        if (!fallidas) { setFotos([]); setParadaDeLasFotos(null); }
+        else setError(`${fallidas} foto(s) no subieron. Toque «Reintentar» cuando tenga señal.`);
+      }
 
       // Solo se detiene a preguntar cuando de verdad hace falta. Si el código
       // o el área lo resolvieron, se sigue caminando.
@@ -138,6 +170,15 @@ export function Recorrido({
     } finally { setTrabajando(false); }
   }
 
+  async function reintentarFotos() {
+    if (!paradaDeLasFotos) return;
+    setSubiendo(true); setError(null);
+    const fallidas = await subirPendientes({ rondinParadaId: paradaDeLasFotos }, fotos, setFotos);
+    setSubiendo(false);
+    if (!fallidas) { setFotos([]); setParadaDeLasFotos(null); }
+    else setError(`${fallidas} foto(s) siguen sin subir.`);
+  }
+
   async function terminar() {
     if (!rondin) return;
     setTrabajando(true);
@@ -164,6 +205,8 @@ export function Recorrido({
       setPendiente(null);
       setTexto("");
       setTokenQr(null);
+      setFotos([]);
+      setParadaDeLasFotos(null);
       router.refresh();
     } finally { setTrabajando(false); }
   }
@@ -262,10 +305,31 @@ export function Recorrido({
             <MapPin className="h-3 w-3" aria-hidden /> Punto identificado por su código
           </p>
         ) : null}
+
+        {/* Las fotos van aquí, con la observación, porque son la misma cosa
+            vista de dos formas: lo que se dice y lo que se ve. */}
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <FotosPorSubir
+            archivos={fotos}
+            onCambio={setFotos}
+            maximo={6}
+            deshabilitado={trabajando || subiendo}
+          />
+          {paradaDeLasFotos && fotos.some((f) => f.estado === "error") ? (
+            <button
+              type="button"
+              onClick={reintentarFotos}
+              disabled={subiendo}
+              className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            >
+              Reintentar las fotos
+            </button>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={anotar}
-          disabled={trabajando || (!texto.trim() && !tokenQr)}
+          disabled={trabajando || subiendo || (!texto.trim() && !tokenQr && !fotos.length)}
           className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-40"
         >
           {trabajando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
@@ -343,6 +407,7 @@ export function Recorrido({
                 <p className="text-xs text-slate-700">{p.orden}. {p.observacion ?? "(sin nota)"}</p>
                 <p className="text-[0.625rem] text-slate-500">
                   {p.equipo ?? (p.comoSeIdentifico === "NINGUNO" ? "Sin equipo" : "Equipo por confirmar")}
+                  {p.fotos ? ` · ${p.fotos} foto(s)` : ""}
                 </p>
               </li>
             ))}

@@ -140,6 +140,13 @@ async function main() {
       conArea.como === "DICHO" && conArea.assetId === bomba2.id,
       { como: conArea.como, correcta: conArea.assetId === bomba2.id });
 
+    // Una palabra suelta no identifica, pero SI acota la pregunta: preguntar
+    // con dos opciones se contesta de un vistazo; con catorce, no.
+    const bombaSola = await identificarParada(org.id, { dicho: "hay una fuga abajo de la bomba" });
+    revisar("una palabra suelta no decide, pero acota la pregunta",
+      bombaSola.assetId === null && bombaSola.candidatos.length === 2,
+      { asset: bombaSola.assetId, candidatos: bombaSola.candidatos.length });
+
     console.log("\nLo que la persona elige, manda\n");
     const elegido = await identificarParada(org.id, { assetIdElegido: bomba3.id, dicho: "aquí en la bomba tres", locationId: linea2.id });
     revisar("lo elegido gana sobre lo deducido", elegido.como === "ELEGIDO" && elegido.assetId === bomba3.id);
@@ -230,6 +237,27 @@ async function main() {
     const otraVezCerrado = await pedir(deJefe, "POST", `/api/rondines/${rid}/paradas`, { dicho: "tarde" });
     revisar("y ya no acepta paradas: 409, no un 500", otraVezCerrado.status === 409, { status: otraVezCerrado.status });
 
+    console.log("\nLas fotos de la parada\n");
+    // Se vuelve a abrir uno: el anterior ya se cerro.
+    const paraFotos = await pedir(deJefe, "POST", "/api/rondines", { locationId: linea2.id });
+    const rid2 = (paraFotos.json.rondin as { id: string })?.id;
+    const conFoto = await pedir(deJefe, "POST", `/api/rondines/${rid2}/paradas`, { dicho: "fuga en el piso" });
+    const paradaId = (conFoto.json.parada as { id: string })?.id;
+    revisar("hay una parada a la que colgarle fotos", !!paradaId);
+
+    const permiso = await pedir(deJefe, "POST", "/api/attachments", {
+      rondinParadaId: paradaId, name: "parada.jpg", mimeType: "image/jpeg", size: 120_000,
+    });
+    revisar("se puede pedir subir una foto a la parada", permiso.status === 200, { status: permiso.status });
+    revisar("   y la ruta del archivo queda dentro de la empresa",
+      String((permiso.json as { storagePath?: string }).storagePath ?? "").includes("rondines"),
+      (permiso.json as { storagePath?: string }).storagePath);
+
+    const sinPermiso = await pedir(deMirona, "POST", "/api/attachments", {
+      rondinParadaId: paradaId, name: "x.jpg", mimeType: "image/jpeg", size: 1000,
+    });
+    revisar("una cuenta de solo lectura no le cuelga fotos", sinPermiso.status === 403, { status: sinPermiso.status });
+
     console.log("\nNo se cruza con la empresa de al lado\n");
     const otraOrg = await prisma.organization.create({
       data: { name: `${sello}-c`, slug: `${sello}-c`, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" },
@@ -245,6 +273,11 @@ async function main() {
     revisar("ni se le anotan paradas", metido.status === 409, { status: metido.status });
     const areaAjena = await pedir(deVecino, "POST", "/api/rondines", { locationId: linea2.id });
     revisar("ni se empieza un recorrido en un área ajena", areaAjena.status === 404, { status: areaAjena.status });
+    const fotoAjena = await pedir(deVecino, "POST", "/api/attachments", {
+      rondinParadaId: paradaId, name: "colada.jpg", mimeType: "image/jpeg", size: 1000,
+    });
+    // 404 y no 403: al de fuera no se le confirma que esa parada exista.
+    revisar("ni se le cuelgan fotos a la parada de otra empresa", fotoAjena.status === 404, { status: fotoAjena.status });
   } finally {
     for (const id of creadas) {
       await prisma.rondinParada.deleteMany({ where: { organizationId: id } });

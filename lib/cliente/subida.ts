@@ -8,7 +8,8 @@
 
 export type Destino =
   | { workOrderId: string } | { assetId: string }
-  | { workRequestId: string } | { partId: string };
+  | { workRequestId: string } | { partId: string }
+  | { rondinParadaId: string };
 
 /** Lo mismo que acepta el servidor (lib/almacenamiento.ts): aquí para avisar antes de intentar. */
 const TIPOS = [
