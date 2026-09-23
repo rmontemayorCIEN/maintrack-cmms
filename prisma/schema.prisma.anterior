@@ -43,6 +43,8 @@ model Organization {
   rcSequence            Int       @default(0)
   reSequence            Int       @default(0)
   icSequence            Int       @default(0)
+  /// Folio de los rondines (RD-000001).
+  rdSequence            Int       @default(0)
   /// Si el proceso de compras corre DENTRO de MainTrack.
   ///
   /// Apagado por omision a proposito: la mayoria de las empresas ya compra en
@@ -288,6 +290,8 @@ model Organization {
   purchaseOrders     PurchaseOrder[]
   inventoryCounts    InventoryCount[]
   reportPoints       ReportPoint[]
+  rondines           Rondin[]
+  rondinParadas      RondinParada[]
   festivos           DiaFestivo[]
   equivalencias      EquivalenciaRefaccion[]
   asignacionesPlan   PlanAsset[]
@@ -375,6 +379,7 @@ model User {
   quotesCapturadas     Quote[]
   purchaseOrders       PurchaseOrder[]
   inventoryCounts      InventoryCount[]
+  rondines      Rondin[]
   reportPoints         ReportPoint[]
   tareasLiberadas      WorkOrderTask[]         @relation("TareaLiberadaPor")
   /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
@@ -553,6 +558,7 @@ model Site {
   requests     WorkRequest[]
   warehouses   Warehouse[]
   reportPoints ReportPoint[]
+  rondines     Rondin[]
 
   conjuntos Conjunto[]
 
@@ -609,6 +615,8 @@ model Location {
   workOrders   WorkOrder[]
   requests     WorkRequest[]
   reportPoints ReportPoint[]
+  rondines     Rondin[]
+  rondinParadas RondinParada[]
 
   @@index([organizationId])
   @@index([siteId])
@@ -708,6 +716,7 @@ model Asset {
   alerts           PredictiveAlert[]
   downtimes        DowntimeEvent[]
   requisiciones    MaterialRequest[]
+  rondinParadas RondinParada[]
   attachments      Attachment[]
   links            ReferenceLink[]
   reportPoints     ReportPoint[]
@@ -1292,6 +1301,7 @@ model Attachment {
   workRequestId  String?
   partId         String?
   assetIntakeId  String?
+  rondinParadaId String?
   uploadedById   String?
   name           String
   /// Ruta dentro del almacen (no una URL): el enlace de descarga se firma al
@@ -1309,6 +1319,7 @@ model Attachment {
   asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
   workRequest  WorkRequest? @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
   part         Part?        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  rondinParada RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: Cascade)
   assetIntake  AssetIntake? @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
   uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
 
@@ -1892,6 +1903,7 @@ model ReportPoint {
   createdById    String?
   createdAt      DateTime @default(now())
 
+  rondinParadas RondinParada[]
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   site         Site?         @relation(fields: [siteId], references: [id])
   location     Location?     @relation(fields: [locationId], references: [id])
@@ -3299,4 +3311,86 @@ model ResumenInicio {
   datos          String
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------------------ Rondin ---
+
+/// Un recorrido por la planta: el rondin del supervisor, con sus paradas.
+///
+/// Lo que hoy se pierde en el pasillo. Quien recorre ve cosas —un charco, una
+/// guarda floja, un ruido— y eso se queda en su cabeza o en una libreta que
+/// nadie vuelve a leer. Aqui queda con su foto, su lugar y su fecha.
+///
+/// El valor no esta en un recorrido: esta en el SIGUIENTE. Dos rondines del
+/// mismo punto separados por un mes contestan la pregunta que nadie puede
+/// contestar hoy: si aquella mancha crecio.
+model Rondin {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// RD-000001. Por empresa, como todos los folios del sistema.
+  numero         String
+  siteId         String?
+  /// El area que se declaro al empezar: «voy a recorrer la linea 2».
+  ///
+  /// No es adorno: es la segunda mejor forma de saber de que equipo se esta
+  /// hablando cuando no hay codigo QR. Acota el universo de cuatrocientos
+  /// equipos a doce, y con eso casi todo lo demas se resuelve solo.
+  locationId     String?
+  /// EN_CURSO | TERMINADO | CANCELADO. Sin enum nativo: el esquema es portable.
+  estado         String    @default("EN_CURSO")
+  iniciadoPorId  String?
+  iniciadoEn     DateTime  @default(now())
+  terminadoEn    DateTime?
+  /// Lo que se dijo del recorrido completo, no de una parada.
+  nota           String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site?          @relation(fields: [siteId], references: [id])
+  location     Location?      @relation(fields: [locationId], references: [id])
+  iniciadoPor  User?          @relation(fields: [iniciadoPorId], references: [id])
+  paradas      RondinParada[]
+
+  @@unique([organizationId, numero])
+  @@index([organizationId])
+  @@index([organizationId, estado])
+}
+
+/// Cada parada del recorrido: un lugar, lo que se vio y lo que se dijo.
+model RondinParada {
+  id             String   @id @default(cuid())
+  organizationId String
+  rondinId       String
+  /// En que orden se hizo. La ruta del recorrido anterior ayuda a identificar
+  /// las paradas del siguiente cuando no hay codigo.
+  orden          Int      @default(0)
+
+  reportPointId  String?
+  assetId        String?
+  locationId     String?
+
+  /// Como se supo de que equipo o punto se trata.
+  ///
+  /// QR | PLACA | DICHO | ELEGIDO | AREA | NINGUNO, de mas a menos confiable.
+  /// Se guarda para poder MEDIR despues cuanto se depende de que alguien
+  /// concilie a mano: si resulta que casi todo llega como ELEGIDO, es que
+  /// faltan codigos pegados, y eso es una conversacion con el cliente, no un
+  /// defecto del sistema.
+  comoSeIdentifico String @default("NINGUNO")
+
+  /// Lo que se dicto en la parada. De aqui sale casi todo el valor: la imagen
+  /// dice como se ve, la voz dice que le preocupa a quien lo vio.
+  observacion    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rondin       Rondin       @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  reportPoint  ReportPoint? @relation(fields: [reportPointId], references: [id])
+  asset        Asset?       @relation(fields: [assetId], references: [id])
+  location     Location?    @relation(fields: [locationId], references: [id])
+  adjuntos     Attachment[]
+
+  @@index([organizationId])
+  @@index([rondinId])
+  @@index([organizationId, assetId])
 }
