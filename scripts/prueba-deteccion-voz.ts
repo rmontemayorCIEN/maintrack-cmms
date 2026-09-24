@@ -15,7 +15,7 @@
  *
  *   npx tsx scripts/prueba-deteccion-voz.ts
  */
-import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS, SILENCIO_DICTADO_MS } from "../lib/deteccion-voz";
+import { crearDetectorDeSilencio, ESPERA_MAXIMA_MS, SILENCIO_COMANDO_MS, SILENCIO_DICTADO_MS } from "../lib/deteccion-voz";
 import { porQueNoSePudo } from "../lib/dictado";
 
 let fallas = 0;
@@ -32,6 +32,18 @@ function correr(niveles: number[], silencioMs = SILENCIO_COMANDO_MS): number | n
   const d = crearDetectorDeSilencio({ silencioMs, muestraMs: MUESTRA });
   for (let i = 0; i < niveles.length; i++) {
     if (d.alNivel(niveles[i]) === "cortar") return i;
+  }
+  return null;
+}
+
+/** Lo mismo, pero diciendo en que muestra se dio por vencido (o nunca). */
+function correrHastaRendirse(niveles: number[], esperaMaximaMs: number): number | null {
+  const d = crearDetectorDeSilencio({ silencioMs: SILENCIO_COMANDO_MS, muestraMs: MUESTRA, esperaMaximaMs });
+  for (let i = 0; i < niveles.length; i++) {
+    const decision = d.alNivel(niveles[i]);
+    if (decision === "abandonar") return i;
+    // Cortar es otra cosa: alguien hablo y termino. Si pasa, no se rindio.
+    if (decision === "cortar") return null;
   }
   return null;
 }
@@ -97,6 +109,34 @@ function main() {
   // Y al revés: alguien que no para de hablar tampoco se corta.
   const sinParar = [...repetir(0.002, 5), ...voz(100, 0.3)];
   revisar("quien no para de hablar no se corta a media frase", correr(sinParar) === null);
+
+  console.log("\nCuando no habla NADIE\n");
+  /**
+   * Manos libres reabre el micrófono solo. Quien deja la conversación abierta
+   * y se va tenía el micrófono encendido hasta el tope de 60 segundos, y al
+   * final subía ese minuto de silencio a transcribir —que se cobra por
+   * segundo—. Cada vez, no una.
+   */
+  const nadie = repetir(0.002, 300);
+  const seRindio = correrHastaRendirse(nadie, ESPERA_MAXIMA_MS);
+  const esperado = 5 + ESPERA_MAXIMA_MS / MUESTRA;
+  revisar("se da por vencido cuando nadie habla", seRindio !== null, { muestra: seRindio });
+  revisar("   y a la hora pedida, no antes ni mucho después",
+    seRindio !== null && Math.abs(seRindio - esperado) <= 2, { muestra: seRindio, esperado });
+
+  // El caso VIEJO sigue igual: sin pedirlo, no se rinde nunca. El dictado del
+  // cierre de orden depende de eso.
+  revisar("sin pedirlo, no se rinde: el dictado se comporta como siempre",
+    correr(nadie) === null && crearDetectorDeSilencio({ silencioMs: SILENCIO_COMANDO_MS, muestraMs: MUESTRA }) !== null);
+
+  // Y lo que NO debe pasar: cortarle a quien tardó en arrancar pero arrancó.
+  const tardio = [...repetir(0.002, 5 + ESPERA_MAXIMA_MS / MUESTRA - 15), ...voz(20, 0.2), ...repetir(0.002, 60)];
+  revisar("quien tarda en arrancar pero arranca, NO se abandona",
+    correrHastaRendirse(tardio, ESPERA_MAXIMA_MS) === null);
+  // Y quien ya habló nunca se abandona, por larga que sea la pausa después.
+  const hablóYCalló = [...repetir(0.002, 5), ...voz(10, 0.3), ...repetir(0.002, 400)];
+  revisar("quien ya habló se corta, no se abandona",
+    correrHastaRendirse(hablóYCalló, ESPERA_MAXIMA_MS) === null && correr(hablóYCalló) !== null);
 
   console.log("\nCuando el micrófono no se puede usar, decir POR QUÉ\n");
   /**

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Loader2, Mic, Send, Square } from "lucide-react";
 import { cn, sinMarcas } from "@/lib/utils";
+import { pedirFrase, pedirVoz, reproducir, type ClaveFrase } from "@/components/hablar";
 
 /**
  * Hablar con el sistema.
@@ -135,48 +136,16 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
   function pararLatido() { latido.current?.parar(); }
 
   /**
-   * Suena un audio y AVISA cuando termino, pase lo que pase.
+   * Una frase fija del sistema, dicha.
    *
-   * Aqui estaba el defecto que dejaba la pantalla en «Contestando…» para
-   * siempre: si el navegador bloquea la reproduccion —y lo hace, porque entre
-   * la pregunta y la respuesta pasan diez segundos y el permiso del clic ya
-   * caduco— nadie volvia a poner el estado en reposo. Ahora la promesa se
-   * cierra sola en los cuatro casos: termino, fallo, lo bloquearon, o se
-   * paso de largo el tiempo que podia durar.
+   * Lo de pedirla y sonarla vive en `components/hablar.ts`, compartido con el
+   * microfono de la barra de arriba. Aqui solo queda lo propio de esta
+   * pantalla: avisar cuando no hubo voz.
    */
-  function reproducir(blob: Blob, pista: HTMLAudioElement): Promise<boolean> {
-    return new Promise((listo) => {
-      let cerrado = false;
-      const cerrar = (ok: boolean) => { if (!cerrado) { cerrado = true; clearTimeout(reloj); listo(ok); } };
-      // Red de seguridad: ningun audio del sistema dura mas de dos minutos.
-      const reloj = setTimeout(() => cerrar(false), 120_000);
-
-      pista.onended = () => cerrar(true);
-      pista.onerror = () => cerrar(false);
-      pista.src = URL.createObjectURL(blob);
-      pista.play().catch(() => cerrar(false));
-    });
-  }
-
-  /** Trae el audio de una frase fija del sistema. Puede tardar la primera vez. */
-  async function pedirFrase(clave: string): Promise<Blob | null> {
-    try {
-      const r = await fetch("/api/ia/voz/frase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clave }),
-      });
-      if (r.status === 204 || !r.ok) { setSinVoz(true); return null; }
-      return await r.blob();
-    } catch {
-      return null;
-    }
-  }
-
-  /** Pide una frase fija del sistema y la suena. */
-  async function decirFrase(clave: string, pista: HTMLAudioElement) {
+  async function decirFrase(clave: ClaveFrase, pista: HTMLAudioElement) {
     const blob = await pedirFrase(clave);
-    return blob ? reproducir(blob, pista) : false;
+    if (!blob) { setSinVoz(true); return false; }
+    return reproducir(blob, pista);
   }
 
   // Al entrar, saluda. Es lo que hace que esto se sienta una conversacion y
@@ -351,20 +320,16 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
       // Se pide la voz mientras el acuse todavia suena: asi la espera de la
       // sintesis se gasta en algo que la persona ya esta oyendo.
-      const vozPedida = fetch("/api/ia/consulta/voz", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: data.respuesta }),
-      });
+      const vozPedida = pedirVoz(data.respuesta);
 
       await acuse; // que no se encimen las dos voces
       const voz = await vozPedida;
       pararLatido();
       if (audio.current !== pista) return; // lo detuvieron mientras tanto
 
-      if (voz.status === 204 || !voz.ok) { setSinVoz(true); setEstado("quieto"); return; }
+      if (!voz) { setSinVoz(true); setEstado("quieto"); return; }
       setEstado("hablando");
-      const sono = await reproducir(await voz.blob(), pista);
+      const sono = await reproducir(voz, pista);
       // Suene o no, la pantalla vuelve a reposo. Si no sono, se dice: quedarse
       // callado sin explicacion es peor que decir «no se pudo».
       setEstado("quieto");

@@ -25,13 +25,26 @@
  * audio de verdad vive en el componente; la decision, aqui.
  */
 
-export type Decision = "calibrando" | "esperando" | "hablando" | "cortar";
+export type Decision = "calibrando" | "esperando" | "hablando" | "cortar" | "abandonar";
 
 export type OpcionesDetector = {
   /** Cuanto silencio, en ms, se toma como «ya termino». */
   silencioMs: number;
   /** Cada cuanto llegan las muestras. */
   muestraMs: number;
+  /**
+   * Cuanto se espera a que alguien EMPIECE a hablar antes de darse por vencido.
+   *
+   * No es lo mismo que `silencioMs`, que es la pausa que cierra una frase ya
+   * empezada. Esto es el caso de nadie: se abrio el microfono y no hablo
+   * nadie —se distrajo, lo dejo en la mesa, se fue—.
+   *
+   * Sin esto, el microfono se queda abierto hasta el tope de un minuto y
+   * despues sube ese minuto de silencio a transcribir, que se cobra por
+   * segundo. Con manos libres eso pasa CADA vez que alguien deja la
+   * conversacion abierta, no una vez.
+   */
+  esperaMaximaMs?: number;
   /**
    * Cuantas muestras se dedican a oir el lugar antes de decidir nada.
    *
@@ -64,6 +77,9 @@ const UMBRAL_MAXIMO = 0.12;
 export function crearDetectorDeSilencio(opciones: OpcionesDetector) {
   const calibracion = opciones.muestrasDeCalibracion ?? 5;
   const paraCortar = Math.max(1, Math.round(opciones.silencioMs / opciones.muestraMs));
+  const paraRendirse = opciones.esperaMaximaMs
+    ? calibracion + Math.max(1, Math.round(opciones.esperaMaximaMs / opciones.muestraMs))
+    : Infinity;
 
   let muestras = 0;
   let sumaRuido = 0;
@@ -91,8 +107,9 @@ export function crearDetectorDeSilencio(opciones: OpcionesDetector) {
       }
 
       // Silencio. Solo cuenta si ya hubo voz: si no, es alguien que todavia
-      // no arranca.
-      if (!hablo) return "esperando";
+      // no arranca —o nadie, y entonces hay que cerrar en vez de grabar el
+      // cuarto vacio hasta el tope.
+      if (!hablo) return muestras >= paraRendirse ? "abandonar" : "esperando";
       callado++;
       return callado >= paraCortar ? "cortar" : "hablando";
     },
@@ -123,3 +140,14 @@ export function crearDetectorDeSilencio(opciones: OpcionesDetector) {
  */
 export const SILENCIO_COMANDO_MS = 3000;
 export const SILENCIO_DICTADO_MS = 3500;
+
+/**
+ * Cuanto se espera a que alguien empiece, antes de cerrar solo.
+ *
+ * Doce segundos es de sobra para tocar el boton, pensar y arrancar. Pasados
+ * esos, o no hay nadie o no se le oye, y las dos cosas se atienden igual:
+ * cerrar sin mandar nada. Se noto con manos libres, donde el microfono se
+ * reabre solo: quien deja la conversacion abierta y se va generaba un minuto
+ * de silencio subido a transcribir cada vez.
+ */
+export const ESPERA_MAXIMA_MS = 12_000;

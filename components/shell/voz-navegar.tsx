@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Mic, Square, Volume2, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, sinMarcas } from "@/lib/utils";
 import { usarGrabadora } from "../usar-grabadora";
+import { ESPERA_MAXIMA_MS } from "@/lib/deteccion-voz";
+import { pedirFrase, pedirVoz, reproducir } from "../hablar";
 
 /**
  * Hablarle al sistema: un solo micrófono para ir a un lado o preguntar algo.
@@ -15,6 +17,19 @@ import { usarGrabadora } from "../usar-grabadora";
  * Para quien lo usa eso es una sola cosa —hablarle al sistema— y tener dos
  * obliga a clasificar la propia frase antes de decirla. Lo que decide es el
  * verbo, en el servidor: «llévame» va a una pantalla, «cuánto» se contesta.
+ *
+ * ── Y contesta HABLANDO ──
+ *
+ * La primera versión de este botón escuchaba y no decía nada: la respuesta
+ * aparecía escrita en un cartel. Eso no es hablarle al sistema, es dictarle.
+ * Rafael lo dijo con la comparación exacta: «ya no sale el "Hola Rafael, en
+ * qué le puedo ayudar"» —el saludo que sí tenía el modo voz del chat—, y «la
+ * respuesta de audio no la da». Quien trae las manos sucias o va manejando no
+ * puede leer un cartel; si hay que leerlo, el micrófono sobraba.
+ *
+ * Así que saluda al abrir, contesta hablando, y solo entonces vuelve a
+ * escuchar. El orden importa: si el micrófono se abriera mientras el sistema
+ * habla, se grabaría a sí mismo.
  *
  * ── Manos libres ──
  *
@@ -39,21 +54,65 @@ export function VozNavegar() {
   const [respuesta, setRespuesta] = useState<Respuesta>(null);
   /** Manos libres: sigue escuchando hasta que alguien lo cierre. */
   const [seguido, setSeguido] = useState(false);
+  /** Mientras el sistema habla NO se escucha, o se grabaría a sí mismo. */
+  const [hablando, setHablando] = useState(false);
+  /** Se dice una sola vez: el aparato no dejó sonar nada. */
+  const [sinVoz, setSinVoz] = useState(false);
   const enVano = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
 
+  /**
+   * Suena algo y avisa al terminar, sin dejar el estado colgado.
+   *
+   * La pista se compara con la que hay al terminar: si alguien cerró mientras
+   * sonaba, ya hay otra —o ninguna— y este resultado no manda.
+   */
+  async function decir(traer: () => Promise<Blob | null>) {
+    const pista = audio.current;
+    if (!pista) return;
+    setHablando(true);
+    try {
+      const blob = await traer();
+      if (audio.current !== pista) return; // lo cerraron mientras tanto
+      if (!blob) { setSinVoz(true); return; }
+      const sono = await reproducir(blob, pista);
+      if (!sono && audio.current === pista) setSinVoz(true);
+    } finally {
+      // Pase lo que pase se vuelve a escuchar: quedarse mudo y sordo tras un
+      // fallo de audio sería peor que no haber hablado.
+      if (audio.current === pista) setHablando(false);
+    }
+  }
+
+  /**
+   * Cortar la conversación sin tocar la grabadora.
+   *
+   * Existe aparte de `cerrar` por orden de declaración: esto lo llama el
+   * callback de la grabadora, que se escribe ANTES de que exista `cerrar`.
+   * Llamar ahí a `cerrar` compila igual y revienta en ejecución.
+   */
+  const cortarConversacion = () => {
+    setSeguido(false); setHablando(false);
+    if (audio.current) { audio.current.pause(); audio.current = null; }
+  };
+
   const g = usarGrabadora({
+    // Manos libres reabre el micrófono solo, así que el descuido se repite:
+    // si nadie habla se cierra la conversación en vez de subir el silencio.
+    esperaMaximaMs: ESPERA_MAXIMA_MS,
+    alDesistir: () => cortarConversacion(),
     alTerminar: async (grabado) => {
       try {
         const r = await fetch("/api/ia/navegar", { method: "POST", body: grabado });
         const d = await r.json().catch(() => ({}));
         if (!g.sigueVivo()) return;
-        if (!r.ok) { setSeguido(false); g.setError(d.error ?? "No se pudo oír en este momento."); return; }
+        if (!r.ok) { cortarConversacion(); g.soltar(); g.setError(d.error ?? "No se pudo oír en este momento."); return; }
 
         if (d.tipo === "ir" && d.ruta) {
           // Al cambiar de pantalla se acaba la conversación: seguir
           // escuchando mientras alguien lee otra cosa sería escuchar de más.
-          setSeguido(false);
+          cortarConversacion();
+          g.soltar();
           router.push(d.ruta);
           return;
         }
@@ -61,6 +120,9 @@ export function VozNavegar() {
           enVano.current = 0;
           setFallo(null);
           setRespuesta({ texto: d.texto, respuesta: d.respuesta });
+          // Escrita y dicha. La escrita se pone primero porque es la que no
+          // puede fallar: de estas cifras se toman decisiones.
+          await decir(() => pedirVoz(sinMarcas(d.respuesta)));
           return;
         }
         enVano.current += 1;
@@ -68,7 +130,7 @@ export function VozNavegar() {
         setFallo({ mensaje: d.mensaje ?? "No le entendí.", texto: d.texto ?? "", ejemplos: d.ejemplos ?? [] });
         if (enVano.current >= INTENTOS_EN_VANO) setSeguido(false);
       } catch {
-        if (g.sigueVivo()) { setSeguido(false); g.setError("Se perdió la conexión."); }
+        if (g.sigueVivo()) { cortarConversacion(); g.soltar(); g.setError("Se perdió la conexión."); }
       }
     },
   });
@@ -76,67 +138,112 @@ export function VozNavegar() {
   /**
    * Volver a escuchar cuando se terminó de atender lo anterior.
    *
-   * Se espera a que el estado vuelva a reposo —no se encadena dentro de la
-   * respuesta— porque si no, el micrófono se abriría mientras todavía se está
-   * hablando o transcribiendo, y se grabaría a sí mismo.
+   * Las tres condiciones son necesarias: que la conversación siga abierta, que
+   * la grabadora esté en reposo —no transcribiendo— y que el sistema no esté
+   * hablando. Sin la tercera, el micrófono se abriría encima de la respuesta y
+   * grabaría la voz del propio sistema.
    */
   useEffect(() => {
-    if (!seguido || g.estado !== "quieto") return;
+    if (!seguido || hablando || g.estado !== "quieto") return;
     const t = setTimeout(() => { if (seguido) void g.alternar(); }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seguido, g.estado]);
+  }, [seguido, hablando, g.estado]);
+
+  /**
+   * Si la grabadora falla, se acaba la conversación.
+   *
+   * Sin esto quedaba marcada como abierta —el botón en «dejar de escuchar»—
+   * con nada escuchando detrás: el siguiente toque cerraba algo que ya no
+   * existía en vez de volver a empezar, y había que tocar dos veces sin que
+   * se entendiera por qué.
+   */
+  useEffect(() => {
+    if (g.error) cortarConversacion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [g.error]);
 
   useEffect(() => () => { audio.current?.pause(); audio.current = null; }, []);
 
   if (g.puedeGrabar === false) return null;
 
   const grabando = g.estado === "grabando";
-  const abrir = () => { enVano.current = 0; setFallo(null); setRespuesta(null); setSeguido(true); void g.alternar(); };
+  /** Hay conversación abierta: el botón cierra, no abre. */
+  const enConversacion = seguido || grabando || hablando || g.estado === "trabajando";
+
+  /**
+   * Abrir. Todo lo que iOS solo permite dentro del toque va aquí, antes de
+   * cualquier espera: el permiso del audio y el arranque de la pista.
+   */
+  const abrir = () => {
+    enVano.current = 0;
+    setFallo(null); setRespuesta(null); setSinVoz(false); g.setError(null);
+    g.prepararAudio();
+    const pista = new Audio();
+    audio.current = pista;
+    // Arrancarla vacía dentro del toque es lo que la deja sonar después: el
+    // saludo tarda en llegar del servidor y para entonces el permiso del clic
+    // ya caducó.
+    void pista.play().catch(() => undefined);
+    setSeguido(true);
+    // Saluda primero y escucha después. El efecto de arriba abre el micrófono
+    // solo cuando esto termina.
+    void decir(() => pedirFrase("saludo"));
+  };
+
   const cerrar = () => {
-    setSeguido(false); setFallo(null); setRespuesta(null); g.setError(null);
+    cortarConversacion();
+    setFallo(null); setRespuesta(null); setSinVoz(false); g.setError(null);
     if (grabando) g.detener();
     // Al cerrar se suelta el micrófono: es lo que apaga el indicador del
     // teléfono. Entre frase y frase NO se suelta, o volvería a pedir permiso.
     g.soltar();
   };
 
+  /** Lo que está pasando, en una línea. Es lo único que se enseña arriba. */
+  const paso = hablando ? "Contestando…"
+    : grabando ? "Escuchando… diga a dónde ir o pregunte algo"
+    : g.estado === "trabajando" ? "Revisando sus datos…"
+    : seguido ? "Un momento…"
+    : null;
+
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => (seguido || grabando ? cerrar() : abrir())}
-        disabled={g.puedeGrabar === null || g.estado === "trabajando"}
-        aria-label={seguido || grabando ? "Dejar de escuchar" : "Hablarle al sistema"}
-        aria-pressed={seguido || grabando}
+        onClick={() => (enConversacion ? cerrar() : abrir())}
+        // Solo se deshabilita mientras no se sabe si el aparato puede grabar.
+        // Estuvo apagado durante «trabajando» y eso dejaba a quien quisiera
+        // cortar picando un botón muerto: la salida nunca se bloquea.
+        disabled={g.puedeGrabar === null}
+        aria-label={enConversacion ? "Dejar de escuchar" : "Hablarle al sistema"}
+        aria-pressed={enConversacion}
         title="Diga a dónde ir, o pregunte algo"
         className={cn(
           "grid h-10 w-10 place-items-center rounded-lg transition disabled:opacity-40",
           grabando ? "bg-red-50 text-red-600 hover:bg-red-100"
-            : seguido ? "bg-brand-50 text-brand-700"
+            : enConversacion ? "bg-brand-50 text-brand-700"
             : "text-slate-600 hover:bg-slate-100",
         )}
       >
         {g.estado === "trabajando" ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        ) : grabando || seguido ? (
+        ) : enConversacion ? (
           <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
         ) : (
           <Mic className="h-4 w-4" aria-hidden />
         )}
       </button>
 
-      {grabando ? (
+      {/* El aviso de estado solo sale cuando NO hay cartel abajo. Los dos
+          viven en la misma esquina y encimados no se leía ninguno. */}
+      {paso && !respuesta && !fallo && !g.error ? (
         <span
           role="status"
           className="fixed right-3 top-14 z-30 max-w-[calc(100vw-1.5rem)] rounded-md bg-slate-900 px-2 py-1 text-[0.625rem] text-white shadow-lg sm:absolute sm:right-0 sm:top-full sm:mt-1 sm:max-w-none sm:whitespace-nowrap"
         >
-          Escuchando… diga a dónde ir o pregunte algo
-          {g.cortaSolo ? <span className="ml-1 opacity-70">(se corta solo)</span> : null}
-        </span>
-      ) : g.estado === "trabajando" ? (
-        <span role="status" className="fixed right-3 top-14 z-30 rounded-md bg-slate-900 px-2 py-1 text-[0.625rem] text-white shadow-lg sm:absolute sm:right-0 sm:top-full sm:mt-1">
-          Revisando sus datos…
+          {paso}
+          {grabando && g.cortaSolo ? <span className="ml-1 opacity-70">(se corta solo)</span> : null}
         </span>
       ) : null}
 
@@ -160,11 +267,11 @@ export function VozNavegar() {
               {/* La respuesta completa, no un resumen: de estas cifras se
                   toman decisiones y recortarlas aquí sería contestar a medias. */}
               <p className="mt-1.5 max-h-64 overflow-y-auto whitespace-pre-line text-xs leading-relaxed text-slate-800">
-                {respuesta.respuesta}
+                {sinMarcas(respuesta.respuesta)}
               </p>
-              {seguido ? (
+              {paso ? (
                 <p className="mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 text-[0.625rem] text-brand-700">
-                  <Volume2 className="h-3 w-3" aria-hidden /> Siga hablando, lo escucho
+                  <Volume2 className="h-3 w-3" aria-hidden /> {grabando ? "Siga hablando, lo escucho" : paso}
                 </p>
               ) : null}
             </>
@@ -184,6 +291,14 @@ export function VozNavegar() {
               ) : null}
             </>
           )}
+
+          {/* Si el aparato no dejó sonar, se dice: quedarse callado sin
+              explicación es lo que hace pensar que se descompuso. */}
+          {sinVoz ? (
+            <p className="mt-2 border-t border-slate-100 pt-2 text-[0.625rem] text-slate-500">
+              Este aparato no dejó reproducir el audio. La respuesta está aquí completa.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>
