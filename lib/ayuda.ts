@@ -239,10 +239,13 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Solo aparece lo que su rol puede abrir, y siempre de su empresa: quien reporta encuentra sus reportes, no los de otros.",
       "El folio exacto sale primero. Cada registro aparece una sola vez.",
       "Para preguntas en lenguaje natural, use Pregunte a sus datos.",
-      "También se puede decir a dónde ir, sin escribir: el micrófono de la barra de arriba lleva a donde usted pida —«llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3»—. Lo que se dice se interpreta con reglas, así que es inmediato; si no lo entiende, le enseña lo que oyó y ejemplos de lo que sí puede decir. Nunca lleva a una pantalla que su perfil no puede abrir.",
+      "El micrófono de la barra de arriba sirve para las dos cosas: llevarlo a donde pida —«llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3»— y contestarle preguntas sobre sus datos —«cuánto llevo gastado en el compresor», «por qué se paró la línea 2»—. Lo que decide es cómo empiece la frase: «llévame» o «ábreme» es ir; «cuánto», «cuántas» o «por qué» es preguntar.",
+      "Una vez que lo toca, sigue escuchando: al terminar de atender lo que dijo vuelve a escuchar sin que usted toque nada. Se detiene al cerrarlo, al cambiar de pantalla, o si dos veces seguidas no le entiende.",
+      "«Llévame a la orden de trabajo 11» abre la OT-000011, no una lista con todo lo que contenga «11». Funciona con el número dicho en cifra o en letra, y distingue series: «orden de compra 5» es una compra.",
+      "Nunca lleva a una pantalla que su perfil no puede abrir, y si no entiende le enseña lo que oyó —que casi siempre explica el problema solo— y ejemplos de lo que sí puede decir.",
     ],
     botones: [
-      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Diga a dónde quiere ir y lo lleva. Se corta solo cuando usted termina de hablar; no hace falta volver a tocarlo. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
+      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Háblele al sistema: lo lleva a donde pida o le contesta lo que pregunte. Se corta solo cuando usted termina de hablar, y sigue escuchando hasta que lo cierre. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
     ],
     noPuedo: [
       { sintoma: "Se cortó antes de que yo terminara", porque: "Hizo una pausa larga y lo tomó por el final. Vuelva a tocar el micrófono: en el dictado, lo nuevo se agrega a lo anterior y no se pierde nada." },

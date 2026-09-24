@@ -17,7 +17,7 @@
 import { type ChildProcess } from "node:child_process";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
-import { destinoDe, quitarVerbo, intencionDeOrden, folioPedido, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
+import { destinoDe, quitarVerbo, intencionDeOrden, folioPedido, esPregunta, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
 import { pantallasDelMenu } from "../lib/pantallas";
 import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
@@ -253,6 +253,32 @@ async function main() {
      */
     revisar("   y es exactamente esa orden, no otra que se le parezca",
       alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, esperada: `/work-orders/${vieja.id}` });
+
+    console.log("\nUn solo micrófono: el verbo decide\n");
+    /**
+     * Con un microfono para todo, algo tiene que separar «llevame al almacen»
+     * de «cuanto llevo gastado». Lo hace el verbo, no un modelo: quien habla
+     * ya marca la diferencia sin proponerselo.
+     */
+    revisar("«cuánto llevo gastado» es pregunta", esPregunta("cuánto llevo gastado en el compresor"));
+    revisar("«por qué se paró la línea 2» también", esPregunta("por qué se paró la línea 2"));
+    revisar("«dime cuántas refacciones faltan» también", esPregunta("dime cuántas refacciones faltan"));
+    revisar("«llévame al almacén» NO es pregunta", !esPregunta("llévame al almacén"));
+    revisar("«ábreme las vencidas» tampoco", !esPregunta("ábreme las vencidas"));
+    // Una orden de ir gana aunque la frase suene a pregunta: «llevame a lo que
+    // mas gasta» es navegar, no consultar.
+    revisar("una orden de ir gana aunque mencione una cifra",
+      !esPregunta("llévame a lo que más gasta"));
+    revisar("y «mis órdenes», que no lleva verbo, se navega", !esPregunta("mis órdenes"));
+
+    // Lo que importa del reparto: una pregunta que menciona una pantalla NO
+    // puede acabar abriendo la lista en vez de contestar el número.
+    const comoPregunta = await navegar(deJefa, "cuántas órdenes vencidas tengo");
+    revisar("«cuántas órdenes vencidas tengo» no abre la lista: la trata como pregunta",
+      comoPregunta.json.ruta === null, { tipo: comoPregunta.json.tipo, ruta: comoPregunta.json.ruta });
+    const comoOrden = await navegar(deJefa, "llévame a las vencidas");
+    revisar("   y «llévame a las vencidas» sí navega",
+      comoOrden.json.ruta === "/work-orders?vencidas=1", { tipo: comoOrden.json.tipo, ruta: comoOrden.json.ruta });
 
     console.log("\nCuando no entiende\n");
     const perdida = await navegar(deJefa, "llévame a la luna");

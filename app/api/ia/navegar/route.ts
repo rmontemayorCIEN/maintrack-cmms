@@ -4,9 +4,12 @@ import { escuchar, MAXIMO_SEGUNDOS_DICTADO, USD_POR_SEGUNDO } from "@/lib/escuch
 import { puedeUsarIa, registrarEscucha } from "@/lib/ia/consumo";
 import { buscar } from "@/lib/busqueda";
 import { OPEN_STATUSES, REQUEST_OPEN_STATUSES } from "@/lib/constants";
-import { destinoDe, folioPedido, intencionDeOrden, quitarAnuncio, quitarVerbo, DESTINOS, ATAJOS, EJEMPLOS } from "@/lib/navegacion-voz";
+import { destinoDe, esPregunta, folioPedido, intencionDeOrden, quitarAnuncio, quitarVerbo, DESTINOS, ATAJOS, EJEMPLOS } from "@/lib/navegacion-voz";
+import { responderConsulta } from "@/lib/ia/consulta";
+import { puedeVerRuta as puedeVer } from "@/lib/pantallas";
 import { adivinarDestino } from "@/lib/ia/navegar";
 import { iaConfigurada } from "@/lib/ia/cliente";
+import { iaDeLaOrganizacion } from "@/lib/planes";
 import { puedeVerRuta } from "@/lib/pantallas";
 
 /**
@@ -30,6 +33,19 @@ import { puedeVerRuta } from "@/lib/pantallas";
  * resolver por otro, pero eso son dos viajes desde un telefono en la planta, y
  * el segundo se siente. Aqui lo que tarda es oir; resolver es instantaneo
  * porque no pasa por el modelo.
+ *
+ * ── Un solo microfono para las dos cosas ──
+ *
+ * Hablarle al sistema es UNA cosa para quien lo usa, aunque por dentro sean
+ * dos: ir a un lado y preguntar algo. Dos botones obligaban a saber de
+ * antemano cual tocar, y eso es pedirle a alguien que clasifique su propia
+ * frase antes de decirla.
+ *
+ * Lo que decide es el VERBO, no un modelo: «llevame», «abreme» son ordenes de
+ * ir; «cuanto», «por que», «cuantas» son preguntas. Quien habla ya marca la
+ * diferencia sin proponerselo. Ante la duda se navega: llevar de mas deja a
+ * alguien en una pantalla, contestar de mas gasta una operacion de IA y hace
+ * esperar varios segundos.
  *
  * ── Tambien acepta texto, y no es solo para la prueba ──
  *
@@ -103,7 +119,7 @@ export async function POST(request: Request) {
 
     const sinRumbo = (mensaje: string) => {
       anotar(false);
-      return ok({ texto: dicho, ruta: null, mensaje, ejemplos: EJEMPLOS });
+      return ok({ tipo: "nada", texto: dicho, ruta: null, mensaje, ejemplos: EJEMPLOS });
     };
 
     if (!dicho) return sinRumbo("No le entendí. Acérquese el teléfono e intente de nuevo.");
@@ -119,8 +135,34 @@ export async function POST(request: Request) {
         return sinRumbo(`«${titulo}» no está disponible para su perfil.`);
       }
       anotar(true);
-      return ok({ texto: dicho, ruta, titulo });
+      return ok({ tipo: "ir", texto: dicho, ruta, titulo });
     };
+
+    /**
+     * Si es una PREGUNTA, se contesta en vez de navegar.
+     *
+     * Va antes que todo lo demas porque una pregunta puede mencionar el nombre
+     * de una pantalla —«cuántas órdenes vencidas tengo»— y acabaría abriendo
+     * la lista en lugar de decir el número, que es lo que se pidió.
+     */
+    if (esPregunta(dicho)) {
+      const conConsulta = iaDeLaOrganizacion(user.organization).funciones.includes("BUSQUEDA");
+      if (!conConsulta || !puedeVer(user.role, "/consulta", contexto)) {
+        // No se deja a nadie sin salida: se dice que eso no se puede preguntar
+        // aqui, pero que sí se puede pedir ir a algún lado.
+        anotar(false);
+        return ok({
+          tipo: "nada", texto: dicho, ruta: null, ejemplos: EJEMPLOS,
+          mensaje: conConsulta
+            ? "Preguntarle a los datos no está disponible para su perfil."
+            : "Preguntarle a los datos se activa con el complemento IA Avanzada. Sí puede pedirme que lo lleve a alguna pantalla.",
+        });
+      }
+      const r = await responderConsulta(org, { pregunta: dicho, userId: user.id, rol: user.role });
+      if (!r.ok) { anotar(false); return ok({ tipo: "nada", texto: dicho, ruta: null, mensaje: r.motivo, ejemplos: EJEMPLOS }); }
+      anotar(true);
+      return ok({ tipo: "respuesta", texto: dicho, respuesta: r.respuesta, consultas: r.consultas });
+    }
 
     // 1. Una pantalla o un atajo con filtro: es lo mas comun y no toca la base.
     const directo = destinoDe(dicho);

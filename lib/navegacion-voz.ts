@@ -371,6 +371,34 @@ export function destinoDe(frase: string): { ruta: string; titulo: string } | nul
   return m ? { ruta: m.ruta, titulo: m.titulo } : null;
 }
 
+/**
+ * Si lo dicho es una PREGUNTA y no una orden de ir.
+ *
+ * Con un solo microfono para todo, algo tiene que decidir si «cuánto llevo
+ * gastado» se contesta o se navega. Y no hace falta un modelo para eso: el
+ * verbo ya lo dice, y quien habla lo marca sin proponerselo.
+ *
+ * Se mira primero si empieza con una orden de ir —«llevame», «abreme»—,
+ * porque eso es inequivoco. Si no, se busca si es una pregunta. Y ante la
+ * duda NO es pregunta: navegar de mas lleva a una pantalla, contestar de mas
+ * gasta una operacion de IA y hace esperar.
+ */
+const INICIOS_DE_PREGUNTA = [
+  "cuanto", "cuantos", "cuantas", "cual", "cuales", "que tal", "como va", "como van",
+  "como esta", "como estan", "por que", "porque", "quien", "quienes", "donde esta",
+  "dime", "sabes", "hay ", "tengo", "tenemos", "me puedes decir", "necesito saber",
+  "que equipo", "que refaccion", "que orden", "que me", "cuando",
+];
+
+export function esPregunta(frase: string): boolean {
+  const t = normalizar(frase);
+  if (!t) return false;
+  // Una orden de ir gana siempre: «llevame a lo que mas gasta» es navegar.
+  if (VERBOS.some((v) => t.startsWith(`${v} `) || t === v)) return false;
+  if (t.includes("?")) return true;
+  return INICIOS_DE_PREGUNTA.some((p) => t.startsWith(p));
+}
+
 /** Ejemplos para cuando no se entendio, para no dejar a nadie adivinando. */
 export const EJEMPLOS = [
   "Llévame a las órdenes vencidas",
