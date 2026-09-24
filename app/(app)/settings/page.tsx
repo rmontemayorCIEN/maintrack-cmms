@@ -14,6 +14,7 @@ import { instalacionDe } from "@/lib/instalaciones";
 import { PanelApariencia } from "./apariencia";
 import { PanelVoz } from "./voz";
 import { VOCES, VOZ_POR_OMISION } from "@/lib/voz";
+import { LARGOS_DE_RESPUESTA, LARGO_POR_OMISION } from "@/lib/respuestas-voz";
 import type { ClaveAcento, ClaveDensidad, ClaveEscala } from "@/lib/apariencia";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
 import { FichasPlanes } from "./planes";
@@ -209,7 +210,12 @@ export default async function SettingsPage({
           panorama de la empresa: el mismo criterio que protege esa ruta. */}
       {activa === "apariencia" && puedeVerRuta(user.role, "/indicadores") ? (
         <div className="mt-4">
-          <PanelVoz voces={VOCES} elegida={user.vozBrief ?? VOZ_POR_OMISION} />
+          <PanelVoz
+            voces={VOCES}
+            elegida={user.vozBrief ?? VOZ_POR_OMISION}
+            largos={LARGOS_DE_RESPUESTA}
+            largoElegido={user.respuestaVoz ?? LARGO_POR_OMISION}
+          />
         </div>
       ) : null}
 

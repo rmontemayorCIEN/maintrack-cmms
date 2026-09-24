@@ -13,7 +13,7 @@
  */
 
 /** Las frases fijas que el servidor tiene sintetizadas. */
-export type ClaveFrase = "saludo" | "pensando" | "sinDatos" | "tope";
+export type ClaveFrase = "saludo" | "pensando" | "sinDatos" | "tope" | "vamos";
 
 /**
  * Un latido bajito mientras el sistema revisa los datos.

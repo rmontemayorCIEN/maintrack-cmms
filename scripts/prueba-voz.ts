@@ -9,6 +9,7 @@
  *   npx tsx scripts/prueba-voz.ts
  */
 import { conPausas, huella, nombreDeVoz, paraDecir, RITMO, VOCES, VOZ_POR_OMISION, vozValida } from "../lib/voz";
+import { HAY_MAS_ESCRITO, LARGOS_DE_RESPUESTA, LARGO_POR_OMISION, largoDe, loQueSeDice } from "../lib/respuestas-voz";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle = "") {
@@ -201,6 +202,54 @@ async function consumo() {
     const enterprise = await puedeHablar({ id: org.id, plan: "ENTERPRISE" });
     revisar("el plan grande tiene más margen que el chico", enterprise.puede,
       `Enterprise ${TOPE_VOZ_MENSUAL.ENTERPRISE} contra Professional ${tope}`);
+
+    console.log("\nQué tanto contesta hablando\n");
+    /**
+     * Medido en producción con la pregunta de Rafael, «¿cuántos activos
+     * tenemos?»: 735 caracteres, unos 53 segundos hablados. La respuesta que
+     * se pidió cabe en el primer párrafo; lo demás es contexto que sí vale,
+     * pero leído, no oído de pie.
+     */
+    // Copiada tal cual de la corrida contra producción, no aproximada: si se
+    // resume aquí, la prueba mide un problema más chico que el real.
+    const laDeRafael = [
+      "Según los indicadores al corte del 24 de septiembre de 2026, tienen **18 equipos en servicio**, ninguno detenido, y de esos **9 son de criticidad alta** —es decir, la mitad del parque es crítico.",
+      "Ese número es el de activos activos en operación; si hay equipos retirados, no entran en ese conteo (conservan su historial pero salen de las listas de trabajo). Para el padrón completo, incluyendo retirados y agrupado por sitio o categoría, la pantalla de Activos se lo arma con \"Agrupar por…\" y cada grupo trae su conteo.",
+      "Un dato que vale la pena: con 18 equipos en servicio, el cumplimiento preventivo va en 45.9% y hay 17 órdenes de backlog, 13 de ellas vencidas. El parque es chico, así que ese atraso se concentra en pocos equipos.",
+    ].join("\n\n");
+
+    const concisa = loQueSeDice(laDeRafael, "CONCISA");
+    revisar("concisa dice la respuesta y no el informe",
+      concisa.texto.includes("18 equipos") && !concisa.texto.includes("backlog"),
+      `${concisa.texto.length} de ${laDeRafael.length} caracteres`);
+    revisar("   y avisa que hay más, para que nadie crea que eso es todo", concisa.hayMas);
+    // ~14 caracteres por segundo hablando: el punto del ajuste son los segundos.
+    revisar("   baja de ~53 segundos a menos de 20",
+      concisa.texto.length / 14 < 20 && laDeRafael.length / 14 > 45,
+      `${(concisa.texto.length / 14).toFixed(0)} s contra ${(laDeRafael.length / 14).toFixed(0)} s`);
+
+    // El caso VIEJO sigue: completa dice todo, sin prometer un detalle aparte.
+    const completa = loQueSeDice(laDeRafael, "COMPLETA");
+    revisar("completa sigue diciendo todo", completa.texto === laDeRafael && !completa.hayMas);
+
+    // Lo que NO debe pasar: cortar una frase a la mitad, o prometer detalle
+    // que no existe.
+    const deUnSoloParrafo = "Tienes 13 órdenes vencidas, las más atrasadas llevan 21 días.";
+    const sinCortar = loQueSeDice(deUnSoloParrafo, "CONCISA");
+    revisar("una respuesta de un solo párrafo no se corta",
+      sinCortar.texto === deUnSoloParrafo && !sinCortar.hayMas);
+    const deCorrido = "Frase uno. Frase dos. Frase tres, toda de corrido sin renglones en blanco.";
+    revisar("   y una respuesta de corrido se dice entera, no a medias",
+      loQueSeDice(deCorrido, "CONCISA").texto === deCorrido);
+    revisar("   nunca termina a media frase",
+      [laDeRafael, deUnSoloParrafo, deCorrido].every((t) => /[.!?»]$/.test(loQueSeDice(t, "CONCISA").texto.trim())));
+
+    revisar("la de omisión es la concisa", LARGO_POR_OMISION === "CONCISA");
+    revisar("   y un valor desconocido cae en ella, no revienta", largoDe("LO-QUE-SEA") === "CONCISA");
+    revisar("   y quien no ha escogido nada también", largoDe(null) === "CONCISA");
+    revisar("son dos opciones, no tres", LARGOS_DE_RESPUESTA.length === 2,
+      LARGOS_DE_RESPUESTA.map((l) => l.etiqueta).join(" | "));
+    revisar("el aviso de que hay más es una frase, no un párrafo", HAY_MAS_ESCRITO.length < 60, HAY_MAS_ESCRITO);
 
     console.log("\nEl chat con voz, solo donde se decidió\n");
     revisar("Enterprise sí lo tiene", tieneChatDeVoz("ENTERPRISE"));

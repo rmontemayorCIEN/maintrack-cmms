@@ -17,8 +17,18 @@ import { cn } from "@/lib/utils";
  */
 
 type Voz = { id: string; quien: string; como: string };
+type Largo = { clave: string; etiqueta: string; explica: string; aproximado: string };
 
-export function PanelVoz({ voces, elegida }: { voces: readonly Voz[]; elegida: string }) {
+export function PanelVoz({
+  voces, elegida, largos, largoElegido,
+}: {
+  voces: readonly Voz[];
+  elegida: string;
+  largos: readonly Largo[];
+  largoElegido: string;
+}) {
+  const [largo, setLargo] = useState(largoElegido);
+  const [guardandoLargo, setGuardandoLargo] = useState<string | null>(null);
   const [actual, setActual] = useState(elegida);
   const [probando, setProbando] = useState<string | null>(null);
   const [guardando, setGuardando] = useState<string | null>(null);
@@ -50,6 +60,22 @@ export function PanelVoz({ voces, elegida }: { voces: readonly Voz[]; elegida: s
       // Si sonó, el `onended` lo apaga; si no, se apaga aquí.
       if (!audio.current || audio.current.paused) setProbando(null);
     }
+  }
+
+  /**
+   * Cuanto habla al contestar.
+   *
+   * Va aqui y no en una tarjeta aparte porque es la misma decision: como se
+   * oye el sistema. Quien viene a escoger voz es quien lo usa hablando.
+   */
+  async function escogerLargo(clave: string) {
+    const antes = largo;
+    setLargo(clave);
+    setGuardandoLargo(clave);
+    setError(null);
+    const r = await pedir("/api/apariencia", { method: "PATCH", json: { respuestaVoz: clave } });
+    setGuardandoLargo(null);
+    if (!r.ok) { setLargo(antes); setError(r.error); }
   }
 
   async function escoger(id: string) {
@@ -131,6 +157,52 @@ export function PanelVoz({ voces, elegida }: { voces: readonly Voz[]; elegida: s
         La voz es suya: cada quien escucha su parte con la que escogió. Al cambiarla, el siguiente parte
         se genera con la nueva.
       </p>
+
+      {/* Cuánto habla al contestar una pregunta hablada. */}
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <h3 className="text-sm font-semibold text-slate-900">Qué tanto le contesta hablando</h3>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Cuando le pregunta por sus datos con el micrófono. Lo escrito sale completo en los dos casos:
+          esto solo cambia lo que se dice en voz alta.
+        </p>
+
+        <ul className="mt-2.5 grid gap-2 sm:grid-cols-2">
+          {largos.map((l) => {
+            const esta = l.clave === largo;
+            return (
+              <li key={l.clave}>
+                <button
+                  type="button"
+                  onClick={() => escogerLargo(l.clave)}
+                  disabled={Boolean(guardandoLargo)}
+                  aria-pressed={esta}
+                  className={cn(
+                    "flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left disabled:opacity-60",
+                    esta ? "border-brand-400 bg-brand-50/60" : "border-slate-200 bg-white hover:border-brand-300",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border",
+                      esta ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300",
+                    )}
+                    aria-hidden
+                  >
+                    {guardandoLargo === l.clave ? <Loader2 className="h-3 w-3 animate-spin" /> : esta ? <Check className="h-3 w-3" /> : null}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-900">{l.etiqueta}</span>
+                    <span className="block text-[0.6875rem] leading-snug text-slate-500">{l.explica}</span>
+                    {/* El tiempo aproximado es lo que de verdad decide: nadie
+                        escoge «concisa» por la palabra, sino por los segundos. */}
+                    <span className="mt-0.5 block text-[0.6875rem] text-slate-400">{l.aproximado}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </Card>
   );
 }

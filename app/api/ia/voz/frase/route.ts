@@ -15,7 +15,7 @@ import { FRASES, sintetizar } from "@/lib/voz";
  * los dias sale gratis a partir del segundo.
  */
 const schema = z.object({
-  clave: z.enum(["saludo", "pensando", "sinDatos", "tope"]),
+  clave: z.enum(["saludo", "pensando", "sinDatos", "tope", "vamos"]),
 });
 
 export async function POST(request: Request) {

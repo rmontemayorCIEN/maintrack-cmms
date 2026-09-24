@@ -2,8 +2,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { ok, withAuth } from "@/lib/api";
 import { VOCES } from "@/lib/voz";
+import { LARGOS_DE_RESPUESTA } from "@/lib/respuestas-voz";
 
 const CLAVES_DE_VOZ = VOCES.map((v) => v.id) as unknown as [string, ...string[]];
+const LARGOS = LARGOS_DE_RESPUESTA.map((l) => l.clave) as unknown as [string, ...string[]];
 
 /**
  * Preferencias de como se ve —y como se oye— el sistema.
@@ -23,6 +25,12 @@ const personal = z.object({
    * silencio sin explicacion a la hora de escuchar—.
    */
   vozBrief: z.enum(CLAVES_DE_VOZ).nullable().optional(),
+  /**
+   * Que tan larga es la respuesta HABLADA. Personal por la misma razon que la
+   * voz: quien va manejando quiere el numero y ya, y quien revisa sentado
+   * quiere el contexto. Ver `lib/respuestas-voz.ts`.
+   */
+  respuestaVoz: z.enum(LARGOS).nullable().optional(),
 });
 
 const empresa = z.object({

@@ -533,6 +533,15 @@ export async function puedeHablar(org: { id: string; plan: string }): Promise<Ve
 export const FRASES = {
   saludo: (nombre: string) => `Buen día, ${nombre.split(" ")[0]}. ¿En qué le ayudo?`,
   pensando: "Claro, déjeme revisar sus datos.",
+  /**
+   * Antes de llevar a alguien a otra pantalla.
+   *
+   * Navegar y preguntar entran por el mismo boton, y hasta que la pantalla
+   * cambia no hay forma de saber cual de las dos entendio. Esta frase lo dice
+   * en segundo y medio: si uno pidio ir a algun lado y oye «vamos para alla»,
+   * ya sabe que le entendio antes de que la pantalla se mueva.
+   */
+  vamos: "Vamos para allá.",
   sinDatos: "No encontré con qué contestar eso. ¿Lo intentamos de otra forma?",
   tope: "Por hoy ya no puedo hablar más. Lo escrito sigue funcionando igual.",
 } as const;

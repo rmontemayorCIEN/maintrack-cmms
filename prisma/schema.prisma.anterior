@@ -344,6 +344,14 @@ model User {
   /// oido, como la escala de letra: al director le puede gustar una y a su
   /// jefe de mantenimiento otra.
   vozBrief          String?
+  /// Que tan larga quiere la respuesta HABLADA: CONCISA o COMPLETA
+  /// (lib/respuestas-voz.ts). Nula = concisa, que es la de omision.
+  ///
+  /// Solo manda sobre lo que se DICE. Lo escrito sale completo siempre: el
+  /// contexto de mas si vale —«ojo, la mitad no tiene causa raiz»— y tirarlo
+  /// seria resolver un problema creando otro. Rafael lo midio en su telefono:
+  /// preguntar «cuantos activos tenemos» y oir cincuenta segundos de informe.
+  respuestaVoz      String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

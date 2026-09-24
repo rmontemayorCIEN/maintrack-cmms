@@ -147,26 +147,16 @@ export function VozNavegar() {
       })();
       pulso.latir();
 
-      /** «Déme un momento», mientras la consulta corre en paralelo. */
-      const acuse = (async () => {
-        const blob = await pedirFrase("pensando");
-        if (!blob || !pista || audio.current !== pista) return;
-        pulso.callar();
-        await reproducir(blob, pista);
-        // La consulta sigue: vuelve el pulso.
-        pulso.latir();
-      })().catch(() => undefined);
-
       /**
-       * Esperar al acuse, pero con tope.
+       * El «déme un momento» hablado estuvo aquí y se quitó.
        *
-       * `reproducir` solo se resuelve cuando el audio TERMINA, y al cerrar la
-       * conversación la pista se pausa: una pausa no es un final, así que la
-       * promesa se quedaría colgada —hasta su propia red de seguridad de dos
-       * minutos— y con ella el botón en «trabajando». La frase dura dos
-       * segundos; ocho son de sobra y acotan el peor caso.
+       * Rafael, después de probarlo: «quitar el "Claro, reviso tus datos" para
+       * que se escuche el pulso directo». Tiene razón, y hay una razón de
+       * fondo: el pulso arranca en el instante en que uno deja de hablar, así
+       * que YA dice «te oí». La frase decía lo mismo dos segundos y medio más
+       * tarde, y encima obligaba a coordinar dos audios para que no se
+       * encimaran. Lo que menos piezas tiene es lo que menos se rompe.
        */
-      const acuseListo = Promise.race([acuse, new Promise((r) => setTimeout(r, 8000))]);
 
       try {
         const r = await fetch("/api/ia/navegar", { method: "POST", body: grabado });
@@ -191,19 +181,34 @@ export function VozNavegar() {
            * se apaga. Ese es el mismo trato que entre una frase y la
            * siguiente, no uno nuevo.
            */
-          cortarConversacion();
+          /**
+           * Se dice ANTES de llevar, y la navegación no espera.
+           *
+           * Navegar y preguntar entran por el mismo botón, así que hasta que
+           * la pantalla cambia no hay forma de saber cuál de las dos entendió.
+           * «Vamos para allá» lo resuelve en segundo y medio.
+           *
+           * El `push` va primero y el audio sigue sonando encima: el
+           * componente vive en la barra, que sobrevive a la navegación. Al
+           * revés —esperar la frase para navegar— se sentiría lento, que es
+           * justo lo que se está tratando de quitar.
+           */
+          pulso.fin();
           router.push(d.ruta);
+          await decir(() => pedirFrase("vamos"));
+          cortarConversacion();
           return;
         }
         if (d.tipo === "respuesta") {
           enVano.current = 0;
           setFallo(null);
           setRespuesta({ texto: d.texto, respuesta: d.respuesta });
-          // Que no se encimen las dos voces: primero termina el acuse.
-          await acuseListo;
           // Escrita y dicha. La escrita se pone primero porque es la que no
           // puede fallar: de estas cifras se toman decisiones.
-          await decir(() => pedirVoz(sinMarcas(d.respuesta)), () => pulso.fin());
+          // Se DICE lo que el servidor marcó como hablado —recortado según la
+          // preferencia— y se LEE la respuesta entera. Si por lo que sea no
+          // vino, se dice todo: hablar de más es molesto, callarse es peor.
+          await decir(() => pedirVoz(sinMarcas(d.hablado ?? d.respuesta)), () => pulso.fin());
           return;
         }
         enVano.current += 1;

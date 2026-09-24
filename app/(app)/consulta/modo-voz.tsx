@@ -275,7 +275,9 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
       const res = await fetch("/api/ia/consulta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pregunta: q }),
+        // `paraVoz`: la respuesta se va a oír, así que vale la preferencia de
+        // «qué tanto le contesta hablando» de Ajustes.
+        body: JSON.stringify({ pregunta: q, paraVoz: true }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -293,7 +295,8 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
       // Se pide la voz mientras el acuse todavia suena: asi la espera de la
       // sintesis se gasta en algo que la persona ya esta oyendo.
-      const vozPedida = pedirVoz(data.respuesta);
+      // Se dice lo recortado y se lee lo entero.
+      const vozPedida = pedirVoz(data.hablado ?? data.respuesta);
 
       await acuse; // que no se encimen las dos voces
       const voz = await vozPedida;

@@ -10,6 +10,7 @@ import { puedeVerRuta as puedeVer } from "@/lib/pantallas";
 import { adivinarDestino } from "@/lib/ia/navegar";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { iaDeLaOrganizacion } from "@/lib/planes";
+import { HAY_MAS_ESCRITO, largoDe, loQueSeDice } from "@/lib/respuestas-voz";
 import { puedeVerRuta } from "@/lib/pantallas";
 
 /**
@@ -158,10 +159,34 @@ export async function POST(request: Request) {
             : "Preguntarle a los datos se activa con el complemento IA Avanzada. Sí puede pedirme que lo lleve a alguna pantalla.",
         });
       }
-      const r = await responderConsulta(org, { pregunta: dicho, userId: user.id, rol: user.role });
+      /**
+       * Por voz la respuesta se OYE, asi que el largo lo manda la preferencia
+       * de la persona. Por texto —la misma ruta acepta `{ texto }`— no: ahi se
+       * lee, y leer de mas no cuesta tiempo a nadie.
+       */
+      const r = await responderConsulta(org, {
+        pregunta: dicho,
+        userId: user.id,
+        rol: user.role,
+        largoHablado: escrito ? undefined : largoDe(user.respuestaVoz),
+      });
       if (!r.ok) { anotar(false); return ok({ tipo: "nada", texto: dicho, ruta: null, mensaje: r.motivo, ejemplos: EJEMPLOS }); }
       anotar(true);
-      return ok({ tipo: "respuesta", texto: dicho, respuesta: r.respuesta, consultas: r.consultas });
+      /**
+       * Se contesta DOS veces la misma respuesta: entera para leer, recortada
+       * para oir.
+       *
+       * El recorte se decide aqui y no en el navegador porque aqui esta la
+       * preferencia de la persona y la regla de como se parte. La pantalla no
+       * tiene que saber nada de eso: enseña `respuesta` y manda a sintetizar
+       * `hablado`.
+       */
+      const dicho_ = loQueSeDice(r.respuesta, largoDe(user.respuestaVoz));
+      return ok({
+        tipo: "respuesta", texto: dicho, respuesta: r.respuesta,
+        hablado: dicho_.hayMas ? `${dicho_.texto}\n\n${HAY_MAS_ESCRITO}` : dicho_.texto,
+        consultas: r.consultas,
+      });
     }
 
     // 1. Una pantalla o un atajo con filtro: es lo mas comun y no toca la base.
