@@ -16,6 +16,58 @@
 export type ClaveFrase = "saludo" | "pensando" | "sinDatos" | "tope";
 
 /**
+ * Un latido bajito mientras el sistema revisa los datos.
+ *
+ * Entre la pregunta y la respuesta hay un silencio largo —medido en este
+ * proyecto: mas de treinta segundos entre que alguien deja de hablar y que
+ * empieza a oir la respuesta, contando la consulta y la sintesis de la voz—.
+ * Un silencio asi, en una conversacion, se siente como que se corto la
+ * llamada. Un pulso suave cada segundo y medio dice «sigo aqui» sin estorbar.
+ *
+ * Se genera con el propio navegador —un oscilador— en vez de descargar un
+ * archivo: no cuesta, no tarda y no hay nada que se pueda quedar a medias.
+ *
+ * El contexto tiene que venir de un gesto de la persona: iOS arranca los
+ * contextos suspendidos y solo deja reanudarlos ahi. El latido empieza mucho
+ * despues, cuando ese permiso ya caduco, asi que si se creara aqui no sonaria
+ * nunca —y sin un solo error—.
+ */
+export function crearLatido(ctx: AudioContext | null): { parar: () => void } {
+  const nada = { parar: () => undefined };
+  if (!ctx || ctx.state === "closed") return nada;
+  try {
+    void ctx.resume().catch(() => undefined);
+    let vivo = true;
+
+    const pulso = () => {
+      if (!vivo || ctx.state === "closed") return;
+      const osc = ctx.createOscillator();
+      const vol = ctx.createGain();
+      osc.type = "sine";
+      // Grave: se oye sin picar el oido, y no compite con la voz.
+      osc.frequency.value = 320;
+      const t = ctx.currentTime;
+      vol.gain.setValueAtTime(0, t);
+      // Se oye, pero no manda. Tan bajo que no se notaba no servia de nada.
+      vol.gain.linearRampToValueAtTime(0.12, t + 0.05);
+      vol.gain.linearRampToValueAtTime(0, t + 0.35);
+      osc.connect(vol).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    };
+
+    pulso();
+    const reloj = setInterval(pulso, 1500);
+    // El contexto NO se cierra al parar: cerrarlo obliga a pedir permiso otra
+    // vez, y la siguiente pregunta se quedaria sin latido.
+    return { parar: () => { vivo = false; clearInterval(reloj); } };
+  } catch {
+    // Sin audio del navegador simplemente no hay latido. No es un fallo.
+    return nada;
+  }
+}
+
+/**
  * Suena un audio y AVISA cuando termino, pase lo que pase.
  *
  * Aqui estaba el defecto que dejaba la pantalla en «Contestando…» para

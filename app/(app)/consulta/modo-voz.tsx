@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Loader2, Mic, Send, Square } from "lucide-react";
 import { cn, sinMarcas } from "@/lib/utils";
-import { pedirFrase, pedirVoz, reproducir, type ClaveFrase } from "@/components/hablar";
+import { crearLatido, pedirFrase, pedirVoz, reproducir, type ClaveFrase } from "@/components/hablar";
 
 /**
  * Hablar con el sistema.
@@ -99,38 +99,11 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
     }
   }
 
+  /** El pulso vive en `components/hablar.ts`, compartido con el micrófono
+   *  de la barra de arriba. Aquí solo se guarda para poder pararlo. */
   function empezarLatido() {
-    try {
-      const ctx = contexto.current;
-      if (!ctx || ctx.state === "closed") return;
-      void ctx.resume().catch(() => undefined);
-      let vivo = true;
-
-      const pulso = () => {
-        if (!vivo) return;
-        const osc = ctx.createOscillator();
-        const vol = ctx.createGain();
-        osc.type = "sine";
-        // Grave: se oye sin picar el oido, y no compite con la voz.
-        osc.frequency.value = 320;
-        const t = ctx.currentTime;
-        vol.gain.setValueAtTime(0, t);
-        // Se oye, pero no manda. Tan bajo que no se notaba no servia de nada.
-        vol.gain.linearRampToValueAtTime(0.12, t + 0.05);
-        vol.gain.linearRampToValueAtTime(0, t + 0.35);
-        osc.connect(vol).connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.32);
-      };
-
-      pulso();
-      const reloj = setInterval(pulso, 1500);
-      // El contexto NO se cierra al parar: cerrarlo obliga a pedir permiso
-      // otra vez, y la siguiente pregunta se quedaria sin latido.
-      latido.current = { parar: () => { vivo = false; clearInterval(reloj); latido.current = null; } };
-    } catch {
-      // Sin audio del navegador, simplemente no hay latido. No es un fallo.
-    }
+    latido.current?.parar();
+    latido.current = crearLatido(contexto.current);
   }
 
   function pararLatido() { latido.current?.parar(); }

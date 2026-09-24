@@ -6,7 +6,7 @@ import { Loader2, Mic, Square, Volume2, X } from "lucide-react";
 import { cn, sinMarcas } from "@/lib/utils";
 import { usarGrabadora } from "../usar-grabadora";
 import { ESPERA_MAXIMA_MS } from "@/lib/deteccion-voz";
-import { pedirVoz, reproducir } from "../hablar";
+import { crearLatido, pedirFrase, pedirVoz, reproducir } from "../hablar";
 
 /**
  * Hablarle al sistema: un solo micrófono para ir a un lado o preguntar algo.
@@ -76,12 +76,14 @@ export function VozNavegar() {
    * La pista se compara con la que hay al terminar: si alguien cerró mientras
    * sonaba, ya hay otra —o ninguna— y este resultado no manda.
    */
-  async function decir(traer: () => Promise<Blob | null>) {
+  async function decir(traer: () => Promise<Blob | null>, alEmpezarASonar?: () => void) {
     const pista = audio.current;
     if (!pista) return;
     setHablando(true);
     try {
       const blob = await traer();
+      // El audio ya está aquí: quien acompañaba la espera se calla.
+      alEmpezarASonar?.();
       if (audio.current !== pista) return; // lo cerraron mientras tanto
       if (!blob) { setSinVoz(true); return; }
       const sono = await reproducir(blob, pista);
@@ -102,6 +104,8 @@ export function VozNavegar() {
    */
   const cortarConversacion = () => {
     setSeguido(false); setHablando(false);
+    // Soltar la pista es lo que desarma el acuse y el pulso: los dos se
+    // comparan contra ella antes de sonar.
     if (audio.current) { audio.current.pause(); audio.current = null; }
   };
 
@@ -113,11 +117,63 @@ export function VozNavegar() {
     avisarAlEscuchar: true,
     alDesistir: () => cortarConversacion(),
     alTerminar: async (grabado) => {
+      /**
+       * El silencio empieza AQUÍ, no cuando llega la respuesta.
+       *
+       * Medido en este proyecto: entre que alguien deja de hablar y que
+       * empieza a oír la respuesta pasan más de treinta segundos —oír el
+       * audio, consultar los datos, sintetizar la voz—. Sin nada que suene,
+       * eso se siente como que se cortó la llamada, y quien va manejando ni
+       * siquiera puede mirar la pantalla para comprobar que sigue viva.
+       *
+       * Dos cosas acompañan esa espera, y se turnan para no encimarse: un
+       * pulso suave desde el primer instante, y un «déme un momento» hablado
+       * en cuanto el servidor lo manda. Las dos existían en el modo voz del
+       * chat; al unificar los micrófonos se quedaron allá.
+       */
+      const pista = audio.current;
+      const pulso = (() => {
+        let actual: { parar: () => void } = { parar: () => undefined };
+        let acabado = false;
+        return {
+          latir() {
+            if (acabado || audio.current !== pista) return;
+            actual.parar();
+            actual = crearLatido(g.audioDelNavegador());
+          },
+          callar() { actual.parar(); actual = { parar: () => undefined }; },
+          fin() { acabado = true; actual.parar(); actual = { parar: () => undefined }; },
+        };
+      })();
+      pulso.latir();
+
+      /** «Déme un momento», mientras la consulta corre en paralelo. */
+      const acuse = (async () => {
+        const blob = await pedirFrase("pensando");
+        if (!blob || !pista || audio.current !== pista) return;
+        pulso.callar();
+        await reproducir(blob, pista);
+        // La consulta sigue: vuelve el pulso.
+        pulso.latir();
+      })().catch(() => undefined);
+
+      /**
+       * Esperar al acuse, pero con tope.
+       *
+       * `reproducir` solo se resuelve cuando el audio TERMINA, y al cerrar la
+       * conversación la pista se pausa: una pausa no es un final, así que la
+       * promesa se quedaría colgada —hasta su propia red de seguridad de dos
+       * minutos— y con ella el botón en «trabajando». La frase dura dos
+       * segundos; ocho son de sobra y acotan el peor caso.
+       */
+      const acuseListo = Promise.race([acuse, new Promise((r) => setTimeout(r, 8000))]);
+
       try {
         const r = await fetch("/api/ia/navegar", { method: "POST", body: grabado });
         const d = await r.json().catch(() => ({}));
         if (!g.sigueVivo()) return;
         if (!r.ok) { cortarConversacion(); g.soltar(); g.setError(d.error ?? "No se pudo oír en este momento."); return; }
+
 
         if (d.tipo === "ir" && d.ruta) {
           /**
@@ -143,9 +199,11 @@ export function VozNavegar() {
           enVano.current = 0;
           setFallo(null);
           setRespuesta({ texto: d.texto, respuesta: d.respuesta });
+          // Que no se encimen las dos voces: primero termina el acuse.
+          await acuseListo;
           // Escrita y dicha. La escrita se pone primero porque es la que no
           // puede fallar: de estas cifras se toman decisiones.
-          await decir(() => pedirVoz(sinMarcas(d.respuesta)));
+          await decir(() => pedirVoz(sinMarcas(d.respuesta)), () => pulso.fin());
           return;
         }
         enVano.current += 1;
@@ -154,6 +212,12 @@ export function VozNavegar() {
         if (enVano.current >= INTENTOS_EN_VANO) setSeguido(false);
       } catch {
         if (g.sigueVivo()) { cortarConversacion(); g.soltar(); g.setError("Se perdió la conexión."); }
+      } finally {
+        // Pase lo que pase, nada sigue latiendo: un pulso que no para es peor
+        // que no haberlo puesto. Al acuse NO se le espera aquí —si alguien
+        // cerró, su audio quedó pausado y nunca «termina»—; se le deja morir
+        // solo, y `latir` ya no hace nada después de `fin`.
+        pulso.fin();
       }
     },
   });

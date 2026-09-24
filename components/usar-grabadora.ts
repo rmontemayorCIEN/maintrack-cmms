@@ -410,23 +410,34 @@ export function usarGrabadora({
       rec.onstop = async () => {
         const audio = new Blob(trozos.current, { type: rec.mimeType });
         trozos.current = [];
-        // NO se suelta aqui: si se soltara, la frase siguiente volveria a
-        // pedir permiso. Se deja en cuenta atras, y si nadie vuelve a hablar
-        // se suelta solo.
         if (aLaBasura.current) {
           aLaBasura.current = false;
-          // Aqui NO se aplaza: no hablo nadie, asi que no hay frase siguiente
-          // que proteger. Se suelta ya y el indicador del telefono se apaga en
-          // el momento, no veinticinco segundos despues.
+          // No hablo nadie, asi que no hay frase siguiente que proteger. Se
+          // suelta ya y el indicador del telefono se apaga en el momento, no
+          // veinticinco segundos despues.
           soltarMicrofono();
           if (vivo.current) setEstado("quieto");
           return;
         }
-        aplazarElSuelte();
-        if (!audio.size) { if (vivo.current) setEstado("quieto"); return; }
+        if (!audio.size) { aplazarElSuelte(); if (vivo.current) setEstado("quieto"); return; }
         try {
           await alTerminar(audio);
         } finally {
+          /**
+           * La cuenta atras empieza AQUI, no al dejar de hablar.
+           *
+           * Estaba arriba, antes de atender lo dicho, y ese era el defecto:
+           * contestar una pregunta de los datos —consultarlos, sintetizar la
+           * voz y leerla— tarda de sobra mas de veinticinco segundos. El
+           * micrófono se soltaba A MEDIA RESPUESTA y, al volver a escuchar,
+           * Safari pedia permiso otra vez encima de la respuesta recien
+           * dada. Rafael lo vio y lo describio exacto: «responde, pero
+           * inmediatamente al terminar sale la pantalla del permiso».
+           *
+           * El rato de gracia es para cuando NO esta pasando nada. Mientras
+           * el sistema trabaja o habla, no esta ocioso.
+           */
+          aplazarElSuelte();
           if (vivo.current) setEstado("quieto");
         }
       };
@@ -474,6 +485,15 @@ export function usarGrabadora({
      * arrancar un contexto nuevo.
      */
     prepararAudio: () => { abrirAudio(); },
+    /**
+     * El audio del navegador que esta grabadora tiene abierto.
+     *
+     * Lo necesita quien quiera hacer sonar algo generado —el latido de
+     * «sigo aqui»— sin abrir un contexto propio: en iOS solo sirve el que
+     * nacio dentro del toque, y este es ese. Devuelve `null` cuando todavia
+     * no hay ninguno o ya se cerro.
+     */
+    audioDelNavegador: () => (audio.current && audio.current.state !== "closed" ? audio.current : null),
     /** Si esta corta sola o hay que tocar el boton. Para decirlo en pantalla. */
     cortaSolo: cortarSolo,
     /** Para que quien lo use no toque el estado despues de desmontarse. */
