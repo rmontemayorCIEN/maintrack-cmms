@@ -244,6 +244,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Un tono corto avisa el instante exacto en que empieza a oírlo: hable después de ese tono. Le contesta HABLANDO, con la voz que usted escogió en Ajustes → Apariencia, y la respuesta también queda escrita para comprobar una cifra.",
       "Una vez que lo toca, sigue escuchando: al terminar de atender lo que dijo vuelve a escuchar sin que usted toque nada. Se detiene al cerrarlo, al cambiar de pantalla, si dos veces seguidas no le entiende, o si pasan doce segundos sin que nadie hable —así no se queda el micrófono abierto si usted se distrajo—.",
       "«Llévame a la orden de trabajo 11» abre la OT-000011, no una lista con todo lo que contenga «11». Funciona con el número dicho en cifra o en letra, y distingue series: «orden de compra 5» es una compra.",
+      "También llegan las pantallas que viven detrás de un botón, no solo las del menú: «abre kardex» abre el kardex, no el almacén donde vive. Igual con conteos cíclicos, traspasos, equivalencias, análisis e indicadores de almacén, el levantamiento, la cobertura de planes y una orden nueva.",
       "Nunca lleva a una pantalla que su perfil no puede abrir, y si no entiende le enseña lo que oyó —que casi siempre explica el problema solo— y ejemplos de lo que sí puede decir.",
     ],
     botones: [

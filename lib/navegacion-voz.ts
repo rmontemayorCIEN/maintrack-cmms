@@ -22,7 +22,7 @@
  * que no dice nada de la causa—. `lib/pantallas.ts`, de donde sale el catalogo
  * de pantallas, tampoco importa nada de servidor.
  */
-import { pantallasDelMenu } from "./pantallas";
+import { pantallasQueSePuedenPedir } from "./pantallas";
 import { armarFolio, NUMEROS_DICHOS, SERIES_HABLADAS } from "./folios";
 
 /** Sin acentos, sin mayusculas, sin signos. Igual que la busqueda general. */
@@ -129,7 +129,18 @@ const OTROS_NOMBRES: Record<string, string[]> = {
   "/assets": ["equipos", "maquinas", "maquinaria", "activos"],
   "/plans": ["planes", "preventivos", "programa de mantenimiento"],
   "/inventory": ["almacen", "refacciones", "inventario", "existencias", "partes"],
-  "/inventory/kardex": ["kardex", "movimientos", "movimientos de almacen"],
+  "/inventory/kardex": ["kardex", "movimientos", "movimientos de almacen", "cardex", "tarjeta de almacen"],
+  "/inventory/analisis": ["analisis de almacen", "valor del inventario", "que me sobra"],
+  "/inventory/indicadores": ["indicadores de almacen", "rotacion", "rotacion de inventario"],
+  "/inventory/conteos": ["conteos", "conteo ciclico", "inventario fisico", "toma de inventario"],
+  "/inventory/traspasos": ["traspasos", "traspaso", "mover material", "pasar material"],
+  "/inventory/duplicados": ["duplicados", "refacciones repetidas", "limpiar el catalogo"],
+  "/inventory/equivalencias": ["equivalencias", "equivalentes", "refacciones equivalentes", "sustitutos"],
+  "/assets/levantamiento": ["levantamiento", "levantamiento de activos", "censo de equipos"],
+  "/plans/cobertura": ["cobertura", "cobertura de planes", "equipos sin plan", "que equipos no tienen plan"],
+  "/work-orders/new": ["nueva orden", "crear orden", "levantar una orden", "abrir una orden"],
+  "/search": ["buscar", "busqueda", "buscador"],
+  "/requests/puntos/imprimir": ["imprimir puntos", "imprimir los qr"],
   "/requisiciones": ["vales", "pedidos de material"],
   "/compras": ["ordenes de compra", "cotizaciones"],
   "/suppliers": ["provedores"],
@@ -156,7 +167,8 @@ const OTROS_NOMBRES: Record<string, string[]> = {
 };
 
 /**
- * Las pantallas a las que se puede pedir ir, sacadas DEL MENU.
+ * Las pantallas a las que se puede pedir ir: el menu MAS lo que vive detras
+ * de un boton.
  *
  * No es una lista aparte que haya que mantener: es el menu mismo, mas los
  * nombres con que la gente las llama. Se construyo asi despues de que el
@@ -166,7 +178,7 @@ const OTROS_NOMBRES: Record<string, string[]> = {
  * Cual ve cada quien lo sigue decidiendo `lib/pantallas.ts`; aqui solo se
  * nombran.
  */
-export const DESTINOS: Destino[] = pantallasDelMenu().map((item) => ({
+export const DESTINOS: Destino[] = pantallasQueSePuedenPedir().map((item) => ({
   ruta: item.href,
   titulo: item.etiqueta,
   /**

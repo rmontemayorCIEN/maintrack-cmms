@@ -228,6 +228,83 @@ export function pantallasDelMenu(): ItemMenu[] {
   return MENU.flatMap((g) => g.items);
 }
 
+/**
+ * Pantallas que existen pero NO estan en el menu: se llega a ellas por un
+ * boton desde otra.
+ *
+ * El kardex vive dentro de Almacen, detras de un boton. Pedirlo hablando
+ * —«abre kardex»— dejaba a la persona en Almacen, que es donde vive, pero no
+ * en el kardex: se parecia lo suficiente a «almacen» para ganar el concurso de
+ * nombres, y el kardex ni siquiera competia porque no estaba en esta lista.
+ *
+ * Peor: `OTROS_NOMBRES` de la navegacion por voz YA traia «kardex» apuntando a
+ * su ruta. El dato estaba escrito y nadie lo leia, porque los destinos salian
+ * solo del menu. Es el defecto de siempre en este proyecto —escribir un campo
+ * que ningun lector mira— disfrazado de catalogo.
+ *
+ * Que se pueda PEDIR no es lo mismo que se pueda VER: quien ve cada una lo
+ * sigue decidiendo `puedeVerRuta`, con la misma tabla de arriba.
+ */
+const SUBPANTALLAS: ItemMenu[] = [
+  // Del dia a dia, aunque no esten en el menu.
+  { href: "/search", etiqueta: "Búsqueda", icono: "buscar" },
+  { href: "/notificaciones", etiqueta: "Avisos", icono: "avisos" },
+  { href: "/work-orders/new", etiqueta: "Nueva orden de trabajo", icono: "ordenes" },
+
+  // Dentro de Almacen, cada una detras de su boton.
+  { href: "/inventory/kardex", etiqueta: "Kardex de almacén", icono: "kardex" },
+  { href: "/inventory/analisis", etiqueta: "Análisis de almacén", icono: "analisis" },
+  { href: "/inventory/indicadores", etiqueta: "Indicadores de almacén", icono: "indicadores" },
+  { href: "/inventory/conteos", etiqueta: "Conteos cíclicos", icono: "conteos" },
+  { href: "/inventory/traspasos", etiqueta: "Traspasos entre almacenes", icono: "traspasos" },
+  { href: "/inventory/duplicados", etiqueta: "Limpieza del catálogo", icono: "limpieza" },
+  { href: "/inventory/equivalencias", etiqueta: "Equivalencias sugeridas", icono: "equivalencias" },
+
+  // Dentro de Activos y de Planes.
+  { href: "/assets/levantamiento", etiqueta: "Levantamiento de inventario", icono: "levantamiento" },
+  { href: "/plans/cobertura", etiqueta: "Equipos y sus planes", icono: "cobertura" },
+
+  // Dentro de Puntos de reporte.
+  { href: "/requests/puntos/imprimir", etiqueta: "Imprimir puntos de reporte", icono: "imprimir" },
+
+  // De la demostracion y de la plataforma: `puedeVerRuta` las cierra a quien no toca.
+  // La guia se le agrega al menu solo a la cuenta demostrativa, en `menuDe`,
+  // asi que el catalogo estatico no la traia.
+  { href: "/demo", etiqueta: "Guía de la demostración", icono: "demo" },
+  { href: "/demo/presentacion", etiqueta: "Presentación", icono: "demo" },
+  { href: "/clients", etiqueta: "Empresas cliente", icono: "clientes" },
+  { href: "/clients/cobranza", etiqueta: "Cobranza", icono: "cobranza" },
+  { href: "/clients/prospectos", etiqueta: "Prospectos", icono: "prospectos" },
+  { href: "/clients/ia", etiqueta: "Consumo de IA", icono: "consumo" },
+  { href: "/clients/soporte", etiqueta: "Soporte a clientes", icono: "soporte" },
+];
+
+/**
+ * TODO lo que se puede pedir hablando: el menu mas lo que vive detras de un
+ * boton.
+ *
+ * `scripts/prueba-navegacion-voz.ts` recorre las pantallas que existen de
+ * verdad —los `page.tsx` del proyecto— y exige que cada una este aqui o en
+ * `SIN_VOZ`. Una pantalla nueva que nadie apunte detiene la prueba, que es lo
+ * unico que evita que esto se vuelva a quedar atras.
+ */
+export function pantallasQueSePuedenPedir(): ItemMenu[] {
+  return [...pantallasDelMenu(), ...SUBPANTALLAS];
+}
+
+/**
+ * Pantallas que a proposito NO se piden hablando.
+ *
+ * No se ignoran en silencio: se apuntan, con su razon. Igual que `SIN_AYUDA`
+ * en `lib/ayuda.ts`.
+ */
+export const SIN_VOZ: Record<string, string> = {
+  // Hoy no hay ninguna: las 52 pantallas del proyecto se pueden pedir
+  // hablando. La lista se queda porque el dia que haya una que no tenga
+  // sentido pedir, tiene que quedar APUNTADA con su razon —no ignorada en
+  // silencio, que es como se pierden—.
+};
+
 export function menuDe(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}): GrupoMenu[] {
   const grupos = MENU
     .map((g) => ({ ...g, items: g.items.filter((i) => puedeVerRuta(rol, i.href, opciones)) }))

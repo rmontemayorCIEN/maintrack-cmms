@@ -18,7 +18,9 @@ import { type ChildProcess } from "node:child_process";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { destinoDe, quitarVerbo, intencionDeOrden, folioPedido, esPregunta, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
-import { pantallasDelMenu } from "../lib/pantallas";
+import { existsSync, readdirSync } from "fs";
+import { join } from "path";
+import { pantallasQueSePuedenPedir, SIN_VOZ } from "../lib/pantallas";
 import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 const PUERTO = 3218;
@@ -108,23 +110,73 @@ async function main() {
     revisar("«la solicitud más reciente» también", intencionDeOrden("ábreme la solicitud más reciente")?.clase === "masReciente");
     revisar("«el almacén» no es una intención de orden", intencionDeOrden("llévame al almacén") === null);
 
-    console.log("\nToda pantalla del menú se puede pedir hablando\n");
+    console.log("\nToda pantalla que existe se puede pedir hablando\n");
     /**
      * El rondin se agrego al menu y a la tabla de permisos, y quedo fuera del
      * catalogo de voz: «llevame a rondines» no encontraba nada. Ahora los
      * destinos SALEN del menu, asi que esto vigila la clase entera —cada
      * pantalla nueva nace pudiendose pedir— y no solo el caso que falló.
      */
-    const delMenu = pantallasDelMenu();
+    const delMenu = pantallasQueSePuedenPedir();
     const sinNombre = delMenu.filter((i) => !DESTINOS.some((d) => d.ruta === i.href));
-    revisar("ninguna pantalla del menú se queda sin poder pedirse",
+    revisar("ninguna pantalla del catálogo se queda sin poder pedirse",
       sinNombre.length === 0, sinNombre.map((i) => i.href).join(" "));
     const noSeEncuentran = delMenu.filter((i) => destinoDe(i.etiqueta)?.ruta !== i.href);
-    revisar("y a cada una se llega diciendo su nombre del menú",
+    revisar("y a cada una se llega diciendo su nombre",
       noSeEncuentran.length === 0,
       noSeEncuentran.map((i) => `${i.etiqueta}→${destinoDe(i.etiqueta)?.ruta ?? "nada"}`).join(" | "));
     revisar("«llévame a Rondines» —el que se había quedado fuera— llega",
       destinoDe("llévame a Rondines")?.ruta === "/rondines", destinoDe("llévame a Rondines")?.ruta);
+    /**
+     * El kardex vive detras de un boton dentro de Almacen. «Abre kardex»
+     * dejaba a la persona en Almacen: se parecia lo suficiente para ganar, y
+     * el kardex no competia porque el catalogo salia solo del menu.
+     */
+    revisar("«abre kardex» abre el kardex, no el almacén donde vive",
+      destinoDe("abre kardex")?.ruta === "/inventory/kardex", destinoDe("abre kardex")?.ruta);
+    for (const [frase, esperada] of [
+      ["llévame a conteos cíclicos", "/inventory/conteos"],
+      ["ábreme traspasos", "/inventory/traspasos"],
+      ["enséñame los equivalentes", "/inventory/equivalencias"],
+      ["llévame a qué equipos no tienen plan", "/plans/cobertura"],
+      ["abre el levantamiento", "/assets/levantamiento"],
+      ["quiero una nueva orden", "/work-orders/new"],
+    ] as const) {
+      revisar(`   «${frase}» → ${esperada}`, destinoDe(frase)?.ruta === esperada, destinoDe(frase)?.ruta ?? "nada");
+    }
+    // Y el almacén sigue siendo el almacén: llevar de más es tan malo como de menos.
+    revisar("   «llévame al almacén» sigue llegando al almacén",
+      destinoDe("llévame al almacén")?.ruta === "/inventory", destinoDe("llévame al almacén")?.ruta);
+
+    console.log("\nNinguna pantalla se queda fuera sin decirlo\n");
+    /**
+     * Esta es la que habria atrapado lo del kardex. Recorre las pantallas que
+     * EXISTEN de verdad —los `page.tsx` del proyecto— en vez de una lista
+     * escrita a mano, que es justo lo que se desincroniza.
+     */
+    const raiz = join(process.cwd(), "app", "(app)");
+    const pantallasReales: string[] = [];
+    const recorrer = (dir: string, ruta: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (!e.isDirectory()) continue;
+        // Las rutas con parámetro —`[id]`— no se piden por nombre: se llega a
+        // ellas por un folio o un código, que ya resuelve la búsqueda.
+        if (e.name.startsWith("[") || e.name.startsWith("(")) continue;
+        const sub = join(dir, e.name);
+        const r = `${ruta}/${e.name}`;
+        if (existsSync(join(sub, "page.tsx"))) pantallasReales.push(r);
+        recorrer(sub, r);
+      }
+    };
+    recorrer(raiz, "");
+    const enCatalogo = new Set(delMenu.map((i) => i.href));
+    const olvidadas = pantallasReales.filter((r) => !enCatalogo.has(r) && !(r in SIN_VOZ));
+    revisar(`las ${pantallasReales.length} pantallas del proyecto están en el catálogo o en SIN_VOZ`,
+      olvidadas.length === 0, olvidadas.join(" "));
+    // Y al revés: un destino que apunte a una pantalla que ya no existe.
+    const fantasmas = delMenu.filter((i) => !pantallasReales.includes(i.href) && i.href !== "/dashboard" && !pantallasReales.includes(i.href.split("?")[0]));
+    revisar("y ningún destino apunta a una pantalla que no existe",
+      fantasmas.length === 0, fantasmas.map((i) => i.href).join(" "));
 
     console.log("\nEl catálogo está sano\n");
     const rutas = DESTINOS.map((d) => d.ruta);
