@@ -93,7 +93,13 @@ export function VozNavegar() {
 
   const grabando = g.estado === "grabando";
   const abrir = () => { enVano.current = 0; setFallo(null); setRespuesta(null); setSeguido(true); void g.alternar(); };
-  const cerrar = () => { setSeguido(false); setFallo(null); setRespuesta(null); g.setError(null); if (grabando) g.detener(); };
+  const cerrar = () => {
+    setSeguido(false); setFallo(null); setRespuesta(null); g.setError(null);
+    if (grabando) g.detener();
+    // Al cerrar se suelta el micrófono: es lo que apaga el indicador del
+    // teléfono. Entre frase y frase NO se suelta, o volvería a pedir permiso.
+    g.soltar();
+  };
 
   return (
     <div className="relative">

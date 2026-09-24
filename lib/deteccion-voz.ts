@@ -112,5 +112,14 @@ export function crearDetectorDeSilencio(opciones: OpcionesDetector) {
  * frase— y cortarle a los dos segundos seria pelearse con quien esta
  * trabajando. Por eso no es el mismo numero.
  */
-export const SILENCIO_COMANDO_MS = 1800;
-export const SILENCIO_DICTADO_MS = 3200;
+/**
+ * Un segundo ochenta se probo y corta demasiado pronto.
+ *
+ * Rafael: «se corta rapido, no me alcanza para formular lo que quiero». Y
+ * tiene sentido: al hablarle a una maquina uno arranca, duda a media frase y
+ * corrige —«cuanto llevo gastado en… en refacciones este año»—. Esperar tres
+ * segundos no se siente lento cuando ya no hay que tocar nada para seguir;
+ * cortar a media pregunta obliga a repetirla entera, que es mucho peor.
+ */
+export const SILENCIO_COMANDO_MS = 3000;
+export const SILENCIO_DICTADO_MS = 3500;
