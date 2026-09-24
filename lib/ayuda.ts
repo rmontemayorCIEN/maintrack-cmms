@@ -1439,6 +1439,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
       "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
       "Un arrastre de menos de un día se ignora: casi siempre es un toque que se resbaló, y aplicarlo dejaría la pantalla vacía sin que se entienda por qué.",
+      "«Por qué para» agrupa las fallas del periodo por la FAMILIA de su causa raíz —práctica de mantenimiento, operación, desgaste, ambiente— y dice qué se hace con cada una: un pico en operación no lo arregla ningún plan de mantenimiento, es capacitación. Arriba dice sobre cuántas fallas está hablando: las que se cerraron sin causa no entran en el reparto y se cuentan aparte, porque un porcentaje sobre la mitad de los datos es un número preciso y falso.",
     ],
     botones: [
       {
@@ -1489,6 +1490,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: ["Cambiar el periodo", "Abrir un indicador y cada orden que aporta a su cifra"],
     flujo: [
       "Una orden cuenta como FALLA (MTBF, MTTR, tiempo de respuesta) solo si es correctiva, tiene código de falla en la orden o en una actividad, o trae una actividad de una solicitud clasificada como falla. Una preventiva o de seguridad sin falla registrada no cuenta. El detalle dice por qué cuenta cada una.",
+      "El Pareto de códigos dice QUÉ falló —el síntoma— y «Por qué falla» dice el ORIGEN, agrupando por la familia de la causa raíz: práctica de mantenimiento, instalación, operación, desgaste normal, ambiente, causa externa o diseño. Cada familia trae qué se hace con ella, porque un pico en desgaste se ataca con reemplazo programado y uno en operación con capacitación.",
+      "«Por qué falla» dice arriba sobre cuántas fallas está hablando. Las que se cerraron sin causa raíz no entran en el reparto y se cuentan aparte: un porcentaje calculado sobre la mitad de los datos es un número preciso y falso, y quien lo repita en una junta no tendría cómo saberlo.",
       "La suma del detalle es exactamente la cifra de la tarjeta (o su numerador, en porcentajes y promedios).",
       "«Con los datos de hoy» muestra la fórmula con los números reales del periodo.",
       "Completada es la fecha de finalización operativa; el cierre administrativo es aparte y no cambia el cumplimiento.",

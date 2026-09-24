@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OPCIONES_DE_FAMILIA } from "./causas";
 import { prisma } from "./db";
 
 /**
@@ -550,17 +551,11 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "ej. LUB-NO-EJECUTADA" },
       { nombre: "description", etiqueta: "Descripción", tipo: "texto", requerido: true },
       {
+        // La lista vive en `lib/causas.ts`, no aqui: con ella se captura Y se
+        // agrupa en Reportes y en Donde para la planta. Tenerla en dos lados
+        // era garantizar que un dia dijeran cosas distintas.
         nombre: "category", etiqueta: "Familia", tipo: "select",
-        opciones: [
-          { valor: "MANTENIMIENTO", etiqueta: "Práctica de mantenimiento" },
-          { valor: "INSTALACION", etiqueta: "Instalación o montaje" },
-          { valor: "OPERACION", etiqueta: "Operación" },
-          { valor: "DESGASTE", etiqueta: "Desgaste normal" },
-          { valor: "AMBIENTE", etiqueta: "Ambiente" },
-          { valor: "EXTERNO", etiqueta: "Causa externa" },
-          { valor: "DISENO", etiqueta: "Diseño o selección" },
-          { valor: "OTRO", etiqueta: "Otro" },
-        ],
+        opciones: OPCIONES_DE_FAMILIA,
       },
     ],
     crear: z.object({

@@ -9,7 +9,7 @@
  */
 import { prisma } from "../lib/db";
 import { transitionWorkOrder, recalcWorkOrder } from "../lib/workorders";
-import { fallasCodificadas, agruparPorCodigo } from "../lib/fallas";
+import { fallasCodificadas, agruparPorCodigo, agruparPorFamiliaDeCausa } from "../lib/fallas";
 
 /**
  * Lo minimo que el ciclo de la OT exige (lib/reglas-ot.ts) para las ordenes de
@@ -216,6 +216,74 @@ async function main() {
     });
     const sinElMalo = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
     revisar("un preventivo con codigo NO ensucia el Pareto", sinElMalo.length === 2, `${sinElMalo.length}`);
+
+    // ── Por que falla: agrupado por familia de causa ─────────────────────────
+    console.log("\n  POR QUE FALLA — familias de causa raiz\n");
+    /**
+     * Lo que se cuida aqui no es el agrupado —eso es sumar—, es la HONESTIDAD
+     * del numero: una falla sin causa registrada no puede desaparecer del
+     * conteo, porque entonces «el 100% es por desgaste» se dice sobre una sola
+     * falla de tres y suena a verdad.
+     */
+    await prisma.rootCause.update({ where: { id: causaSello.id }, data: { category: "DESGASTE" } });
+    const causaOperacion = await prisma.rootCause.create({
+      data: { organizationId: org.id, code: "MAL-USO", description: "Uso indebido", category: "OPERACION" },
+    });
+    const causaSinFamilia = await prisma.rootCause.create({
+      data: { organizationId: org.id, code: "RARA", description: "Causa sin familia" },
+    });
+
+    const conFamilias = await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000));
+    const antes = agruparPorFamiliaDeCausa(conFamilias);
+    const conCausaAntes = conFamilias.filter((f) => f.rootCauseId).length;
+    revisar("las fallas sin causa registrada se cuentan aparte, no se pierden",
+      antes.total === conFamilias.length && antes.conCausa + antes.sinCausa === antes.total,
+      `total ${antes.total} = con causa ${antes.conCausa} + sin causa ${antes.sinCausa}`);
+    revisar("   y «con causa» es lo que de verdad trae causa",
+      antes.conCausa === conCausaAntes, `${antes.conCausa} vs ${conCausaAntes}`);
+
+    // Ponerle causa a las dos fallas vivas, de familias distintas.
+    const tareasConCodigo = await prisma.workOrderTask.findMany({
+      where: { workOrder: { organizationId: org.id }, failureCodeId: { not: null } },
+      select: { id: true }, orderBy: { id: "asc" },
+    });
+    if (tareasConCodigo.length >= 2) {
+      await prisma.workOrderTask.update({ where: { id: tareasConCodigo[0].id }, data: { rootCauseId: causaSello.id } });
+      await prisma.workOrderTask.update({ where: { id: tareasConCodigo[1].id }, data: { rootCauseId: causaOperacion.id } });
+    }
+    const conDos = agruparPorFamiliaDeCausa(await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000)));
+    revisar("agrupa por familia, no por causa",
+      conDos.familias.length === 2, conDos.familias.map((f) => `${f.etiqueta}:${f.eventos}`).join(" "));
+    revisar("   con la etiqueta en español, no la clave",
+      conDos.familias.every((f) => f.etiqueta !== f.familia),
+      conDos.familias.map((f) => f.etiqueta).join(" | "));
+    revisar("   los porcentajes suman 100 sobre las que SÍ tienen causa",
+      Math.abs(conDos.familias.reduce((t, f) => t + f.porcentaje, 0) - 100) < 0.01,
+      `${conDos.familias.reduce((t, f) => t + f.porcentaje, 0).toFixed(1)}%`);
+    revisar("   y el paro de cada familia es el de sus fallas, no cero",
+      conDos.familias.some((f) => f.minutosParo > 0),
+      conDos.familias.map((f) => `${f.etiqueta}:${f.minutosParo}min`).join(" "));
+
+    // Una causa SIN familia no se esconde en «Otro»: se dice lo que es.
+    if (tareasConCodigo.length >= 2) {
+      await prisma.workOrderTask.update({ where: { id: tareasConCodigo[1].id }, data: { rootCauseId: causaSinFamilia.id } });
+    }
+    const conHuerfana = agruparPorFamiliaDeCausa(await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000)));
+    const huerfana = conHuerfana.familias.find((f) => f.familia === null);
+    revisar("una causa sin familia sale como tal, no disfrazada de «Otro»",
+      !!huerfana && huerfana.etiqueta === "Causa sin familia",
+      conHuerfana.familias.map((f) => f.etiqueta).join(" | "));
+    revisar("   y no se cuela en la familia «Otro»",
+      !conHuerfana.familias.some((f) => f.familia === "OTRO"));
+
+    // El caso que NO debe pasar: sin ninguna causa, no inventar porcentajes.
+    await prisma.workOrderTask.updateMany({
+      where: { workOrder: { organizationId: org.id } }, data: { rootCauseId: null },
+    });
+    const sinNinguna = agruparPorFamiliaDeCausa(await fallasCodificadas(org.id, new Date(Date.now() - 86_400_000)));
+    revisar("sin una sola causa registrada no inventa familias",
+      sinNinguna.familias.length === 0 && sinNinguna.conCausa === 0 && sinNinguna.sinCausa === sinNinguna.total,
+      `familias ${sinNinguna.familias.length}, sin causa ${sinNinguna.sinCausa} de ${sinNinguna.total}`);
   } finally {
     // Las ordenes primero: sus cargos apuntan a usuarios, y esa llave no
     // cascadea desde la organizacion.

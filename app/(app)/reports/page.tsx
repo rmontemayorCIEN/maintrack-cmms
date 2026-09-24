@@ -15,7 +15,8 @@ import {
   PRIORITY_LABELS,
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
+import { agruparPorCodigo, agruparPorFamiliaDeCausa, fallasCodificadas } from "@/lib/fallas";
+import { PorQueFalla } from "@/components/por-que-falla";
 
 export const metadata = { title: "Reportes" };
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function ReportsPage({
   const orgId = user.organizationId;
   const periodo = await periodoDeLaEmpresa(orgId, days);
 
-  const [kpis, trend, ranking, byTechnician, failureCodes, backlogAging, materialPorTipo] = await Promise.all([
+  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo] = await Promise.all([
     calcularIndicadores(orgId, periodo),
     tendenciaMensual(orgId, 12),
     costoYParoPorActivo(orgId, periodo, 10),
@@ -46,13 +47,20 @@ export default async function ReportsPage({
     // Pasa por fallasCodificadas y no por un groupBy directo: ese contaba
     // cualquier OT con codigo, incluidos preventivos codificados por error, y
     // el Pareto no coincidia con el analisis de recurrencia.
-    fallasCodificadas(orgId, periodo.desde, periodo.hasta).then(agruparPorCodigo),
+    // Se traen las fallas UNA vez y de ahi salen las dos lecturas: que falló
+    // (código) y por qué (familia de causa). Consultarlas dos veces daría el
+    // mismo número por el doble de trabajo, y permitiría que un día no
+    // coincidieran.
+    fallasCodificadas(orgId, periodo.desde, periodo.hasta),
     prisma.workOrder.findMany({
       where: { organizationId: orgId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } },
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
     }),
     costoDeMaterialPorTipo(orgId, periodo.desde, periodo.hasta),
   ]);
+
+  const failureCodes = agruparPorCodigo(fallas);
+  const porQueFalla = agruparPorFamiliaDeCausa(fallas);
 
   const [technicians, codes] = await Promise.all([
     prisma.user.findMany({
@@ -397,6 +405,11 @@ export default async function ReportsPage({
               </div>
             )}
           </Card>
+
+          {/* Qué falló y por qué, uno al lado del otro: el código es el
+              síntoma y la familia de causa es el origen, y separarlos es lo
+              que permite atacar patrones en vez de repetir reparaciones. */}
+          <PorQueFalla causas={porQueFalla} moneda={currency} />
         </div>
       </div>
     </>

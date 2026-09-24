@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { etiquetaDeFamilia } from "@/lib/causas";
 
 /**
  * Un solo lugar decide que cuenta como falla.
@@ -115,6 +116,13 @@ export const REGLA_DE_FALLA =
 export type FallaContada = {
   failureCodeId: string;
   rootCauseId: string | null;
+  /**
+   * La familia de la causa raiz —practica de mantenimiento, desgaste,
+   * operacion—, o `null` si no se registro causa o si la causa no tiene
+   * familia. Viaja aqui, con la falla, para que agrupar por familia no
+   * necesite otra consulta ni un mapa aparte que se pueda desincronizar.
+   */
+  familiaCausa: string | null;
   downtimeMinutes: number;
   /**
    * Lo que costo esta falla. En las de actividad es lo que se le cargo
@@ -161,6 +169,7 @@ export async function fallasCodificadas(
       select: {
         failureCodeId: true, rootCauseId: true, downtimeMinutes: true,
         maintenanceType: true, totalCost: true,
+        rootCause: { select: { category: true } },
         workOrder: { select: { id: true, assetId: true, completedAt: true, maintenanceType: true } },
       },
     }),
@@ -175,6 +184,7 @@ export async function fallasCodificadas(
       select: {
         id: true, failureCodeId: true, rootCauseId: true, downtimeMinutes: true,
         assetId: true, completedAt: true, totalCost: true,
+        rootCause: { select: { category: true } },
       },
     }),
   ]);
@@ -187,6 +197,7 @@ export async function fallasCodificadas(
     .map((a) => ({
       failureCodeId: a.failureCodeId!,
       rootCauseId: a.rootCauseId,
+      familiaCausa: a.rootCause?.category ?? null,
       downtimeMinutes: a.downtimeMinutes,
       costo: a.totalCost,
       fuente: "ACTIVIDAD" as const,
@@ -199,6 +210,7 @@ export async function fallasCodificadas(
     .map((w) => ({
       failureCodeId: w.failureCodeId!,
       rootCauseId: w.rootCauseId,
+      familiaCausa: w.rootCause?.category ?? null,
       downtimeMinutes: w.downtimeMinutes,
       costo: w.totalCost,
       fuente: "ENCABEZADO" as const,
@@ -232,4 +244,68 @@ export function agruparPorCausa(fallas: FallaContada[]) {
     mapa.set(f.rootCauseId, acc);
   }
   return [...mapa.values()].sort((a, b) => b.eventos - a.eventos);
+}
+
+/**
+ * Por QUE falla la planta, agrupado por familia de causa raiz.
+ *
+ * ── Lo que devuelve, y por que incluye lo que no se sabe ──
+ *
+ * Contestar «el 40% de sus fallas son por practica de mantenimiento» cuando
+ * solo la mitad de las fallas traen causa registrada es dar un numero preciso
+ * y falso. Asi que esto devuelve las familias Y la cobertura: cuantas fallas
+ * hubo, cuantas traen causa, y cuantas no. Quien lo enseñe tiene que enseñar
+ * las dos cosas.
+ *
+ * Los porcentajes se calculan sobre las que SI tienen causa —es la unica base
+ * con sentido—, y por eso al lado va siempre de cuantas se esta hablando.
+ *
+ * Una causa registrada pero sin familia no se esconde en «Otro»: sale como
+ * «Causa sin familia», que es lo que de verdad es y lo que hace que alguien
+ * la corrija.
+ */
+export type GrupoDeFamilia = {
+  familia: string | null;
+  etiqueta: string;
+  eventos: number;
+  minutosParo: number;
+  costo: number;
+  /** Sobre el total de fallas CON causa registrada, no sobre todas. */
+  porcentaje: number;
+};
+
+export type CausasAgrupadas = {
+  familias: GrupoDeFamilia[];
+  /** Fallas del periodo, con causa o sin ella. */
+  total: number;
+  conCausa: number;
+  sinCausa: number;
+};
+
+export function agruparPorFamiliaDeCausa(fallas: FallaContada[]): CausasAgrupadas {
+  const mapa = new Map<string, { familia: string | null; eventos: number; minutosParo: number; costo: number }>();
+  let conCausa = 0;
+
+  for (const f of fallas) {
+    // Sin causa raiz no hay familia que valga: esta falla no entra al reparto,
+    // se cuenta aparte y se dice.
+    if (!f.rootCauseId) continue;
+    conCausa += 1;
+    const clave = f.familiaCausa ?? "";
+    const acc = mapa.get(clave) ?? { familia: f.familiaCausa, eventos: 0, minutosParo: 0, costo: 0 };
+    acc.eventos += 1;
+    acc.minutosParo += f.downtimeMinutes;
+    acc.costo += f.costo;
+    mapa.set(clave, acc);
+  }
+
+  const familias = [...mapa.values()]
+    .map((g) => ({
+      ...g,
+      etiqueta: etiquetaDeFamilia(g.familia),
+      porcentaje: conCausa ? (g.eventos / conCausa) * 100 : 0,
+    }))
+    .sort((a, b) => b.eventos - a.eventos || b.minutosParo - a.minutosParo);
+
+  return { familias, total: fallas.length, conCausa, sinCausa: fallas.length - conCausa };
 }
