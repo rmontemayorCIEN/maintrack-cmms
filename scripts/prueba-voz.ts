@@ -78,6 +78,27 @@ revisar("los millones llevan «de»",
   paraDecir("Costó $2,500,000.").includes("millones de pesos"), paraDecir("Costó $2,500,000."));
 revisar("«$45 pesos» no sale «45 pesos pesos»",
   !paraDecir("Son $45 pesos.").includes("pesos pesos"), paraDecir("Son $45 pesos."));
+/**
+ * Sin el signo de pesos tambien.
+ *
+ * «El gasto fue de 11,430» se oia «once, cuatro treinta»: el sintetizador
+ * toma la coma como pausa y parte el numero en dos. Lo encontro Rafael
+ * oyendolo —en pantalla el texto se ve perfecto— y afectaba a todo lo que el
+ * modelo escribiera sin el signo, que es casi siempre.
+ */
+revisar("una cifra con separador de miles se dice entera, aunque no traiga signo",
+  paraDecir("El gasto fue de 11,430 en el año").includes("11 mil 430"),
+  paraDecir("El gasto fue de 11,430 en el año"));
+revisar("   y no queda ninguna coma partiendo el número",
+  !paraDecir("Hay 1,250 piezas").includes("1,250"), paraDecir("Hay 1,250 piezas"));
+// «Mil doscientos», no «un mil doscientos»: nadie lo dice asi.
+revisar("   el millar no se dice «un mil»",
+  paraDecir("Hay 1,250 piezas").includes("mil 250") && !paraDecir("Hay 1,250 piezas").includes("1 mil"),
+  paraDecir("Hay 1,250 piezas"));
+// La preposicion que pone `miles()` y la que ya traia el texto no se suman.
+revisar("y no salen dos «de» seguidos en los millones",
+  !paraDecir("Van 3,000,000 de pesos").includes("de de"), paraDecir("Van 3,000,000 de pesos"));
+
 revisar("el porcentaje se dice, no se deletrea el símbolo",
   paraDecir("Quedó en 87.5% este mes.").includes("87.5 por ciento"), paraDecir("Quedó en 87.5% este mes."));
 

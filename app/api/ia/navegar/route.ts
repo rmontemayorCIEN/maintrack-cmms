@@ -4,7 +4,7 @@ import { escuchar, MAXIMO_SEGUNDOS_DICTADO, USD_POR_SEGUNDO } from "@/lib/escuch
 import { puedeUsarIa, registrarEscucha } from "@/lib/ia/consumo";
 import { buscar } from "@/lib/busqueda";
 import { OPEN_STATUSES, REQUEST_OPEN_STATUSES } from "@/lib/constants";
-import { destinoDe, intencionDeOrden, quitarAnuncio, quitarVerbo, DESTINOS, ATAJOS, EJEMPLOS } from "@/lib/navegacion-voz";
+import { destinoDe, folioPedido, intencionDeOrden, quitarAnuncio, quitarVerbo, DESTINOS, ATAJOS, EJEMPLOS } from "@/lib/navegacion-voz";
 import { adivinarDestino } from "@/lib/ia/navegar";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { puedeVerRuta } from "@/lib/pantallas";
@@ -156,6 +156,28 @@ export async function POST(request: Request) {
       });
       if (!sol) return sinRumbo("No hay solicitudes pendientes.");
       return llevar(`/requests/${sol.id}`, `Solicitud ${sol.number}`);
+    }
+
+    /**
+     * 3. Un folio dicho por su numero: «la orden de trabajo once».
+     *
+     * Se reconstruye el folio completo —OT-000011— y se busca ESE. Buscar
+     * «11» a secas encontraba la 11, la 110, la 1100 y cualquier orden que
+     * mencionara «11» en su titulo; con varias coincidencias no se podia
+     * elegir y se terminaba abriendo la busqueda, que no es lo que se pidio.
+     */
+    const folio = folioPedido(dicho);
+    if (folio) {
+      const halladas = await buscar(
+        { id: user.id, role: user.role, isSuperAdmin: user.isSuperAdmin, organizationId: orgId },
+        folio,
+      );
+      // El folio no viaja como campo propio en el resultado, pero el título
+      // empieza con él: «OT-000011 · Cambio de rodamiento».
+      const exacto = halladas.flatMap((g) => g.resultados).filter((r) => r.titulo.startsWith(folio));
+      if (exacto.length === 1) return llevar(exacto[0].enlace, exacto[0].titulo);
+      // Si no existe, se dice con su folio: es mas util que «no encontre eso».
+      if (!exacto.length) return sinRumbo(`No encontré ${folio}.`);
     }
 
     // 3. Un equipo, un folio, una refaccion: lo resuelve la busqueda general,

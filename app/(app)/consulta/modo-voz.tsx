@@ -46,13 +46,16 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
   /** El contexto de audio, abierto DENTRO del toque para que iOS lo permita. */
   const contexto = useRef<AudioContext | null>(null);
   /**
-   * El microfono queda reservado mientras se esta en el modo voz.
+   * El microfono se suelta en cuanto se termina de hablar.
    *
-   * Antes se soltaba al terminar cada grabacion, y varios navegadores vuelven
-   * a preguntar «¿permite usar el microfono?» la siguiente vez: preguntar en
-   * cada pregunta es insoportable. Se reserva una vez, se reusa, y se suelta
-   * al salir del modo voz —no se queda escuchando cuando uno ya se fue, que
-   * seria peor que preguntar de mas—.
+   * Estuvo reservado mientras durara el modo voz, para no volver a pedir
+   * permiso en cada pregunta. El precio era que el indicador de grabacion del
+   * iPhone se quedaba encendido toda la conversacion: uno lo tocaba y el
+   * sistema ofrecia «¿dejar de grabar audio?», como si la aplicacion
+   * estuviera escuchando de fondo. Lo estaba, aunque no grabara nada.
+   *
+   * En HTTPS el permiso queda concedido para el sitio, asi que volver a
+   * pedirlo no muestra ningun dialogo: el motivo para conservarlo no existia.
    */
   const microfono = useRef<MediaStream | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
@@ -232,8 +235,11 @@ export function ModoVoz({ ejemplos, onSalir }: { ejemplos: string[]; onSalir: ()
 
       rec.ondataavailable = (e) => { if (e.data.size) trozos.current.push(e.data); };
       rec.onstop = async () => {
-        // El flujo NO se cierra aqui: cerrarlo obliga a volver a pedir
-        // permiso en la siguiente pregunta.
+        // Se suelta el aparato ANTES de transcribir: eso apaga el indicador
+        // del telefono en cuanto uno deja de hablar, no varios segundos
+        // despues.
+        microfono.current?.getTracks().forEach((t) => t.stop());
+        microfono.current = null;
         const audioGrabado = new Blob(trozos.current, { type: rec.mimeType });
         trozos.current = [];
         if (!audioGrabado.size) { setEstado("quieto"); return; }

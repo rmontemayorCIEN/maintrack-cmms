@@ -16,15 +16,19 @@ import { porQueNoSePudo } from "@/lib/dictado";
  * Lo que aqui se decidio una vez, y vale para los dos:
  *
  *   El microfono se pide en el PRIMER toque, no al aparecer el boton. Pedirlo
- *   antes enciende el punto rojo de grabacion del telefono sin que nadie haya
+ *   antes enciende el indicador de grabacion del telefono sin que nadie haya
  *   tocado nada, y eso asusta con razon.
  *
- *   Se reusa mientras el componente viva. Soltarlo entre una grabacion y otra
- *   hace que varios navegadores vuelvan a preguntar, y preguntar dos veces
- *   seguidas es insoportable.
+ *   Y se SUELTA en cuanto se termina de grabar. Antes se conservaba mientras
+ *   el componente viviera —para no volver a pedir permiso— y el resultado era
+ *   que el indicador del iPhone se quedaba encendido despues de terminar el
+ *   comando: uno lo tocaba y el sistema preguntaba «¿dejar de grabar audio?»,
+ *   como si la aplicacion siguiera escuchando. Lo hacia, aunque no grabara
+ *   nada. Ningun ahorro de permisos vale eso.
  *
- *   Y se suelta SIEMPRE al salir. Dejarlo tomado deja el punto rojo encendido
- *   despues de cerrar la pantalla.
+ *   En un sitio con HTTPS el permiso queda concedido para el origen, asi que
+ *   volver a pedirlo no muestra ningun dialogo: el temor que justificaba
+ *   conservarlo no se cumple.
  *
  *   Se graba y se manda al servidor en vez de usar el reconocimiento del
  *   navegador porque Safari de iPhone no lo tiene, y medio piso trae iPhone.
@@ -91,8 +95,7 @@ export function usarGrabadora({
         if (grabadora.current?.state === "recording") grabadora.current.stop();
       } catch { /* ya se habia detenido */ }
       cerrarEscucha();
-      microfono.current?.getTracks().forEach((t) => t.stop());
-      microfono.current = null;
+      soltarMicrofono();
     };
   }, []);
 
@@ -103,6 +106,16 @@ export function usarGrabadora({
    * por el camino que sea: dejarlo abierto mantiene el microfono tomado y el
    * punto rojo del telefono encendido despues de terminar.
    */
+  /**
+   * Suelta el microfono. Apaga el indicador del telefono.
+   *
+   * Se llama al terminar CADA grabacion, no solo al salir de la pantalla.
+   */
+  function soltarMicrofono() {
+    microfono.current?.getTracks().forEach((t) => t.stop());
+    microfono.current = null;
+  }
+
   function cerrarEscucha() {
     if (!escucha.current) return;
     clearInterval(escucha.current.medidor);
@@ -193,6 +206,10 @@ export function usarGrabadora({
       rec.onstop = async () => {
         const audio = new Blob(trozos.current, { type: rec.mimeType });
         trozos.current = [];
+        // Primero se suelta el aparato y despues se procesa: transcribir tarda
+        // unos segundos, y dejar el indicador encendido mientras tanto es
+        // justo lo que hacia pensar que seguia escuchando.
+        soltarMicrofono();
         if (!audio.size) { if (vivo.current) setEstado("quieto"); return; }
         try {
           await alTerminar(audio);

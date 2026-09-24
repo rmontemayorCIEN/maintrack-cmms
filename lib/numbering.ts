@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
+import { armarFolio } from "./folios";
 
 /**
  * Folios consecutivos por organizacion.
@@ -36,7 +37,9 @@ export async function siguienteFolio(organizationId: string, serie: Serie, clien
     select: { [campo]: true },
   });
   const consecutivo = (org as unknown as Record<string, number>)[campo];
-  return `${prefijo}-${String(consecutivo).padStart(6, "0")}`;
+  // El formato vive en `lib/folios.ts`: lo comparte con quien reconstruye
+  // un folio a partir de lo que alguien dijo hablando.
+  return armarFolio(prefijo, consecutivo);
 }
 
 export const nextWorkOrderNumber = (organizationId: string, cliente?: Prisma.TransactionClient) =>

@@ -19,8 +19,11 @@
  * A proposito: lo usan la ruta y tambien la prueba, y podria usarlo el
  * navegador. Es el criterio de `lib/pantallas.ts` y `lib/motivos-movimiento.ts`
  * —arrastrar prisma al cliente rompe la compilacion con un «no encuentro tls»
- * que no dice nada de la causa—.
+ * que no dice nada de la causa—. `lib/pantallas.ts`, de donde sale el catalogo
+ * de pantallas, tampoco importa nada de servidor.
  */
+import { pantallasDelMenu } from "./pantallas";
+import { armarFolio, NUMEROS_DICHOS, SERIES_HABLADAS } from "./folios";
 
 /** Sin acentos, sin mayusculas, sin signos. Igual que la busqueda general. */
 export function normalizar(t: string): string {
@@ -95,6 +98,8 @@ export type Destino = {
   ruta: string;
   /** Como se le dice en pantalla al confirmar: «Lo llevo a Almacén». */
   titulo: string;
+  /** Su nombre en el menú, que gana sobre los sinónimos de otras pantallas. */
+  oficial: string;
   /** Todas las formas en que alguien puede nombrarla, ya normalizadas. */
   nombres: string[];
 };
@@ -110,36 +115,75 @@ export type Destino = {
  * Las rutas salen de `lib/pantallas.ts`, que es donde viven de verdad; aqui
  * solo se les ponen nombres. Cual ve cada quien lo decide esa tabla, no esta.
  */
-export const DESTINOS: Destino[] = [
-  { ruta: "/dashboard", titulo: "Inicio", nombres: ["inicio", "tablero", "dashboard", "principal", "mi dia", "pantalla principal", "el parte del dia", "parte del dia"] },
-  { ruta: "/work-orders", titulo: "Órdenes de trabajo", nombres: ["ordenes", "ordenes de trabajo", "ots", "trabajos", "ordenes de servicio"] },
-  { ruta: "/requests", titulo: "Solicitudes", nombres: ["solicitudes", "solicitudes de servicio", "reportes", "reportes de falla", "peticiones"] },
-  { ruta: "/assets", titulo: "Activos", nombres: ["activos", "equipos", "maquinas", "maquinaria", "inventario de equipos"] },
-  { ruta: "/plans", titulo: "Planes de mantenimiento", nombres: ["planes", "planes de mantenimiento", "preventivos", "programa de mantenimiento"] },
-  { ruta: "/inventory", titulo: "Almacén", nombres: ["almacen", "refacciones", "inventario", "existencias", "partes"] },
-  { ruta: "/inventory/kardex", titulo: "Kardex", nombres: ["kardex", "movimientos", "movimientos de almacen"] },
-  { ruta: "/requisiciones", titulo: "Requisiciones", nombres: ["requisiciones", "vales", "pedidos de material"] },
-  { ruta: "/compras", titulo: "Compras", nombres: ["compras", "ordenes de compra", "cotizaciones"] },
-  { ruta: "/suppliers", titulo: "Proveedores", nombres: ["proveedores", "provedores"] },
-  { ruta: "/calendar", titulo: "Calendario", nombres: ["calendario", "agenda", "programacion"] },
-  { ruta: "/board", titulo: "Tablero", nombres: ["tablero de trabajo", "pizarron", "board"] },
-  { ruta: "/alerts", titulo: "Alertas", nombres: ["alertas", "avisos de condicion"] },
-  { ruta: "/predictive", titulo: "Predictivo", nombres: ["predictivo", "monitoreo", "sensores", "condicion"] },
-  { ruta: "/meters", titulo: "Medidores", nombres: ["medidores", "lecturas", "horometros", "contadores"] },
-  { ruta: "/paros", titulo: "Paros", nombres: ["paros", "paros de linea", "tiempo muerto", "donde para la planta"] },
-  { ruta: "/reports", titulo: "Reportes", nombres: ["reportes generales", "informes"] },
-  { ruta: "/indicadores", titulo: "Indicadores", nombres: ["indicadores", "kpis", "metricas", "resultados"] },
-  { ruta: "/backlog", titulo: "Trabajo pendiente", nombres: ["pendiente", "trabajo pendiente", "backlog", "rezago"] },
-  { ruta: "/equipo", titulo: "Equipo de trabajo", nombres: ["equipo", "personal", "mi gente", "cuadrilla", "tecnicos"] },
-  { ruta: "/conjuntos", titulo: "Mapa de líneas", nombres: ["mapa de lineas", "conjuntos", "lineas", "mapa"] },
-  { ruta: "/consulta", titulo: "Pregúntale a tus datos", nombres: ["consulta", "preguntale a tus datos", "pregunte a sus datos", "preguntar a mis datos", "preguntar"] },
-  { ruta: "/notificaciones", titulo: "Avisos", nombres: ["avisos", "notificaciones", "campana"] },
-  { ruta: "/settings", titulo: "Ajustes", nombres: ["ajustes", "configuracion", "preferencias", "mi cuenta"] },
-  { ruta: "/catalogs", titulo: "Catálogos", nombres: ["catalogos", "codigos de falla", "causas"] },
-  { ruta: "/escanear", titulo: "Escanear", nombres: ["escanear", "escaner", "codigo qr", "qr"] },
-  { ruta: "/soporte", titulo: "Soporte", nombres: ["soporte", "ayuda de maintrack", "reportar un problema"] },
-  { ruta: "/glossary", titulo: "Glosario", nombres: ["glosario", "diccionario", "que significa"] },
-];
+/**
+ * Nombres ADICIONALES por pantalla: como le dice la gente, no como se llama.
+ *
+ * Al almacen le dicen «refacciones» e «inventario», y a las solicitudes
+ * «reportes». El nombre oficial no hace falta repetirlo aqui: sale del menu.
+ */
+const OTROS_NOMBRES: Record<string, string[]> = {
+  "/dashboard": ["inicio", "tablero", "dashboard", "principal", "mi dia", "pantalla principal", "el parte del dia", "parte del dia"],
+  "/work-orders": ["ordenes", "ots", "trabajos", "ordenes de servicio"],
+  "/requests": ["solicitudes", "reportes", "reportes de falla", "peticiones"],
+  "/rondines": ["rondin", "recorrido", "recorridos", "rondines de planta"],
+  "/assets": ["equipos", "maquinas", "maquinaria", "activos"],
+  "/plans": ["planes", "preventivos", "programa de mantenimiento"],
+  "/inventory": ["almacen", "refacciones", "inventario", "existencias", "partes"],
+  "/inventory/kardex": ["kardex", "movimientos", "movimientos de almacen"],
+  "/requisiciones": ["vales", "pedidos de material"],
+  "/compras": ["ordenes de compra", "cotizaciones"],
+  "/suppliers": ["provedores"],
+  "/calendar": ["agenda", "programacion"],
+  "/board": ["tablero de trabajo", "pizarron", "board"],
+  "/alerts": ["avisos de condicion"],
+  "/predictive": ["monitoreo", "sensores", "condicion"],
+  "/meters": ["lecturas", "horometros", "contadores"],
+  "/paros": ["paros", "paros de linea", "tiempo muerto"],
+  "/reports": ["reportes generales", "informes"],
+  "/indicadores": ["kpis", "metricas", "resultados"],
+  "/backlog": ["pendiente", "rezago"],
+  "/equipo": ["mi gente", "cuadrilla", "tecnicos"],
+  "/conjuntos": ["mapa de lineas", "lineas", "mapa"],
+  "/consulta": ["consulta", "preguntale a tus datos", "pregunte a sus datos", "preguntar a mis datos", "preguntar"],
+  "/notificaciones": ["campana"],
+  "/settings": ["configuracion", "preferencias", "mi cuenta"],
+  "/catalogs": ["codigos de falla", "causas"],
+  "/escanear": ["escaner", "codigo qr", "qr"],
+  "/soporte": ["ayuda de maintrack", "reportar un problema"],
+  "/glossary": ["diccionario", "que significa"],
+  "/requests/puntos": ["puntos de reporte", "codigos qr", "imprimir codigos"],
+  "/diagnostico": ["diagnostico", "diagnostico con ia"],
+};
+
+/**
+ * Las pantallas a las que se puede pedir ir, sacadas DEL MENU.
+ *
+ * No es una lista aparte que haya que mantener: es el menu mismo, mas los
+ * nombres con que la gente las llama. Se construyo asi despues de que el
+ * rondin quedara fuera —se agrego al menu y a los permisos, y nadie se acordo
+ * de este archivo—, y eso iba a repetirse con cada pantalla nueva.
+ *
+ * Cual ve cada quien lo sigue decidiendo `lib/pantallas.ts`; aqui solo se
+ * nombran.
+ */
+export const DESTINOS: Destino[] = pantallasDelMenu().map((item) => ({
+  ruta: item.href,
+  titulo: item.etiqueta,
+  /**
+   * El nombre del menu, aparte de los demas.
+   *
+   * Le gana a los sinonimos de OTRA pantalla, y hace falta: «tablero» es
+   * sinonimo de Inicio y a la vez el nombre de Tablero, y «reportes» es como
+   * la gente llama a las solicitudes y a la vez el nombre de Reportes. Sin
+   * esta preferencia, decir el nombre exacto de una pantalla llevaba a otra
+   * —que es lo mas desconcertante que puede pasar—.
+   */
+  oficial: normalizar(item.etiqueta),
+  nombres: [
+    normalizar(item.etiqueta),
+    ...(OTROS_NOMBRES[item.href] ?? []),
+  ].filter((n, i, a) => n && a.indexOf(n) === i),
+}));
 
 /**
  * Atajos con criterio: no llevan a una pantalla, llevan a una pregunta.
@@ -167,6 +211,31 @@ export const ATAJOS: Array<{ frases: string[]; ruta: string; titulo: string }> =
  * intencion y quien tenga la base la resuelve. Se separa para que este archivo
  * siga sin importar nada.
  */
+/**
+ * El folio que alguien pidió diciendo su número.
+ *
+ * «Llévame a la orden de trabajo once» tiene que llegar a OT-000011. Buscar
+ * «11» a secas encuentra la 11, la 110, la 1100 y cualquier orden que
+ * mencione «11» en su titulo: con varias coincidencias no se puede elegir y
+ * se acababa abriendo la busqueda, que no es lo que se pidio.
+ *
+ * Los numeros dichos con letra tambien valen: «la orden once» es la misma.
+ */
+export function folioPedido(frase: string): string | null {
+  const t = quitarVerbo(frase);
+  for (const serie of SERIES_HABLADAS) {
+    for (const forma of serie.dicho) {
+      // El nombre de la serie, luego lo que sea, y al final el número.
+      const m = new RegExp(`\\b${forma}\\b[^0-9a-z]*([a-z]+|\\d+)`, "i").exec(t);
+      if (!m) continue;
+      const crudo = m[1];
+      const n = /^\d+$/.test(crudo) ? Number(crudo) : Number(NUMEROS_DICHOS[crudo] ?? NaN);
+      if (Number.isFinite(n) && n > 0) return armarFolio(serie.prefijo, n);
+    }
+  }
+  return null;
+}
+
 export type Intencion = { clase: "masAntigua" | "masReciente"; que: "orden" | "solicitud" };
 
 const ANTIGUA = ["mas antigua", "mas vieja", "mas antiguo", "mas viejo", "la primera", "el primero"];
@@ -213,13 +282,29 @@ function palabras(t: string): string[] {
  * el limite: por eso el que gana es el nombre MAS LARGO que encaje, para que
  * una coincidencia de una palabra no le arrebate el destino a una de tres.
  */
+/**
+ * Si dos palabras son la misma con otra terminacion.
+ *
+ * No basta con que una empiece como la otra: «dia» empieza igual que
+ * «diagnostico», y por eso «escuchar el parte del DIA» llevaba al
+ * DIAGNOSTICO. Se exige que la corta tenga cuerpo —cuatro letras— y que sea
+ * la mayor parte de la larga; asi «orden/ordenes» y «pregunta/preguntar»
+ * siguen valiendo, y «dia/diagnostico» no.
+ */
+function mismaRaiz(a: string, b: string): boolean {
+  const [corta, larga] = a.length <= b.length ? [a, b] : [b, a];
+  if (corta.length < 4) return false;
+  if (!larga.startsWith(corta)) return false;
+  return corta.length / larga.length >= 0.6;
+}
+
 function encaja(dicho: string, nombre: string): boolean {
   if (dicho === nombre) return true;
   const suyas = palabras(nombre);
   if (!suyas.length) return false;
   const dichas = palabras(dicho);
   if (!dichas.length) return false;
-  return suyas.every((p) => dichas.some((q) => q === p || q.startsWith(p) || p.startsWith(q)));
+  return suyas.every((p) => dichas.some((q) => q === p || mismaRaiz(p, q)));
 }
 
 /**
@@ -237,7 +322,7 @@ function encaja(dicho: string, nombre: string): boolean {
  */
 function nombraAlgoConcreto(dicho: string, nombre: string): boolean {
   const suyas = palabras(nombre);
-  return palabras(dicho).some((q) => !suyas.some((p) => q === p || q.startsWith(p) || p.startsWith(q)));
+  return palabras(dicho).some((q) => !suyas.some((p) => q === p || mismaRaiz(p, q)));
 }
 
 export function destinoDe(frase: string): { ruta: string; titulo: string } | null {
@@ -253,8 +338,18 @@ export function destinoDe(frase: string): { ruta: string; titulo: string } | nul
 
   let mejor: { ruta: string; titulo: string; peso: number } | null = null;
   const tomar = () => mejor as { ruta: string; titulo: string; peso: number } | null;
-  const proponer = (ruta: string, titulo: string, nombre: string) => {
-    const peso = palabras(nombre).length * 10 + nombre.length;
+  /**
+   * Quien gana, en orden:
+   *
+   *   1. Lo que coincide EXACTO. «Reportes de falla» es, palabra por palabra,
+   *      como se le dice a Solicitudes; no puede perder contra «Reportes», que
+   *      solo coincide a medias aunque sea nombre de menú.
+   *   2. El nombre del menú sobre el sinónimo de otra pantalla. «Tablero» es
+   *      el nombre de Tablero y a la vez apodo del Inicio: gana Tablero.
+   *   3. El más específico: «mis órdenes» sobre «órdenes».
+   */
+  const proponer = (ruta: string, titulo: string, nombre: string, oficial = false, exacto = false) => {
+    const peso = (exacto ? 10_000 : 0) + (oficial ? 1_000 : 0) + palabras(nombre).length * 10 + nombre.length;
     if (!mejor || peso > mejor.peso) mejor = { ruta, titulo, peso };
   };
 
@@ -263,12 +358,12 @@ export function destinoDe(frase: string): { ruta: string; titulo: string } | nul
     // «ordenes», o el filtro que la persona pidio se pierde en silencio.
     for (const a of ATAJOS) {
       for (const f of a.frases) {
-        if (encaja(t, f) && !(anuncia && nombraAlgoConcreto(t, f))) proponer(a.ruta, a.titulo, `${f} ${f}`);
+        if (encaja(t, f) && !(anuncia && nombraAlgoConcreto(t, f))) proponer(a.ruta, a.titulo, `${f} ${f}`, false, t === f);
       }
     }
     for (const d of DESTINOS) {
       for (const n of d.nombres) {
-        if (encaja(t, n) && !(anuncia && nombraAlgoConcreto(t, n))) proponer(d.ruta, d.titulo, n);
+        if (encaja(t, n) && !(anuncia && nombraAlgoConcreto(t, n))) proponer(d.ruta, d.titulo, n, n === d.oficial, t === n);
       }
     }
   }

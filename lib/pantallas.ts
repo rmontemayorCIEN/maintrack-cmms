@@ -215,6 +215,19 @@ const MENU: GrupoMenu[] = [
 ];
 
 /** El menú de un rol: solo lo que puede abrir, sin grupos vacíos. */
+/**
+ * Todas las pantallas del menu, en una lista plana.
+ *
+ * La usa la navegacion por voz para que CUALQUIER pantalla del menu se pueda
+ * pedir hablando sin tener que acordarse de apuntarla en otra lista. Se
+ * agrego el rondin al menu y a la tabla de permisos, y se olvido el catalogo
+ * de voz: «llevame a rondines» no encontraba nada. Con esto, la proxima
+ * pantalla nueva ya nace diciendose.
+ */
+export function pantallasDelMenu(): ItemMenu[] {
+  return MENU.flatMap((g) => g.items);
+}
+
 export function menuDe(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}): GrupoMenu[] {
   const grupos = MENU
     .map((g) => ({ ...g, items: g.items.filter((i) => puedeVerRuta(rol, i.href, opciones)) }))

@@ -32,7 +32,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ZonaEmpresaProvider zona={user.organization.timezone || "America/Mexico_City"}>
-    <div className="flex min-h-screen">
+    {/* `min-h-dvh` y no `min-h-screen`: el «alto de pantalla» de CSS no
+          descuenta la barra de direcciones de Safari, que aparece y desaparece
+          al desplazarse. La unidad dinámica sí, y es lo que evita que la barra
+          del pie quede descolocada mientras el navegador se encoge. */}
+      <div className="flex min-h-dvh">
       <RegistrarSW />
       <Sidebar
         tieneLogo={Boolean(user.organization.logoUrl)}

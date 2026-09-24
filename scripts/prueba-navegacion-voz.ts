@@ -17,7 +17,8 @@
 import { type ChildProcess } from "node:child_process";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
-import { destinoDe, quitarVerbo, intencionDeOrden, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
+import { destinoDe, quitarVerbo, intencionDeOrden, folioPedido, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
+import { pantallasDelMenu } from "../lib/pantallas";
 import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 const PUERTO = 3218;
@@ -107,15 +108,49 @@ async function main() {
     revisar("«la solicitud más reciente» también", intencionDeOrden("ábreme la solicitud más reciente")?.clase === "masReciente");
     revisar("«el almacén» no es una intención de orden", intencionDeOrden("llévame al almacén") === null);
 
+    console.log("\nToda pantalla del menú se puede pedir hablando\n");
+    /**
+     * El rondin se agrego al menu y a la tabla de permisos, y quedo fuera del
+     * catalogo de voz: «llevame a rondines» no encontraba nada. Ahora los
+     * destinos SALEN del menu, asi que esto vigila la clase entera —cada
+     * pantalla nueva nace pudiendose pedir— y no solo el caso que falló.
+     */
+    const delMenu = pantallasDelMenu();
+    const sinNombre = delMenu.filter((i) => !DESTINOS.some((d) => d.ruta === i.href));
+    revisar("ninguna pantalla del menú se queda sin poder pedirse",
+      sinNombre.length === 0, sinNombre.map((i) => i.href).join(" "));
+    const noSeEncuentran = delMenu.filter((i) => destinoDe(i.etiqueta)?.ruta !== i.href);
+    revisar("y a cada una se llega diciendo su nombre del menú",
+      noSeEncuentran.length === 0,
+      noSeEncuentran.map((i) => `${i.etiqueta}→${destinoDe(i.etiqueta)?.ruta ?? "nada"}`).join(" | "));
+    revisar("«llévame a Rondines» —el que se había quedado fuera— llega",
+      destinoDe("llévame a Rondines")?.ruta === "/rondines", destinoDe("llévame a Rondines")?.ruta);
+
     console.log("\nEl catálogo está sano\n");
     const rutas = DESTINOS.map((d) => d.ruta);
     revisar("ninguna pantalla está repetida", new Set(rutas).size === rutas.length);
-    const nombres = DESTINOS.flatMap((d) => d.nombres);
-    const repetidos = nombres.filter((n, i) => nombres.indexOf(n) !== i);
-    // Un nombre en dos pantallas es una moneda al aire: gana la que este
-    // primero en la lista, que no es un criterio que nadie haya decidido.
-    revisar("ningún nombre apunta a dos pantallas distintas", repetidos.length === 0, repetidos.join(" "));
-    const chocan = ATAJOS.flatMap((a) => a.frases).filter((f) => nombres.includes(f));
+    /**
+     * Un nombre puede estar en dos pantallas SI en una de ellas es el nombre
+     * oficial: entonces gana esa, y es un criterio decidido.
+     *
+     * «Tablero» es el nombre de Tablero y a la vez como mucha gente llama al
+     * Inicio; «reportes» es el nombre de Reportes y como se llama a las
+     * solicitudes de falla. Prohibir esos cruces obligaría a empobrecer el
+     * vocabulario. Lo que NO puede pasar es que un nombre sea sinónimo suelto
+     * de dos pantallas: ahí no habría con qué decidir.
+     */
+    const sinonimosSueltos = DESTINOS.flatMap((d) => d.nombres.filter((n) => n !== d.oficial));
+    const ambiguos = sinonimosSueltos.filter((n, i) => sinonimosSueltos.indexOf(n) !== i);
+    revisar("ningún sinónimo apunta a dos pantallas sin forma de decidir",
+      ambiguos.length === 0, ambiguos.join(" "));
+    // Y cuando un nombre choca con el oficial de otra, gana el oficial.
+    revisar("   «tablero» lleva a Tablero, no al Inicio que lo tiene de sinónimo",
+      destinoDe("tablero")?.ruta === "/board", destinoDe("tablero")?.ruta);
+    revisar("   «reportes» lleva a Reportes, no a Solicitudes",
+      destinoDe("reportes")?.ruta === "/reports", destinoDe("reportes")?.ruta);
+    revisar("   pero «reportes de falla» sigue llevando a Solicitudes",
+      destinoDe("reportes de falla")?.ruta === "/requests", destinoDe("reportes de falla")?.ruta);
+    const chocan = ATAJOS.flatMap((a) => a.frases).filter((f) => DESTINOS.flatMap((d) => d.nombres).includes(f));
     revisar("ningún atajo choca con el nombre de una pantalla", chocan.length === 0, chocan.join(" "));
 
     // ─────────────────────────────────────── Contra el sistema de verdad ────
@@ -192,8 +227,18 @@ async function main() {
     const alEquipo = await navegar(deJefa, "abre el equipo compresor de tornillo");
     revisar("«abre el equipo compresor de tornillo» abre el compresor",
       alEquipo.json.ruta === `/assets/${equipo.id}`, { ruta: alEquipo.json.ruta });
+    console.log("\nUn folio dicho por su número\n");
+    // «La orden once» tiene que llegar a OT-000011, no buscar «11» y toparse
+    // con la 11, la 110 y la 1100.
+    revisar("«la orden de trabajo 11» arma OT-000011", folioPedido("llévame a la Orden de Trabajo 11") === "OT-000011", folioPedido("llévame a la Orden de Trabajo 11"));
+    revisar("   y dicho con letra también: «la orden once»", folioPedido("abre la orden once") === "OT-000011");
+    revisar("«orden de compra 5» no cae en órdenes de trabajo", folioPedido("la orden de compra 5") === "OC-000005", folioPedido("la orden de compra 5"));
+    revisar("«la solicitud 203» arma SS-000203", folioPedido("abre la solicitud 203") === "SS-000203");
+    revisar("y una frase sin folio no inventa uno", folioPedido("llévame al almacén") === null);
+    revisar("   ni «la orden más antigua», que es otra cosa", folioPedido("la orden más antigua") === null);
+
     const alFolio = await navegar(deJefa, "abre la orden 101");
-    revisar("«abre la orden <folio>» abre esa orden",
+    revisar("«abre la orden 101» abre exactamente esa orden",
       alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, folio: vieja.number });
     /**
      * Que no sea la orden de la otra empresa: se compara contra SU

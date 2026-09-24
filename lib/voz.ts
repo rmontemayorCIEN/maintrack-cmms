@@ -134,7 +134,9 @@ function miles(n: number): string {
     // El resto SE DICE. Redondear «128,400» a «128 mil» es aproximar una
     // cifra que el sistema calculo exacta, y aqui se esta contestando una
     // pregunta sobre datos: el numero es la respuesta.
-    return resto ? `${m} mil ${resto}` : `${m} mil`;
+    // «Mil doscientos», no «un mil doscientos»: nadie lo dice así.
+    const cuantos = m === 1 ? "mil" : `${m} mil`;
+    return resto ? `${cuantos} ${resto}` : cuantos;
   }
   return String(n);
 }
@@ -301,6 +303,20 @@ export function paraDecir(texto: string): string {
     // Importes: $128,400.50 → 128 mil 400 pesos. Si el texto YA decia «pesos»
     // detras, no se repite: «$45 pesos» no puede salir «45 pesos pesos».
     .replace(/\$\s?([\d,]+)(?:\.\d+)?(\s*pesos)?/gi, (_, n: string) => `${miles(Number(n.replace(/,/g, "")))} pesos`)
+    /**
+     * Y las cifras con separador de miles aunque NO traigan el signo.
+     *
+     * «El gasto fue de 11,430» se oia «once, cuatro treinta»: el sintetizador
+     * toma la coma como pausa y parte el numero en dos. Cualquier cifra con
+     * coma seguida de tres digitos es separador de miles —en México el decimal
+     * es el punto— y se dice entera.
+     *
+     * NO se le agrega «pesos»: aqui ya no se sabe si son pesos, horas o
+     * piezas, y ponerle moneda a un conteo de ordenes seria inventar. Lo que
+     * si se hace es pedirle al modelo que escriba los importes con su signo,
+     * que es lo que activa la regla de arriba.
+     */
+    .replace(/\b(\d{1,3}(?:,\d{3})+)(?!\d)/g, (_, n: string) => miles(Number(n.replace(/,/g, ""))))
     // Porcentajes: 87.5% → 87.5 por ciento
     .replace(/(\d)\s?%/g, "$1 por ciento")
     // Vinetas al empezar un renglon: se oirian como «guion». Se quitan, pero
@@ -312,6 +328,9 @@ export function paraDecir(texto: string): string {
     // Encabezados de markdown y negritas, que el modelo a veces cuela.
     .replace(/^#{1,6}\s*/gm, "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
+    // «3 millones DE DE pesos»: `miles()` pone su propia preposición para que
+    // «$3,000,000» se diga bien, y si el texto ya traía la suya salían dos.
+    .replace(/\bde de\b/g, "de")
     .replace(/\s+/g, " ")
     .trim();
 }

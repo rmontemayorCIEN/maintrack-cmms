@@ -1,6 +1,9 @@
 import { prisma } from "./db";
 import { normalizar } from "./busqueda";
 import { nextRequestNumber, siguienteFolio } from "./numbering";
+// Los numeros con letra viven en `lib/folios.ts`: los necesita tambien la
+// navegacion por voz, y dos copias se desincronizarian en la primera adicion.
+import { NUMEROS_DICHOS } from "./folios";
 import { avisarSolicitudNueva } from "./avisos/detectores";
 import type { HallazgoPropuesto } from "./ia/rondin";
 
@@ -91,11 +94,6 @@ const RELLENO = new Set([
   "estamos", "sigo", "siguiente", "parada", "punto", "revisando", "checando",
 ]);
 
-/** Los numeros dichos con letra, que es como se dictan. */
-const NUMEROS: Record<string, string> = {
-  uno: "1", dos: "2", tres: "3", cuatro: "4", cinco: "5",
-  seis: "6", siete: "7", ocho: "8", nueve: "9", diez: "10",
-};
 
 /**
  * Lo que de la frase dictada puede ser el nombre de un equipo.
@@ -113,7 +111,7 @@ export function pistasDelDictado(dicho: string): string[] {
     // las bombas de la planta. Justo el dato que identifica al equipo era el
     // que se perdia, y en silencio.
     .filter((p) => (p.length > 1 || /^\d$/.test(p)) && !RELLENO.has(p))
-    .map((p) => NUMEROS[p] ?? p)
+    .map((p) => NUMEROS_DICHOS[p] ?? p)
     .slice(0, 6);
 }
 
