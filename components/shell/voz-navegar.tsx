@@ -6,7 +6,7 @@ import { Loader2, Mic, Square, Volume2, X } from "lucide-react";
 import { cn, sinMarcas } from "@/lib/utils";
 import { usarGrabadora } from "../usar-grabadora";
 import { ESPERA_MAXIMA_MS } from "@/lib/deteccion-voz";
-import { pedirFrase, pedirVoz, reproducir } from "../hablar";
+import { pedirVoz, reproducir } from "../hablar";
 
 /**
  * Hablarle al sistema: un solo micrófono para ir a un lado o preguntar algo.
@@ -22,14 +22,23 @@ import { pedirFrase, pedirVoz, reproducir } from "../hablar";
  *
  * La primera versión de este botón escuchaba y no decía nada: la respuesta
  * aparecía escrita en un cartel. Eso no es hablarle al sistema, es dictarle.
- * Rafael lo dijo con la comparación exacta: «ya no sale el "Hola Rafael, en
- * qué le puedo ayudar"» —el saludo que sí tenía el modo voz del chat—, y «la
- * respuesta de audio no la da». Quien trae las manos sucias o va manejando no
- * puede leer un cartel; si hay que leerlo, el micrófono sobraba.
+ * Quien trae las manos sucias o va manejando no puede leer un cartel; si hay
+ * que leerlo, el micrófono sobraba. Contesta hablando, y solo cuando termina
+ * vuelve a escuchar: si el micrófono se abriera mientras el sistema habla, se
+ * grabaría a sí mismo.
  *
- * Así que saluda al abrir, contesta hablando, y solo entonces vuelve a
- * escuchar. El orden importa: si el micrófono se abriera mientras el sistema
- * habla, se grabaría a sí mismo.
+ * ── Un tono, no un saludo ──
+ *
+ * Estuvo puesto el saludo hablado del modo voz del chat, y ahí tiene sentido
+ * porque se entra a la pantalla una vez. Aquí se toca el botón muchas veces al
+ * día y decir «Hola Rafael, en qué le puedo ayudar» en cada una es una espera
+ * de dos segundos y medio antes de poder hablar. Rafael: «lo dice cada vez que
+ * le doy click».
+ *
+ * Y escondía algo peor: el saludo terminaba y el micrófono tardaba todavía un
+ * segundo en abrir, así que quien arrancaba a hablar al acabar la frase perdía
+ * sus primeras palabras. El tono suena cuando la grabación YA empezó, así que
+ * no miente, y no cuesta nada.
  *
  * ── Manos libres ──
  *
@@ -100,6 +109,8 @@ export function VozNavegar() {
     // Manos libres reabre el micrófono solo, así que el descuido se repite:
     // si nadie habla se cierra la conversación en vez de subir el silencio.
     esperaMaximaMs: ESPERA_MAXIMA_MS,
+    // Un tono corto al abrir el micrófono, en vez del saludo hablado.
+    avisarAlEscuchar: true,
     alDesistir: () => cortarConversacion(),
     alTerminar: async (grabado) => {
       try {
@@ -109,10 +120,22 @@ export function VozNavegar() {
         if (!r.ok) { cortarConversacion(); g.soltar(); g.setError(d.error ?? "No se pudo oír en este momento."); return; }
 
         if (d.tipo === "ir" && d.ruta) {
-          // Al cambiar de pantalla se acaba la conversación: seguir
-          // escuchando mientras alguien lee otra cosa sería escuchar de más.
+          /**
+           * Al cambiar de pantalla se acaba la conversación: seguir
+           * escuchando mientras alguien lee otra cosa sería escuchar de más.
+           *
+           * Pero el micrófono NO se suelta aquí. Soltándolo, el siguiente
+           * toque volvía a pedir permiso —Safari de iPhone pregunta otra vez
+           * en cuanto se suelta el aparato—, y encadenar «llévame a…» con una
+           * pregunta es justo lo más común. Rafael lo vio: «en un par de
+           * ocasiones me salió la ventana de permisos».
+           *
+           * Queda en la cuenta atrás de siempre: si en veinticinco segundos
+           * nadie vuelve a hablar se suelta solo y el indicador del teléfono
+           * se apaga. Ese es el mismo trato que entre una frase y la
+           * siguiente, no uno nuevo.
+           */
           cortarConversacion();
-          g.soltar();
           router.push(d.ruta);
           return;
         }
@@ -181,14 +204,12 @@ export function VozNavegar() {
     g.prepararAudio();
     const pista = new Audio();
     audio.current = pista;
-    // Arrancarla vacía dentro del toque es lo que la deja sonar después: el
-    // saludo tarda en llegar del servidor y para entonces el permiso del clic
-    // ya caducó.
+    // Arrancarla vacía dentro del toque es lo que la deja sonar después: la
+    // respuesta tarda segundos en llegar del servidor, y para entonces el
+    // permiso del clic ya caducó.
     void pista.play().catch(() => undefined);
+    // Escucha de inmediato. El tono de la grabadora avisa cuándo empezar.
     setSeguido(true);
-    // Saluda primero y escucha después. El efecto de arriba abre el micrófono
-    // solo cuando esto termina.
-    void decir(() => pedirFrase("saludo"));
   };
 
   const cerrar = () => {

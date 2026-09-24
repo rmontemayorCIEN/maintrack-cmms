@@ -63,6 +63,7 @@ export function usarGrabadora({
   silencioMs = SILENCIO_COMANDO_MS,
   esperaMaximaMs,
   cortarSolo = true,
+  avisarAlEscuchar = false,
 }: {
   alTerminar: (audio: Blob) => Promise<void>;
   /**
@@ -90,6 +91,19 @@ export function usarGrabadora({
   esperaMaximaMs?: number;
   /** En falso, solo corta quien toque el boton. */
   cortarSolo?: boolean;
+  /**
+   * Un tono corto en el instante EXACTO en que empieza a oir.
+   *
+   * Sustituye al saludo hablado, que duraba dos segundos y medio y se decia
+   * en cada apertura. Rafael: «lo dice cada vez que le doy click». Pero
+   * quitarlo sin poner nada dejaba un problema peor escondido: el saludo
+   * terminaba y el microfono todavia tardaba un segundo en abrir, asi que
+   * quien arrancaba a hablar al acabar la frase perdia sus primeras palabras.
+   *
+   * El tono no tiene ese hueco —suena cuando la grabacion YA empezo—, es
+   * instantaneo y no cuesta: lo genera el propio navegador.
+   */
+  avisarAlEscuchar?: boolean;
 }) {
   const [estado, setEstado] = useState<EstadoGrabacion>("quieto");
   const [segundos, setSegundos] = useState(0);
@@ -261,6 +275,33 @@ export function usarGrabadora({
     }
   }
 
+  /**
+   * El tono de «ya lo escucho».
+   *
+   * Sale del mismo contexto que mide el nivel, que nacio dentro del toque y
+   * por eso si puede sonar en iOS. Corto y con entrada y salida suaves: un
+   * pitido seco, oido en el coche, es insoportable.
+   */
+  function avisar(ctx: AudioContext | null) {
+    if (!avisarAlEscuchar || !ctx || ctx.state === "closed") return;
+    try {
+      void ctx.resume().catch(() => undefined);
+      const osc = ctx.createOscillator();
+      const vol = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      const t = ctx.currentTime;
+      vol.gain.setValueAtTime(0, t);
+      vol.gain.linearRampToValueAtTime(0.15, t + 0.02);
+      vol.gain.linearRampToValueAtTime(0, t + 0.16);
+      osc.connect(vol).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.18);
+    } catch {
+      // Sin audio del navegador simplemente no hay tono. No es un fallo.
+    }
+  }
+
   function escucharParaCortar(flujo: MediaStream, ctx: AudioContext | null) {
     if (!cortarSolo || !ctx) return;
     try {
@@ -394,6 +435,9 @@ export function usarGrabadora({
       // en mitad de una frase.
       if (ocioso.current) { clearTimeout(ocioso.current); ocioso.current = null; }
       rec.start();
+      // El tono va DESPUES de arrancar la grabacion: avisa de algo que ya es
+      // cierto. Antes seria la misma mentira que el saludo.
+      avisar(ctxAudio);
       escucharParaCortar(microfono.current, ctxAudio);
       setSegundos(0);
       setEstado("grabando");
