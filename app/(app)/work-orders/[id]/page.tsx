@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Comentarios } from "@/components/comentarios";
 import { notFound } from "next/navigation";
 import { ArrowLeft, LifeBuoy, Printer } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -855,6 +856,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       </div>
       {/* Lugar para la barra de acciones fija del teléfono: el final de la orden no queda debajo. */}
       {canExecute && (hayAcciones || puedeAceptar || puedePedirApoyo) ? <div className="h-32 lg:hidden" aria-hidden /> : null}
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="workOrder" anclaId={wo.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la orden" />
+      </div>
     </>
   );
 }

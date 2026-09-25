@@ -1,4 +1,5 @@
 import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
+import { Comentarios } from "@/components/comentarios";
 import { cubiertoPorCompras } from "@/lib/compras";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -300,6 +301,12 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
             )}
           </Card>
         </div>
+      </div>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="materialRequest" anclaId={req.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la requisición" />
       </div>
     </>
   );

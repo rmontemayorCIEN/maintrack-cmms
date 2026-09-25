@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Comentarios } from "@/components/comentarios";
 import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -242,6 +243,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             ) : null}
           </dl>
         </Card>
+      </div>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="workRequest" anclaId={solicitud.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la solicitud" />
       </div>
     </>
   );

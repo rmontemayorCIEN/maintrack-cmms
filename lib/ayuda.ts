@@ -604,6 +604,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Si otra persona cambió un dato de la orden mientras usted la editaba, no se pisa: se avisa qué cambió, se carga lo vigente y lo que usted escribió se queda en el formulario para revisarlo.",
       "La lista acepta ligas con filtros: «mis órdenes», vencidas, sin responsable, por estado o por prioridad. En el teléfono se ve como tarjetas; en computadora, como tabla.",
       "Quien ejecuta no ve costos en la orden ni en la lista: los ven la administración, supervisión y consulta.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -807,6 +808,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Todo cuelga de aquí: los planes, las órdenes, las refacciones y los costos se acumulan por activo.",
       "La criticidad decide el orden de atención cuando hay varias cosas detenidas a la vez.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -1028,6 +1030,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo devuelto baja ese consumo: el cargo original no se borra, se le anota lo que regresó y el costo de la orden queda en lo que de verdad se usó.",
       "Lo que el almacén no puede cubrir se manda a compras sin volver a capturarlo. Lo que ya está en una compra abierta deja de aparecer como faltante, para no comprarlo dos veces.",
       "Si la refacción no tiene costo capturado, se puede surtir, pero se avisa: el consumo entraría en $0 y el costo del equipo saldría corto.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -1147,6 +1150,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo que se escribe y no se envía se conserva unas horas en ese dispositivo (si se cae la señal o se cierra sin querer). Las fotos se eligen antes, se ven, se pueden quitar, y se suben al enviar; si una falla, se reintenta sola esa.",
       "Quien reporta y el técnico ven sus propias solicitudes (el técnico, también las de sus órdenes); quien revisa, todas.",
       "Una solicitud convertida que no tiene una OT activa —porque nunca quedó ligada a una orden, o porque su orden está cancelada— se muestra «Sin OT activa» y aparece en la calidad de captura. El sistema no le inventa ni le reasigna una orden: alguien decide si se vuelve a atender.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
     ],
     campos: [
       { nombre: "Posible condición de riesgo", explica: "Aparece en rojo cuando lo reportado menciona algo peligroso. Se detecta al recibir, en el acto y sin IA, porque un «huele a gas» no puede esperar a que alguien abra la bandeja." },

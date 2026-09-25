@@ -1,4 +1,5 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { Comentarios } from "@/components/comentarios";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
@@ -588,6 +589,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </Card>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="asset" anclaId={asset.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación del equipo" />
+      </div>
     </>
   );
 }

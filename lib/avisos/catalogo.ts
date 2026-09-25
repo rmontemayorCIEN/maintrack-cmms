@@ -27,11 +27,11 @@ export const ETIQUETA_PRIORIDAD: Record<Prioridad, string> = {
 
 export type Categoria = "OBLIGATORIO" | "OPERATIVO" | "INFORMATIVO";
 
-export type Modulo = "ORDENES" | "SOLICITUDES" | "PREVENTIVO" | "MEDIDORES" | "ALMACEN" | "COMPRAS" | "ADMINISTRACION" | "RESUMENES";
+export type Modulo = "ORDENES" | "SOLICITUDES" | "PREVENTIVO" | "MEDIDORES" | "ALMACEN" | "COMPRAS" | "ADMINISTRACION" | "RESUMENES" | "COMENTARIOS";
 export const ETIQUETA_MODULO: Record<Modulo, string> = {
   ORDENES: "Órdenes de trabajo", SOLICITUDES: "Solicitudes", PREVENTIVO: "Mantenimiento preventivo",
   MEDIDORES: "Medidores y predictivo", ALMACEN: "Almacén", COMPRAS: "Compras",
-  ADMINISTRACION: "Administración", RESUMENES: "Resúmenes",
+  ADMINISTRACION: "Administración", RESUMENES: "Resúmenes", COMENTARIOS: "Comentarios y menciones",
 };
 
 /**
@@ -72,6 +72,30 @@ export type DefinicionEvento = {
 const d = (x: DefinicionEvento) => x;
 
 export const EVENTOS = {
+  // ───────────────────────────────────────────── Comentarios
+  /**
+   * NO pide accion, y lo aprendio la suite.
+   *
+   * Estuvo con `requiereAccion: true` razonando que nombrar a alguien es
+   * pedirle algo. Eso es cierto de la intencion y falso del sistema: aqui
+   * «pide accion» significa que el aviso QUEDA PENDIENTE hasta que una
+   * condicion se resuelva sola —la OT se inicia, la compra se recibe— y por
+   * eso cada uno de esos tipos lleva su regla de ciclo de vida en
+   * `lib/avisos/condiciones.ts`.
+   *
+   * Una mencion no tiene esa condicion: nadie puede calcular «ya la
+   * contestaron». Dejarla pidiendo accion la habria vuelto un pendiente que no
+   * se puede cerrar nunca, que es peor que no marcarla.
+   *
+   * Es OPERATIVO y no obligatorio: se puede apagar, porque nadie corre peligro
+   * por no leer una mencion.
+   */
+  MENCION: d({
+    titulo: "Lo mencionaron", descripcion: "Alguien lo nombró en un comentario de una orden, un activo, una solicitud o una requisición.",
+    modulo: "COMENTARIOS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: false,
+    destinatarios: [["USUARIO_AFECTADO"]], quien: "La persona mencionada, y nadie más.", webhook: false,
+  }),
+
   // ───────────────────────────────────────────── Órdenes de trabajo
   OT_ASIGNADA: d({
     titulo: "OT asignada", descripcion: "Le asignan una orden de trabajo.",

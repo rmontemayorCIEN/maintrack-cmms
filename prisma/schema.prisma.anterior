@@ -300,8 +300,9 @@ model Organization {
   revisionesAgenda   RevisionAgenda[]
   passwordResets     PasswordReset[]
   importBatches      ImportBatch[]
-  downtimeEvents DowntimeEvent[]
-  resumenInicio  ResumenInicio?
+  downtimeEvents     DowntimeEvent[]
+  resumenInicio      ResumenInicio?
+  comentarios        Comentario[]
 }
 
 model User {
@@ -388,8 +389,8 @@ model User {
   quotesCapturadas     Quote[]
   purchaseOrders       PurchaseOrder[]
   inventoryCounts      InventoryCount[]
-  rondines      Rondin[]
-  rondinHallazgos RondinHallazgo[]
+  rondines             Rondin[]
+  rondinHallazgos      RondinHallazgo[]
   reportPoints         ReportPoint[]
   tareasLiberadas      WorkOrderTask[]         @relation("TareaLiberadaPor")
   /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
@@ -399,6 +400,8 @@ model User {
   equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
   asignacionesCreadas  PlanAsset[]             @relation("AsignacionCreadaPor")
   conjuntosACargo      Conjunto[]              @relation("ConjuntoResponsable")
+  comentarios          Comentario[]
+  menciones            ComentarioMencion[]
 
   @@index([organizationId])
 }
@@ -617,15 +620,15 @@ model Location {
   margenPorHora Float    @default(0)
   createdAt     DateTime @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  parent       Location?     @relation("LocationTree", fields: [parentId], references: [id])
-  children     Location[]    @relation("LocationTree")
-  assets       Asset[]
-  workOrders   WorkOrder[]
-  requests     WorkRequest[]
-  reportPoints ReportPoint[]
-  rondines     Rondin[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent        Location?      @relation("LocationTree", fields: [parentId], references: [id])
+  children      Location[]     @relation("LocationTree")
+  assets        Asset[]
+  workOrders    WorkOrder[]
+  requests      WorkRequest[]
+  reportPoints  ReportPoint[]
+  rondines      Rondin[]
   rondinParadas RondinParada[]
 
   @@index([organizationId])
@@ -726,14 +729,15 @@ model Asset {
   alerts           PredictiveAlert[]
   downtimes        DowntimeEvent[]
   requisiciones    MaterialRequest[]
-  rondinParadas RondinParada[]
-  rondinHallazgos RondinHallazgo[]
+  rondinParadas    RondinParada[]
+  rondinHallazgos  RondinHallazgo[]
   attachments      Attachment[]
   links            ReferenceLink[]
   reportPoints     ReportPoint[]
   planesAsignados  PlanAsset[]
   calendariosTarea PlanTaskAsset[]
   conjuntos        ConjuntoAsset[]
+  comentarios      Comentario[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -1073,6 +1077,7 @@ model WorkOrder {
   downtimes     DowntimeEvent[]
   stockMoves    StockMovement[]
   requisiciones MaterialRequest[]
+  comentarios   Comentario[]
 
   @@unique([organizationId, number])
   @@index([organizationId])
@@ -1304,6 +1309,74 @@ model WorkOrderComment {
   @@index([workOrderId])
 }
 
+/// La conversacion, pegada al registro del que se habla.
+///
+/// ── Por que existe ──
+///
+/// Rafael: «se dan muchas interacciones por muchos canales y la mayoria es
+/// informacion valiosa que se dispersa». El tecnico pregunta por WhatsApp si
+/// la bomba lleva sello 6205 o 6206, alguien contesta, y en veinte minutos esa
+/// respuesta no la encuentra nadie —y al mes siguiente se vuelve a preguntar—.
+///
+/// Aqui la misma pregunta queda amarrada a la orden y al activo para siempre.
+/// Ese es todo el punto: no tener chat, sino que lo que se dice viva donde
+/// vive el trabajo del que se habla.
+///
+/// ── Por que una llave por tipo y no `entidad` + `entidadId` ──
+///
+/// Es el patron de `Attachment`, y por la misma razon: con llaves de verdad el
+/// comentario se borra con su registro. Un identificador suelto deja
+/// conversaciones huerfanas de ordenes que ya no existen, y nadie las va a ir
+/// a limpiar.
+model Comentario {
+  id             String    @id @default(cuid())
+  organizationId String
+  autorId        String?
+  texto          String
+  /// Un comentario borrado se marca, no se quita: una conversacion con huecos
+  /// no se entiende, y el hueco tapa justo lo que alguien quiso tapar.
+  eliminadoEl    DateTime?
+  editadoEl      DateTime?
+  createdAt      DateTime  @default(now())
+
+  workOrderId       String?
+  assetId           String?
+  workRequestId     String?
+  materialRequestId String?
+
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  autor           User?               @relation(fields: [autorId], references: [id])
+  workOrder       WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  asset           Asset?              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workRequest     WorkRequest?        @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
+  materialRequest MaterialRequest?    @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+  menciones       ComentarioMencion[]
+
+  @@index([organizationId])
+  @@index([workOrderId])
+  @@index([assetId])
+  @@index([workRequestId])
+  @@index([materialRequestId])
+}
+
+/// A quien se nombro en un comentario.
+///
+/// Se guarda en vez de sacarse del texto al momento de leerlo. Buscar «@Ana»
+/// dentro de la cadena funciona hasta que hay dos Anas, o alguien se llama
+/// «Ana Maria», o se cambia un nombre en Usuarios. Ademas hace falta para
+/// contestar «que menciones tengo» sin leer todos los comentarios del sistema.
+model ComentarioMencion {
+  id           String @id @default(cuid())
+  comentarioId String
+  userId       String
+
+  comentario Comentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([comentarioId, userId])
+  @@index([userId])
+}
+
 model Attachment {
   id             String   @id @default(cuid())
   organizationId String
@@ -1325,14 +1398,14 @@ model Attachment {
   note           String?
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  workRequest  WorkRequest? @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
-  part         Part?        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder?    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  asset        Asset?        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workRequest  WorkRequest?  @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
+  part         Part?         @relation(fields: [partId], references: [id], onDelete: Cascade)
   rondinParada RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: Cascade)
-  assetIntake  AssetIntake? @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
-  uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
+  assetIntake  AssetIntake?  @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   User?         @relation(fields: [uploadedById], references: [id])
 
   @@index([organizationId])
   @@index([workOrderId])
@@ -1402,17 +1475,18 @@ model WorkRequest {
   createdAt     DateTime  @default(now())
   reviewedAt    DateTime?
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  asset        Asset?          @relation(fields: [assetId], references: [id])
-  site         Site?           @relation(fields: [siteId], references: [id])
-  location     Location?       @relation(fields: [locationId], references: [id])
-  requestedBy  User?           @relation("RequestAuthor", fields: [requestedById], references: [id])
-  reportPoint  ReportPoint?    @relation(fields: [reportPointId], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset           Asset?           @relation(fields: [assetId], references: [id])
+  site            Site?            @relation(fields: [siteId], references: [id])
+  location        Location?        @relation(fields: [locationId], references: [id])
+  requestedBy     User?            @relation("RequestAuthor", fields: [requestedById], references: [id])
+  reportPoint     ReportPoint?     @relation(fields: [reportPointId], references: [id])
   rondinHallazgos RondinHallazgo[]
-  attachments  Attachment[]
-  reviewedBy   User?           @relation("RequestReviewer", fields: [reviewedById], references: [id])
-  workOrder    WorkOrder?      @relation(fields: [workOrderId], references: [id])
-  actividades  WorkOrderTask[] @relation("SolicitudAtendida")
+  attachments     Attachment[]
+  reviewedBy      User?            @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  workOrder       WorkOrder?       @relation(fields: [workOrderId], references: [id])
+  actividades     WorkOrderTask[]  @relation("SolicitudAtendida")
+  comentarios     Comentario[]
 
   @@unique([organizationId, number])
   @@index([organizationId])
@@ -1916,12 +1990,12 @@ model ReportPoint {
   createdAt      DateTime @default(now())
 
   rondinParadas RondinParada[]
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site?         @relation(fields: [siteId], references: [id])
-  location     Location?     @relation(fields: [locationId], references: [id])
-  asset        Asset?        @relation(fields: [assetId], references: [id])
-  createdBy    User?         @relation(fields: [createdById], references: [id])
-  solicitudes  WorkRequest[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site          Site?          @relation(fields: [siteId], references: [id])
+  location      Location?      @relation(fields: [locationId], references: [id])
+  asset         Asset?         @relation(fields: [assetId], references: [id])
+  createdBy     User?          @relation(fields: [createdById], references: [id])
+  solicitudes   WorkRequest[]
 
   @@index([organizationId])
 }
@@ -1982,6 +2056,7 @@ model MaterialRequest {
   renglones    MaterialRequestLine[]
   movements    StockMovement[]
   compras      PurchaseRequest[]
+  comentarios  Comentario[]
 
   @@unique([organizationId, folio])
   @@index([organizationId])
@@ -3280,7 +3355,7 @@ model ConjuntoAsset {
 /// historial de operacion por delante.
 model ProcesoProgramado {
   /// "avisos", "diagnostico" o "scheduler:<organizationId>".
-  clave          String    @id
+  clave          String  @id
   /// Presente solo en los procesos que corren por empresa.
   organizationId String?
 
@@ -3363,10 +3438,10 @@ model Rondin {
   analizadoEn    DateTime?
   createdAt      DateTime  @default(now())
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site?          @relation(fields: [siteId], references: [id])
-  location     Location?      @relation(fields: [locationId], references: [id])
-  iniciadoPor  User?          @relation(fields: [iniciadoPorId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site?            @relation(fields: [siteId], references: [id])
+  location     Location?        @relation(fields: [locationId], references: [id])
+  iniciadoPor  User?            @relation(fields: [iniciadoPorId], references: [id])
   paradas      RondinParada[]
   hallazgos    RondinHallazgo[]
 
@@ -3377,16 +3452,16 @@ model Rondin {
 
 /// Cada parada del recorrido: un lugar, lo que se vio y lo que se dijo.
 model RondinParada {
-  id             String   @id @default(cuid())
+  id             String @id @default(cuid())
   organizationId String
   rondinId       String
   /// En que orden se hizo. La ruta del recorrido anterior ayuda a identificar
   /// las paradas del siguiente cuando no hay codigo.
-  orden          Int      @default(0)
+  orden          Int    @default(0)
 
-  reportPointId  String?
-  assetId        String?
-  locationId     String?
+  reportPointId String?
+  assetId       String?
+  locationId    String?
 
   /// Como se supo de que equipo o punto se trata.
   ///
@@ -3399,14 +3474,14 @@ model RondinParada {
 
   /// Lo que se dicto en la parada. De aqui sale casi todo el valor: la imagen
   /// dice como se ve, la voz dice que le preocupa a quien lo vio.
-  observacion    String?
-  createdAt      DateTime @default(now())
+  observacion String?
+  createdAt   DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  rondin       Rondin       @relation(fields: [rondinId], references: [id], onDelete: Cascade)
-  reportPoint  ReportPoint? @relation(fields: [reportPointId], references: [id])
-  asset        Asset?       @relation(fields: [assetId], references: [id])
-  location     Location?    @relation(fields: [locationId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rondin       Rondin           @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  reportPoint  ReportPoint?     @relation(fields: [reportPointId], references: [id])
+  asset        Asset?           @relation(fields: [assetId], references: [id])
+  location     Location?        @relation(fields: [locationId], references: [id])
   adjuntos     Attachment[]
   hallazgos    RondinHallazgo[]
 
@@ -3433,7 +3508,7 @@ model RondinParada {
 /// juzgar si eso esta ahi, que es la unica forma de que una persona pueda
 /// contradecir a la maquina con fundamento en vez de por corazonada.
 model RondinHallazgo {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   rondinId       String
   /// De que parada salio. Nulo si el modelo no pudo atribuirlo a ninguna.
@@ -3442,21 +3517,21 @@ model RondinHallazgo {
   assetId        String?
 
   /// FUGA | SEGURIDAD | ORDEN | DETERIORO | OBSTRUCCION | OTRO
-  categoria      String   @default("OTRO")
-  titulo         String
-  detalle        String?
+  categoria  String  @default("OTRO")
+  titulo     String
+  detalle    String?
   /// En que se basa, mirando la foto. Se separa de la conclusion a proposito.
-  baseVisual     String?
+  baseVisual String?
   /// SEGURO | PROBABLE | DUDOSO. Lo dudoso se enseña, pero se ve distinto.
-  certeza        String   @default("DUDOSO")
+  certeza    String  @default("DUDOSO")
 
   /// PROPUESTO | ACEPTADO | DESCARTADO
-  estado         String   @default("PROPUESTO")
+  estado        String    @default("PROPUESTO")
   /// La solicitud que se levanto al aceptarlo.
-  workRequestId  String?
-  resueltoPorId  String?
-  resueltoEn     DateTime?
-  createdAt      DateTime @default(now())
+  workRequestId String?
+  resueltoPorId String?
+  resueltoEn    DateTime?
+  createdAt     DateTime  @default(now())
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   rondin       Rondin        @relation(fields: [rondinId], references: [id], onDelete: Cascade)
