@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Mic, Square, Volume2, X } from "lucide-react";
+import { Check, Copy, Loader2, Mic, Square, Volume2, X } from "lucide-react";
 import { cn, sinMarcas } from "@/lib/utils";
 import { usarGrabadora } from "../usar-grabadora";
 import { ESPERA_MAXIMA_MS } from "@/lib/deteccion-voz";
@@ -69,6 +69,8 @@ export function VozNavegar() {
   const [sinVoz, setSinVoz] = useState(false);
   const enVano = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
+  /** Se acaba de copiar la respuesta. Se apaga solo. */
+  const [copiado, setCopiado] = useState(false);
 
   /**
    * Suena algo y avisa al terminar, sin dejar el estado colgado.
@@ -182,20 +184,51 @@ export function VozNavegar() {
            * siguiente, no uno nuevo.
            */
           /**
-           * Se dice ANTES de llevar, y la navegación no espera.
+           * «Vamos para allá», y se lleva EN CUANTO LA FRASE SUENA.
            *
            * Navegar y preguntar entran por el mismo botón, así que hasta que
            * la pantalla cambia no hay forma de saber cuál de las dos entendió.
-           * «Vamos para allá» lo resuelve en segundo y medio.
+           * La frase lo resuelve en segundo y medio —pero solo si llega a
+           * tiempo—.
            *
-           * El `push` va primero y el audio sigue sonando encima: el
-           * componente vive en la barra, que sobrevive a la navegación. Al
-           * revés —esperar la frase para navegar— se sentiría lento, que es
-           * justo lo que se está tratando de quitar.
+           * Las dos formas obvias están mal y las dos se probaron:
+           *
+           *   Empujar primero y hablar después anuncia un viaje que ya
+           *   ocurrió. Rafael: «primero me lleva y cuando llega dice vamos
+           *   para allá». El hueco es el que tarda en llegar el audio.
+           *
+           *   Esperar a que la frase TERMINE para empujar se siente lento,
+           *   que es justo lo que se está tratando de quitar.
+           *
+           * El momento correcto es el tercero: se empuja cuando el audio
+           * empieza a oírse, y la frase se acaba de decir ya en la pantalla
+           * nueva —el micrófono vive en la barra, que sobrevive a la
+           * navegación—.
            */
           pulso.fin();
-          router.push(d.ruta);
-          await decir(() => pedirFrase("vamos"));
+          let yaLlevo = false;
+          const llevar = () => { if (!yaLlevo) { yaLlevo = true; router.push(d.ruta); } };
+
+          /**
+           * La red de seguridad se arma ANTES de pedir el audio, no después.
+           *
+           * Estuvo después y se vio en la primera prueba: la petición de la
+           * frase se quedó colgada —la primera síntesis tarda, o el servidor
+           * no puede— y la navegación NUNCA ocurrió. Alguien dijo «llévame a
+           * catálogos» y no pasó nada.
+           *
+           * Llevar a una pantalla no puede depender de que llegue un sonido.
+           * La frase es cortesía; el viaje es la función.
+           */
+          const red = setTimeout(llevar, 1500);
+          const frase = await pedirFrase("vamos");
+          if (frase && pista && audio.current === pista) {
+            setHablando(true);
+            // Lo normal: se empuja en cuanto la frase se oye.
+            await reproducir(frase, pista, () => { clearTimeout(red); llevar(); });
+          }
+          clearTimeout(red);
+          llevar();
           cortarConversacion();
           return;
         }
@@ -281,9 +314,31 @@ export function VozNavegar() {
     setSeguido(true);
   };
 
+  /**
+   * Copiar la respuesta.
+   *
+   * Lo pidió Rafael y tiene razón: una cifra que se oye no sirve para pegarla
+   * en un correo ni para llevarla a una junta, y volver a escribirla a mano es
+   * justo donde se equivoca uno. Se copia lo ESCRITO —la respuesta entera— no
+   * lo que se dijo, que va recortado.
+   */
+  const copiar = async () => {
+    if (!respuesta) return;
+    try {
+      await navigator.clipboard.writeText(sinMarcas(respuesta.respuesta));
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Algunos navegadores no dejan copiar sin gesto directo. No es un fallo
+      // del sistema y no vale la pena un error en pantalla: el texto está ahí
+      // para seleccionarlo a mano.
+      g.setError("Este navegador no dejó copiar. Seleccione el texto a mano.");
+    }
+  };
+
   const cerrar = () => {
     cortarConversacion();
-    setFallo(null); setRespuesta(null); setSinVoz(false); g.setError(null);
+    setFallo(null); setRespuesta(null); setSinVoz(false); g.setError(null); setCopiado(false);
     if (grabando) g.detener();
     // Al cerrar se suelta el micrófono: es lo que apaga el indicador del
     // teléfono. Entre frase y frase NO se suelta, o volvería a pedir permiso.
@@ -359,11 +414,25 @@ export function VozNavegar() {
               <p className="mt-1.5 max-h-64 overflow-y-auto whitespace-pre-line text-xs leading-relaxed text-slate-800">
                 {sinMarcas(respuesta.respuesta)}
               </p>
-              {paso ? (
-                <p className="mt-2 flex items-center gap-1 border-t border-slate-100 pt-2 text-[0.625rem] text-brand-700">
-                  <Volume2 className="h-3 w-3" aria-hidden /> {grabando ? "Siga hablando, lo escucho" : paso}
-                </p>
-              ) : null}
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                {paso ? (
+                  <p className="flex min-w-0 items-center gap-1 text-[0.625rem] text-brand-700">
+                    <Volume2 className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">{grabando ? "Siga hablando, lo escucho" : paso}</span>
+                  </p>
+                ) : <span />}
+                <button
+                  type="button"
+                  onClick={() => void copiar()}
+                  title="Copiar la respuesta"
+                  aria-label="Copiar la respuesta"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[0.625rem] font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  {copiado
+                    ? <><Check className="h-3 w-3 text-emerald-600" aria-hidden /> Copiado</>
+                    : <><Copy className="h-3 w-3" aria-hidden /> Copiar</>}
+                </button>
+              </div>
             </>
           ) : (
             <>

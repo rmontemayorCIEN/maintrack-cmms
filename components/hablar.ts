@@ -79,13 +79,27 @@ export function crearLatido(ctx: AudioContext | null): { parar: () => void } {
  *
  * Devuelve si de verdad se oyo, para poder decirlo cuando no.
  */
-export function reproducir(blob: Blob, pista: HTMLAudioElement): Promise<boolean> {
+export function reproducir(
+  blob: Blob,
+  pista: HTMLAudioElement,
+  /**
+   * Cuando el audio EMPIEZA a oirse, no cuando termina.
+   *
+   * Hace falta para lo que tiene que pasar «mientras» habla y no «despues».
+   * El caso que lo pidio: «vamos para alla» antes de cambiar de pantalla.
+   * Moviendo la pantalla al terminar la frase se siente lento, y moviendola
+   * antes de empezarla se anuncia un viaje que ya ocurrio —Rafael: «ya llego y
+   * dice vamos para alla»—. Lo correcto es en cuanto suena.
+   */
+  alSonar?: () => void,
+): Promise<boolean> {
   return new Promise((listo) => {
     let cerrado = false;
     const cerrar = (ok: boolean) => { if (!cerrado) { cerrado = true; clearTimeout(reloj); listo(ok); } };
     // Red de seguridad: ningun audio del sistema dura mas de dos minutos.
     const reloj = setTimeout(() => cerrar(false), 120_000);
 
+    if (alSonar) pista.addEventListener("playing", alSonar, { once: true });
     pista.onended = () => cerrar(true);
     pista.onerror = () => cerrar(false);
     pista.src = URL.createObjectURL(blob);
