@@ -11,7 +11,26 @@ import { Loader2, Send, Sparkles } from "lucide-react";
  * contestadas NO pasan por aqui —se leen del catalogo, sin costo ni espera—;
  * esto es para lo que no esta escrito.
  */
-export function AyudaConIa({ pantalla, sugerencias }: { pantalla: string; sugerencias: string[] }) {
+export function AyudaConIa({
+  pantalla, sugerencias, termino, titulo, explica, marcador, compacto = false,
+}: {
+  pantalla: string;
+  sugerencias: string[];
+  /**
+   * El termino del glosario del que sale la pregunta.
+   *
+   * Con el, la misma conversacion queda anclada a un concepto: la respuesta
+   * amplia la definicion con los datos de quien pregunta, en vez de repetirla.
+   * Se manda la clave y el servidor busca la definicion en el catalogo.
+   */
+  termino?: string;
+  titulo?: string;
+  explica?: string;
+  /** El ejemplo dentro del campo. El de la ayuda no encaja en el glosario. */
+  marcador?: string;
+  /** Dentro de una tarjeta, sin marco propio: ya lo trae la tarjeta. */
+  compacto?: boolean;
+}) {
   const [pregunta, setPregunta] = useState("");
   const [respuesta, setRespuesta] = useState<string | null>(null);
   const [consultas, setConsultas] = useState<string[]>([]);
@@ -24,7 +43,7 @@ export function AyudaConIa({ pantalla, sugerencias }: { pantalla: string; sugere
     setCargando(true); setError(null); setRespuesta(null); setConsultas([]);
     const res = await fetch("/api/ia/ayuda", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pregunta: q, pantalla }),
+      body: JSON.stringify({ pregunta: q, pantalla, termino }),
     });
     const data = await res.json().catch(() => ({}));
     setCargando(false);
@@ -34,14 +53,15 @@ export function AyudaConIa({ pantalla, sugerencias }: { pantalla: string; sugere
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-brand-200 bg-brand-50/40 p-4">
+    <section className={compacto ? "mt-3 border-t border-slate-100 pt-3" : "mt-6 rounded-lg border border-brand-200 bg-brand-50/40 p-4"}>
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand-600" />
-        <h3 className="text-sm font-semibold text-slate-900">Pregunte lo que sea de esta pantalla</h3>
+        <h3 className="text-sm font-semibold text-slate-900">
+          {titulo ?? "Pregunte lo que sea de esta pantalla"}
+        </h3>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-slate-600">
-        Responde con la documentación del sistema y, cuando la pregunta es sobre su caso
-        —por qué su plan no genera, por qué no puede surtir algo— revisa sus datos reales.
+        {explica ?? "Responde con la documentación del sistema y, cuando la pregunta es sobre su caso —por qué su plan no genera, por qué no puede surtir algo— revisa sus datos reales."}
       </p>
 
       {sugerencias.length ? (
@@ -65,7 +85,7 @@ export function AyudaConIa({ pantalla, sugerencias }: { pantalla: string; sugere
         <input
           value={pregunta}
           onChange={(e) => setPregunta(e.target.value)}
-          placeholder="¿Por qué no me deja…?"
+          placeholder={marcador ?? "¿Por qué no me deja…?"}
           className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
         />
         <button

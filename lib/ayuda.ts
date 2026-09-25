@@ -1629,9 +1629,23 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/glossary": {
     titulo: "Glosario",
-    que: "Qué significa cada término del sistema, en el lenguaje de mantenimiento.",
-    hacer: ["Consultar un término"],
-    flujo: ["Si algo en otra pantalla no se entiende, probablemente esté aquí."],
+    que: "Qué significa cada término del sistema, y qué significa en SU planta con sus propios datos.",
+    hacer: [
+      "Consultar un término",
+      "Preguntar qué significa ese término en su operación, con sus cifras",
+    ],
+    flujo: [
+      "Si algo en otra pantalla no se entiende, probablemente esté aquí. Donde aparezcan dentro del sistema van subrayados con puntos: al tocarlos se abre la definición sin salir de la pantalla.",
+      "La definición es la misma para todos. Lo que no da ningún diccionario es el botón «Qué significa en mi planta»: ahí el sistema consulta SUS datos y le dice cómo va el suyo, qué lo está moviendo y en qué pantalla verlo. Preguntar por el MTBF, por ejemplo, contesta con su cifra, la fórmula con sus números, y los modos de falla que lo están hundiendo.",
+      "Cuando el sistema NO calcula ese indicador, lo dice y explica qué haría falta, en vez de dar una cifra parecida. El OEE necesita datos de producción —rendimiento y calidad— que un sistema de mantenimiento no captura; presentar la disponibilidad como si fuera OEE sería engañoso.",
+      "Usa la misma bolsa mensual que la ayuda con IA: es la misma conversación, anclada a un concepto en vez de a una pantalla.",
+    ],
+    botones: [
+      { nombre: "Qué significa en mi planta", explica: "Abre una pregunta sobre ese término, contestada con sus datos reales. Trae tres sugerencias que sirven para cualquier término —qué significa aquí, dónde lo veo, qué hago con él— y acepta la pregunta que usted quiera escribir." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo el botón de preguntar", porque: "Su plan no incluye la ayuda con IA, o el servidor no la tiene configurada. El glosario sigue sirviendo como glosario." },
+    ],
   },
 
   "/puesta-en-marcha": {

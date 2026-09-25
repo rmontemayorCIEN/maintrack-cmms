@@ -2,16 +2,38 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { Search, Sparkles, X } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
 import { CATEGORIAS_GLOSARIO, type TerminoGlosario } from "@/lib/glosario";
 import { cn } from "@/lib/utils";
+import { AyudaConIa } from "@/components/shell/ayuda-ia";
 
 /** Quita acentos para que "operacion" encuentre "Operación" y viceversa. */
 const normalizar = (x: string) =>
   x.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function VistaGlosario({ terminos }: { terminos: TerminoGlosario[] }) {
+/**
+ * Lo que se le puede preguntar a cualquiera de los 82 terminos.
+ *
+ * Sirven para los 82 a proposito. «¿Como va el mio?» funciona para el MTBF y
+ * no para el kardex; estas tres funcionan para todos, y son las que de verdad
+ * convierten un diccionario en algo util: que significa ESTO en MI planta,
+ * donde lo veo, y que hago con ello.
+ */
+const PREGUNTAS = [
+  "¿Qué significa esto en mi planta?",
+  "¿Dónde lo veo en el sistema?",
+  "¿Qué debería hacer con esto?",
+];
+
+export function VistaGlosario({ terminos, conIa }: { terminos: TerminoGlosario[]; conIa: boolean }) {
+  /**
+   * Solo un termino abierto a la vez.
+   *
+   * Poner la caja de preguntar en las 82 tarjetas convertiria el glosario en
+   * un muro de formularios. Se abre donde se toca.
+   */
+  const [abierto, setAbierto] = useState<string | null>(null);
   const params = useSearchParams();
   // Al llegar desde un popup con ?q=MTTR, la busqueda viene precargada.
   const [busqueda, setBusqueda] = useState(params.get("q") ?? "");
@@ -106,6 +128,32 @@ export function VistaGlosario({ terminos }: { terminos: TerminoGlosario[] }) {
                       {t.n ? <span className="text-xs text-slate-500">{t.n}</span> : null}
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{t.d}</p>
+
+                    {/* La definición es la misma para todos; lo que sigue es
+                        lo único que ningún diccionario puede dar: qué
+                        significa esto con SUS datos. */}
+                    {conIa ? (
+                      abierto === t.t ? (
+                        <AyudaConIa
+                          pantalla="/glossary"
+                          termino={t.t}
+                          sugerencias={PREGUNTAS}
+                          compacto
+                          titulo={`«${t.t}» en su planta`}
+                          explica="Amplía la definición con sus propios datos: cómo va el suyo, dónde se ve y qué hacer con él. Si el sistema no calcula ese número, lo dice."
+                          marcador={`¿…sobre ${t.t}?`}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAbierto(t.t)}
+                          className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-700 transition hover:border-brand-400 hover:bg-brand-50"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                          Qué significa en mi planta
+                        </button>
+                      )
+                    ) : null}
                   </Card>
                 ))}
               </div>
