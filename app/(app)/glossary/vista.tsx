@@ -7,6 +7,8 @@ import { Card, EmptyState } from "@/components/ui";
 import { CATEGORIAS_GLOSARIO, type TerminoGlosario } from "@/lib/glosario";
 import { cn } from "@/lib/utils";
 import { AyudaConIa } from "@/components/shell/ayuda-ia";
+import { SIN_CIFRA, type CifraDeTermino } from "@/lib/glosario-cifras";
+import { formatNumber } from "@/lib/utils";
 
 /** Quita acentos para que "operacion" encuentre "Operación" y viceversa. */
 const normalizar = (x: string) =>
@@ -26,7 +28,16 @@ const PREGUNTAS = [
   "¿Qué debería hacer con esto?",
 ];
 
-export function VistaGlosario({ terminos, conIa }: { terminos: TerminoGlosario[]; conIa: boolean }) {
+export function VistaGlosario({
+  terminos, conIa, cifras, periodo,
+}: {
+  terminos: TerminoGlosario[];
+  conIa: boolean;
+  /** La cifra de la propia empresa, para los términos que tienen una. */
+  cifras: Record<string, CifraDeTermino>;
+  /** El periodo del que salen esas cifras. Sin él, un número no dice nada. */
+  periodo: string | null;
+}) {
   /**
    * Solo un termino abierto a la vez.
    *
@@ -129,6 +140,8 @@ export function VistaGlosario({ terminos, conIa }: { terminos: TerminoGlosario[]
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{t.d}</p>
 
+                    <SuCifra termino={t.t} cifra={cifras[t.t]} periodo={periodo} />
+
                     {/* La definición es la misma para todos; lo que sigue es
                         lo único que ningún diccionario puede dar: qué
                         significa esto con SUS datos. */}
@@ -162,5 +175,72 @@ export function VistaGlosario({ terminos, conIa }: { terminos: TerminoGlosario[]
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * La cifra de la empresa para este termino, si la hay.
+ *
+ * Tres estados, y los tres dicen algo:
+ *
+ *   Hay cifra      -> el numero, su periodo y el calculo con sus propios
+ *                     datos. El calculo no es adorno: es lo que hace que
+ *                     alguien le crea al numero sin ir a verificarlo.
+ *   Hay indicador
+ *   pero sin dato  -> el motivo que da el propio calculo —«sin fallas en el
+ *                     periodo»—, no un cero, que se leeria como un resultado.
+ *   No se calcula  -> se dice, y se dice que haria falta. Es el caso del OEE,
+ *                     y callarlo dejaria a alguien buscando en Reportes un
+ *                     numero que no existe.
+ *
+ * Cuando el termino no es un indicador —«kardex», «criticidad»— no se enseña
+ * nada: ahi la definicion se basta.
+ */
+function SuCifra({
+  termino, cifra, periodo,
+}: {
+  termino: string;
+  cifra?: CifraDeTermino;
+  periodo: string | null;
+}) {
+  const noSeCalcula = SIN_CIFRA[termino];
+
+  if (!cifra && !noSeCalcula) return null;
+
+  if (noSeCalcula) {
+    return (
+      <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2">
+        <p className="text-[0.6875rem] font-medium text-amber-900">Este no se calcula en MainTrack</p>
+        <p className="mt-0.5 text-[0.6875rem] leading-snug text-amber-800">{noSeCalcula}</p>
+      </div>
+    );
+  }
+
+  if (cifra!.valor === null) {
+    return (
+      <div className="mt-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="text-[0.6875rem] text-slate-600">
+          <span className="font-medium">Su cifra:</span> {cifra!.sinValor ?? "no se pudo calcular en este periodo."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[0.6875rem] font-medium text-slate-600">Su cifra</span>
+        <span className="text-sm font-semibold tabular-nums text-brand-800">
+          {formatNumber(cifra!.valor, cifra!.unidad === "%" ? 1 : cifra!.unidad === "ordenes" ? 0 : 1)}
+          {cifra!.unidad === "%" ? "%" : cifra!.unidad === "ordenes" ? "" : ` ${cifra!.unidad}`}
+        </span>
+      </div>
+      {periodo ? <p className="mt-0.5 text-[0.625rem] text-slate-500">{periodo}</p> : null}
+      {/* El cálculo con sus propios números: es lo que separa un dato de una
+          afirmación. El mismo que abre cada tarjeta en Reportes. */}
+      <p className="mt-1 border-t border-brand-200/60 pt-1 text-[0.625rem] leading-snug text-slate-500">
+        {cifra!.calculo}
+      </p>
+    </div>
   );
 }

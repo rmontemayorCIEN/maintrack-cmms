@@ -1636,6 +1636,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Si algo en otra pantalla no se entiende, probablemente esté aquí. Donde aparezcan dentro del sistema van subrayados con puntos: al tocarlos se abre la definición sin salir de la pantalla.",
+      "Los términos que el sistema calcula traen SU cifra ahí mismo, con el periodo y la cuenta hecha con sus propios números —el MTBF dice «2,323 h» y debajo «(30,240 h − 39.1 h) ÷ 13 fallas»—. Es la misma cifra de Reportes, del mismo periodo: dos números distintos para lo mismo sería peor que no enseñar ninguno.",
+      "Las cifras solo las ve quien puede abrir Indicadores. Para los demás la definición sale completa; lo que falta es el número, no el concepto.",
       "La definición es la misma para todos. Lo que no da ningún diccionario es el botón «Qué significa en mi planta»: ahí el sistema consulta SUS datos y le dice cómo va el suyo, qué lo está moviendo y en qué pantalla verlo. Preguntar por el MTBF, por ejemplo, contesta con su cifra, la fórmula con sus números, y los modos de falla que lo están hundiendo.",
       "Cuando el sistema NO calcula ese indicador, lo dice y explica qué haría falta, en vez de dar una cifra parecida. El OEE necesita datos de producción —rendimiento y calidad— que un sistema de mantenimiento no captura; presentar la disponibilidad como si fuera OEE sería engañoso.",
       "Usa la misma bolsa mensual que la ayuda con IA: es la misma conversación, anclada a un concepto en vez de a una pantalla.",

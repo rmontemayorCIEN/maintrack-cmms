@@ -38,18 +38,31 @@ export const TIPOS_PROGRAMADOS = ["PREVENTIVE", "INSPECTION"] as const;
 /** Apoyos a produccion: no son mantenimiento planeado ni falla. */
 export const TIPOS_FUERA_DE_MANTENIMIENTO = ["SUPPORT"] as const;
 
-export type ClaveIndicador =
-  | "paroTotal"
-  | "paroNoPlaneado"
-  | "paroPlaneado"
-  | "disponibilidad"
-  | "mttr"
-  | "mtbf"
-  | "cumplimientoPreventivo"
-  | "tiempoRespuesta"
-  | "trabajoPlanificado"
-  | "backlog"
-  | "costoMantenimiento";
+/**
+ * Los indicadores que el sistema calcula, en una lista que existe en
+ * EJECUCION y no solo en los tipos.
+ *
+ * Era una union de tipos, que se borra al compilar. El glosario necesita
+ * comprobar que sus claves apuntan a indicadores reales, y una comprobacion
+ * asi no se puede hacer contra algo que no existe en ejecucion: se quedaria
+ * en «compila», que es justo lo que no basta cuando lo que une dos listas es
+ * una cadena de texto.
+ */
+export const CLAVES_INDICADOR = [
+  "paroTotal",
+  "paroNoPlaneado",
+  "paroPlaneado",
+  "disponibilidad",
+  "mttr",
+  "mtbf",
+  "cumplimientoPreventivo",
+  "tiempoRespuesta",
+  "trabajoPlanificado",
+  "backlog",
+  "costoMantenimiento",
+] as const;
+
+export type ClaveIndicador = (typeof CLAVES_INDICADOR)[number];
 
 export type Renglon = {
   /** Id de la orden o del evento de paro. */
