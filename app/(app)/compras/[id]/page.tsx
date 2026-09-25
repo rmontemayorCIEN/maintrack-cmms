@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -272,6 +273,13 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
             )}
           </Card>
         </div>
+      </div>
+
+      {/* Aquí es donde se dan los acuerdos que no son una orden:
+          «cotiza con tres proveedores», «revisa la frecuencia con
+          producción». */}
+      <div className="mt-4">
+        <Compromisos entidad="PurchaseRequest" entidadId={compra.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

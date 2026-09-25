@@ -114,6 +114,45 @@ async function main() {
     revisar("poner de responsable a alguien de otra empresa lo deja sin responsable", sinResponsable.ok);
     revisar("   y no le avisa", (await prisma.notification.count({ where: { userId: b.tec.id } })) === 0);
 
+    console.log("\nCada anclaje respeta el permiso de SU pantalla\n");
+    /**
+     * Compras y planes se agregaron despues, a peticion de Rafael, y es justo
+     * donde una pantalla nueva puede abrir una puerta trasera: colgar algo de
+     * una compra que ese rol no puede abrir seria una forma de averiguar que
+     * existe. Se comprueba, no se supone.
+     */
+    const almacen = await prisma.warehouse.create({
+      data: { organization: { connect: { id: a.org.id } }, code: "ALM-1", name: "Almacén" },
+    });
+    const compra = await prisma.purchaseRequest.create({
+      data: {
+        organization: { connect: { id: a.org.id } },
+        warehouse: { connect: { id: almacen.id } },
+        folio: `RQ-${sello.slice(-4)}`,
+      },
+    });
+    const plan = await prisma.maintenancePlan.create({
+      data: {
+        organization: { connect: { id: a.org.id } },
+        asset: { connect: { id: a.activo.id } },
+        name: "Plan de prueba",
+      },
+    });
+
+    for (const [rol, entidad, id, debe] of [
+      ["COMPRAS", "PurchaseRequest", compra.id, true],
+      ["TECHNICIAN", "PurchaseRequest", compra.id, false],
+      ["SUPERVISOR", "MaintenancePlan", plan.id, true],
+      ["COMPRAS", "MaintenancePlan", plan.id, false],
+    ] as const) {
+      const r = await registroAnclable(a.org.id, rol, entidad, id);
+      revisar(`${rol} ${debe ? "SÍ" : "NO"} puede colgar algo de ${entidad}`,
+        r.ok === debe, r.ok ? r.comoSeLlama : r.motivo);
+    }
+
+    const deOtra = await registroAnclable(b.org.id, "OWNER", "PurchaseRequest", compra.id);
+    revisar("   y la compra de otra empresa sigue cerrada", !deOtra.ok);
+
     console.log("\nEl catálogo de anclajes\n");
     revisar("hay más lugares que los cuatro del principio", ENTIDADES_ANCLABLES.length >= 8, ENTIDADES_ANCLABLES.join(" "));
     const todos = await Promise.all(ENTIDADES_ANCLABLES.map((e) => registroAnclable(a.org.id, "OWNER", e, "noExiste")));
@@ -122,6 +161,8 @@ async function main() {
   } finally {
     for (const org of [a.org, b.org]) {
       await prisma.compromiso.deleteMany({ where: { organizationId: org.id } });
+      await prisma.maintenancePlan.deleteMany({ where: { organizationId: org.id } });
+      await prisma.purchaseRequest.deleteMany({ where: { organizationId: org.id } });
       await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
       await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     }

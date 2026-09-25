@@ -733,6 +733,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Cada actividad tiene su propia fecha, contada desde la última vez que se hizo ESA actividad en ESE equipo. Al asignar el plan usted dice cuándo se hizo por última vez o desde cuándo arranca; después manda el historial. Si el aceite se cambió fuera de ciclo porque la máquina ya estaba abierta, solo ese calendario se recorre.",
       "«Mensual» no es lo mismo que «cada 30 días»: doce veces treinta días se corren cinco al año. Y si en Configuración → Órdenes de trabajo eligió contar en días hábiles, «cada 15 días» son 15 días de trabajo, saltando los que su empresa no labora. Eso aplica solo a los intervalos en días; un trimestre son tres meses siempre.",
       "Las actividades que caen cerca salen en UNA sola orden: el técnico va una vez y hace todo lo que toca. Qué tan cerca lo decide «cuánto se puede adelantar un preventivo», en Configuración. La ventana siempre adelanta, nunca retrasa: nada se difiere por acompañar a otra cosa.",
+      "Abajo hay COMPROMISOS: lo que se acordó aquí y no es una orden de trabajo —cotizar con tres proveedores, revisar una frecuencia con producción, hablar con alguien—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
 ],
     tablaConfigurable: true,
     campos: [
@@ -1083,6 +1084,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Debajo del monto de autorización que tenga configurado su empresa, la requisición nace autorizada y lo dice; de ahí para arriba necesita firma, y sin firma no se puede colocar.",
       "La recepción admite parciales y no se puede recibir más de lo pedido. Si el mismo recibo se envía dos veces —doble clic, reintento— el material entra una sola vez.",
       "Mientras una compra siga viva, el almacén marca esa refacción como «Ya pedida» para que no se vuelva a comprar por mínimo.",
+      "Abajo hay COMPROMISOS: lo que se acordó aquí y no es una orden de trabajo —cotizar con tres proveedores, revisar una frecuencia con producción, hablar con alguien—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
     ],
     tablaConfigurable: true,
     campos: [

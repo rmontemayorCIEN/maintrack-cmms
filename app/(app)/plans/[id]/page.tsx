@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarClock, Gauge } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -262,6 +263,13 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
             </Plegable>
           </Card>
         </div>
+      </div>
+
+      {/* Aquí es donde se dan los acuerdos que no son una orden:
+          «cotiza con tres proveedores», «revisa la frecuencia con
+          producción». */}
+      <div className="mt-4">
+        <Compromisos entidad="MaintenancePlan" entidadId={plan.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );
