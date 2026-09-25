@@ -168,12 +168,42 @@ async function main() {
         r.ok === debe, r.ok ? r.comoSeLlama : r.motivo);
     }
 
+    const conjunto = await prisma.conjunto.create({
+      data: { organization: { connect: { id: a.org.id } }, code: `CJ-${sello.slice(-4)}`, name: "Línea de prueba" },
+    });
+    for (const [rol, debe] of [["SUPERVISOR", true], ["COMPRAS", false]] as const) {
+      const r = await registroAnclable(a.org.id, rol, "Conjunto", conjunto.id);
+      revisar(`${rol} ${debe ? "SÍ" : "NO"} puede colgar algo de Conjunto`, r.ok === debe,
+        r.ok ? r.comoSeLlama : r.motivo);
+    }
+
     const deOtra = await registroAnclable(b.org.id, "OWNER", "PurchaseRequest", compra.id);
     revisar("   y la compra de otra empresa sigue cerrada", !deOtra.ok);
 
     console.log("\nEl catálogo de anclajes\n");
     revisar("hay más lugares que los cuatro del principio", ENTIDADES_ANCLABLES.length >= 8, ENTIDADES_ANCLABLES.join(" "));
     const todos = await Promise.all(ENTIDADES_ANCLABLES.map((e) => registroAnclable(a.org.id, "OWNER", e, "noExiste")));
+    /**
+     * Las nueve entidades del catalogo tienen su tarjeta puesta en la pantalla
+     * que les toca. Sin esto, agregar una al catalogo y olvidar conectarla
+     * pasa desapercibido: la funcion existe, el permiso existe, y nadie la ve.
+     */
+    const { readFileSync } = await import("node:fs");
+    const PANTALLA_DE: Record<string, string> = {
+      WorkOrder: "work-orders/[id]", Asset: "assets/[id]", WorkRequest: "requests/[id]",
+      MaterialRequest: "requisiciones/[id]", PurchaseRequest: "compras/[id]",
+      MaintenancePlan: "plans/[id]", Rondin: "rondines/[id]", Conjunto: "conjuntos/[id]",
+      Part: "inventory/[id]",
+    };
+    const sinConectar = ENTIDADES_ANCLABLES.filter((e) => {
+      try {
+        const txt = readFileSync(`app/(app)/${PANTALLA_DE[e]}/page.tsx`, "utf8");
+        return !txt.includes(`entidad="${e}"`);
+      } catch { return true; }
+    });
+    revisar("las nueve entidades del catálogo están conectadas a su pantalla",
+      sinConectar.length === 0, sinConectar.join(" "));
+
     revisar("   y todos responden que el registro no existe, no revientan",
       todos.every((t) => !t.ok && /no existe/.test(t.motivo)));
   } finally {
@@ -181,6 +211,7 @@ async function main() {
       await prisma.compromiso.deleteMany({ where: { organizationId: org.id } });
       await prisma.maintenancePlan.deleteMany({ where: { organizationId: org.id } });
       await prisma.rondin.deleteMany({ where: { organizationId: org.id } });
+      await prisma.conjunto.deleteMany({ where: { organizationId: org.id } });
       await prisma.part.deleteMany({ where: { organizationId: org.id } });
       await prisma.purchaseRequest.deleteMany({ where: { organizationId: org.id } });
       await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });

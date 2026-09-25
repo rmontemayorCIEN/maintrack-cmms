@@ -1400,6 +1400,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El mismo acomodo se ve de tres maneras: «cómo está ahora» (el estado vivo de cada equipo), «lo que costó» (horas de paro y dinero, con su periodo) y «lo que trae pendiente» (planes vencidos y órdenes abiertas). Cruzado con el filtro de familia, cada combinación es la pregunta de alguien: solo compresores + cómo están ahora es la mañana del jefe de mantenimiento; solo bombas + lo que costó es su junta de presupuesto.",
       "En el lienzo, si su línea es una cadena, acomódela de izquierda a derecha: el dibujo dice el orden sin que el sistema guarde ninguna secuencia. El mismo equipo puede estar en varios grupos y tiene una posición distinta en cada lienzo — acomodar uno no mueve los demás.",
       "Dos equipos nunca quedan encimados. Si suelta uno sobre otro se intercambian de lugar; si cae sobre varios, se va al primer hueco libre.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo. Un sistema lo miran varias áreas a la vez, así que aquí es donde se apunta quién hace qué —«producción confirma la ventana», «eléctrico revisa el arrancador»— con responsable y fecha, y un aviso que se cierra solo al marcarlo hecho.",
     ],
     botones: [
       {
