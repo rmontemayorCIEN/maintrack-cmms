@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -141,6 +142,12 @@ export default async function RondinPage({ params }: { params: Promise<{ id: str
           ))}
         </div>
       )}
+
+      {/* De un hallazgo del recorrido sale trabajo que no siempre es una
+          orden: «avisarle a producción», «pedir la refacción». */}
+      <div className="mt-4">
+        <Compromisos entidad="Rondin" entidadId={rondin.id} yo={user.id} zona={user.organization.timezone} />
+      </div>
     </div>
   );
 }

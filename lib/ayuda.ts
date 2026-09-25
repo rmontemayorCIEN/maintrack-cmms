@@ -286,6 +286,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo que no se ve en una foto no se dice: vibración, ruido, temperatura o el estado interno de una máquina no salen en una imagen. Y una lista vacía es una respuesta correcta: significa que el área se ve bien.",
       "Volver a revisar reemplaza las propuestas pendientes, pero respeta lo que usted ya aceptó o descartó: eso es una decisión suya y no se borra por volver a preguntarle a la máquina.",
       "En cada parada queda registrado CÓMO se supo de qué equipo era. Una identificada por su código vale distinto que una deducida de lo que se oyó, y quien lo lea un mes después tiene derecho a saberlo.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo —avisarle a producción, conseguir un equivalente, pedir una cotización—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
     ],
     botones: [
       { nombre: "Empezar recorrido", explica: "Abre un recorrido nuevo. Si ya tenía uno a medias, lo continúa en vez de abrir otro." },
@@ -866,6 +867,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "La existencia baja sola cuando se surte una requisición o se consume en una orden de trabajo.",
       "Sube cuando se recibe una compra o cuando alguien devuelve lo que no usó.",
       "Cada uno de esos movimientos queda en el kardex con el documento que lo originó.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo —avisarle a producción, conseguir un equivalente, pedir una cotización—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
     ],
     tablaConfigurable: true,
     campos: [

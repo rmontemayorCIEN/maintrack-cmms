@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -321,6 +322,11 @@ export default async function RefaccionPage({ params }: { params: Promise<{ id: 
             ayuda="La ficha del fabricante, la foto de la pieza o la cotización: lo que ayude a pedir la correcta."
           />
         </div>
+      </div>
+
+      {/* «Consigue el equivalente», «pide cotización de este número». */}
+      <div className="mt-4">
+        <Compromisos entidad="Part" entidadId={parte.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

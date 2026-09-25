@@ -150,6 +150,24 @@ async function main() {
         r.ok === debe, r.ok ? r.comoSeLlama : r.motivo);
     }
 
+    // Rondines y refacciones, los últimos dos que se conectaron.
+    const rondin = await prisma.rondin.create({
+      data: { organization: { connect: { id: a.org.id } }, numero: `RD-${sello.slice(-4)}` },
+    });
+    const refa = await prisma.part.create({
+      data: { organization: { connect: { id: a.org.id } }, code: `REF-${sello.slice(-4)}`, name: "Sello mecánico" },
+    });
+    for (const [rol, entidad, id, debe] of [
+      ["TECHNICIAN", "Rondin", rondin.id, true],
+      ["COMPRAS", "Rondin", rondin.id, false],
+      ["COMPRAS", "Part", refa.id, true],
+      ["REQUESTER", "Part", refa.id, false],
+    ] as const) {
+      const r = await registroAnclable(a.org.id, rol, entidad, id);
+      revisar(`${rol} ${debe ? "SÍ" : "NO"} puede colgar algo de ${entidad}`,
+        r.ok === debe, r.ok ? r.comoSeLlama : r.motivo);
+    }
+
     const deOtra = await registroAnclable(b.org.id, "OWNER", "PurchaseRequest", compra.id);
     revisar("   y la compra de otra empresa sigue cerrada", !deOtra.ok);
 
@@ -162,6 +180,8 @@ async function main() {
     for (const org of [a.org, b.org]) {
       await prisma.compromiso.deleteMany({ where: { organizationId: org.id } });
       await prisma.maintenancePlan.deleteMany({ where: { organizationId: org.id } });
+      await prisma.rondin.deleteMany({ where: { organizationId: org.id } });
+      await prisma.part.deleteMany({ where: { organizationId: org.id } });
       await prisma.purchaseRequest.deleteMany({ where: { organizationId: org.id } });
       await prisma.workOrder.deleteMany({ where: { organizationId: org.id } });
       await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
