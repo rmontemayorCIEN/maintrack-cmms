@@ -303,6 +303,8 @@ model Organization {
   downtimeEvents     DowntimeEvent[]
   resumenInicio      ResumenInicio?
   comentarios        Comentario[]
+  observadores       Observador[]
+  compromisos        Compromiso[]
 }
 
 model User {
@@ -402,6 +404,9 @@ model User {
   conjuntosACargo      Conjunto[]              @relation("ConjuntoResponsable")
   comentarios          Comentario[]
   menciones            ComentarioMencion[]
+  observa              Observador[]
+  compromisos          Compromiso[]            @relation("CompromisoResponsable")
+  compromisosCreados   Compromiso[]            @relation("CompromisoAutor")
 
   @@index([organizationId])
 }
@@ -1328,6 +1333,91 @@ model WorkOrderComment {
 /// comentario se borra con su registro. Un identificador suelto deja
 /// conversaciones huerfanas de ordenes que ya no existen, y nadie las va a ir
 /// a limpiar.
+/// Quien pidio enterarse de lo que pase con un registro.
+///
+/// «Avisame lo que pase con esta orden», sin ser el responsable ni el
+/// solicitante. Hoy eso se resuelve pidiendole a alguien «me avisas», que es
+/// justo el compromiso que se queda en el aire.
+///
+/// ── Por que `entidad` + `entidadId` y no llaves de verdad ──
+///
+/// Al reves que en `Comentario`. Aqui la forma la manda `emitirAviso`, que es
+/// donde se resuelve a quien se avisa y que trabaja con esas dos cadenas para
+/// CUALQUIER tipo de registro —orden, compra, medidor, sensor—. Con llaves por
+/// tipo habria que tocar el emisor cada vez que se quiera observar algo nuevo,
+/// y observar se vuelve util justamente cuando sirve para todo.
+///
+/// El precio es que un registro borrado deja su observador colgando. No hace
+/// daño —nunca vuelve a coincidir— y se limpia al soltar la organizacion.
+model Observador {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// Como la nombra `emitirAviso`: WorkOrder, WorkRequest, PurchaseRequest...
+  entidad        String
+  entidadId      String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entidad, entidadId])
+  @@index([organizationId, entidad, entidadId])
+}
+
+/// Lo que alguien se comprometio a hacer y no cabe en una orden de trabajo.
+///
+/// ── Por que no es una orden ──
+///
+/// «Cotiza el motor con tres proveedores», «habla con seguridad por el
+/// permiso», «manda el reporte al corporativo». No tienen activo, ni falla, ni
+/// refacciones, ni cierre tecnico: meterlos como orden ensuciaria los
+/// indicadores de mantenimiento con trabajo que no lo es.
+///
+/// ── Y por que NO es una segunda lista de pendientes ──
+///
+/// Una orden de trabajo YA es una tarea con responsable, fecha y avance. Esto
+/// es a proposito lo mas chico posible —un texto, un responsable, una fecha y
+/// tres estados— y nace SIEMPRE colgado de un registro. Un compromiso suelto
+/// se pierde igual que el mensaje que venia a sustituir.
+///
+/// ── Por que `entidad` + `entidadId` y no llaves por tipo ──
+///
+/// Al reves que `Comentario`, y a peticion de Rafael: «los compromisos puedes
+/// ponerlos en mas lugares porque es donde se da el momento». Con una llave
+/// por tipo, cada lugar nuevo seria una columna y una migracion; asi es un
+/// renglon en `lib/anclas.ts` y nada mas.
+///
+/// El precio es que no hay borrado en cascada. Se paga a proposito: un
+/// compromiso es un acuerdo entre personas, y si el registro donde nacio
+/// desaparece, lo que acordaron sigue existiendo. La pantalla dice que el
+/// registro ya no esta en vez de esconder el compromiso.
+model Compromiso {
+  id             String    @id @default(cuid())
+  organizationId String
+  texto          String
+  responsableId  String?
+  creadoPorId    String?
+  /// ABIERTO | HECHO | CANCELADO
+  estado         String    @default("ABIERTO")
+  paraCuando     DateTime?
+  cerradoEl      DateTime?
+  createdAt      DateTime  @default(now())
+
+  /// De donde salio. Como la nombra `emitirAviso`: WorkOrder, Asset,
+  /// PurchaseRequest... La lista de las que valen esta en `lib/anclas.ts`.
+  entidad   String
+  entidadId String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsable  User?        @relation("CompromisoResponsable", fields: [responsableId], references: [id])
+  creadoPor    User?        @relation("CompromisoAutor", fields: [creadoPorId], references: [id])
+
+  @@index([organizationId, entidad, entidadId])
+  @@index([organizationId, estado])
+  @@index([responsableId, estado])
+}
+
 model Comentario {
   id             String    @id @default(cuid())
   organizationId String

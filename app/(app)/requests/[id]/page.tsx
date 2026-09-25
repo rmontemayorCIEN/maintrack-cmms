@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
 import { Comentarios } from "@/components/comentarios";
 import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { notFound } from "next/navigation";
@@ -249,6 +250,11 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           suelto donde se pierde en veinte minutos. */}
       <div className="mt-4">
         <Comentarios ancla="workRequest" anclaId={solicitud.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la solicitud" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="WorkRequest" entidadId={solicitud.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

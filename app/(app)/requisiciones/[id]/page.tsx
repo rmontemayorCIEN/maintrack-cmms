@@ -1,4 +1,5 @@
 import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
+import { Compromisos } from "@/components/compromisos";
 import { Comentarios } from "@/components/comentarios";
 import { cubiertoPorCompras } from "@/lib/compras";
 import Link from "next/link";
@@ -307,6 +308,11 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
           suelto donde se pierde en veinte minutos. */}
       <div className="mt-4">
         <Comentarios ancla="materialRequest" anclaId={req.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la requisición" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="MaterialRequest" entidadId={req.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

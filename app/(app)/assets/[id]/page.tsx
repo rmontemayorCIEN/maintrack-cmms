@@ -1,4 +1,5 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { Compromisos } from "@/components/compromisos";
 import { Comentarios } from "@/components/comentarios";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { filtroDeFalla } from "@/lib/fallas";
@@ -594,6 +595,11 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           suelto donde se pierde en veinte minutos. */}
       <div className="mt-4">
         <Comentarios ancla="asset" anclaId={asset.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación del equipo" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="Asset" entidadId={asset.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

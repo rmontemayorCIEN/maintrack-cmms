@@ -260,11 +260,40 @@ const ordenCompraVencida: Evaluador = cadaUno(
   },
 );
 
+/**
+ * El compromiso: se cierra solo cuando se marca hecho o cancelado.
+ *
+ * Es lo que lo distingue de una mencion —que no tiene condicion que se pueda
+ * calcular— y lo que hace que la promesa deje de estar en el aire: el aviso no
+ * se va hasta que alguien lo resuelve, y cuando lo resuelve se va solo.
+ */
+const compromiso: Evaluador = cadaUno(
+  (c, x) => porId(prisma.compromiso.findMany({
+    where: { organizationId: c.organizationId, id: { in: x } },
+    select: { id: true, estado: true },
+  })),
+  (r) => {
+    if (!r) return resuelto("Ya no existe", "El compromiso se eliminó", "Eliminación");
+    if (r.estado === "HECHO") return resuelto("Hecho", "El compromiso se marcó como hecho", "Compromiso hecho");
+    if (r.estado === "CANCELADO") return resuelto("Cancelado", "El compromiso se canceló", "Cancelación");
+    return sigue("Abierto");
+  },
+);
+
 // ─────────────────────────────────────────── El registro de reglas
 
 type Clave = TipoEvento | `esc:${ClaveRegla}`;
 
 export const REGLAS_DE_AVISO: Partial<Record<Clave, ReglaDeAviso>> = {
+  COMPROMISO_ASIGNADO: {
+    condicion: "Compromiso abierto a su nombre",
+    nace: "Cuando alguien le anota algo a su nombre en un registro.",
+    permanece: "Mientras siga abierto.",
+    actualiza: "No cambia: si cambia lo que hay que hacer, se anota otro.",
+    escala: "No escala: es un acuerdo entre dos personas, no una orden de trabajo.",
+    atiende: "Al marcarse hecho o cancelado, o si el compromiso se elimina.",
+    evaluar: compromiso,
+  },
   OT_ASIGNADA: {
     condicion: "OT asignada sin iniciar",
     nace: "Al asignarse la orden a una persona.", permanece: "Mientras esa persona siga a cargo y no la inicie.",

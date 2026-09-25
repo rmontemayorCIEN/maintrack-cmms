@@ -96,6 +96,19 @@ export const EVENTOS = {
     destinatarios: [["USUARIO_AFECTADO"]], quien: "La persona mencionada, y nadie más.", webhook: false,
   }),
 
+  /**
+   * Un compromiso asignado SI pide accion, al reves que la mencion.
+   *
+   * Aqui si hay condicion que se resuelve sola: el compromiso pasa a HECHO o
+   * CANCELADO. Es exactamente lo que distingue a los avisos que quedan
+   * pendientes de los que solo informan.
+   */
+  COMPROMISO_ASIGNADO: d({
+    titulo: "Le dejaron un compromiso", descripcion: "Alguien anotó algo a su nombre en una orden, un activo, una solicitud o una requisición.",
+    modulo: "COMENTARIOS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: true,
+    destinatarios: [["USUARIO_AFECTADO"]], quien: "El responsable del compromiso.", webhook: false,
+  }),
+
   // ───────────────────────────────────────────── Órdenes de trabajo
   OT_ASIGNADA: d({
     titulo: "OT asignada", descripcion: "Le asignan una orden de trabajo.",

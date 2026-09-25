@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Loader2, MessageSquare, Send, Trash2 } from "lucide-react";
+import { AtSign, Bell, BellOff, Loader2, MessageSquare, Send, Trash2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui";
 // De `comentarios-tipos`, NO de `comentarios`: ese importa Prisma, y aquí
 // estamos en el navegador.
@@ -71,6 +71,8 @@ export function Comentarios({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [eligiendo, setEligiendo] = useState(false);
+  /** Si yo pedí enterarme de lo que pase con este registro. */
+  const [observando, setObservando] = useState<boolean | null>(null);
   const campo = useRef<HTMLTextAreaElement | null>(null);
 
   async function traer() {
@@ -90,6 +92,36 @@ export function Comentarios({
 
   useEffect(() => { void traer(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ancla, anclaId]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await fetch(`/api/observadores?ancla=${ancla}&anclaId=${encodeURIComponent(anclaId)}`);
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) setObservando(Boolean(d.observa));
+      } catch { /* sin esto solo falta el botón; la conversación sigue */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ancla, anclaId]);
+
+  /**
+   * «Avíseme lo que pase con esto.»
+   *
+   * No es lo mismo que comentar: uno se apunta para enterarse aunque no sea el
+   * responsable ni el solicitante. Hoy eso se pide de palabra —«me avisas»— y
+   * es justo el compromiso que se queda en el aire.
+   */
+  async function alternarObservar() {
+    const antes = observando;
+    setObservando(!antes);
+    const r = await fetch("/api/observadores", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ancla, anclaId }),
+    });
+    if (!r.ok) { setObservando(antes); setError("No se pudo cambiar el aviso."); return; }
+    const d = await r.json().catch(() => ({}));
+    setObservando(Boolean(d.observa));
+  }
 
   /**
    * Mencionar mete el nombre en el texto Y guarda el identificador.
@@ -142,6 +174,24 @@ export function Comentarios({
       <CardHeader
         title={titulo}
         subtitle="Lo que se hable aquí queda con este registro. Mencione a alguien con @ y le llega un aviso."
+        action={
+          observando === null ? null : (
+            <button
+              type="button"
+              onClick={() => void alternarObservar()}
+              title={observando ? "Dejar de recibir avisos de este registro" : "Avisarme lo que pase aquí"}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+                observando
+                  ? "border-brand-300 bg-brand-50 text-brand-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              {observando ? <Bell className="h-3.5 w-3.5" aria-hidden /> : <BellOff className="h-3.5 w-3.5" aria-hidden />}
+              {observando ? "Me avisan" : "Avísenme"}
+            </button>
+          )
+        }
       />
 
       {cargando ? (
