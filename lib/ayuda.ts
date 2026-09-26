@@ -1740,6 +1740,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Elegir qué avisos le llegan y por dónde; y, si administra, cómo avisa la empresa: canales, horario, resúmenes, recordatorios y escalamiento",
       "Crear credenciales de API y webhooks para otros sistemas, y revisar el historial de entregas",
       "Poner a la mano las pantallas que usa a diario, hasta arriba de su menú",
+      "Plegar la columna del menú con el botón de junto al logotipo, para ganar ancho en el tablero, el calendario o los reportes",
       "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [

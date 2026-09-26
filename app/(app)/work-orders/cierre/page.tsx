@@ -23,11 +23,23 @@ export const metadata = { title: "Qué falta para cerrar" };
 export default async function CierrePage({
   searchParams,
 }: {
-  searchParams: Promise<{ f?: string }>;
+  searchParams: Promise<{ f?: string; cerradas?: string }>;
 }) {
-  const { f } = await searchParams;
+  const { f, cerradas } = await searchParams;
   const user = await requireUser();
-  const { filas, listas, conPendientes } = await tableroDeCierre(user.organizationId);
+  /*
+   * Las cerradas NO entran por omision: en una planta son miles contra
+   * decenas de abiertas y ahogarian justo lo que este tablero vino a
+   * resolver. Pero se pueden pedir: reabrir una para complementarla es un
+   * caso real, y hoy encontrarlas obligaba a ir a Calidad de captura, que es
+   * un diagnostico de la cuenta y no una lista de trabajo.
+   */
+  const verCerradas = cerradas === "1";
+  const { filas, listas, conPendientes } = await tableroDeCierre(user.organizationId, {
+    estados: verCerradas
+      ? ["COMPLETED", "IN_PROGRESS", "ON_HOLD", "CLOSED"]
+      : ["COMPLETED", "IN_PROGRESS", "ON_HOLD"],
+  });
 
   return (
     <div className="grid gap-5">
@@ -57,9 +69,25 @@ export default async function CierrePage({
             />
           </Link>
           <Stat label="Con algo pendiente" value={String(conPendientes)} tone={conPendientes ? "warn" : "good"} />
-          <Stat label="En el tablero" value={String(filas.length)} hint="Completadas, en proceso y en espera" />
+          <Stat
+            label="En el tablero"
+            value={String(filas.length)}
+            hint={verCerradas ? "Incluyendo las ya cerradas" : "Completadas, en proceso y en espera"}
+          />
         </div>
       ) : null}
+
+      <p className="-mt-2 text-xs text-slate-600">
+        <Link
+          href={verCerradas ? "/work-orders/cierre" : "/work-orders/cierre?cerradas=1"}
+          className="font-medium text-brand-600 hover:underline"
+        >
+          {verCerradas ? "Dejar solo el trabajo abierto" : "Ver también las ya cerradas"}
+        </Link>
+        {verCerradas
+          ? " · Una cerrada pasó la validación: si aparece con algo en ámbar es porque se justificó al completarla, se cerró antes de que existiera esa regla, o vino importada. Se puede reabrir para complementarla."
+          : " · para revisar si alguna quedó incompleta y reabrirla"}
+      </p>
 
       {filas.length === 0 ? (
         <EmptyState
