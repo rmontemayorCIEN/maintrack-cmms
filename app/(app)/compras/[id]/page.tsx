@@ -9,6 +9,7 @@ import { Badge, Card, PageHeader } from "@/components/ui";
 import { ESTADOS_COMPRA, quienAutorizo } from "@/lib/estados-compra";
 import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
+import { costosVigentes } from "@/lib/compras";
 import { AccionesCompra, type RenglonCompra } from "./acciones";
 import { Comparativo, type Cotizacion } from "./comparativo";
 import { PasarRegistros } from "@/components/paso-registros";
@@ -86,6 +87,15 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   }));
   const orden = compra.ordenes[0] ?? null;
 
+  // Una sola decision sobre que cifra vale hoy, para que la tabla sume el
+  // total del encabezado en vez de contradecirlo (ver costosVigentes).
+  const vigentes = costosVigentes(renglones, cotizaciones);
+  const totalVigente = renglones.reduce((suma, r) => {
+    const v = vigentes.porRenglon.get(r.id)!;
+    return v.fuera ? suma : suma + r.solicitada * v.costo;
+  }, 0);
+  const hayFuera = renglones.some((r) => vigentes.porRenglon.get(r.id)!.fuera);
+
   const recibidoReal = compra.recepciones.reduce(
     (s, rec) => s + rec.renglones.reduce((t, l) => t + l.cantidad * l.costoUnitario, 0), 0,
   );
@@ -94,7 +104,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
     <>
       <PageHeader
         title={`Compra ${compra.folio}`}
-        description={`Entra al almacén ${compra.warehouse.name} · estimado ${formatCurrency(compra.montoEstimado, moneda)}`}
+        description={`Entra al almacén ${compra.warehouse.name} · ${vigentes.base} ${formatCurrency(compra.montoEstimado, moneda)}`}
         breadcrumb={
           <span className="flex flex-wrap items-center gap-2">
             <Link href="/compras" className="inline-flex items-center gap-1 hover:text-brand-600">
@@ -134,13 +144,14 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
                     <th className="text-right">Cantidad</th>
                     <th className="text-right">Recibido</th>
                     <th className="text-right">Por recibir</th>
-                    <th className="text-right">Costo est.</th>
+                    <th className="text-right">{vigentes.base === "cotizado" ? "Costo cotiz." : "Costo est."}</th>
                     <th className="text-right">Importe</th>
                   </tr>
                 </thead>
                 <tbody>
                   {renglones.map((r) => {
                     const falta = r.solicitada - r.recibida;
+                    const vigente = vigentes.porRenglon.get(r.id)!;
                     return (
                       <tr key={r.id}>
                         <td>
@@ -156,19 +167,42 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
                         <td className="text-right tabular-nums text-xs">
                           {falta > 0.0001 ? <span className="font-medium text-amber-700">{formatNumber(falta, 2)}</span> : <span className="text-slate-300">—</span>}
                         </td>
-                        <td className="text-right tabular-nums text-xs text-slate-600">{formatCurrency(r.costoEstimado, moneda)}</td>
+                        <td className="text-right tabular-nums text-xs text-slate-600">{formatCurrency(vigente.costo, moneda)}</td>
                         <td className="text-right tabular-nums text-xs text-slate-700">
-                          {formatCurrency(r.solicitada * r.costoEstimado, moneda)}
+                          {vigente.fuera ? (
+                            <span className="text-amber-700">No lo surte</span>
+                          ) : (
+                            formatCurrency(r.solicitada * vigente.costo, moneda)
+                          )}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <th colSpan={5} className="text-right text-xs font-medium text-slate-600">
+                      Total {vigentes.base}
+                      {hayFuera ? " (sin lo que el proveedor no surte)" : ""}
+                    </th>
+                    <td className="text-right tabular-nums text-xs font-semibold text-slate-800">
+                      {formatCurrency(totalVigente, moneda)}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </Card>
 
-          {user.organization.comprasInternas ? (
+          {/*
+            Con el proceso interno apagado tambien se muestran las cotizaciones
+            que ya existan, solo que sin poder capturar ni elegir. Apagar la
+            bandera nunca borro las cotizaciones —ninguna funcion de negocio la
+            mira— y una cotizacion elegida manda sobre el monto de la
+            requisicion: ocultarla dejaba en pantalla un total que nada
+            explicaba.
+          */}
+          {user.organization.comprasInternas || cotizaciones.length ? (
             <Comparativo
               compraId={compra.id}
               estado={compra.estado}
@@ -179,7 +213,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
               cotizaciones={cotizaciones}
               proveedores={proveedores}
               moneda={moneda}
-              editable={can(user.role, "purchase:request")}
+              editable={user.organization.comprasInternas && can(user.role, "purchase:request")}
               ordenEmitida={orden?.folio ?? null}
             />
           ) : null}

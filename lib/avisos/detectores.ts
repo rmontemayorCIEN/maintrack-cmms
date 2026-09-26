@@ -19,6 +19,7 @@
  * crítica sin avisar (hay seis lugares que crean órdenes), aquí se avisa.
  */
 import { prisma } from "../db";
+import { formatCurrency } from "../utils";
 import { emitirAviso } from "./emitir";
 import { reconciliar } from "./condiciones";
 import { criticosSinPlan, medidoresSinLectura, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./situaciones";
@@ -524,10 +525,15 @@ export async function avisarCompraPorAutorizar(
   // importar la criticidad del equipo (que la compra no conoce).
   const prioridad = paro ? "CRITICA" : calculada.prioridad;
   const razones = calculada.razones;
+  // El monto se escribe con la moneda de la empresa: «$3720.00» a secas no es
+  // lo que la persona ve en pantalla, y en una cuenta en otra moneda enganaba.
+  const moneda = (await prisma.organization.findUnique({
+    where: { id: organizationId }, select: { currency: true },
+  }))?.currency ?? "MXN";
   await emitirAviso({
     organizationId, tipo: "REQUISICION_POR_AUTORIZAR", entidad: "PurchaseRequest", entidadId: c.id, prioridad,
     titulo: `Compra ${c.folio} por autorizar${paro ? " · equipo parado" : ""}`,
-    cuerpo: `Monto estimado $${c.montoEstimado.toFixed(2)}.`,
+    cuerpo: `Monto estimado ${formatCurrency(c.montoEstimado, moneda)}.`,
     porQue: razones.length ? `Importa porque ${razones.join(", ")}.` : "Mientras no se autorice, el material no se pide.",
     accion: "Autorícela o recházela con motivo.", enlace: `/compras/${c.id}`,
     contexto: { solicitanteId: c.solicitanteId, excluir: c.solicitanteId ? [c.solicitanteId] : [], warehouseId: c.warehouseId },

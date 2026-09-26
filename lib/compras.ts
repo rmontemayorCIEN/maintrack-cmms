@@ -35,6 +35,48 @@ export function requiereAutorizacion(montoEstimado: number, umbral: number) {
 }
 
 /**
+ * Lo que cuesta hoy cada renglon, y como se llama esa cifra.
+ *
+ * Al elegir cotizacion, `montoEstimado` pasa a ser el cotizado (ver
+ * `elegirCotizacion`), pero el costo de cada renglon se queda como se pidio.
+ * La pantalla sumaba los estimados y el encabezado mostraba el cotizado: dos
+ * cifras distintas para la misma compra, a diez centimetros una de otra y sin
+ * decir por que. Se vio abriendo la pantalla; ninguna prueba de datos lo iba
+ * a notar, porque las dos cifras son correctas por separado.
+ *
+ * El total de una cotizacion solo suma lo que el proveedor SI surte, asi que
+ * un renglon que el no tiene queda fuera de la cifra: eso se marca con
+ * `fuera`, para que la pantalla lo muestre aparte en vez de cuadrarlo a la
+ * fuerza.
+ */
+export function costosVigentes(
+  renglones: Array<{ id: string; costoEstimado: number }>,
+  cotizaciones: Array<{
+    seleccionada: boolean;
+    renglones: Array<{ requestLineId: string | null; costoUnitario: number; disponible: boolean }>;
+  }>,
+) {
+  const elegida = cotizaciones.find((c) => c.seleccionada);
+  const porRenglon = new Map<string, { costo: number; fuera: boolean }>();
+
+  for (const r of renglones) {
+    if (!elegida) {
+      porRenglon.set(r.id, { costo: r.costoEstimado, fuera: false });
+      continue;
+    }
+    const cotizado = elegida.renglones.find((l) => l.requestLineId === r.id);
+    porRenglon.set(
+      r.id,
+      cotizado
+        ? { costo: cotizado.costoUnitario, fuera: !cotizado.disponible }
+        : { costo: r.costoEstimado, fuera: true },
+    );
+  }
+
+  return { base: elegida ? ("cotizado" as const) : ("estimado" as const), porRenglon };
+}
+
+/**
  * Avisa de una compra nueva a quien le toca actuar.
  *
  * Si espera firma, a quien puede autorizar (nunca a quien la pidió). Si nació
@@ -193,15 +235,20 @@ export async function crearRequisicionDeCompra(params: {
       urgencia: params.urgencia,
       justificacion: params.justificacion || null,
       montoEstimado,
-      ...(sinFirma
-        ? {
-            estado: "AUTORIZADA",
-            autorizadaEl: new Date(),
-            justificacion:
-              `${params.justificacion ? `${params.justificacion} · ` : ""}` +
-              `Autorizada automáticamente: $${montoEstimado.toFixed(2)} está por debajo del umbral de $${umbral.toFixed(2)}`,
-          }
-        : {}),
+      /*
+       * Nace autorizada, y nada mas. La razon NO se pega a `justificacion`:
+       * ese campo es lo que escribio quien pidio, y el sistema le agregaba su
+       * propia nota con el monto de ese momento. Cuando despues se elegia una
+       * cotizacion, el monto cambiaba y la nota se quedaba citando el viejo:
+       * la pantalla mostraba las dos cifras juntas, contradiciendose. Ademas
+       * el inicio usa ese texto como titulo del renglon, asi que una compra
+       * sin justificacion propia se titulaba con la nota del sistema.
+       *
+       * Que se autorizo sola se deduce de tener fecha sin firmante, que es lo
+       * que lee `quienAutorizo()`; el monto y el umbral de ese momento quedan
+       * en la bitacora, que es el registro que sirve para auditar.
+       */
+      ...(sinFirma ? { estado: "AUTORIZADA", autorizadaEl: new Date() } : {}),
       renglones: {
         create: params.renglones.map((r) => ({
           partId: r.partId || null,

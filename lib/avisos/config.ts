@@ -29,6 +29,8 @@ export type ConfigEmpresa = typeof CONFIG_RECOMENDADA & {
   diasHabiles: number[];
   festivos: string[];
   avisosPush: boolean;
+  /** Para escribir dinero en los avisos con la moneda de la empresa, no con un «$» a secas. */
+  moneda: string;
 };
 
 export function leerJson<T>(texto: string | null | undefined, porOmision: T): T {
@@ -50,7 +52,7 @@ export async function configDe(organizationId: string, ahora = new Date()): Prom
   const [org, c, festivos] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { timezone: true, diasHabiles: true, avisosPush: true },
+      select: { timezone: true, diasHabiles: true, avisosPush: true, currency: true },
     }),
     prisma.configAvisos.findUnique({ where: { organizationId } }),
     prisma.diaFestivo.findMany({ where: { organizationId, fecha: { gte: desde, lte: hasta } }, select: { fecha: true } }),
@@ -72,6 +74,7 @@ export async function configDe(organizationId: string, ahora = new Date()): Prom
     // Los festivos se guardan como la medianoche UTC de su fecha: su clave es la fecha UTC.
     festivos: festivos.map((f) => f.fecha.toISOString().slice(0, 10)),
     avisosPush: org?.avisosPush ?? false,
+    moneda: org?.currency ?? "MXN",
   };
 }
 

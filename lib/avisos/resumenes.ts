@@ -21,6 +21,7 @@
 import { prisma } from "../db";
 import { notify } from "../audit";
 import { can } from "../rbac";
+import { formatCurrency } from "../utils";
 import { claveDiaEnZona, diaEnZona, medianocheEnZona } from "../periodos";
 import { PESO_PRIORIDAD } from "./catalogo";
 import { leerJson, type ConfigEmpresa } from "./config";
@@ -241,7 +242,7 @@ export async function resumenDiario(organizationId: string, p: Persona, cfg: Con
     for (const c of porFirmar) {
       R.push({
         clave: `PurchaseRequest:${c.id}`, nivel: 3, prioridad: c.urgencia === "PARO" ? PESO_PRIORIDAD.CRITICA : PESO_PRIORIDAD.MEDIA,
-        texto: `${c.folio}${c.urgencia === "PARO" ? " (equipo parado)" : ""} — $${c.montoEstimado.toFixed(2)}`, enlace: `/compras/${c.id}`,
+        texto: `${c.folio}${c.urgencia === "PARO" ? " (equipo parado)" : ""} — ${formatCurrency(c.montoEstimado, cfg.moneda)}`, enlace: `/compras/${c.id}`,
         etiqueta: "compra por autorizar", accion: "Autorícelas o recházelas: el material no se pide sin su firma.",
       });
     }
@@ -374,7 +375,7 @@ export async function resumenSemanal(organizationId: string, p: Persona, cfg: Co
       const costo = salidas.reduce((a, m) => a + m.quantity * m.unitCost, 0);
       if (salidas.length) {
         s.push(seccion("Consumo de refacciones", salidas.length,
-          [{ texto: `${salidas.length} salida(s) por $${costo.toFixed(2)}`, enlace: "/inventory", clave: "cifra:consumo" }], "Compare contra lo planeado del mes."));
+          [{ texto: `${salidas.length} salida(s) por ${formatCurrency(costo, cfg.moneda)}`, enlace: "/inventory", clave: "cifra:consumo" }], "Compare contra lo planeado del mes."));
       }
     }
   }

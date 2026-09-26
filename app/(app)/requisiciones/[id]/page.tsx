@@ -218,6 +218,7 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
               ) : null}
               <div className="mt-2">
                 <CompraDialog
+                  moneda={user.organization.currency}
                   almacenes={almacenes}
                   refacciones={refaccionesCatalogo.map((r) => ({ id: r.id, code: r.code, name: r.name, unit: r.unit, costo: r.unitCost }))}
                   proveedores={proveedores}

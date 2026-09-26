@@ -1143,9 +1143,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
     flujo: [
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
-      "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción.",
+      "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción. Apagarlo no borra las cotizaciones que ya se hayan capturado: se siguen viendo, solo que sin poder cambiarlas.",
       "Si está encendido, entre autorizar y recibir van las cotizaciones, el comparativo y la orden de compra.",
       "Al recibir, la existencia sube solo por lo que de verdad llegó y el costo promedio de la refacción se recalcula.",
+      "Mientras no haya cotización elegida, la tabla muestra lo que se estimó al pedir. En cuanto se elige una, muestra lo cotizado y el total de la compra pasa a ser ese: por eso la cifra de un renglón puede cambiar sin que nadie la edite. Lo que el proveedor elegido no surte se marca «No lo surte» y queda fuera del total, porque tampoco entró en el de su cotización.",
       "Debajo del monto de autorización que tenga configurado su empresa, la requisición nace autorizada y lo dice; de ahí para arriba necesita firma, y sin firma no se puede colocar.",
       "La recepción admite parciales y no se puede recibir más de lo pedido. Si el mismo recibo se envía dos veces —doble clic, reintento— el material entra una sola vez.",
       "Mientras una compra siga viva, el almacén marca esa refacción como «Ya pedida» para que no se vuelva a comprar por mínimo.",

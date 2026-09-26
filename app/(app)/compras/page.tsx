@@ -100,6 +100,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         }
         actions={puedePedir && almacenes.length ? (
           <CompraDialog
+            moneda={moneda}
             almacenes={almacenes}
             refacciones={refacciones.map((r) => ({ id: r.id, code: r.code, name: r.name, unit: r.unit, costo: r.unitCost }))}
             proveedores={proveedores}
