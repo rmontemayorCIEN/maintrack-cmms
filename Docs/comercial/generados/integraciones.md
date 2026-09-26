@@ -22,7 +22,7 @@
 **Lo que MainTrack le entrega al ERP**
 
 - Consultas: activos con su estado, ubicaciones, órdenes, existencias por almacén, conteos de pendientes
-- Avisos en el momento: 26 eventos del catálogo, firmados y con reintentos
+- Avisos en el momento: 29 eventos del catálogo, firmados y con reintentos
 - Compras por colocar, con su justificación y su renglonaje
 - Recepciones y consumo, para que el ERP descargue y contabilice
 
@@ -46,7 +46,7 @@ Nunca de un parámetro de la petición. Un sistema externo no puede leer los dat
 
 Las rutas que escriben aceptan una clave de idempotencia: si la red se cae a media petición y el ERP reintenta, no se crea un segundo registro; se devuelve la misma respuesta de la primera vez.
 
-### Webhooks firmados, 26 eventos
+### Webhooks firmados, 29 eventos
 
 MainTrack avisa al sistema del cliente cuando pasa algo: se abrió una orden crítica, se venció un preventivo, una refacción quedó bajo mínimo, hay una compra por autorizar, llegó la mercancía. Cada webhook tiene su secreto de firma, con reintentos, historial de entregas y suspensión automática si el destino deja de responder.
 
@@ -80,7 +80,7 @@ El cliente elige uno por uno. Lo que no marque, no existe para ese sistema exter
 | `costos:leer` | Ver costos en activos, órdenes e inventario |
 | `eventos:enviar` | Enviar eventos entrantes (webhook entrante) |
 
-## Los 26 eventos que MainTrack puede avisar
+## Los 29 eventos que MainTrack puede avisar
 
 Cada webhook elige cuáles recibe. Van firmados, con reintentos y con historial de entrega.
 
@@ -88,6 +88,7 @@ Cada webhook elige cuáles recibe. Van firmados, con reintentos y con historial 
 - **Solicitudes:** Solicitud nueva, Solicitud atendida, Solicitud rechazada.
 - **Mantenimiento preventivo:** Falló una orden programada, Preventivo incumplido.
 - **Medidores y predictivo:** Lectura cerca del límite, Umbral excedido, Lectura anormal, Alerta predictiva, Condición normalizada.
+- **Garantías y vigencias:** Vigencia por vencer, Vigencia vencida, Se abrió trabajo sobre un equipo en garantía.
 - **Almacén:** Refacciones bajo mínimo, Refacción crítica agotada.
 - **Compras:** Compra por autorizar, Compra autorizada o rechazada, Compra vencida, Recepción parcial, Ya llegó lo que pidió.
 
@@ -100,6 +101,7 @@ Para el arranque, y para lo que no valga la pena automatizar. Cada tipo se valid
 - **Usuarios y responsables** — Su equipo de trabajo con su rol, puesto y tarifa. No se importan contraseñas: cada persona elige la suya con una liga de un solo uso que se genera en Usuarios.
 - **Almacenes** — Los almacenes o bodegas de refacciones, con su sitio y su responsable.
 - **Categorías de activo** — Familias de equipo para agrupar y filtrar.
+- **Centros de costo** — El eje contable: la clave con la que su empresa lleva el gasto. Tráigalos de su ERP tal como están allá —la clave es lo que permite conciliar—. Después se le asigna uno a cada equipo, y sus órdenes lo heredan.
 - **Activos** — El catálogo de equipos. Es la importación más importante y la que más tiempo ahorra.
 - **Medidores** — Horómetros, odómetros y contadores de cada equipo, con su lectura inicial.
 - **Lecturas de medidores** — Lecturas de los medidores que ya existen. Pasan por las mismas reglas que una lectura capturada a mano: no negativas, no hacia atrás, no en el futuro, y un horómetro no avanza más horas de las que pasaron.

@@ -13,7 +13,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import {
-  BENEFICIOS_POR_ROL, COBRO, DESCRIPCION, DIFERENCIADORES, LEMA, MODULOS, NO_ES, PREGUNTAS, PROBLEMAS, PRUEBA_DIAS, SEVERIDADES, SOPORTE, SUBLEMA, TEXTO_PRUEBA,
+  BENEFICIOS_POR_ROL, COBRO, DESCRIPCION, DIFERENCIADORES, LEMA, MARCA, MODULOS, NO_ES, PREGUNTAS, PROBLEMAS, PRUEBA_DIAS, SEGURIDAD, SEVERIDADES, SOPORTE, SUBLEMA, TEXTO_PRUEBA,
   comparacion, precio, textoCelda,
 } from "../lib/comercial";
 import { COMPLEMENTO_IA, NOMBRE_RECURSO, ORDEN_PLANES, PLANES } from "../lib/planes";
@@ -27,6 +27,9 @@ import {
 import { ALCANCES } from "../lib/integraciones/alcances";
 import { ETIQUETA_MODULO, EVENTOS, EVENTOS_WEBHOOK, type Modulo } from "../lib/avisos/catalogo";
 import { IMPORTACIONES, ORDEN_IMPORTACION } from "../lib/importacion";
+import {
+  COMO_SE_LLAMA_EL_ROL, elTamanoDelSistema, funcionesDeIa, pantallasInventariadas, pantallasPorRol,
+} from "../lib/inventario";
 
 const DIR = join("Docs", "comercial", "generados");
 const AVISO = "<!-- Generado por scripts/generar-documentos-comerciales.ts. No se edita a mano: cambie la fuente y vuelva a generar. -->\n\n";
@@ -287,6 +290,76 @@ ${EL_ARGUMENTO_DE_FONDO.texto}
 ---
 
 La referencia técnica de la API —rutas, cuerpos, códigos de error y ejemplos— está en \`Docs/api-v1.md\`, y el índice vivo en \`GET /api/v1\` de la instalación del cliente.
+`;
+
+/**
+ * Inventario de funcionalidad: todo lo que el sistema tiene y que hace.
+ *
+ * Cada renglon sale de donde vive la verdad —el menu, las 51 fichas de ayuda,
+ * el registro de funciones de IA, los permisos de la API— y por eso `--revisar`
+ * lo cuida: si se agrega una pantalla y no se regenera, el despliegue avisa.
+ * Un inventario escrito a mano describe a los dos meses un sistema que ya no
+ * existe.
+ */
+const TAMANO = elTamanoDelSistema();
+const GRUPOS = pantallasInventariadas();
+
+archivos["funcionalidad.md"] = `# ${MARCA} — todo lo que hace
+
+> ${DESCRIPCION}
+
+**${TAMANO.pantallas} pantallas** en ${TAMANO.grupos} grupos · **${TAMANO.funcionesDeIa} funciones de inteligencia artificial** · **${TAMANO.roles} roles** · API con ${TAMANO.permisosDeApi} permisos y ${TAMANO.eventosDeWebhook} eventos.
+
+Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capturado: tener la función y tenerla en marcha son cosas distintas.
+
+## Qué es
+
+${MODULOS.map((m) => `- **${m.nombre}:** ${m.texto}`).join("\n")}
+
+## Qué no es
+
+${NO_ES.map((x) => `- ${x}`).join("\n")}
+
+## Cada pantalla, y qué se hace en ella
+
+${GRUPOS.map((g) => `### ${g.seccion}
+
+${g.pantallas.map((p) => [
+  `**${p.etiqueta}** — ${p.que}`,
+  p.hacer.length ? p.hacer.map((h) => `  - ${h}`).join("\n") : null,
+].filter(Boolean).join("\n")).join("\n\n")}`).join("\n\n")}
+
+## Cuántas pantallas ve cada quien
+
+Nadie ve todo. El menú se arma según el rol, así que un solicitante entra a un sistema de seis pantallas y un técnico a uno de veinte: no hay que enseñarles lo que no van a usar.
+
+| Rol | Pantallas |
+|---|---|
+${pantallasPorRol().map((r) => `| ${COMO_SE_LLAMA_EL_ROL[r.rol]} | ${r.cuantas} |`).join("\n")}
+
+Además, cada persona puede poner sus pantallas de diario hasta arriba de su menú, sin cambiarle el menú a nadie más.
+
+## Lo que hace la inteligencia artificial
+
+Interpreta y redacta sobre los datos de la empresa. **No hace la aritmética**: disponibilidad, cumplimiento, costos, MTBF y MTTR los calcula el sistema y cada indicador muestra su fórmula; la IA lee esos números ya resueltos.
+
+| Función | Qué hace | Operaciones |
+|---|---|---|
+${funcionesDeIa().map((f) => `| ${f.nombre} | ${f.descripcion} | ${f.operaciones} |`).join("\n")}
+
+## Cómo se conecta con otros sistemas
+
+${LO_QUE_YA_HAY.map((x) => `- **${x.titulo}:** ${x.texto}`).join("\n")}
+
+El detalle está en \`integraciones.md\`, y la referencia técnica en \`Docs/api-v1.md\`.
+
+## Cómo entra la información al arrancar
+
+${ORDEN_IMPORTACION.map((k) => `- **${IMPORTACIONES[k].titulo}** — ${IMPORTACIONES[k].descripcion}`).join("\n")}
+
+## Seguridad y respaldo
+
+${SEGURIDAD.map((x) => `- ${x}`).join("\n")}
 `;
 
 const revisar = process.argv.includes("--revisar");

@@ -2,6 +2,7 @@
 
 | Documento | Para qué | Cómo se mantiene |
 |---|---|---|
+| `generados/funcionalidad.md` | Inventario completo: qué tiene el sistema y qué hace cada pantalla, cuántas ve cada rol, las funciones de IA, la integración y la carga inicial | Generado del menú, las 51 fichas de `lib/ayuda.ts`, `lib/ia/funciones.ts` y los permisos de la API |
 | `generados/propuesta-de-valor.md` | Descripción, cinco problemas, diferenciadores, módulos, qué no es | Generado de `lib/comercial.ts` |
 | `generados/planes-y-precios.md` | Planes, precios, límites, complemento, condiciones y comparación | Generado de `lib/planes.ts` y `lib/comercial.ts` |
 | `generados/presentacion.md` | Las diapositivas de la presentación al cliente, en documento | Generado de `lib/demo-presentacion.ts` |
