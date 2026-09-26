@@ -62,12 +62,13 @@ export const CAMPO_BUSCABLE = {
 } as const;
 
 export const CONTROLES_TABLA: Array<{ nombre: string; explica: string }> = [
+  { nombre: "Ordenar", explica: "Toque el titulo de una columna y la lista se ordena por ella; otro toque la invierte; el tercero quita el orden y la deja como llego. La flecha aparece solo en la columna que manda. Los montos y las fechas se ordenan por su valor, no como texto: 900 va antes que 1,200 y enero antes que febrero. Si hay grupos, el orden vale dentro de cada grupo." },
   { nombre: "Filtrar", explica: "Busca en TODAS las columnas, incluidas las que tiene ocultas. Esconder una columna es decision de presentacion, no de que se puede encontrar." },
   { nombre: "Agrupar por…", explica: "Junta los renglones por el criterio que elija. Cada grupo trae su conteo y se pliega con un clic." },
   { nombre: "+ nivel 2 y + nivel 3", explica: "Agrupa dentro de lo agrupado, hasta tres niveles. Por ejemplo Sitio › Categoría › Criticidad." },
   { nombre: "Contraer todo / Expandir todo", explica: "Cierra o abre todos los grupos de golpe. Contraer cierra todos los niveles, para bajar de nivel en nivel al volver a abrir." },
   { nombre: "Columnas", explica: "Prende, apaga y acomoda columnas con las flechas. Las dos primeras son fijas: sin ellas la tabla deja de identificar de que habla." },
-  { nombre: "Guardar vista", explica: "Deja su arreglo permanente. Es SUYO, no de la empresa: el almacenista y el jefe de mantenimiento no miran lo mismo." },
+  { nombre: "Guardar vista", explica: "Deja su arreglo permanente: columnas, grupos y el orden que haya elegido. Es SUYO, no de la empresa: el almacenista y el jefe de mantenimiento no miran lo mismo." },
   { nombre: "De fabrica", explica: "Regresa a las columnas originales y quita la agrupación." },
 ];
 

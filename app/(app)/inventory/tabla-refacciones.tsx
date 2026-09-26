@@ -147,8 +147,8 @@ export function TablaRefacciones({
           ? <Badge tone="danger">Agotada</Badge>
           : bajoMinimo(p) ? <Badge tone="warning">Bajo mínimo</Badge> : <Badge tone="success">Surtida</Badge>,
     },
-    { id: "costoUnit", etiqueta: "Costo unit.", alineaDerecha: true, texto: (p) => formatCurrency(p.unitCost, p.moneda) },
-    { id: "valor", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.quantityOnHand * p.unitCost, p.moneda) },
+    { id: "costoUnit", etiqueta: "Costo unit.", alineaDerecha: true, texto: (p) => formatCurrency(p.unitCost, p.moneda), ordenPor: (p) => p.unitCost },
+    { id: "valor", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.quantityOnHand * p.unitCost, p.moneda), ordenPor: (p) => p.quantityOnHand * p.unitCost },
     { id: "minimo", etiqueta: "Mínimo", alineaDerecha: true, texto: (p) => formatNumber(p.minQuantity, 0) },
     { id: "maximo", etiqueta: "Máximo", alineaDerecha: true, texto: (p) => formatNumber(p.maxQuantity, 0) },
     { id: "unidad", etiqueta: "Unidad", agrupable: true, texto: (p) => p.unit },

@@ -699,6 +699,53 @@ async function main() {
     const regreso = await t.evaluar<{ valor: string; url: string }>(`(() => ({ valor: document.querySelector('input[aria-label="Filtrar la lista"]')?.value ?? "", url: location.pathname + location.search }))()`);
     revisar("45. regresar con «atrás» a la lista la deja filtrada como estaba", Boolean(liga) && atras.url.includes("f=") && regreso.valor === "acoplamiento 1" && regreso.url.startsWith("/work-orders?"), { atras, regreso, liga });
 
+    // ═══════════════════════════════════════════ 51: ordenar tocando el encabezado
+    console.log("\n51. Ordenar tocando el encabezado");
+    await pantalla(1440, 900);
+    await sesion("SUPERVISOR");
+    donde = "orden por encabezado";
+    await t.ir(`${base}/work-orders`);
+    /*
+     * Se toca de verdad y se lee la columna, en vez de comprobar el estado por
+     * dentro: lo que importa es que la LISTA cambie. El ciclo de tres estados
+     * y el comparador se prueban aparte, en prueba-orden-tabla.
+     */
+    const orden = await t.evaluar<{
+      hayBoton: boolean; etiqueta: string;
+      inicial: string[]; asc: string[]; desc: string[]; vuelta: string[];
+      marcaAsc: string | null; marcaDesc: string | null; marcaFuera: string | null;
+    }>(`(async () => {
+      const ths = [...document.querySelectorAll("table.data thead th")];
+      const i = ths.findIndex((x) => x.querySelector("button"));
+      const th = ths[i];
+      if (!th) return { hayBoton: false, etiqueta: "", inicial: [], asc: [], desc: [], vuelta: [], marcaAsc: null, marcaDesc: null, marcaFuera: null };
+      const columna = () => [...document.querySelectorAll("table.data tbody tr")]
+        .map((tr) => tr.children[i]?.textContent?.trim() ?? "")
+        .filter(Boolean).slice(0, 12);
+      const toque = async () => { th.querySelector("button").click(); await new Promise((r) => setTimeout(r, 400)); };
+      const inicial = columna();
+      await toque(); const asc = columna(); const marcaAsc = th.getAttribute("aria-sort");
+      await toque(); const desc = columna(); const marcaDesc = th.getAttribute("aria-sort");
+      await toque(); const vuelta = columna(); const marcaFuera = th.getAttribute("aria-sort");
+      return { hayBoton: true, etiqueta: th.textContent.trim(), inicial, asc, desc, vuelta, marcaAsc, marcaDesc, marcaFuera };
+    })()`);
+    const ordenado = [...orden.asc].sort((a, b) => a.localeCompare(b, "es", { numeric: true, sensitivity: "base" }));
+    revisar("51. un toque en el encabezado ordena la lista de verdad",
+      orden.hayBoton && orden.asc.length > 1 && JSON.stringify(orden.asc) === JSON.stringify(ordenado),
+      { columna: orden.etiqueta, asc: orden.asc.slice(0, 5) });
+    const alReves = [...orden.desc].sort((a, b) => -a.localeCompare(b, "es", { numeric: true, sensitivity: "base" }));
+    revisar("    el segundo toque la invierte",
+      orden.desc.length > 1
+      && JSON.stringify(orden.desc) === JSON.stringify(alReves)
+      && orden.desc[0] !== orden.asc[0],
+      { desc: orden.desc.slice(0, 5), empiezaAsc: orden.asc[0], empiezaDesc: orden.desc[0] });
+    revisar("    y el tercero la deja como llegó",
+      JSON.stringify(orden.vuelta) === JSON.stringify(orden.inicial), { inicial: orden.inicial.slice(0, 5), vuelta: orden.vuelta.slice(0, 5) });
+    revisar("    y lo dice en aria-sort, para quien no ve la flecha",
+      orden.marcaAsc === "ascending" && orden.marcaDesc === "descending" && orden.marcaFuera === "none",
+      { asc: orden.marcaAsc, desc: orden.marcaDesc, fuera: orden.marcaFuera });
+    await captura("1440-supervisor-ordenes-ordenadas");
+
     // ═══════════════════════════════════════════ 49: horizontal, y la barra de acciones de la orden
     console.log("\n49. Horizontal y acciones de la orden");
     await sesion("TECHNICIAN");

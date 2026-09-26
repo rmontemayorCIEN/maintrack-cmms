@@ -47,10 +47,10 @@ const crearColumnas = (zona: string): Columna<FilaProveedor>[] => [
       ? <Badge tone="danger">{p.refaccionesBajoMinimo} por comprar</Badge>
       : <span className="text-slate-300">—</span>,
   },
-  { id: "valorEnPiso", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.valorEnPiso, p.moneda) },
+  { id: "valorEnPiso", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.valorEnPiso, p.moneda), ordenPor: (p) => p.valorEnPiso },
   { id: "serviciosCatalogo", etiqueta: "Servicios en catálogo", alineaDerecha: true, texto: (p) => String(p.serviciosCatalogo) },
   { id: "serviciosPrestados", etiqueta: "Servicios prestados", alineaDerecha: true, texto: (p) => String(p.serviciosPrestados) },
-  { id: "gasto", etiqueta: "Gasto acumulado", alineaDerecha: true, texto: (p) => formatCurrency(p.gastoAcumulado, p.moneda) },
+  { id: "gasto", etiqueta: "Gasto acumulado", alineaDerecha: true, texto: (p) => formatCurrency(p.gastoAcumulado, p.moneda), ordenPor: (p) => p.gastoAcumulado },
   {
     id: "ultimo", etiqueta: "Último servicio",
     texto: (p) => (p.ultimoServicio ? new Date(p.ultimoServicio).toLocaleDateString("es-MX", { timeZone: zona }) : "—"),
