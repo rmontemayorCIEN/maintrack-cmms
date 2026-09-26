@@ -259,6 +259,7 @@ model Organization {
   externalServices   ExternalService[]
   vigencias          Vigencia[]
   centrosDeCosto     CentroDeCosto[]
+  presupuestos       Presupuesto[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
@@ -392,6 +393,7 @@ model User {
   stockTransfers       StockTransfer[]
   materialRequests     MaterialRequest[]
   purchaseRequests     PurchaseRequest[]       @relation("CompraSolicitante")
+  presupuestos         Presupuesto[]           @relation("PresupuestoCapturadoPor")
   purchaseAuthorized   PurchaseRequest[]       @relation("CompraAutorizador")
   goodsReceipts        GoodsReceipt[]
   quotesCapturadas     Quote[]
@@ -1539,9 +1541,41 @@ model CentroDeCosto {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assets       Asset[]
   workOrders   WorkOrder[]
+  presupuestos Presupuesto[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
+}
+
+/// Cuanto se puede gastar en un centro de costo, mes por mes.
+///
+/// Mensual y no anual: de los meses sale el trimestre y el año sumando, y al
+/// reves no —repartir un anual entre doce miente en cuanto hay un paro
+/// programado o una temporada alta—.
+///
+/// Un solo monto, sin desglosar en mano de obra, refacciones y servicios: el
+/// gasto real SI se muestra desglosado, asi que se ve en que se fue sin
+/// obligar a presupuestarlo por separado y a mantener cuatro cifras al dia.
+model Presupuesto {
+  id              String   @id @default(cuid())
+  organizationId  String
+  centroDeCostoId String
+  /// Separados y no una fecha: se consulta «todo 2026» sin recortar cadenas.
+  anio            Int
+  mes             Int
+  monto           Float    @default(0)
+  nota            String?
+  /// Quien lo dejo en este valor. El historial completo vive en la bitacora.
+  capturadoPorId  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  centroDeCosto CentroDeCosto @relation(fields: [centroDeCostoId], references: [id], onDelete: Cascade)
+  capturadoPor  User?         @relation("PresupuestoCapturadoPor", fields: [capturadoPorId], references: [id])
+
+  @@unique([centroDeCostoId, anio, mes])
+  @@index([organizationId, anio])
 }
 
 /// Las pantallas que alguien quiere a la mano, arriba de su menu.

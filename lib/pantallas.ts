@@ -83,6 +83,7 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/paros", roles: ANALISIS },
   { ruta: "/reports", roles: ANALISIS },
   { ruta: "/indicadores", roles: ANALISIS },
+  { ruta: "/presupuestos", roles: ["OWNER", "ADMIN", "SUPERVISOR", "VIEWER"] },
   // Preguntar a toda la base o diagnosticarla con IA es análisis de mando.
   { ruta: "/consulta", roles: MANDO },
   { ruta: "/diagnostico", roles: MANDO },
@@ -199,6 +200,7 @@ const MENU: GrupoMenu[] = [
   {
     seccion: "Cómo me fue", clave: "analisis", items: [
       { href: "/indicadores", etiqueta: "Indicadores", icono: "indicadores" },
+      { href: "/presupuestos", etiqueta: "Presupuestos", icono: "reportes" },
       { href: "/paros", etiqueta: "Dónde para la planta", icono: "paros" },
       { href: "/reports", etiqueta: "Reportes", icono: "reportes" },
       { href: "/consulta", etiqueta: "Pregunte a sus datos", icono: "consulta" },

@@ -1618,6 +1618,35 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/presupuestos": {
+    titulo: "Presupuestos",
+    que: "Cuánto se puede gastar en cada centro de costo, contra lo que de verdad se lleva gastado.",
+    hacer: [
+      "Capturar el presupuesto de cada centro, mes por mes",
+      "Ver cuánto se lleva ejercido y cuánto queda disponible",
+      "Cambiar de mes o ver el año completo",
+      "Ver en qué se fue: mano de obra, refacciones, servicios y otros",
+    ],
+    flujo: [
+      "Se presupuesta por MES, no por año: de los meses sale el trimestre y el año sumando, y al revés no. Repartir una cifra anual entre doce miente en cuanto hay un paro programado o una temporada alta.",
+      "Se captura un solo monto por centro, no desglosado. El gasto real sí se muestra desglosado, así que se ve en qué se fue sin obligar a mantener cuatro cifras al día: un presupuesto desglosado que nadie actualiza es peor que uno solo que sí se cuida.",
+      "Se captura en la misma pantalla donde se compara: escriba el monto y salga de la casilla, se guarda solo. El año completo es de solo lectura.",
+      "Dejar la casilla vacía QUITA el presupuesto; escribir 0 lo deja en cero. No es lo mismo: cero significa «este centro no gasta este mes», vacío significa «nadie lo ha presupuestado», y la pantalla los muestra distinto.",
+      "Un centro con gasto y sin presupuesto se avisa arriba con su clave: ese gasto es real y no se está comparando contra nada. Si solo saliera lo presupuestado, el total se vería mejor de lo que es.",
+      "Cada cambio queda en la bitácora con el monto, el mes y quién lo dejó así: el historial de una cifra que se ajusta varias veces es justo lo que se audita.",
+    ],
+    campos: [
+      { nombre: "Gastado", explica: "El costo de las órdenes TERMINADAS en ese mes, por su fecha de término. Es el mismo criterio del costo por centro de costo: no hay dos respuestas a «cuánto llevamos»." },
+      { nombre: "Diferencia", explica: "Lo que queda disponible. En rojo cuando ya se rebasó, y ahí el número es por cuánto se pasó." },
+      { nombre: "Ejercido", explica: "El porcentaje gastado del presupuesto. Verde hasta 89 %, ámbar de 90 a 100, rojo arriba de 100. Sin presupuesto capturado no hay porcentaje, y con presupuesto en cero tampoco: no se divide entre cero." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo ningún centro de costo", porque: "Los presupuestos cuelgan del centro de costo. Déselos de alta en Catálogos con la misma clave que usa su contabilidad, y asígneselos a los equipos: las órdenes lo heredan del equipo." },
+      { sintoma: "El gasto no cuadra con lo que llevo comprado", porque: "Aquí cuenta lo EJECUTADO —órdenes terminadas—, no lo comprometido. Una compra autorizada que todavía no llega no aparece: sumarla haría que el ejercido pareciera mayor de lo que es. Lo que viene en camino se ve en «Qué hay que comprar»." },
+      { sintoma: "Capturé el presupuesto y no cambió el total del año", porque: "Revise que esté en el año correcto. El presupuesto es de un mes de un año: si captura enero de 2027 no cambia 2026." },
+    ],
+  },
+
   "/indicadores": {
     titulo: "Cómo se calculan los indicadores",
     que: "Todos los indicadores con su definición y fórmula, y el detalle de cada uno: qué órdenes y paros cuentan, y los registros exactos que forman la cifra.",
