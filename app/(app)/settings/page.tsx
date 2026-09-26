@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, UserCog, Users, ClipboardList } from "lucide-react";
+import { PanelAtajos } from "./atajos";
+import { favoritosDe } from "@/lib/favoritos";
+import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
-import { puedeVerRuta } from "@/lib/pantallas";
+import { menuDe, puedeVerRuta } from "@/lib/pantallas";
 import { consumoDe, PLANES, type ClavePlan } from "@/lib/planes";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { PanelSuscripcion } from "@/components/panel-suscripcion";
@@ -43,12 +45,13 @@ import { ZONA_POR_OMISION } from "@/lib/periodos";
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "atajos", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
   cuenta: "Sus datos de acceso al sistema.",
   apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
+  atajos: "Las pantallas que usa a diario, hasta arriba de su menú. Es suyo: no cambia el de nadie más.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
@@ -84,7 +87,8 @@ export default async function SettingsPage({
    */
   const MANDO = can(user.role, "workorder:write");
   const PERMITIDAS: Record<Seccion, boolean> = {
-    cuenta: true, apariencia: true, avisos: true, seguridad: true,
+    // Personales, de todos: cada quien decide los suyos.
+    cuenta: true, apariencia: true, atajos: true, avisos: true, seguridad: true,
     organizacion: can(user.role, "settings:write"),
     jornada: MANDO, ordenes: MANDO,
     suscripcion: can(user.role, "settings:write"),
@@ -100,6 +104,7 @@ export default async function SettingsPage({
   const todas: Pestana[] = [
     { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
+    { clave: "atajos", titulo: "Lo que más uso", icono: <Star className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
@@ -195,6 +200,13 @@ export default async function SettingsPage({
     <>
       <PageHeader title="Configuracion" description={DESCRIPCIONES[activa]} />
       <Pestanas activa={activa} pestanas={pestanas} />
+
+      {activa === "atajos" ? (
+        <PanelAtajos
+          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })}
+          iniciales={(await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })).map((i) => i.href)}
+        />
+      ) : null}
 
       {activa === "apariencia" ? (
         <PanelApariencia

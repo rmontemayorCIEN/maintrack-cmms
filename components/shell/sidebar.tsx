@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight, Menu, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { menuDe } from "@/lib/pantallas";
+import { menuDe, type ItemMenu } from "@/lib/pantallas";
 import { IconoMenu } from "./iconos";
 
 /**
@@ -26,6 +26,7 @@ export function Sidebar({
   esDemo = false,
   tieneLogo = false,
   terminoConjuntoPlural,
+  favoritos,
 }: {
   orgName: string;
   plan: string;
@@ -37,6 +38,8 @@ export function Sidebar({
   tieneLogo?: boolean;
   /** Como le llama esta cuenta a un conjunto de equipos: Lineas, Sistemas, Servicios, Rutas. */
   terminoConjuntoPlural?: string;
+  /** Las pantallas que esta persona ancló, ya filtradas por su rol. */
+  favoritos: ItemMenu[];
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -48,7 +51,18 @@ export function Sidebar({
    * usuario todavia no sabe que existe. Quien ya lo conoce cierra lo que no
    * usa y el navegador se lo recuerda.
    */
-  const menu = menuDe(rol, { esSuperAdmin, esDemo });
+  /**
+   * Los accesos rápidos van ARRIBA y como un grupo más, no como una barra
+   * aparte: así se recorre el menú de una sola manera y la pantalla anclada se
+   * ve igual que en su grupo de siempre —mismo ícono, mismo nombre—. Quien no
+   * ancle nada ve el menú de siempre, sin un hueco donde antes no había nada.
+   */
+  const menu = [
+    ...(favoritos.length
+      ? [{ seccion: "Lo que más uso", clave: "favoritos", items: favoritos }]
+      : []),
+    ...menuDe(rol, { esSuperAdmin, esDemo }),
+  ];
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(menu.map((g) => [g.clave, true])),
   );

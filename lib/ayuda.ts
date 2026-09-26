@@ -1630,6 +1630,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Encender los avisos al teléfono y activar cada aparato",
       "Elegir qué avisos le llegan y por dónde; y, si administra, cómo avisa la empresa: canales, horario, resúmenes, recordatorios y escalamiento",
       "Crear credenciales de API y webhooks para otros sistemas, y revisar el historial de entregas",
+      "Poner a la mano las pantallas que usa a diario, hasta arriba de su menú",
       "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [
@@ -1646,6 +1647,10 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Los permisos de una credencial se marcan uno por uno y lo que no marque no existe para ese sistema. Dos van juntos y conviene entenderlos: «compras:escribir» deja que su ERP informe el folio con que colocó la compra y registre la recepción de la mercancía —que entra al almacén con su kardex y su costo, igual que si la capturara una persona—, y «costos:leer» es lo que decide si además ve los montos. Una integración que nada más confirma folios no necesita ver precios.",
       "Las recepciones que manda una integración se ven en la ficha de la compra y en el kardex a nombre de esa integración, no en blanco: se sabe siempre si la entrada la capturó alguien o la mandó el ERP.",
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
+      "En «Lo que más uso» marca las pantallas que abre a diario y aparecen hasta arriba del menú, en el orden en que las eligió. Caben ocho: un acceso rápido de veinte renglones vuelve a ser un menú y no resuelve nada.",
+      "Esos accesos son SUYOS, no de la empresa: el almacenista vive en existencias y requisiciones, y dirección en indicadores y reportes; no hay un acomodo que les sirva a los dos. Marcar los suyos no le cambia el menú a nadie más.",
+      "Lo que NO cambian es cómo se llaman las cosas ni en qué grupo están. Es a propósito: de los nombres del menú salen los comandos de voz («llévame a almacén») y con esos nombres está escrita toda la ayuda. Si cada quien renombrara sus grupos, pedir una pantalla hablando dejaría de funcionarle y el soporte por teléfono no podría guiarlo.",
+      "Si cambia de rol y pierde acceso a una pantalla anclada, deja de aparecer en su menú pero no se borra: si le devuelven el permiso, vuelve sola.",
       "En «Apariencia» escoge la voz con que lo escucha Y qué tanto le contesta hablando. «Concisa» dice lo que preguntó y deja el detalle escrito; «Completa» dice también el contexto que no pidió pero cambia la lectura. Las dos son suyas, no de la empresa: al que va manejando le sirve una y al que revisa sentado, la otra.",
     ],
     campos: [

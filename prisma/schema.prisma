@@ -259,6 +259,7 @@ model Organization {
   externalServices   ExternalService[]
   vigencias          Vigencia[]
   centrosDeCosto     CentroDeCosto[]
+  favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
   teams              Team[]
@@ -381,6 +382,7 @@ model User {
   attachments          Attachment[]
   vigencias            Vigencia[]              @relation("VigenciaDeUsuario")
   vigenciasCreadas     Vigencia[]              @relation("VigenciaAutor")
+  favoritos            PantallaFavorita[]
   links                ReferenceLink[]
   planRequests         PlanRequest[]
   solicitudesSoporte   SolicitudSoporte[]
@@ -1540,6 +1542,44 @@ model CentroDeCosto {
 
   @@unique([organizationId, code])
   @@index([organizationId])
+}
+
+/// Las pantallas que alguien quiere a la mano, arriba de su menu.
+///
+/// ── Por que personales y no de la empresa ──
+///
+/// El menu llego a 33 pantallas, y cada quien usa una cuarta parte. Pero no la
+/// MISMA cuarta parte: el almacenista vive en existencias y requisiciones, y el
+/// director en indicadores y reportes. Un menu que el administrador configura
+/// para todos no resuelve ni la mitad del problema, porque no hay un acomodo
+/// que le sirva a los dos.
+///
+/// ── Por que en la base y no en el navegador ──
+///
+/// Un favorito tiene que seguir a la persona del telefono de piso a la
+/// computadora de la oficina. `localStorage` se queda en el aparato, y ahi
+/// dejaria de ser suyo para ser de esa maquina.
+///
+/// ── Lo que NO se guarda aqui ──
+///
+/// El nombre ni el grupo. La ruta apunta a `lib/pantallas.ts`, que sigue
+/// mandando en como se llaman las cosas: asi el soporte, la ayuda y los
+/// comandos de voz hablan del mismo sistema que la persona ve en pantalla.
+model PantallaFavorita {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// La ruta, tal como la registra `lib/pantallas.ts`.
+  ruta           String
+  /// En que orden las quiere. Se reacomoda al mover una.
+  posicion       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ruta])
+  @@index([userId, posicion])
 }
 
 model Comentario {

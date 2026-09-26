@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { favoritosDe } from "@/lib/favoritos";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -26,6 +27,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // responde «Sin permiso» con el menú de su rol alrededor.
   const ruta = (await headers()).get("x-ruta") ?? "/dashboard";
   const esDemo = user.organization.esDemo;
+  // Los accesos rápidos de esta persona: ya cruzados con lo que su rol ve hoy.
+  const favoritos = await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo });
   const permitida = puedeVerRuta(user.role, ruta, { esSuperAdmin: user.isSuperAdmin, esDemo });
   // Mientras se restaura la demo no se muestra ninguna pantalla a medio sembrar.
   const restaurando = esDemo && demoEnRestauracion(user.organization);
@@ -45,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         rol={user.role}
         esSuperAdmin={user.isSuperAdmin}
         esDemo={esDemo}
+        favoritos={favoritos}
         terminoConjuntoPlural={nombreDelMapa(terminoConjunto(user.organization))}
       />
       <div className="flex min-w-0 flex-1 flex-col">
