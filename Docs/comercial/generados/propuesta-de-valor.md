@@ -28,6 +28,8 @@
 - **Mantenimiento, inventario y compras conectados.** La orden pide la refacción, el almacén la surte o la requisición la compra, y el costo regresa a la orden.
 - **Condición, medidores y alertas.** Lecturas y sensores que disparan trabajo antes de la falla.
 - **Multiempresa.** Varios sitios en una misma cuenta y, para quien da servicio, varias empresas cliente separadas por completo.
+- **El sistema le habla.** El parte del día cuenta en voz alta lo que hay que saber hoy, para oírlo camino a la planta; y se le puede preguntar hablando, como a un jefe de mantenimiento.
+- **Se entiende antes de leerlo.** El inicio y el almacén abren con una franja donde cada cuadro es un equipo o una refacción: en un segundo se ve qué área está parada y qué familia está sufriendo.
 
 ## Módulos
 
@@ -35,11 +37,14 @@
 - **Órdenes de trabajo:** Correctivas, preventivas y de mejora, con responsable, tiempo, material, evidencia y cierre validado.
 - **Solicitudes:** Cualquier persona reporta una falla, también sin cuenta desde el QR del equipo.
 - **Preventivo:** Planes por calendario o por medidor que generan sus órdenes.
+- **Rondines:** Rutas de inspección con sus puntos y su QR: el rondín se recorre desde el teléfono y lo que se encuentra se convierte en orden sin capturarlo dos veces.
 - **Medidores y predictivo:** Lecturas, umbrales, tendencias y vida útil remanente.
-- **Almacén:** Existencias por almacén, kardex, costo promedio y mínimos.
+- **Almacén:** Existencias por almacén, kardex, costo promedio y mínimos, con una franja que dice de un vistazo qué familia está sufriendo y dónde está parado el dinero.
 - **Compras:** Requisiciones, autorización, órdenes de compra, proveedores y recepción.
-- **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog y paros.
-- **Avisos:** En la campana y en el celular, sin costo por mensaje.
+- **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro.
+- **Avisos:** En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega.
+- **Conversaciones y compromisos:** Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple.
+- **Integración con su ERP:** API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas.
 
 ## Beneficios por rol
 

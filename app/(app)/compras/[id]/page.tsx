@@ -253,7 +253,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
                     <p className="text-[0.625rem] text-slate-500">
                       {formatDateTime(rec.createdAt)}
                       {rec.supplier?.name ? ` · ${rec.supplier.name}` : ""}
-                      {rec.recibidoPor?.name ? ` · recibió ${rec.recibidoPor.name}` : ""}
+                      {rec.recibidoPor?.name ?? rec.recibidoPorNombre ? ` · recibió ${rec.recibidoPor?.name ?? rec.recibidoPorNombre}` : ""}
                     </p>
                     <ul className="mt-1 grid gap-0.5">
                       {rec.renglones.map((l) => (

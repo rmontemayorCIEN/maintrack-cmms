@@ -5,6 +5,7 @@ import {
 import { COMPLEMENTO_IA, ORDEN_PLANES, PLANES } from "./planes";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "./ia/funciones";
 import { HISTORIAS, ORDEN_RECOMENDADO } from "./demo-guia";
+import { DE_QUIEN_ES_EL_ALMACEN, EL_ARGUMENTO_DE_FONDO, LAS_DOS_DIRECCIONES, POR_ERP, POSTURA } from "./comercial-integraciones";
 
 /**
  * La presentación al cliente, en diapositivas.
@@ -172,6 +173,27 @@ export function armarPresentacion(ligasPorHistoria: Record<string, Liga[]> = {})
       ],
       ligas: [{ etiqueta: "El parte del día", href: "/dashboard" }, { etiqueta: "Preguntar hablando", href: "/consulta" }],
       nota: "Si hay bocina, reprodúzcalo. Es lo que más se recuerda de la demo, y no se explica: se oye.",
+    },
+    {
+      clave: "erp", seccion: "Cómo se trabaja",
+      titulo: "Y lo que ya tenemos en el ERP",
+      entradilla: POSTURA,
+      bloques: [
+        {
+          tipo: "tarjetas", columnas: 2, items: [
+            { titulo: "Lo que entra a MainTrack", texto: LAS_DOS_DIRECCIONES.entra.resumen },
+            { titulo: "Lo que MainTrack entrega", texto: LAS_DOS_DIRECCIONES.sale.resumen },
+          ],
+        },
+        { tipo: "filas", items: POR_ERP.map((e) => ({ etiqueta: `${e.erp} · ${e.dificultad}`, texto: e.texto })) },
+        {
+          tipo: "destacado", titulo: DE_QUIEN_ES_EL_ALMACEN.pregunta,
+          texto: `${DE_QUIEN_ES_EL_ALMACEN.porQueImporta} ${DE_QUIEN_ES_EL_ALMACEN.enLaPractica}`,
+        },
+        { tipo: "destacado", titulo: EL_ARGUMENTO_DE_FONDO.titulo, texto: EL_ARGUMENTO_DE_FONDO.texto },
+      ],
+      ligas: [{ etiqueta: "Credenciales y webhooks", href: "/settings" }],
+      nota: "Se enseña solo si preguntan por el ERP; si no, se salta. Cuando pregunten, no prometa un conector: lea la postura tal cual y pase a las preguntas para su área de sistemas. Lo que MainTrack no hace está en el documento de integraciones, y conviene decirlo: es lo que hace creíble el resto.",
     },
     {
       clave: "seguridad", seccion: "Cómo se trabaja",

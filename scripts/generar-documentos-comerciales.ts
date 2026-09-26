@@ -20,6 +20,13 @@ import { COMPLEMENTO_IA, NOMBRE_RECURSO, ORDEN_PLANES, PLANES } from "../lib/pla
 import { DOCUMENTOS, ESTADO_DOCUMENTOS, PENDIENTES, VERSION_DOCUMENTOS } from "../lib/legal";
 import { HISTORIAS, ORDEN_RECOMENDADO, PASOS_RECORRIDO, PREGUNTAS_DEMO } from "../lib/demo-guia";
 import { armarPresentacion, type Bloque } from "../lib/demo-presentacion";
+import {
+  CUANTOS, DE_QUIEN_ES_EL_ALMACEN, EL_ARGUMENTO_DE_FONDO, LAS_DOS_DIRECCIONES, LO_QUE_NO_HACE,
+  LO_QUE_YA_HAY, POR_ERP, POR_QUE_ASI, POSTURA, PREGUNTAS_AL_AREA_DE_SISTEMAS,
+} from "../lib/comercial-integraciones";
+import { ALCANCES } from "../lib/integraciones/alcances";
+import { ETIQUETA_MODULO, EVENTOS, EVENTOS_WEBHOOK, type Modulo } from "../lib/avisos/catalogo";
+import { IMPORTACIONES, ORDEN_IMPORTACION } from "../lib/importacion";
 
 const DIR = join("Docs", "comercial", "generados");
 const AVISO = "<!-- Generado por scripts/generar-documentos-comerciales.ts. No se edita a mano: cambie la fuente y vuelva a generar. -->\n\n";
@@ -190,6 +197,96 @@ ${SEVERIDADES.map((s) => `| ${s.nombre} | ${s.cuando} | ${s.respuesta.PROFESSION
 ${SOPORTE.disponibilidad}
 
 El texto completo está en legal/sla.md y legal/soporte.md.
+`;
+
+/**
+ * Integraciones: el documento que se manda antes de la junta cuando el cliente
+ * dijo el nombre de su ERP.
+ *
+ * Los datos duros salen del codigo —los permisos de `alcances.ts`, los eventos
+ * del catalogo de avisos, los tipos de carga de `importacion.ts`—, no de una
+ * lista escrita aqui. Un permiso nuevo aparece en el documento sin que nadie lo
+ * recuerde; era la unica forma de que no mintiera a los seis meses.
+ */
+const porModulo = EVENTOS_WEBHOOK.reduce<Partial<Record<Modulo, string[]>>>((acc, t) => {
+  const m = EVENTOS[t].modulo;
+  (acc[m] ??= []).push(EVENTOS[t].titulo);
+  return acc;
+}, {});
+
+archivos["integraciones.md"] = `# MainTrack y su ERP
+
+> ${POSTURA}
+
+## Por qué así y no con un conector
+
+${POR_QUE_ASI.map((x) => `- ${x}`).join("\n")}
+
+## Las dos direcciones
+
+**${LAS_DOS_DIRECCIONES.entra.titulo}**
+
+${LAS_DOS_DIRECCIONES.entra.items.map((x) => `- ${x}`).join("\n")}
+
+**${LAS_DOS_DIRECCIONES.sale.titulo}**
+
+${LAS_DOS_DIRECCIONES.sale.items.map((x) => `- ${x}`).join("\n")}
+
+## Lo que ya está hecho
+
+Nada de esta sección es un plan: está en producción hoy.
+
+${LO_QUE_YA_HAY.map((x) => `### ${x.titulo}\n\n${x.texto}`).join("\n\n")}
+
+## Los ${CUANTOS.alcances} permisos que se le pueden dar a una llave
+
+El cliente elige uno por uno. Lo que no marque, no existe para ese sistema externo.
+
+| Permiso | Qué habilita |
+|---|---|
+${(Object.keys(ALCANCES) as Array<keyof typeof ALCANCES>).map((k) => `| \`${k}\` | ${ALCANCES[k]} |`).join("\n")}
+
+## Los ${CUANTOS.eventos} eventos que MainTrack puede avisar
+
+Cada webhook elige cuáles recibe. Van firmados, con reintentos y con historial de entrega.
+
+${(Object.keys(porModulo) as Modulo[]).map((m) => `- **${ETIQUETA_MODULO[m]}:** ${porModulo[m]!.join(", ")}.`).join("\n")}
+
+## Lo que entra por archivo
+
+Para el arranque, y para lo que no valga la pena automatizar. Cada tipo se valida en seco antes de escribir, y el lote completo se puede revertir.
+
+${ORDEN_IMPORTACION.map((k) => `- **${IMPORTACIONES[k].titulo}** — ${IMPORTACIONES[k].descripcion}`).join("\n")}
+
+## ${DE_QUIEN_ES_EL_ALMACEN.pregunta}
+
+${DE_QUIEN_ES_EL_ALMACEN.porQueImporta}
+
+${DE_QUIEN_ES_EL_ALMACEN.opciones.map((o) => `### ${o.titulo}${o.recomendado ? " — recomendada" : ""}\n\n${o.texto}\n\n- **A favor:** ${o.aFavor}\n- **En contra:** ${o.enContra}`).join("\n\n")}
+
+${DE_QUIEN_ES_EL_ALMACEN.enLaPractica}
+
+## Qué esperar de cada ERP
+
+${POR_ERP.map((e) => `### ${e.erp} — ${e.dificultad}\n\n${e.texto}${e.ojo ? `\n\n**Ojo:** ${e.ojo}` : ""}`).join("\n\n")}
+
+## Lo que hay que preguntarle a su área de sistemas
+
+Sin estas respuestas no hay alcance, y sin alcance no hay cotización.
+
+${PREGUNTAS_AL_AREA_DE_SISTEMAS.map((x, i) => `${i + 1}. ${x}`).join("\n")}
+
+## Lo que MainTrack no hace
+
+${LO_QUE_NO_HACE.map((x) => `- ${x}`).join("\n")}
+
+## ${EL_ARGUMENTO_DE_FONDO.titulo}
+
+${EL_ARGUMENTO_DE_FONDO.texto}
+
+---
+
+La referencia técnica de la API —rutas, cuerpos, códigos de error y ejemplos— está en \`Docs/api-v1.md\`, y el índice vivo en \`GET /api/v1\` de la instalación del cliente.
 `;
 
 const revisar = process.argv.includes("--revisar");

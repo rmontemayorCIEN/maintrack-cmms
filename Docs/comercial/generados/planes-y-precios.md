@@ -26,6 +26,10 @@ Incluye:
 - API para integrar sistemas externos y sensores
 - 100 GB para fotos, videos y documentos
 - Diagnóstico semanal con inteligencia artificial
+- El parte del día, para escucharlo camino a la planta
+- El técnico cierra la orden dictándola, con el teléfono y las manos ocupadas
+- Decir a dónde ir y que el sistema lo lleve, desde cualquier pantalla
+- El inicio y el almacén con su franja: se ve el estado antes de leerlo
 
 ## Enterprise — $8,990 MXN al mes
 
@@ -44,6 +48,7 @@ Incluye:
 - Activos, usuarios y sitios sin límite
 - Monitoreo predictivo sin límite
 - Diagnóstico semanal y asistentes de IA (detalle en la comparación)
+- Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz
 - Soporte con tiempos de respuesta prioritarios
 
 ## Complemento IA Avanzada — $990 MXN al mes
@@ -89,8 +94,12 @@ Todas las funciones de inteligencia artificial, con 400 operaciones al mes sobre
 | Integración | Integración con su ERP | Bajo configuración · Por API; el alcance se acuerda en la implementación | Bajo configuración · Por API; el alcance se acuerda en la implementación |
 | Integración | Varias empresas cliente (para quien da servicio) | Bajo configuración · Se habilita a solicitud | Bajo configuración · Se habilita a solicitud |
 | Inteligencia artificial | Operaciones de IA al mes | 20 | 80 |
-| Inteligencia artificial | Funciones de IA | 8 de 19 | 14 de 19 |
-| Inteligencia artificial | IA Avanzada | Complemento · Las 19 funciones y 400 operaciones más al mes, por $990 MXN al mes | Complemento · Las 19 funciones y 400 operaciones más al mes, por $990 MXN al mes |
+| Inteligencia artificial | Funciones de IA | 11 de 23 | 18 de 23 |
+| Inteligencia artificial | Dictar el cierre de la orden | Incluido · Con su propia bolsa: no gasta las operaciones del plan | Incluido · Con su propia bolsa: no gasta las operaciones del plan |
+| Inteligencia artificial | El parte del día, hablado | Incluido · Con su propia bolsa: no gasta las operaciones del plan | Incluido · Con su propia bolsa: no gasta las operaciones del plan |
+| Inteligencia artificial | Preguntarle hablando y que conteste | Bajo configuración · El parte del día sí se escucha; preguntar hablando es de Enterprise | Incluido · Para quien ve el panorama, con tope mensual por empresa |
+| Inteligencia artificial | Revisar las fotos del rondín | Complemento · Con IA Avanzada. El rondín y sus fotos funcionan sin él | Incluido · Propone hallazgos; usted acepta o descarta |
+| Inteligencia artificial | IA Avanzada | Complemento · Las 23 funciones y 400 operaciones más al mes, por $990 MXN al mes | Complemento · Las 23 funciones y 400 operaciones más al mes, por $990 MXN al mes |
 | Servicio | Soporte dentro de MainTrack | Incluido · Tiempos estándar | Incluido · Tiempos prioritarios |
 | Servicio | Puesta en marcha guiada e importación | Incluido | Incluido |
 | Servicio | Acompañamiento de implementación y capacitación | Bajo configuración · Según la ruta de implementación acordada | Bajo configuración · Según la ruta de implementación acordada |

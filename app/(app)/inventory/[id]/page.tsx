@@ -69,7 +69,7 @@ export default async function RefaccionPage({ params }: { params: Promise<{ id: 
         workOrder: { select: { id: true, number: true, asset: { select: { code: true, name: true } } } },
         materialRequest: { select: { id: true, folio: true } },
         transfer: { select: { id: true, folio: true } },
-        goodsReceipt: { select: { id: true, folio: true, purchaseRequest: { select: { id: true, folio: true } }, recibidoPor: { select: { name: true } } } },
+        goodsReceipt: { select: { id: true, folio: true, purchaseRequest: { select: { id: true, folio: true } }, recibidoPor: { select: { name: true } }, recibidoPorNombre: true } },
       },
     }),
     prisma.planTaskPart.findMany({

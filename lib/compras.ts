@@ -310,7 +310,13 @@ export async function enCompra(params: {
  */
 export async function recibir(params: {
   organizationId: string;
-  userId: string;
+  /**
+   * Quien recibio. Nulo cuando la recepcion la mando una integracion: ahi no
+   * hay persona, y entonces se llena `integracion`.
+   */
+  userId: string | null;
+  /** Nombre de la integracion, cuando no hay persona. Ver `quienFirmoLaRecepcion`. */
+  integracion?: string | null;
   purchaseRequestId?: string | null;
   warehouseId: string;
   supplierId?: string | null;
@@ -478,6 +484,7 @@ async function registrarRecepcion(
         remision: params.remision || null,
         ordenCompra: params.ordenCompra || null,
         recibidoPorId: params.userId,
+        recibidoPorNombre: params.integracion || null,
         nota: params.nota || null,
       },
       select: { id: true, folio: true },

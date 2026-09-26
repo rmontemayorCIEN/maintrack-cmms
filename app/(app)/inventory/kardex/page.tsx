@@ -70,6 +70,7 @@ export default async function KardexPage({
             id: true, folio: true,
             purchaseRequest: { select: { id: true, folio: true } },
             recibidoPor: { select: { name: true } },
+            recibidoPorNombre: true,
           },
         },
       },

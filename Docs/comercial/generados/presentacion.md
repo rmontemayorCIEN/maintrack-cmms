@@ -2,7 +2,7 @@
 
 # MainTrack — presentación comercial
 
-> 18 diapositivas, las mismas que se proyectan en **Guía de la demostración › Presentar al cliente** (`/demo/presentacion`, dentro de la empresa demostrativa), donde además abren las pantallas reales. Formato: una diapositiva por sección separada por `---` (compatible con Marp).
+> 20 diapositivas, las mismas que se proyectan en **Guía de la demostración › Presentar al cliente** (`/demo/presentacion`, dentro de la empresa demostrativa), donde además abren las pantallas reales. Formato: una diapositiva por sección separada por `---` (compatible con Marp).
 
 ---
 
@@ -44,11 +44,14 @@ MainTrack es una plataforma de gestión y confiabilidad del mantenimiento que co
 - **Órdenes de trabajo:** Correctivas, preventivas y de mejora, con responsable, tiempo, material, evidencia y cierre validado.
 - **Solicitudes:** Cualquier persona reporta una falla, también sin cuenta desde el QR del equipo.
 - **Preventivo:** Planes por calendario o por medidor que generan sus órdenes.
+- **Rondines:** Rutas de inspección con sus puntos y su QR: el rondín se recorre desde el teléfono y lo que se encuentra se convierte en orden sin capturarlo dos veces.
 - **Medidores y predictivo:** Lecturas, umbrales, tendencias y vida útil remanente.
-- **Almacén:** Existencias por almacén, kardex, costo promedio y mínimos.
+- **Almacén:** Existencias por almacén, kardex, costo promedio y mínimos, con una franja que dice de un vistazo qué familia está sufriendo y dónde está parado el dinero.
 - **Compras:** Requisiciones, autorización, órdenes de compra, proveedores y recepción.
-- **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog y paros.
-- **Avisos:** En la campana y en el celular, sin costo por mensaje.
+- **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro.
+- **Avisos:** En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega.
+- **Conversaciones y compromisos:** Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple.
+- **Integración con su ERP:** API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas.
 
 ---
 
@@ -112,6 +115,8 @@ Lo que no viene en cualquier sistema de órdenes de trabajo.
 - **Mantenimiento, inventario y compras conectados:** La orden pide la refacción, el almacén la surte o la requisición la compra, y el costo regresa a la orden.
 - **Condición, medidores y alertas:** Lecturas y sensores que disparan trabajo antes de la falla.
 - **Multiempresa:** Varios sitios en una misma cuenta y, para quien da servicio, varias empresas cliente separadas por completo.
+- **El sistema le habla:** El parte del día cuenta en voz alta lo que hay que saber hoy, para oírlo camino a la planta; y se le puede preguntar hablando, como a un jefe de mantenimiento.
+- **Se entiende antes de leerlo:** El inicio y el almacén abren con una franja donde cada cuadro es un equipo o una refacción: en un segundo se ve qué área está parada y qué familia está sufriendo.
 
 ---
 
@@ -239,22 +244,65 @@ La llenadora, el equipo más crítico, tiene un plan semanal de lubricación y r
 
 Interpreta y redacta sobre sus propios datos. No inventa números ni decide por usted.
 
+- **Brief del día, para escuchar:** Lo que la dirección necesita saber hoy, contado como lo diría una persona, para oírlo en el camino. Las cifras las calcula el sistema; la IA solo las hilvana, y se verifica que no haya agregado ninguna.
 - **Diagnóstico semanal:** Cada semana la IA revisa indicadores, backlog, costos y calidad de captura, y entrega hallazgos con evidencia, acciones y una matriz FODA.
 - **Asistente de cierre de orden:** Al cerrar una orden, propone código de falla, causa raiz y refacciones a partir de lo que escribio el técnico.
 - **Generador de planes:** Redacta el plan completo de un activo: actividades, frecuencia, mano de obra por especialidad, refacciones y servicios externos.
 - **Triage de solicitudes:** Lee lo que reporto alguien que no es de mantenimiento —con su foto— y propone título, prioridad, tipo y posibles duplicados.
-- **Consulta en lenguaje natural:** Preguntas como «cuanto lleve gastado en el compresor este año» respondidas sobre sus propios datos.
 - **Ayuda con IA:** Dudas sobre como usar el sistema, contestadas con la documentación y —cuando la pregunta es sobre su caso— con sus propios datos.
 
 **La aritmética no es de la IA:** Disponibilidad, cumplimiento, costos, MTBF y MTTR los calcula el sistema con lo registrado, y cada indicador muestra su fórmula. La IA lee esos números ya calculados para explicar y proponer; nunca los suma ella.
 
-Se cobra en operaciones al mes, no en tokens: Professional incluye 20 y Enterprise 80. El complemento «IA Avanzada» agrega 400 más y todas las funciones, por $990 MXN al mes. La ayuda del sistema trae su propia bolsa: preguntar cómo se usa no consume las operaciones del plan.
+Se cobra en operaciones al mes, no en tokens: Professional incluye 20 y Enterprise 80. El complemento «IA Avanzada» agrega 400 más y todas las funciones, por $990 MXN al mes. Dos cosas tienen su propia bolsa y no gastan las operaciones del plan: preguntar cómo se usa el sistema, y el parte del día. Son de uso diario, y racionarlas seria empujar a no usarlas.
 
 Abrir en el sistema: Diagnóstico con IA (`/diagnostico`) · Consulta en lenguaje natural (`/consulta`)
 
 ---
 
-## 15. Su información, separada y respaldada
+## 15. El sistema habla, y también escucha
+
+*Cómo se trabaja*
+
+Lo que un director alcanza a revisar mientras maneja a la planta.
+
+- **El parte del día:** En el inicio hay un botón que lo cuenta en voz alta: qué está parado, qué se venció, qué alerta hay y qué compra espera su firma. Con pausas, como lo diría el jefe de mantenimiento por teléfono. (En los dos planes.)
+- **Prefiero preguntar y escuchar:** En «Pregunte a sus datos» se toca el micrófono y se pregunta hablando —«¿cuántas órdenes tengo vencidas?»—. El sistema consulta, contesta en voz alta y deja la respuesta escrita para copiarla. (Enterprise, para quien ve el panorama, con tope mensual por empresa.)
+
+**Las cifras no las dice la IA:** Los totales, los conteos y las tendencias los calcula el sistema y se le entregan ya resueltos; la IA solo los hilvana para que suenen como los diría una persona. Antes de hablar se verifica que no haya agregado ninguna cifra que no estuviera.
+
+Cada quien elige la voz que prefiere en Ajustes, y se puede probar antes de guardarla. Lo hablado pasa por los mismos permisos que lo escrito: nadie oye lo que no podría ver en pantalla.
+
+Abrir en el sistema: El parte del día (`/dashboard`) · Preguntar hablando (`/consulta`)
+
+> **Quien presenta:** Si hay bocina, reprodúzcalo. Es lo que más se recuerda de la demo, y no se explica: se oye.
+
+---
+
+## 16. Y lo que ya tenemos en el ERP
+
+*Cómo se trabaja*
+
+MainTrack no se conecta a su ERP: publica una API y recibe eventos. Su equipo de sistemas —o nosotros, con un agente instalado en su red— empuja y jala lo que haga falta. Es la única forma de integrar dos sistemas sin que la actualización de uno rompa al otro.
+
+- **Lo que entra a MainTrack:** Solicitudes de trabajo, lecturas de medidor, condiciones de sensores, y los catálogos completos por archivo.
+- **Lo que MainTrack entrega:** Consultas de activos, órdenes y existencias; avisos firmados en el momento; compras por colocar; recepciones y consumo.
+
+- **Dynamics 365 · El más sencillo:** Business Central y Finance & Operations exponen OData y Dataverse, con avisos propios. La integración es cuestión de días de trabajo del lado del cliente, no de meses.
+- **Oracle · Sencillo:** Fusion y NetSuite tienen servicios REST bien documentados. Técnicamente el más limpio de todos.
+- **SAP · Técnicamente sí, políticamente despacio:** S/4HANA y Business One tienen servicios para esto. El obstáculo no es técnico: el área de SAP del cliente tiene su propio calendario, su consultor y su presupuesto. No se comprometen fechas que dependan de ellos.
+- **CONTPAQi · Necesita un agente en su red:** Es el caso más frecuente en México y el más delicado: normalmente es software de escritorio sobre una base de datos en la red del cliente, sin nada a qué llamarle desde internet. Se resuelve con un programa chico instalado en su red que lee su base y empuja a la API de MainTrack —que ya está lista para recibir—.
+
+**¿De quién es el almacén de refacciones?:** De esta respuesta depende todo lo demás. Si no se define, se descubre a medio camino y se rehace. Muchas plantas acaban partiéndolo: el almacén general en el ERP y el de mantenimiento en MainTrack, con traspasos entre los dos. Funciona bien y es la salida cuando el cliente no quiere ceder ninguno de los dos.
+
+**El ERP sabe cuánto costó. No sabe por qué se volvió a romper.:** Un ERP registra que se compró un rodamiento y cuánto se pagó. No sabe que ese rodamiento fue a la bomba 3, que es la cuarta vez en ocho meses, que la causa raíz es desalineación, y que el paro cuesta más que la refacción. MainTrack sí. Integrarlos no es sincronizar almacenes: es devolverle al ERP el costo real de mantenimiento por activo, por línea y por centro de costo —mano de obra, refacciones, servicios externos y tiempo perdido— que hoy no tiene de dónde sacar.
+
+Abrir en el sistema: Credenciales y webhooks (`/settings`)
+
+> **Quien presenta:** Se enseña solo si preguntan por el ERP; si no, se salta. Cuando pregunten, no prometa un conector: lea la postura tal cual y pase a las preguntas para su área de sistemas. Lo que MainTrack no hace está en el documento de integraciones, y conviene decirlo: es lo que hace creíble el resto.
+
+---
+
+## 17. Su información, separada y respaldada
 
 *Cómo se trabaja*
 
@@ -273,7 +321,7 @@ Abrir en el sistema: Diagnóstico con IA (`/diagnostico`) · Consulta en lenguaj
 
 ---
 
-## 16. Cómo se arranca
+## 18. Cómo se arranca
 
 *Cómo se trabaja*
 
@@ -288,7 +336,7 @@ Abrir en el sistema: Puesta en marcha (`/puesta-en-marcha`)
 
 ---
 
-## 17. Planes y precios
+## 19. Planes y precios
 
 *Cierre*
 
@@ -306,11 +354,16 @@ Abrir en el sistema: Puesta en marcha (`/puesta-en-marcha`)
   - API para integrar sistemas externos y sensores
   - 100 GB para fotos, videos y documentos
   - Diagnóstico semanal con inteligencia artificial
+  - El parte del día, para escucharlo camino a la planta
+  - El técnico cierra la orden dictándola, con el teléfono y las manos ocupadas
+  - Decir a dónde ir y que el sistema lo lleve, desde cualquier pantalla
+  - El inicio y el almacén con su franja: se ve el estado antes de leerlo
 - **Enterprise** — $8,990 MXN al mes. Para grupos con varias plantas y volumen alto. Activos, usuarios y sitios sin límite.
   - Todo lo de Professional
   - Activos, usuarios y sitios sin límite
   - Monitoreo predictivo sin límite
   - Diagnóstico semanal y asistentes de IA (detalle en la comparación)
+  - Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz
   - Soporte con tiempos de respuesta prioritarios
 
 - **Complemento de IA:** IA Avanzada: Todas las funciones de inteligencia artificial, con 400 operaciones al mes sobre cualquier plan de pago. Por $990 MXN al mes, sobre cualquier plan.
@@ -322,7 +375,7 @@ Abrir en el sistema: Puesta en marcha (`/puesta-en-marcha`)
 
 ---
 
-## 18. Gracias
+## 20. Gracias
 
 *Cierre*
 

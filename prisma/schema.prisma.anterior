@@ -1866,6 +1866,11 @@ model GoodsReceipt {
   remision          String?
   ordenCompra       String?
   recibidoPorId     String?
+  /// Cuando no hay persona detras: el nombre de la integracion que la
+  /// registro. Una recepcion que mando el ERP sin esto se veria sin quien
+  /// la recibio, y eso es peor que decir de donde vino. Mismo criterio que
+  /// WorkRequest.reporterNombre.
+  recibidoPorNombre String?
   nota              String?
   createdAt         DateTime @default(now())
 

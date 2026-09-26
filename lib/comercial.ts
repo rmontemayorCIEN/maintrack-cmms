@@ -84,11 +84,14 @@ export const MODULOS: Array<{ nombre: string; texto: string }> = [
   { nombre: "Órdenes de trabajo", texto: "Correctivas, preventivas y de mejora, con responsable, tiempo, material, evidencia y cierre validado." },
   { nombre: "Solicitudes", texto: "Cualquier persona reporta una falla, también sin cuenta desde el QR del equipo." },
   { nombre: "Preventivo", texto: "Planes por calendario o por medidor que generan sus órdenes." },
+  { nombre: "Rondines", texto: "Rutas de inspección con sus puntos y su QR: el rondín se recorre desde el teléfono y lo que se encuentra se convierte en orden sin capturarlo dos veces." },
   { nombre: "Medidores y predictivo", texto: "Lecturas, umbrales, tendencias y vida útil remanente." },
   { nombre: "Almacén", texto: "Existencias por almacén, kardex, costo promedio y mínimos, con una franja que dice de un vistazo qué familia está sufriendo y dónde está parado el dinero." },
   { nombre: "Compras", texto: "Requisiciones, autorización, órdenes de compra, proveedores y recepción." },
-  { nombre: "Indicadores y reportes", texto: "Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog y paros." },
+  { nombre: "Indicadores y reportes", texto: "Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro." },
   { nombre: "Avisos", texto: "En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega." },
+  { nombre: "Conversaciones y compromisos", texto: "Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple." },
+  { nombre: "Integración con su ERP", texto: "API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas." },
 ];
 
 /** Un recorrido real del sistema, en el orden en que pasa en la planta. */
