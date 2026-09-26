@@ -61,7 +61,7 @@ export function WorkOrderActions({
     actividadesEnBacklog: number;
     archivos: number;
     moneda: string;
-    faltantes: string[];
+    faltantes: Array<{ seccion: string; texto: string }>;
   };
   workOrderId: string;
   status: string;
@@ -426,7 +426,13 @@ export function WorkOrderActions({
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <p className="font-semibold">Antes de cerrar falta:</p>
               <ul className="mt-1 list-disc pl-4">
-                {cierre.faltantes.map((f) => <li key={f}>{f}</li>)}
+                {/* Cada faltante lleva a la tarjeta donde se arregla: antes decía
+                    qué faltaba y había que adivinar en cuál de nueve secciones. */}
+                {cierre.faltantes.map((f) => (
+                  <li key={f.texto}>
+                    <a href={`#${f.seccion}`} className="underline underline-offset-2 hover:no-underline">{f.texto}</a>
+                  </li>
+                ))}
               </ul>
               <p className="mt-1">Corrija los datos o devuelva la orden a proceso con el motivo.</p>
             </div>

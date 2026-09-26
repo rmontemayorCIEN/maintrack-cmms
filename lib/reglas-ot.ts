@@ -148,45 +148,67 @@ export type DatosDeCierre = {
 };
 
 /**
+ * Donde se resuelve cada faltante, con el mismo identificador que la seccion
+ * de la pantalla de la orden.
+ *
+ * Existe porque el faltante y el lugar donde se arregla estaban desconectados:
+ * el sistema sabia decir «faltan las horas» y la persona tenia que adivinar en
+ * cual de nueve tarjetas se capturan. Con la seccion, el aviso lleva.
+ */
+export type SeccionDeOrden = "actividades" | "tiempo" | "evidencias" | "resultado";
+
+export type FaltanteDeCierre = { seccion: SeccionDeOrden; texto: string };
+
+/**
  * Lo que le falta a una orden para darse por completada (o para cerrarse, que
  * vuelve a revisar lo mismo: entre completar y cerrar se pudo editar).
  *
  * Solo pide lo que aporta valor en ESTA orden: una preventiva no pide codigo de
  * falla, una orden sin paro no pide minutos, y la evidencia solo cuando la
  * empresa la exige para ese tipo de equipo.
+ *
+ * Devuelve la SECCION junto al texto. Es lo que permite que la pantalla lleve
+ * a donde se arregla en vez de solo regañar, y que el indice marque cual de
+ * las tarjetas detiene el cierre. El texto sigue redactado para una persona:
+ * se muestra tal cual.
  */
-export function faltantesDeCierre(d: DatosDeCierre): string[] {
-  const faltan: string[] = [];
+export function faltantesDeCierre(d: DatosDeCierre): FaltanteDeCierre[] {
+  const faltan: FaltanteDeCierre[] = [];
   if (!motivoValido(d.resolucion)) {
-    faltan.push("Escriba la solución aplicada o un resumen del trabajo realizado.");
+    faltan.push({ seccion: "resultado", texto: "Escriba la solución aplicada o un resumen del trabajo realizado." });
   }
   if (d.horas <= 0 && !motivoValido(d.motivoSinHoras)) {
-    faltan.push("Registre las horas de mano de obra, o indique por qué no hay horas que registrar.");
+    faltan.push({ seccion: "tiempo", texto: "Registre las horas de mano de obra, o indique por qué no hay horas que registrar." });
   }
   if (d.requiereParo) {
     if (d.sinParoConfirmado && d.minutosParo > 0) {
-      faltan.push("Se capturaron minutos de paro y a la vez se indicó que no hubo paro: deje solo uno.");
+      faltan.push({ seccion: "resultado", texto: "Se capturaron minutos de paro y a la vez se indicó que no hubo paro: deje solo uno." });
     } else if (d.minutosParo <= 0 && !d.sinParoConfirmado) {
-      faltan.push("La orden requería paro: capture cuánto duró, o confirme que finalmente no hubo paro.");
+      faltan.push({ seccion: "resultado", texto: "La orden requería paro: capture cuánto duró, o confirme que finalmente no hubo paro." });
     }
   }
   const sinDiagnostico = d.fallas.filter((f) => !f.failureCodeId || !f.rootCauseId);
   if (sinDiagnostico.length && !motivoValido(d.motivoSinDiagnostico)) {
-    faltan.push(
-      `Falta código de falla o causa raíz en: ${sinDiagnostico.map((f) => f.etiqueta).join(", ")}. ` +
-        "Captúrelos, o déjelos «Sin determinar» explicando por qué.",
-    );
+    faltan.push({
+      seccion: "resultado",
+      texto: `Falta código de falla o causa raíz en: ${sinDiagnostico.map((f) => f.etiqueta).join(", ")}. `
+        + "Captúrelos, o déjelos «Sin determinar» explicando por qué.",
+    });
   }
   if (d.actividadesSinResolver > 0) {
-    faltan.push(
-      `Quedan ${d.actividadesSinResolver} actividad(es) sin resolver: márquelas como hechas o use «No se pudo hacer» para enviarlas al backlog con su motivo.`,
-    );
+    faltan.push({
+      seccion: "actividades",
+      texto: `Quedan ${d.actividadesSinResolver} actividad(es) sin resolver: márquelas como hechas o use «No se pudo hacer» para enviarlas al backlog con su motivo.`,
+    });
   }
   if (d.evidenciaRequerida && d.archivos === 0) {
-    faltan.push("Esta orden requiere evidencia: suba al menos una foto o documento.");
+    faltan.push({ seccion: "evidencias", texto: "Esta orden requiere evidencia: suba al menos una foto o documento." });
   }
   return faltan;
 }
+
+/** Los textos, para los mensajes que ya existian (el servidor los une con espacios). */
+export const textosDeFaltantes = (f: FaltanteDeCierre[]) => f.map((x) => x.texto);
 
 // ─────────────────────────────────────────── Solicitudes sin OT activa ───
 

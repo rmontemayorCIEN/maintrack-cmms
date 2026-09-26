@@ -10,7 +10,7 @@
  */
 import { prisma } from "../lib/db";
 import { asegurarEditable, consumePart, ErrorDeOrden, recalcWorkOrder, transitionWorkOrder } from "../lib/workorders";
-import { accionesDisponibles, faltantesDeCierre, motivoSinOtActiva, TITULO_SOLICITUDES_SIN_OT } from "../lib/reglas-ot";
+import { accionesDisponibles, faltantesDeCierre, motivoSinOtActiva, textosDeFaltantes, TITULO_SOLICITUDES_SIN_OT } from "../lib/reglas-ot";
 import { aprobarSolicitud, rechazarSolicitud } from "../lib/solicitudes";
 import { trabajoPendiente } from "../lib/backlog";
 import { esReprogramacion, revisarProgramacion, validarDatosDeProgramacion } from "../lib/programacion";
@@ -269,6 +269,34 @@ async function main() {
     await prisma.organization.update({ where: { id: orgA.id }, data: { otEvidenciaCriticas: false } });
     revisar("con la opción apagada, la evidencia no se pide",
       faltantesDeCierre({ resolucion: "Cambio de filtro", horas: 1, motivoSinHoras: null, requiereParo: false, minutosParo: 0, sinParoConfirmado: false, fallas: [], motivoSinDiagnostico: null, actividadesSinResolver: 0, evidenciaRequerida: false, archivos: 0 }).length === 0);
+
+    /**
+     * Cada faltante sabe DONDE se arregla.
+     *
+     * Es lo que hace que la pantalla lleve a la tarjeta en vez de solo decir
+     * que algo falta y dejar a la persona buscando entre nueve secciones. Si
+     * alguien agrega un faltante nuevo sin sección, o le pone una que no
+     * existe en la pantalla, se cae aquí y no en producción.
+     */
+    const SECCIONES_DE_LA_PANTALLA = ["actividades", "tiempo", "evidencias", "resultado"];
+    const conTodoFaltando = faltantesDeCierre({
+      resolucion: null, horas: 0, motivoSinHoras: null, requiereParo: true, minutosParo: 0,
+      sinParoConfirmado: false, fallas: [{ etiqueta: "«Cambiar rodamiento»", failureCodeId: null, rootCauseId: null }],
+      motivoSinDiagnostico: null, actividadesSinResolver: 2, evidenciaRequerida: true, archivos: 0,
+    });
+    revisar("todo faltante dice en qué sección de la orden se resuelve, y esa sección existe",
+      conTodoFaltando.length === 6
+      && conTodoFaltando.every((f) => SECCIONES_DE_LA_PANTALLA.includes(f.seccion))
+      && conTodoFaltando.every((f) => f.texto.trim().length > 10),
+      conTodoFaltando.map((f) => `${f.seccion}: ${f.texto.slice(0, 40)}…`));
+    revisar("   y cada una apunta a donde de verdad se captura",
+      conTodoFaltando.find((f) => /horas de mano de obra/.test(f.texto))?.seccion === "tiempo"
+      && conTodoFaltando.find((f) => /actividad\(es\) sin resolver/.test(f.texto))?.seccion === "actividades"
+      && conTodoFaltando.find((f) => /requiere evidencia/.test(f.texto))?.seccion === "evidencias"
+      && conTodoFaltando.find((f) => /solución aplicada/.test(f.texto))?.seccion === "resultado"
+      && conTodoFaltando.find((f) => /código de falla o causa raíz/.test(f.texto))?.seccion === "resultado");
+    revisar("   y el servidor sigue rechazando con los TEXTOS, sin la sección encima",
+      textosDeFaltantes(conTodoFaltando).every((t) => typeof t === "string" && !t.includes("seccion")));
 
     // ───────────────────────────────────────── 6. Backlog ───
     console.log("\n6. Actividades no realizadas y backlog");

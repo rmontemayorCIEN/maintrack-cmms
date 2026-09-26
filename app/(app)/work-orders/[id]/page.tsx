@@ -33,10 +33,13 @@ import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
 import { esFalla, tipoDeActividad } from "@/lib/fallas";
 import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
-import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
+import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable, motivoValido, type SeccionDeOrden } from "@/lib/reglas-ot";
 import { puedeVerRuta, verCostos } from "@/lib/pantallas";
 import { MeterReadingForm } from "../../meters/reading-form";
-import { FichaDeEjecucion, IndiceDeSecciones } from "./ejecucion";
+import { FichaDeEjecucion, IndiceDeSecciones, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
+import { FaltaParaCerrar } from "./faltantes";
+import { ResultadoDelTrabajo } from "./resultado";
+import { Row } from "./fila";
 import { AceptarOrden } from "./aceptar";
 import { Plegable } from "@/components/plegable";
 import { BitacoraDeEstados } from "./bitacora";
@@ -326,6 +329,30 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     moneda: user.organization.currency,
     faltantes: wo.status === "COMPLETED" ? faltantesDeCierre(datosCierre) : [],
   };
+
+  /**
+   * Lo que falta para cerrar, desde que la orden se INICIA y no solo al
+   * intentar completarla.
+   *
+   * Antes de iniciar no se enseña: a una orden que nadie ha empezado no «le
+   * faltan» las horas, no se ha trabajado. Mostrarlo ahí volvía la pantalla
+   * una regañina de entrada, y a la tercera vez nadie la lee. Ya cerrada o
+   * cancelada tampoco: no hay nada que hacer con la lista.
+   */
+  const faltantes = ["IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(wo.status) ? faltantesDeCierre(datosCierre) : [];
+  const mostrarFaltantes = faltantes.length > 0 || wo.status === "COMPLETED";
+  const faltaEn = new Set(faltantes.map((f) => f.seccion));
+
+  // El mismo contenido para el teléfono y la computadora: se arma una vez.
+  const resultado = {
+    completado: Boolean(wo.completedAt),
+    resolucion: wo.resolution,
+    codigoFalla: wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : null,
+    causaRaiz: wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : null,
+    requiereParo: wo.requiresShutdown,
+    esFalla: esFalla(wo.maintenanceType),
+    evidenciaRequerida,
+  };
   const canExecute = can(user.role, "workorder:execute");
   const canEdit = can(user.role, "workorder:write");
   const doneTasks = wo.tasks.filter((t) => t.done).length;
@@ -337,16 +364,29 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const aceptadaPor = aceptacion ? `Usted la aceptó el ${formatDateTime(aceptacion.createdAt, zona)}` : null;
   const puedePedirApoyo = canExecute && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status);
   const hayAcciones = accionesDisponibles({ status: wo.status, iniciada: !!wo.startedAt, conResponsable: !!wo.assignedToId }, user.role).length > 0;
-  // La secuencia del trabajo, en el orden en que se hace.
-  const indice = [
-    { id: "actividades", texto: "Actividades" },
-    ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad" }] : []),
-    { id: "tiempo", texto: "Tiempo" },
-    { id: "materiales", texto: "Materiales" },
-    ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas" }] : []),
-    { id: "evidencias", texto: "Evidencias" },
-    { id: "bitacora", texto: "Bitácora" },
-    { id: "resultado-movil", texto: "Resultado" },
+  /**
+   * La secuencia del trabajo, en el orden en que se hace, cada paso con su
+   * señal.
+   *
+   * «Hecho» se marca SOLO donde el sistema lo sabe de verdad: actividades
+   * resueltas, horas registradas, evidencia subida, solución escrita. Las que
+   * no tienen noción de completas —seguridad, materiales, lecturas,
+   * bitácora— se quedan neutras en vez de inventarles un estado. Un palomeado
+   * de adorno es peor que ninguno: hace creer que ya se revisó.
+   */
+  const conHoras = horasRegistradas > 0 || motivoValido(wo.motivoSinHoras);
+  const seña = (id: string, hecho: boolean): EstadoDeSeccion =>
+    faltaEn.has(id as SeccionDeOrden) ? "falta" : hecho ? "hecho" : "neutro";
+  const indice: SeccionDelIndice[] = [
+    { id: "actividades", texto: "Actividades", estado: seña("actividades", wo.tasks.length > 0 && datosCierre.actividadesSinResolver === 0) },
+    ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad", estado: "neutro" as EstadoDeSeccion }] : []),
+    { id: "tiempo", texto: "Tiempo", estado: seña("tiempo", conHoras) },
+    { id: "materiales", texto: "Materiales", estado: "neutro" },
+    ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas", estado: "neutro" as EstadoDeSeccion }] : []),
+    { id: "evidencias", texto: "Evidencias", estado: seña("evidencias", wo.attachments.length > 0) },
+    { id: "bitacora", texto: "Bitácora", estado: "neutro" },
+    // El faltante dice «resultado»; el ancla del teléfono es «resultado-movil».
+    { id: "resultado-movil", texto: "Resultado", estado: seña("resultado", motivoValido(wo.resolution)) },
   ];
 
   return (
@@ -480,6 +520,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           )}
         </div>
       ) : null}
+
+      {mostrarFaltantes ? <FaltaParaCerrar faltantes={faltantes} /> : null}
 
       {/* minmax(0,1fr): sin esto la columna crece con el contenido (un nombre de equipo largo) y se corta en el teléfono. */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
@@ -706,21 +748,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           <section id="resultado-movil" className="grid min-w-0 scroll-mt-28 lg:hidden">
             <Card>
               <CardHeader title="Resultado" subtitle={wo.completedAt ? "Lo que quedó registrado al terminar" : "Al terminar se le pedirá esto"} />
-              {wo.completedAt ? (
-                <dl className="grid gap-3 text-sm">
-                  <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
-                  <Row label="Código de falla">{wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}</Row>
-                  <Row label="Causa raíz">{wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}</Row>
-                </dl>
-              ) : (
-                <ul className="grid list-disc gap-1 pl-5 text-sm text-slate-700">
-                  <li>La solución aplicada o el resumen del trabajo.</li>
-                  <li>Horas registradas (o por qué no hay).</li>
-                  {wo.requiresShutdown ? <li>Los minutos de paro del equipo.</li> : null}
-                  {esFalla(wo.maintenanceType) ? <li>Código de falla y causa raíz (o por qué no se determinó).</li> : null}
-                  <li>Todas las actividades hechas o enviadas al backlog{evidenciaRequerida ? ", y la evidencia" : ""}.</li>
-                </ul>
-              )}
+              <ResultadoDelTrabajo {...resultado} />
               <p className="mt-3 text-xs text-slate-500">Después toque «Terminar y enviar a revisión» abajo: supervisión la revisa y la cierra.</p>
             </Card>
           </section>
@@ -838,20 +866,16 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
           ) : null}
 
-          {wo.completedAt ? (
-            <Card id="resultado" className="hidden lg:block">
-              <CardHeader title="Resultado del trabajo" />
-              <dl className="grid gap-3 text-sm">
-                <Row label="Código de falla">
-                  {wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}
-                </Row>
-                <Row label="Causa raiz">
-                  {wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}
-                </Row>
-                <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
-              </dl>
-            </Card>
-          ) : null}
+          {/* Existe aunque la orden no haya terminado: es el ancla a la que llevan
+              los faltantes, y es donde quien revisa desde su escritorio ve qué
+              se le va a pedir. Antes solo aparecía ya completada. */}
+          <Card id="resultado" className="hidden scroll-mt-28 lg:block">
+            <CardHeader
+              title="Resultado del trabajo"
+              subtitle={wo.completedAt ? "Lo que quedó registrado al terminar" : "Al terminar se le pedirá esto"}
+            />
+            <ResultadoDelTrabajo {...resultado} />
+          </Card>
           </Plegable>
         </div>
       </div>
@@ -872,14 +896,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-700">{children}</dd>
-    </div>
-  );
-}
+
 
 function CostRow({ label, value }: { label: string; value: string }) {
   return (

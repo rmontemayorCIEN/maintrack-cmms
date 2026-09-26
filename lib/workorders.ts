@@ -4,7 +4,7 @@ import { can } from "./rbac";
 import { esFalla, tipoDeActividad } from "./fallas";
 import { WO_STATUS_LABELS } from "./constants";
 import {
-  esTransicionPosible, faltantesDeCierre, motivoValido, permisoDeTransicion, pideMotivo,
+  esTransicionPosible, faltantesDeCierre, motivoValido, permisoDeTransicion, pideMotivo, textosDeFaltantes,
   type DatosDeCierre,
 } from "./reglas-ot";
 import { rollForwardPlan } from "./scheduler";
@@ -337,10 +337,11 @@ export async function transitionWorkOrder(params: {
       } : {}),
     }));
     if (faltan.length) {
+      const textos = textosDeFaltantes(faltan);
       throw new ErrorDeOrden(
-        `No se puede ${completando ? "completar" : "cerrar"} la orden todavía: ${faltan.join(" ")}`,
+        `No se puede ${completando ? "completar" : "cerrar"} la orden todavía: ${textos.join(" ")}`,
         422,
-        faltan,
+        textos,
       );
     }
   }
