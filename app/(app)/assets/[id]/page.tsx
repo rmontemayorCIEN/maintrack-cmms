@@ -108,7 +108,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const recurrenciaDisponible =
     iaConfigurada() && (user.isSuperAdmin || iaDeLaOrganizacion(user.organization).funciones.includes("RECURRENCIA"));
 
-  const [sitios, ubicaciones, categorias] = await Promise.all([
+  const [sitios, ubicaciones, categorias, centrosDeCosto] = await Promise.all([
     prisma.site.findMany({
       where: { organizationId: user.organizationId },
       select: { id: true, name: true, code: true },
@@ -121,6 +121,11 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     }),
     prisma.assetCategory.findMany({
       where: { organizationId: user.organizationId },
+      select: { id: true, name: true, code: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: user.organizationId, active: true },
       select: { id: true, name: true, code: true },
       orderBy: { code: "asc" },
     }),
@@ -213,6 +218,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 sites={sitios}
                 locations={ubicaciones}
                 categories={categorias}
+                centrosDeCosto={centrosDeCosto}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
                 activo={{
                   id: asset.id,
@@ -222,6 +228,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   siteId: asset.siteId,
                   locationId: asset.locationId,
                   categoryId: asset.categoryId,
+                  centroDeCostoId: asset.centroDeCostoId,
                   manufacturer: asset.manufacturer,
                   model: asset.model,
                   serialNumber: asset.serialNumber,

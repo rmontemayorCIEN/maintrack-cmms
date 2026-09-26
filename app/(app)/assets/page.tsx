@@ -31,7 +31,7 @@ export default async function AssetsPage({
   const params = await searchParams;
   const orgId = user.organizationId;
 
-  const [assets, sites, locations, categories] = await Promise.all([
+  const [assets, sites, locations, categories, centrosDeCosto] = await Promise.all([
     prisma.asset.findMany({
       where: {
         organizationId: orgId,
@@ -69,6 +69,13 @@ export default async function AssetsPage({
     prisma.assetCategory.findMany({
       where: { organizationId: orgId },
       select: { id: true, name: true },
+    }),
+    // Solo los activos: un centro dado de baja no se vuelve a ofrecer, pero lo
+    // ya cargado con él sigue explicándose.
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: orgId, active: true },
+      select: { id: true, name: true, code: true },
+      orderBy: { code: "asc" },
     }),
   ]);
 
@@ -136,6 +143,7 @@ export default async function AssetsPage({
                 sites={sites}
                 locations={locations}
                 categories={categories}
+                centrosDeCosto={centrosDeCosto}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
               />
             </>

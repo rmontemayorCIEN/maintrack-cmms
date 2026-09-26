@@ -9,7 +9,7 @@ import { ASSET_STATUS_LABELS, CRITICALITY_LABELS } from "@/lib/constants";
 
 export type ActivoEditable = {
   id: string; code: string; name: string; description: string | null;
-  siteId: string; locationId: string | null; categoryId: string | null;
+  siteId: string; locationId: string | null; categoryId: string | null; centroDeCostoId: string | null;
   manufacturer: string | null; model: string | null; serialNumber: string | null;
   criticality: string; status: string;
   detieneLinea: boolean | null;
@@ -21,6 +21,7 @@ export function AssetDialog({
   sites,
   locations,
   categories,
+  centrosDeCosto,
   activo,
   puedeGestionarCatalogos = false,
   abrirAlInicio = false,
@@ -28,6 +29,7 @@ export function AssetDialog({
   sites: Array<{ id: string; name: string; code?: string }>;
   locations: Array<{ id: string; name: string; siteId: string; code?: string }>;
   categories: Array<{ id: string; name: string; code?: string }>;
+  centrosDeCosto: Array<{ id: string; name: string; code?: string }>;
   /** Si viene, el dialogo edita ese activo en vez de crear uno nuevo. */
   activo?: ActivoEditable;
   puedeGestionarCatalogos?: boolean;
@@ -48,6 +50,9 @@ export function AssetDialog({
   const [opcionesCategorias, setOpcionesCategorias] = useState<OpcionCatalogo[]>(
     categories.map((x) => ({ id: x.id, etiqueta: x.code ? `${x.code} — ${x.name}` : x.name })),
   );
+  const [opcionesCentros, setOpcionesCentros] = useState<OpcionCatalogo[]>(
+    centrosDeCosto.map((x) => ({ id: x.id, etiqueta: x.code ? `${x.code} — ${x.name}` : x.name })),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -57,6 +62,7 @@ export function AssetDialog({
     siteId: activo?.siteId ?? sites[0]?.id ?? "",
     locationId: activo?.locationId ?? "",
     categoryId: activo?.categoryId ?? "",
+    centroDeCostoId: activo?.centroDeCostoId ?? "",
     manufacturer: activo?.manufacturer ?? "",
     model: activo?.model ?? "",
     serialNumber: activo?.serialNumber ?? "",
@@ -95,6 +101,7 @@ export function AssetDialog({
         warrantyExpiry: form.warrantyExpiry || null,
         locationId: form.locationId || null,
         categoryId: form.categoryId || null,
+        centroDeCostoId: form.centroDeCostoId || null,
         // El select maneja tres estados y el campo es booleano nulable: vacio
         // viaja como null, que es "nadie lo ha dicho".
         detieneLinea: form.detieneLinea === "SI" ? true : form.detieneLinea === "NO" ? false : null,
@@ -211,6 +218,25 @@ export function AssetDialog({
               { nombre: "name", etiqueta: "Nombre de la familia", requerido: true },
             ]}
           />
+          {/* El eje contable, junto a los de sitio y categoría que son los
+              físicos: es lo que permite entregar el costo de mantenimiento
+              agrupado como lo pide contabilidad. */}
+          <SelectCatalogo
+            catalogo="cost-centers"
+            etiqueta="Centro de costo"
+            valor={form.centroDeCostoId}
+            onChange={(v) => set("centroDeCostoId", v)}
+            opciones={opcionesCentros}
+            onOpcionesChange={setOpcionesCentros}
+            puedeCrear={puedeGestionarCatalogos}
+            vacioTexto="Sin centro de costo"
+            camposAlta={[
+              { nombre: "code", etiqueta: "Clave de contabilidad (ej. 5010-PROD)", requerido: true },
+              { nombre: "name", etiqueta: "Nombre del centro", requerido: true },
+            ]}
+            ayuda="Sus órdenes de trabajo lo heredan, y ahí se puede cambiar cuando el trabajo lo paga otra área"
+          />
+
           <div>
             <label className="label">Criticidad</label>
             <select className="field" value={form.criticality} onChange={(e) => set("criticality", e.target.value)}>

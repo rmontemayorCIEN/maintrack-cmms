@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { nextWorkOrderNumber } from "./numbering";
 import { tocanEn } from "./frecuencias";
 import { addDays, startOfDay } from "./utils";
@@ -221,6 +222,8 @@ async function generarPorMedidor(
         status: plan.assignedToId ? "ASSIGNED" : "OPEN",
         priority: plan.priority,
         assetId: plan.assetId,
+        // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+        centroDeCostoId: await centroDeCostoDelActivo(organizationId, plan.assetId),
         siteId: plan.asset?.siteId ?? null,
         locationId: plan.asset?.locationId ?? null,
         planId: plan.id,
@@ -760,6 +763,8 @@ async function generarPorActividad(
         status: plan.assignedToId ? "ASSIGNED" : "OPEN",
         priority: plan.priority,
         assetId: primera.assetId,
+        // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+        centroDeCostoId: await centroDeCostoDelActivo(organizationId, primera.assetId),
         siteId: asset?.siteId ?? null,
         locationId: asset?.locationId ?? null,
         planId: plan.id,

@@ -16,6 +16,7 @@ import {
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { agruparPorCodigo, agruparPorFamiliaDeCausa, fallasCodificadas } from "@/lib/fallas";
+import { costoPorCentroDeCosto } from "@/lib/indicadores";
 import { PorQueFalla } from "@/components/por-que-falla";
 
 export const metadata = { title: "Reportes" };
@@ -34,7 +35,7 @@ export default async function ReportsPage({
   const orgId = user.organizationId;
   const periodo = await periodoDeLaEmpresa(orgId, days);
 
-  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo] = await Promise.all([
+  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo, porCentro] = await Promise.all([
     calcularIndicadores(orgId, periodo),
     tendenciaMensual(orgId, 12),
     costoYParoPorActivo(orgId, periodo, 10),
@@ -57,6 +58,7 @@ export default async function ReportsPage({
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
     }),
     costoDeMaterialPorTipo(orgId, periodo.desde, periodo.hasta),
+    costoPorCentroDeCosto(orgId, periodo),
   ]);
 
   const failureCodes = agruparPorCodigo(fallas);
@@ -251,6 +253,62 @@ export default async function ReportsPage({
       {/* `grid-cols-[minmax(0,1fr)]`: en el telefono es una sola columna, y una
           columna implicita se mide por el contenido —las tablas de aqui abajo la
           inflaban y sacaban de lado la pantalla completa. */}
+      {/* El gasto en el idioma de contabilidad. Va antes del Pareto de activos
+          porque contesta otra pregunta y a otra persona: el Pareto es del jefe
+          de mantenimiento —qué equipo me está costando— y esto es de quien
+          responde por el presupuesto del área. */}
+      {porCentro.length ? (
+        <Card className="mt-4">
+          <CardHeader
+            title="Costo por centro de costo"
+            subtitle={`Lo gastado en órdenes terminadas del periodo, agrupado como lo lleva su contabilidad. ${
+              porCentro.some((c) => !c.id)
+                ? "Las órdenes sin centro salen aparte: no se reparten entre los demás ni se esconden, para que la suma cuadre."
+                : ""
+            }`.trim()}
+          />
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Centro</th>
+                  <th className="num">Órdenes</th>
+                  <th className="num">Mano de obra</th>
+                  <th className="num">Refacciones</th>
+                  <th className="num">Servicios</th>
+                  <th className="num">Preventivo</th>
+                  <th className="num">Correctivo</th>
+                  <th className="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porCentro.map((c) => (
+                  <tr key={c.id ?? "sin"} className={c.id ? undefined : "text-slate-500"}>
+                    <td>
+                      <span className="font-medium">{c.name}</span>
+                      {c.id ? <span className="block text-xs text-slate-500">{c.code}</span> : null}
+                    </td>
+                    <td className="num">{c.ordenes}</td>
+                    <td className="num">{formatCurrency(c.manoDeObra, currency)}</td>
+                    <td className="num">{formatCurrency(c.refacciones, currency)}</td>
+                    <td className="num">{formatCurrency(c.servicios, currency)}</td>
+                    <td className="num">{formatCurrency(c.preventivo, currency)}</td>
+                    <td className="num">{formatCurrency(c.correctivo, currency)}</td>
+                    <td className="num font-semibold">{formatCurrency(c.total, currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {porCentro.some((c) => !c.id) ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Para que el gasto caiga solo en su centro, asígnele uno a cada equipo en su ficha: la orden lo hereda al
+              crearse. Una orden ya creada conserva el centro que tenía, aunque el equipo cambie después.
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader

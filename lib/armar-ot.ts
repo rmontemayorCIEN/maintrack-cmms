@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { avisarNuevaOrden } from "./avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { backlog } from "@/lib/backlog";
@@ -452,6 +453,8 @@ export async function armarOrden(p: {
       assetId: asset.id,
       siteId: asset.siteId,
       locationId: asset.locationId,
+      // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+      centroDeCostoId: await centroDeCostoDelActivo(p.organizationId, asset.id),
       assignedToId: p.assignedToId || null,
       createdById: p.userId,
       dueDate: vence,

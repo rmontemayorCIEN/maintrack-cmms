@@ -1558,7 +1558,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/catalogs": {
     titulo: "Catálogos",
-    que: "Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, causas de falla, cuadrillas.",
+    que: "Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, centros de costo, causas de falla, cuadrillas.",
     hacer: ["Dar de alta y editar cada catálogo", "Borrar los que no estén en uso"],
     campos: [
       {
@@ -1570,6 +1570,12 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Un catálogo limpio es lo que después permite agrupar y comparar. Texto libre no se puede agrupar.",
       "Los proveedores tienen pantalla propia porque a ellos les cuelga información real.",
+      "Los CENTROS DE COSTO son el eje contable, el único que no es de mantenimiento: sitio, ubicación y categoría dicen dónde está el equipo y qué es; el centro de costo dice a quién se le carga el gasto. Con él, el costo de mantenimiento sale agrupado como lo lleva su contabilidad y se puede llevar a una junta de presupuesto sin traducirlo a mano.",
+      "No se inventan: se traen del ERP con la misma clave que usan allá, porque esa clave es lo que permite conciliar. Se importan como cualquier catálogo, y como cambian dos veces al año, un archivo al año alcanza.",
+      "Un equipo pertenece a un centro de costo y sus órdenes lo heredan AL CREARSE. En la orden se puede cambiar, para el trabajo que paga otra área —una modificación que pide producción, un montaje que carga a un proyecto—.",
+      "Se copia, no se consulta: si el año que viene mueve un equipo a otro centro, lo ya gastado se queda donde se gastó. Es a propósito. Si el histórico se recalculara, los reportes del año pasado cambiarían solos y quien lleva la contabilidad dejaría de confiar en el sistema.",
+      "Un centro con gasto encima no se borra: se desactiva. Así deja de ofrecerse al capturar y lo histórico sigue explicándose.",
+      "El resultado se ve en Reportes › Costo por centro de costo, con mano de obra, refacciones, servicios y el corte entre preventivo y correctivo. Las órdenes sin centro salen aparte, no se reparten entre los demás: repartirlas con una regla inventada daría un número preciso y falso, y esconderlas haría que la suma no cuadre con el total.",
     ],
     noPuedo: [
       { sintoma: "No me deja borrar un registro", porque: "Algo lo está usando. El mensaje le dice exactamente qué y cuántos." },

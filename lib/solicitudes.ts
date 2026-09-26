@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { nextWorkOrderNumber } from "./numbering";
 import { logAudit } from "./audit";
 import { emitirAviso } from "./avisos/emitir";
@@ -155,6 +156,8 @@ export async function aprobarSolicitud(p: AprobarSolicitud) {
         assetId,
         siteId,
         locationId,
+        // El eje contable se hereda del equipo, dentro de la MISMA transacción.
+        centroDeCostoId: await centroDeCostoDelActivo(p.organizationId, assetId, tx),
         assignedToId: p.assignedToId || null,
         createdById: p.userId,
         dueDate: p.dueDate ? new Date(p.dueDate) : new Date(Date.now() + 3 * 86_400_000),

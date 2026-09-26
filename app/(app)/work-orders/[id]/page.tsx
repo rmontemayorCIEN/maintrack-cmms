@@ -177,7 +177,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       ])
     : [[], [], [], []];
 
-  const [tecnicosWo, cuadrillasWo, activosWo] = await Promise.all([
+  const [tecnicosWo, cuadrillasWo, activosWo, centrosWo] = await Promise.all([
     // Responsables posibles: quien ejecuta. Un solicitante o una cuenta de consulta no pueden iniciar la orden.
     prisma.user.findMany({
       where: { organizationId: user.organizationId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } },
@@ -192,6 +192,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     prisma.asset.findMany({
       where: { organizationId: user.organizationId, active: true },
       orderBy: { code: "asc" }, take: 500,
+      select: { id: true, code: true, name: true },
+    }),
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: user.organizationId, active: true },
+      orderBy: { code: "asc" },
       select: { id: true, code: true, name: true },
     }),
   ]);
@@ -414,6 +419,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 assignedToId: wo.assignedToId,
                 teamId: wo.teamId,
                 assetId: wo.assetId,
+                centroDeCostoId: wo.centroDeCostoId,
                 dueDate: wo.dueDate?.toISOString() ?? null,
                 scheduledStart: wo.scheduledStart?.toISOString() ?? null,
                 estimatedHours: wo.estimatedHours,
@@ -424,6 +430,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               tecnicos={tecnicosWo}
               cuadrillas={cuadrillasWo}
               activos={activosWo}
+              centrosDeCosto={centrosWo}
               editable={can(user.role, "workorder:write") && !["CLOSED", "CANCELLED"].includes(wo.status)}
             />
             <Link

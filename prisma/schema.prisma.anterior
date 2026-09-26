@@ -258,6 +258,7 @@ model Organization {
   specialties        Specialty[]
   externalServices   ExternalService[]
   vigencias          Vigencia[]
+  centrosDeCosto     CentroDeCosto[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
   teams              Team[]
@@ -667,6 +668,8 @@ model Asset {
   siteId            String
   locationId        String?
   categoryId        String?
+  /// A que centro de costo pertenece el equipo. La orden lo hereda de aqui.
+  centroDeCostoId   String?
   parentId          String?
   code              String
   name              String
@@ -727,6 +730,7 @@ model Asset {
   site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   location         Location?         @relation(fields: [locationId], references: [id])
   category         AssetCategory?    @relation(fields: [categoryId], references: [id])
+  centroDeCosto    CentroDeCosto?    @relation(fields: [centroDeCostoId], references: [id])
   parent           Asset?            @relation("AssetTree", fields: [parentId], references: [id])
   children         Asset[]           @relation("AssetTree")
   meters           Meter[]
@@ -1020,6 +1024,19 @@ model WorkOrder {
   status           String    @default("OPEN") // DRAFT|OPEN|ASSIGNED|IN_PROGRESS|ON_HOLD|COMPLETED|CLOSED|CANCELLED
   priority         String    @default("MEDIUM") // LOW|MEDIUM|HIGH|CRITICAL
   assetId          String?
+  /// A que centro de costo se carga ESTE trabajo.
+  ///
+  /// Se hereda del activo al crear la orden, y se puede cambiar: hay trabajos
+  /// que no los paga el dueño del equipo —una modificacion que pide
+  /// produccion, un montaje que carga a un proyecto—. Solo con el activo el
+  /// caso se pierde; solo con la orden hay que capturarlo cada vez y nadie lo
+  /// hace.
+  ///
+  /// Se copia, no se resuelve al vuelo: si el equipo cambia de centro el año
+  /// que viene, lo ya gastado se queda donde se gasto. Recalcular el historico
+  /// cambiaria los reportes del año pasado solos, y con eso el contador deja
+  /// de confiar en el sistema.
+  centroDeCostoId  String?
   siteId           String?
   locationId       String?
   planId           String?
@@ -1067,6 +1084,7 @@ model WorkOrder {
 
   organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset         Asset?             @relation(fields: [assetId], references: [id])
+  centroDeCosto CentroDeCosto?     @relation(fields: [centroDeCostoId], references: [id])
   site          Site?              @relation(fields: [siteId], references: [id])
   location      Location?          @relation(fields: [locationId], references: [id])
   plan          MaintenancePlan?   @relation(fields: [planId], references: [id])
@@ -1492,6 +1510,36 @@ model Vigencia {
   @@index([organizationId, hasta])
   @@index([assetId])
   @@index([supplierId])
+}
+
+/// El eje CONTABLE de la operacion, que es el que mantenimiento no tenia.
+///
+/// Un activo se agrupa por sitio, ubicacion y categoria: donde esta y que es.
+/// Ninguno de los tres es el idioma con el que la empresa lleva su
+/// contabilidad, y por eso el costo de mantenimiento —que el sistema calcula
+/// bien— no podia entrar a una junta de presupuesto sin que alguien lo
+/// tradujera a mano en un Excel.
+///
+/// No se inventa aqui: se importa del ERP del cliente, como los demas
+/// catalogos. Un catalogo de centros de costo cambia dos veces al año, asi que
+/// un archivo al año es la solucion correcta y no una limitacion.
+model CentroDeCosto {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// La clave tal como la usa su contabilidad. Es la llave para conciliar.
+  code           String
+  name           String
+  descripcion    String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets       Asset[]
+  workOrders   WorkOrder[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
 }
 
 model Comentario {

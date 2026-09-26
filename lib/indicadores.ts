@@ -637,3 +637,86 @@ export async function costoYParoPorActivo(organizationId: string, periodo: { des
     .sort((x, y) => y.costo - x.costo || y.paroHoras - x.paroHoras)
     .slice(0, limite);
 }
+
+/**
+ * El costo de mantenimiento agrupado como lo pide contabilidad.
+ *
+ * ── Por que existe ──
+ *
+ * El sistema calculaba bien el costo por orden, por activo y por tipo, pero
+ * los tres son ejes de mantenimiento. El centro de costo es el unico que habla
+ * el idioma con el que la empresa lleva su gasto, y sin el este numero —que es
+ * correcto— no podia entrar a una junta de presupuesto sin que alguien lo
+ * tradujera a mano en un Excel.
+ *
+ * ── Lo que no se hace ──
+ *
+ * Las ordenes SIN centro de costo no se reparten entre los demas ni se
+ * esconden: salen juntas como «Sin centro de costo». Repartirlas con una regla
+ * inventada daria un numero preciso y falso, y esconderlas haria que la suma
+ * de la tabla no cuadre con el total de la empresa —que es justo lo primero
+ * que revisa quien lleva la contabilidad—.
+ *
+ * ── De donde sale el centro ──
+ *
+ * De la ORDEN, no del activo. La orden lo copio del equipo cuando se creo, asi
+ * que refleja a quien se le cargo el gasto ENTONCES. Leerlo del activo haria
+ * que cambiar un equipo de centro reescribiera la historia.
+ */
+export async function costoPorCentroDeCosto(
+  organizationId: string,
+  periodo: { desde: Date; hasta: Date },
+) {
+  const terminadas = await prisma.workOrder.findMany({
+    where: { organizationId, status: { in: [...ESTADOS_TERMINADOS] }, completedAt: dentroDe(periodo) },
+    select: {
+      centroDeCostoId: true, totalCost: true, laborCost: true, partsCost: true, serviceCost: true, otherCost: true,
+      maintenanceType: true,
+    },
+  });
+
+  type Fila = {
+    id: string | null; code: string; name: string;
+    ordenes: number; manoDeObra: number; refacciones: number; servicios: number; otros: number; total: number;
+    preventivo: number; correctivo: number;
+  };
+  const por = new Map<string, Fila>();
+  const clave = (id: string | null) => id ?? "SIN_CENTRO";
+  for (const o of terminadas) {
+    const k = clave(o.centroDeCostoId);
+    const f = por.get(k) ?? {
+      id: o.centroDeCostoId, code: "", name: "",
+      ordenes: 0, manoDeObra: 0, refacciones: 0, servicios: 0, otros: 0, total: 0,
+      preventivo: 0, correctivo: 0,
+    };
+    f.ordenes += 1;
+    f.manoDeObra += o.laborCost;
+    f.refacciones += o.partsCost;
+    f.servicios += o.serviceCost;
+    f.otros += o.otherCost;
+    f.total += o.totalCost;
+    // Dos columnas, no una clasificación completa: lo que una junta de
+    // presupuesto pregunta es cuánto se fue en planear y cuánto en apagar
+    // incendios. El desglose fino vive en el reporte por tipo.
+    if (o.maintenanceType === "PREVENTIVE" || o.maintenanceType === "INSPECTION" || o.maintenanceType === "PREDICTIVE") {
+      f.preventivo += o.totalCost;
+    } else if (o.maintenanceType === "CORRECTIVE") {
+      f.correctivo += o.totalCost;
+    }
+    por.set(k, f);
+  }
+
+  const ids = [...por.values()].map((f) => f.id).filter((x): x is string => Boolean(x));
+  const centros = ids.length
+    ? await prisma.centroDeCosto.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true, code: true, name: true } })
+    : [];
+  const nombre = new Map(centros.map((c) => [c.id, c]));
+  const filas = [...por.values()].map((f) => {
+    const c = f.id ? nombre.get(f.id) : null;
+    return { ...f, code: c?.code ?? "—", name: c?.name ?? "Sin centro de costo" };
+  });
+  // De mayor a menor gasto; lo que no tiene centro va al final aunque pese,
+  // porque no es un centro: es un pendiente de captura.
+  filas.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.total - a.total);
+  return filas;
+}

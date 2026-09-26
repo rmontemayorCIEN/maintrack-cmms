@@ -123,6 +123,15 @@ export async function POST(request: Request) {
         priority: input.priority,
         assetId: asset?.id ?? null,
         siteId: asset?.siteId ?? null,
+        /**
+         * El centro de costo se COPIA del equipo, no se resuelve al vuelo.
+         *
+         * Si el equipo cambia de centro el año que viene, lo ya gastado se
+         * queda donde se gastó. Resolverlo al leer haría que los reportes del
+         * año pasado cambiaran solos, y con eso el contador deja de confiar en
+         * el sistema.
+         */
+        centroDeCostoId: asset?.centroDeCostoId ?? null,
         locationId: input.locationId ?? asset?.locationId ?? null,
         assignedToId: input.assignedToId || null,
         teamId: input.teamId || null,

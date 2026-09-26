@@ -15,6 +15,7 @@ const patchSchema = z.object({
   maintenanceType: z.enum(["PREVENTIVE", "CORRECTIVE", "PREDICTIVE", "INSPECTION", "SAFETY", "IMPROVEMENT"]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
   assetId: z.string().nullable().optional(),
+  centroDeCostoId: z.string().nullable().optional(),
   requiresShutdown: z.boolean().optional(),
   procedure: z.string().nullable().optional(),
   safetyNotes: z.string().nullable().optional(),
@@ -69,6 +70,7 @@ export async function GET(_request: Request, { params }: Params) {
 const ETIQUETA_CAMPO: Record<string, string> = {
   title: "el título", description: "la descripción", maintenanceType: "el tipo", priority: "la prioridad",
   assignedToId: "el responsable", teamId: "la cuadrilla", assetId: "el equipo", dueDate: "la fecha compromiso",
+  centroDeCostoId: "el centro de costo",
   scheduledStart: "el inicio programado", estimatedHours: "las horas estimadas", requiresShutdown: "si requiere paro",
   procedure: "el procedimiento", safetyNotes: "las notas de seguridad",
 };
@@ -115,15 +117,27 @@ export async function PATCH(request: Request, { params }: Params) {
       if (input.assetId) {
         const activo = await prisma.asset.findFirst({
           where: { id: input.assetId, organizationId: orgId },
-          select: { id: true, siteId: true, locationId: true },
+          select: { id: true, siteId: true, locationId: true, centroDeCostoId: true },
         });
         if (!activo) return fail("Activo no encontrado", 404);
         data.assetId = activo.id;
         data.siteId = activo.siteId;
         data.locationId = activo.locationId;
+        // El centro de costo NO se arrastra al cambiar de equipo si alguien ya
+        // lo puso a mano: quien lo cambió sabía a quién se le carga el trabajo,
+        // y pisarlo con el del equipo nuevo desharía esa decisión en silencio.
+        if (input.centroDeCostoId === undefined && !existing.centroDeCostoId) {
+          data.centroDeCostoId = activo.centroDeCostoId;
+        }
       } else {
         data.assetId = null;
       }
+    }
+
+    // Un centro de costo de otra empresa no entra, igual que el responsable.
+    if (input.centroDeCostoId) {
+      const hay = await prisma.centroDeCosto.count({ where: { id: input.centroDeCostoId, organizationId: orgId } });
+      if (!hay) return fail("El centro de costo indicado no existe en esta empresa", 404);
     }
 
     // El responsable y la cuadrilla se validan contra la organizacion.

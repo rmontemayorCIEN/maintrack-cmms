@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { centroDeCostoDelActivo } from "@/lib/centro-de-costo";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
@@ -43,6 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           status: "OPEN",
           priority: alert.severity === "CRITICAL" ? "CRITICAL" : "HIGH",
           assetId: alert.assetId,
+          // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+          centroDeCostoId: await centroDeCostoDelActivo(orgId, alert.asset.id),
           siteId: alert.asset.siteId,
           locationId: alert.asset.locationId,
           // El cruce critico solo si todavia es futuro: una fecha pasada crearia

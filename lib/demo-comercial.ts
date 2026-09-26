@@ -13,6 +13,7 @@ import { autorizar, crearRequisicionDeCompra, elegirCotizacion, emitirOrdenDeCom
 import { detectar } from "./avisos/detectores";
 import { configDe } from "./avisos/config";
 import { guardarVigencia } from "./vigencias";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { logAudit } from "./audit";
 import { sembrarCatalogosEstandar } from "./catalogos-estandar";
 import { alertaAbierta } from "./alertas";
@@ -113,6 +114,29 @@ const VIGENCIAS = [
   { tipo: "CALIBRACION", titulo: "Calibración del manómetro de vapor", folio: "CAL-LAB-7781", activo: "CAL-203", prov: null, desdeDias: -90, dias: 275,
     cubre: "Certificado trazable a patrón nacional. Se agenda con el laboratorio con tres semanas de anticipación." },
 ] as const;
+
+/**
+ * Los centros de costo de la planta demostrativa, con claves que se ven como
+ * las de una contabilidad de verdad.
+ *
+ * Tres y no uno: con uno solo la tabla de Reportes sale con un renglon y no
+ * enseña para que sirve. Y el montacargas queda A PROPOSITO sin centro, para
+ * que se vea el renglon «Sin centro de costo» —que es el que explica por que
+ * la suma cuadra y por que conviene asignarlos todos—.
+ */
+const CENTROS_DE_COSTO = [
+  { code: "5010-ENV", name: "Línea de envasado", descripcion: "Llenado, taponado, etiquetado y transporte de botella. Lo que para producción.", area: "L1" },
+  { code: "5020-SERV", name: "Servicios auxiliares", descripcion: "Aire comprimido, vapor, agua helada y subestación. El gasto que sirve a toda la planta.", area: "SRV" },
+  { code: "5030-EMP", name: "Empaque y embarque", descripcion: "Empacadora, paletizadora y maniobras de patio.", area: "EMP" },
+] as const;
+
+/** Qué centro le toca a cada equipo. El montacargas no lleva, a propósito. */
+const CENTRO_POR_ACTIVO: Record<string, string> = {
+  "LLN-101": "5010-ENV", "TAP-102": "5010-ENV", "ETQ-103": "5010-ENV", "TRN-104": "5010-ENV",
+  "EMP-105": "5030-EMP", "PAL-106": "5030-EMP",
+  "CMP-201": "5020-SERV", "SEC-202": "5020-SERV", "CAL-203": "5020-SERV",
+  "CHL-204": "5020-SERV", "BOM-205": "5020-SERV", "SUB-206": "5020-SERV",
+};
 
 const PROVEEDORES = [
   { clave: "rod", name: "Rodamientos y Transmisiones Omega", leadTimeDays: 3 },
@@ -279,6 +303,8 @@ async function ordenCerrada(c: Contexto, o: {
     data: {
       organizationId: c.orgId, number: folio, title: o.titulo, maintenanceType: o.tipo, status: "CLOSED", priority: o.prioridad,
       assetId: a.id, siteId: c.siteId, locationId: a.locationId, planId: o.planId ?? null, assignedToId: tecnico.id, createdById: c.u.supervision.id,
+      // Igual que el sistema: la orden hereda el centro del equipo.
+      centroDeCostoId: await centroDeCostoDelActivo(c.orgId, a.id),
       createdAt: o.creada, dueDate: o.vence, startedAt: o.inicio, completedAt: fin, closedAt: cierre,
       responseMinutes: Math.round((o.inicio.getTime() - o.creada.getTime()) / 60_000), estimatedHours: o.horas, actualHours: o.horas,
       downtimeMinutes: o.paroMin, requiresShutdown: o.paroMin > 0, sinParoConfirmado: o.paroMin === 0,
@@ -365,9 +391,20 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   for (const f of CAUSAS) causa[f.k] = await asegurar("rootCause", f.code, f.description);
 
   const activo: Contexto["activo"] = {};
+  // El eje contable, antes de los activos porque el activo lo refiere.
+  const centro: Record<string, string> = {};
+  for (const x of CENTROS_DE_COSTO) {
+    const cc = await prisma.centroDeCosto.create({
+      data: { organizationId: orgId, code: x.code, name: x.name, descripcion: x.descripcion },
+      select: { id: true },
+    });
+    centro[x.code] = cc.id;
+  }
+
   for (const x of ACTIVOS) {
     const a = await prisma.asset.create({
       data: { organizationId: orgId, siteId: sitio.id, locationId: locs[x.loc], code: x.code, name: x.name, model: x.modelo, criticality: x.crit, detieneLinea: x.para,
+        centroDeCostoId: centro[CENTRO_POR_ACTIVO[x.code]] ?? null,
         purchaseCost: x.costo, replacementCost: Math.round(x.costo * 1.15), commissionedAt: new Date(ahora.getTime() - 6 * 365 * DIA), expectedLifeYears: 15 },
     });
     activo[x.code] = { id: a.id, locationId: a.locationId };
@@ -512,6 +549,9 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   const correctivo = async (titulo: string, codigo: string, quien: ClavePersona | null, prioridad: string, horasAtras: number, venceEnDias: number) => prisma.workOrder.create({
     data: { organizationId: orgId, number: await siguienteFolio(orgId, "ordenTrabajo"), title: titulo, maintenanceType: "CORRECTIVE", status: quien ? "ASSIGNED" : "OPEN", priority: prioridad,
       assetId: activo[codigo].id, siteId: sitio.id, locationId: activo[codigo].locationId, assignedToId: quien ? u[quien].id : null, createdById: u.supervision.id,
+      // La demo hereda el centro igual que el sistema: si no, el reporte de
+      // contabilidad sale entero en «Sin centro de costo» y no enseña nada.
+      centroDeCostoId: centro[CENTRO_POR_ACTIVO[codigo]] ?? null,
       createdAt: new Date(ahora.getTime() - horasAtras * 3_600_000), dueDate: new Date(ahora.getTime() + venceEnDias * DIA), estimatedHours: 2,
       tasks: { create: [{ position: 0, title: "Localizar y corregir la falla; probar el equipo antes de entregarlo", maintenanceType: "CORRECTIVE" }] } },
   });

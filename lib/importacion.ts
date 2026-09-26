@@ -31,7 +31,8 @@ export type ClaveImportacion =
   | "proveedores" | "familias-refaccion" | "unidades" | "refacciones"
   | "planes" | "codigos-falla" | "causas-raiz"
   | "especialidades" | "servicios-externos"
-  | "usuarios" | "almacenes" | "medidores" | "lecturas" | "existencias";
+  | "usuarios" | "almacenes" | "medidores" | "lecturas" | "existencias"
+  | "centros-de-costo";
 
 export type Columna = {
   nombre: string;
@@ -353,6 +354,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "sitio", requerido: true, ejemplo: "P01", ayuda: "Código del sitio" },
       { nombre: "ubicacion", ejemplo: "LIN-A", ayuda: "Código de la ubicación" },
       { nombre: "categoria", ejemplo: "BOMB", ayuda: "Código de la categoría" },
+      { nombre: "centro_de_costo", ejemplo: "5010-PROD", ayuda: "Clave del centro de costo. Sus órdenes la heredan" },
       { nombre: "criticidad", ejemplo: "A", ayuda: "A, B o C. Si se omite queda en B" },
       { nombre: "estado", ejemplo: "OPERATIONAL", ayuda: "OPERATIONAL, DEGRADED, DOWN, STANDBY o RETIRED" },
       { nombre: "fabricante", ejemplo: "Grundfos" },
@@ -375,6 +377,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
         // y en una ubicacion del sitio B.
         sitioDeUbicacion: new Map(ubicaciones.map((u) => [u.id, u.siteId])),
         categorias: porCodigo(await prisma.assetCategory.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } })),
+        centrosDeCosto: porCodigo(await prisma.centroDeCosto.findMany({ where: { organizationId: orgId, active: true }, select: { id: true, code: true } })),
       };
     },
     convertir: (f, ctx) => {
@@ -387,6 +390,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
         r.falla("ubicacion", `La ubicación «${N.codigo(f.ubicacion)}» es de otro sitio`, "Use una ubicación del mismo sitio que el activo");
       }
       const categoryId = r.referencia("categoria", ctx.mapas.categorias, "la categoría", false);
+      const centroDeCostoId = r.referencia("centro_de_costo", ctx.mapas.centrosDeCosto, "el centro de costo", false);
 
       const criticidad = (N.texto(f.criticidad, 2) || "B").toUpperCase();
       if (!["A", "B", "C"].includes(criticidad)) r.falla("criticidad", `Criticidad «${f.criticidad}» inválida`, "Use A, B o C");
@@ -398,7 +402,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
 
       const serieNum = N.serie(f.numero_serie) || null;
       return r.resultado(code, nombre || code, {
-        code, name: nombre, siteId, locationId, categoryId,
+        code, name: nombre, siteId, locationId, categoryId, centroDeCostoId,
         criticality: criticidad, status: estado,
         manufacturer: r.opcional("fabricante", 80),
         model: r.opcional("modelo", 80),
@@ -734,6 +738,20 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
   }),
 
   // ─────────────────────────────────────────────── Especialidades
+  "centros-de-costo": catalogoSimple({
+    titulo: "Centros de costo",
+    descripcion:
+      "El eje contable: la clave con la que su empresa lleva el gasto. Tráigalos de su ERP tal como están allá —la clave "
+      + "es lo que permite conciliar—. Después se le asigna uno a cada equipo, y sus órdenes lo heredan.",
+    entidad: "CentroDeCosto",
+    ejemplo: ["5010-PROD", "Producción"],
+    campoNombre: "name",
+    // La clave contable respeta mayúsculas y minúsculas: «5010-Prod» y
+    // «5010-PROD» pueden ser la misma en el ERP o no, y no nos toca decidirlo.
+    respetaCaso: true,
+    delegado: (db) => db.centroDeCosto as never,
+  }),
+
   especialidades: catalogoSimple({
     titulo: "Especialidades",
     descripcion: "Los oficios del personal y su tarifa por hora, para estimar la mano de obra de los planes.",
@@ -1162,7 +1180,7 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
 
 export const ORDEN_IMPORTACION: ClaveImportacion[] = [
   "sitios", "ubicaciones", "usuarios", "almacenes",
-  "categorias-activo", "activos", "medidores", "lecturas",
+  "categorias-activo", "centros-de-costo", "activos", "medidores", "lecturas",
   "proveedores", "familias-refaccion", "unidades", "refacciones", "existencias",
   "especialidades", "servicios-externos",
   "planes", "codigos-falla", "causas-raiz",

@@ -19,6 +19,7 @@ export type OrdenEditable = {
   assignedToId: string | null;
   teamId: string | null;
   assetId: string | null;
+  centroDeCostoId: string | null;
   dueDate: string | null;
   scheduledStart: string | null;
   estimatedHours: number;
@@ -40,6 +41,7 @@ function valoresDe(orden: OrdenEditable, zona: string) {
     assignedToId: orden.assignedToId ?? "",
     teamId: orden.teamId ?? "",
     assetId: orden.assetId ?? "",
+    centroDeCostoId: orden.centroDeCostoId ?? "",
     dueDate: fecha(orden.dueDate, zona),
     scheduledStart: fecha(orden.scheduledStart, zona),
     estimatedHours: String(orden.estimatedHours),
@@ -56,12 +58,13 @@ function valoresDe(orden: OrdenEditable, zona: string) {
  * cambiarlos. Asignar responsable era el caso mas comun y no habia forma.
  */
 export function EditarOrden({
-  orden, tecnicos, cuadrillas, activos, editable,
+  orden, tecnicos, cuadrillas, activos, centrosDeCosto, editable,
 }: {
   orden: OrdenEditable;
   tecnicos: { id: string; name: string }[];
   cuadrillas: { id: string; name: string }[];
   activos: { id: string; code: string; name: string }[];
+  centrosDeCosto: { id: string; code: string; name: string }[];
   editable: boolean;
 }) {
   const zona = useZona();
@@ -125,6 +128,7 @@ export function EditarOrden({
       assignedToId: v.assignedToId || null,
       teamId: v.teamId || null,
       assetId: v.assetId || null,
+      centroDeCostoId: v.centroDeCostoId || null,
       dueDate: v.dueDate || null,
       scheduledStart: v.scheduledStart || null,
       estimatedHours: Number(v.estimatedHours) || 0,
@@ -232,6 +236,24 @@ export function EditarOrden({
                 />
                 <p className="mt-0.5 text-[0.625rem] text-slate-400">
                   Cambiarlo arrastra también el sitio y la ubicación del equipo.
+                </p>
+              </div>
+
+              {/* A quién se le carga ESTE trabajo. Viene del equipo, y se
+                  cambia cuando lo paga otra área: una modificación que pide
+                  producción, un montaje que carga a un proyecto. */}
+              <div className="sm:col-span-2">
+                <label className="text-[0.6875rem] font-medium text-slate-600">Centro de costo</label>
+                <SelectorBuscable
+                  className="mt-0.5"
+                  valor={v.centroDeCostoId}
+                  onCambio={(id) => set({ centroDeCostoId: id })}
+                  vacio="Sin centro de costo"
+                  marcador="Busque por clave o nombre"
+                  opciones={centrosDeCosto.map((c) => ({ id: c.id, etiqueta: `${c.code} — ${c.name}` }))}
+                />
+                <p className="mt-0.5 text-[0.625rem] text-slate-400">
+                  Se hereda del equipo al crear la orden. Cámbielo solo si este trabajo lo paga otra área.
                 </p>
               </div>
 
