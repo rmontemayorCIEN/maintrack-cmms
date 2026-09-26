@@ -1,5 +1,5 @@
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { revisarConfiguracion } from "@/lib/ia/revision";
 
 export const maxDuration = 180;
@@ -19,7 +19,7 @@ export async function POST() {
       return ok({ revision: r.revision });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible revisar la configuración", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

@@ -774,10 +774,12 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Las rutinas que se repiten: qué se le hace a cada equipo, cada cuánto, con qué refacciones y cuánto cuesta.",
     hacer: [
       "Dar de alta un plan con sus actividades, refacciones, mano de obra y servicios",
-      "Generarlo con IA a partir del equipo",
+      "Generarlo con IA a partir del equipo, o completar con IA lo que consume un plan que ya existe",
       "Ejecutar el programador para que nazcan las órdenes",
     ],
     flujo: [
+      "Decir QUÉ CONSUME cada actividad no es un adorno del plan: es lo que después contesta qué hay que comprar y cuándo (Almacén › «Lo que va a pedir el preventivo»). Un plan sin eso genera órdenes correctas y deja al almacén adivinando.",
+      "La mayoría de las actividades de un preventivo NO consumen material —revisar, medir, limpiar, probar no gastan nada— y dejarlas sin refacción es correcto. Lo que sí conviene revisar es un plan entero sin una sola refacción.",
       "El nombre abre el expediente del plan: sus equipos con la próxima fecha y la última ejecución, sus actividades con recursos, las órdenes que ha generado y su cumplimiento. Editar se hace ahí mismo.",
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
@@ -812,6 +814,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Ejecutar programador", explica: "Convierte planes en órdenes. Le dice plan por plan si genero o por que no." },
       { nombre: "El desplegable de horizonte", explica: "Por omisión genera lo que toca hoy. Ampliarlo a 7 o 30 días adelanta la generación, útil antes de un puente." },
       { nombre: "Generar con IA", explica: "Propone la rutina completa a partir del equipo: actividades, tiempos, refacciones y frecuencia. Se revisa antes de guardar." },
+      { nombre: "Sugerir qué consume cada actividad", explica: "En un plan que ya existe, propone qué refacción gasta cada actividad usando SOLO el catálogo de su empresa. Se marca renglón por renglón y nada se guarda hasta que usted le da guardar; lo que ya tenía capturado no se pisa. Aparece en el detalle del plan, y solo mientras alguna actividad no diga qué consume." },
       { nombre: "Pausar (en cada renglon)", explica: "Deja de generar órdenes sin borrar el plan ni su historial." },
     ],
     noPuedo: [

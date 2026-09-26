@@ -392,3 +392,48 @@ export async function conversarConIa(params: {
     throw new Error(`No fue posible responder la consulta. ${detalle}`);
   }
 }
+
+/**
+ * El error del proveedor, dicho para una persona.
+ *
+ * ── Por que existe ──
+ *
+ * Las rutas de IA devolvian `error.message` tal cual, y eso le ponia enfrente
+ * al usuario cosas como:
+ *
+ *   401 401 {"type":"error","error":{"type":"authentication_error",
+ *   "message":"API key is invalid."},"request_id":null}
+ *
+ * Quien lo ve no puede hacer nada con eso, y peor: parece que el sistema se
+ * rompio. Casi siempre es una de cinco cosas, y cada una tiene una salida
+ * distinta —esperar, reintentar, o avisarle a soporte—.
+ *
+ * El detalle crudo NO se pierde: queda en `AiUsage.error`, que es donde este
+ * proyecto manda a buscar cuando algo de IA falla
+ * (`scripts/ultimo-error-ia.ts`). Aqui solo se decide que leer la persona.
+ */
+export function motivoLegible(error: unknown): string {
+  const crudo = error instanceof Error ? error.message : String(error ?? "");
+  const t = crudo.toLowerCase();
+
+  if (/authentication|api key|401|invalid x-api-key/.test(t)) {
+    return "La llave del servicio de inteligencia artificial no es válida. Avise a soporte: no es algo que se resuelva reintentando.";
+  }
+  if (/credit|billing|payment|quota|insufficient/.test(t)) {
+    return "La cuenta del servicio de inteligencia artificial no tiene crédito disponible. Avise a soporte.";
+  }
+  if (/rate.?limit|429|overloaded|529|capacity/.test(t)) {
+    return "El servicio de inteligencia artificial está saturado en este momento. Espere un minuto y vuelva a intentar.";
+  }
+  if (/timeout|timed out|aborted|abort|etimedout/.test(t)) {
+    return "La inteligencia artificial tardó demasiado en contestar. Vuelva a intentar; si se repite, pruebe con menos información.";
+  }
+  if (/enotfound|econnreset|econnrefused|fetch failed|network|socket/.test(t)) {
+    return "No se pudo contactar al servicio de inteligencia artificial. Revise la conexión e intente de nuevo.";
+  }
+  if (/validation|invalid_request|400|schema/.test(t)) {
+    return "El servicio de inteligencia artificial rechazó la petición. Avise a soporte; el detalle quedó registrado.";
+  }
+  // Lo desconocido se dice como desconocido, no se disfraza de otra cosa.
+  return "No fue posible completar la consulta a la inteligencia artificial. El detalle quedó registrado; si se repite, avise a soporte.";
+}

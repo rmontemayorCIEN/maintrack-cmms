@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { puedeVerRuta } from "@/lib/pantallas";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { explicarParos } from "@/lib/ia/paros";
 import { PERIODOS } from "@/lib/costo-de-parar";
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       return ok({ analisis: r.analisis, area: r.area });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible analizar", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

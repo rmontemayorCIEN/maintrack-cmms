@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { generarPlan } from "@/lib/ia/plan";
 
 export const maxDuration = 300;
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return ok({ formulario: r.formulario, justificacion: r.borrador.justificacion, faltantes: r.faltantes });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible generar el plan", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

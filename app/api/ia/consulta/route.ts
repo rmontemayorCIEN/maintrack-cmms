@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { puedeVerRuta } from "@/lib/pantallas";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { responderConsulta } from "@/lib/ia/consulta";
 import { HAY_MAS_ESCRITO, largoDe, loQueSeDice } from "@/lib/respuestas-voz";
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible responder", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

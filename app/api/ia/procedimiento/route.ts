@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { aplicarProcedimiento, generarProcedimiento } from "@/lib/ia/procedimiento";
 import { logAudit } from "@/lib/audit";
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         });
         return ok(r);
       } catch (error) {
-        return fail(error instanceof Error ? error.message : "No fue posible aplicar", 422);
+        return fail(motivoLegible(error), 422);
       }
     }
 
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       return ok({ procedimiento: r.procedimiento });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible generar", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

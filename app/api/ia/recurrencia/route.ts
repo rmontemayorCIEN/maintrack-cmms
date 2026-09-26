@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { puedeVerRuta } from "@/lib/pantallas";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { analizarRecurrencia } from "@/lib/ia/recurrencia";
 
 export const maxDuration = 180;
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       return ok({ analisis: r.analisis });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible analizar", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

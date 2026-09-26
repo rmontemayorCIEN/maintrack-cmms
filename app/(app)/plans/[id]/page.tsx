@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { ConsumoSugerido } from "./consumo-sugerido";
+import { iaConfigurada } from "@/lib/ia/cliente";
+import { iaDeLaOrganizacion } from "@/lib/planes";
 import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarClock, Gauge } from "lucide-react";
@@ -201,6 +204,19 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
               ))}
               {plan.tasks.length === 0 ? <li className="text-sm text-slate-500">Este plan todavía no tiene actividades.</li> : null}
             </ol>
+
+            {/* Lo que consume cada actividad es lo que después alimenta la
+                proyección de compras. Se propone aquí, junto a las actividades,
+                y se acepta una por una. */}
+            {plan.tasks.some((t) => t.parts.length === 0) ? (
+              <ConsumoSugerido
+                planId={plan.id}
+                disponible={
+                  can(user.role, "plan:write") && iaConfigurada()
+                  && iaDeLaOrganizacion(user.organization).funciones.includes("PLAN")
+                }
+              />
+            ) : null}
           </Card>
 
           <Card>
