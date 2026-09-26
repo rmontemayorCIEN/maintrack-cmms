@@ -404,6 +404,28 @@ async function main() {
       const o = [...s.options].find((x) => x.textContent.includes(${JSON.stringify(textoOpcion)})); if (!o) return "";
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(s, o.value); s.dispatchEvent(new Event("change", { bubbles: true })); return o.value;
     })()`);
+    /**
+     * Elige en un SelectorBuscable como lo haria una persona: lo abre, escribe
+     * para buscar y toca la opcion. Devuelve cuantas quedaron tras filtrar, asi
+     * que tambien comprueba que la busqueda sirve.
+     */
+    const buscarYElegir = (p: Pestana, dentroDe: string, texto: string) => p.evaluar<{ opciones: number; elegida: string }>(`(async () => {
+      const caja = document.querySelector(${JSON.stringify(dentroDe)});
+      const abrir = caja.querySelector('button[aria-haspopup="listbox"]');
+      abrir.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const buscador = caja.querySelector('input[type="search"], input:not([type="hidden"])');
+      const poner = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      poner.call(buscador, ${JSON.stringify(texto)});
+      buscador.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 400));
+      const opciones = [...caja.querySelectorAll('[role="option"]')].filter((o) => o.textContent.trim() && !/Elija|Sin seleccionar/.test(o.textContent));
+      const elegida = opciones[0]?.textContent?.trim() ?? "";
+      opciones[0]?.click();
+      await new Promise((r) => setTimeout(r, 300));
+      return { opciones: opciones.length, elegida };
+    })()`);
+
     const hasta = async (p: Pestana, expresion: string, ms = 10_000) => {
       for (let i = 0; i < ms / 200; i++) { if (await p.evaluar<boolean>(expresion).catch(() => false)) return true; await esperar(200); }
       return false;
@@ -945,7 +967,11 @@ async function main() {
     pasos["tiempo: 1.5 h registradas una sola vez (doble toque) y el supervisor las ve"] = horas.length === 1 && Number(horas[0].hours) === 1.5 && await supervisorVe(/Lubricación y prueba de vibración/);
     // Materiales.
     donde = "flujo material";
-    await escoger(t, 'select[aria-label="Refacción"]', "Rodamiento");
+    // Se busca la refaccion, no se recorre una lista: el almacen de una planta
+    // tiene cientos y el tecnico esta buscando UNA.
+    const refaccion = await buscarYElegir(t, "#materiales", "Rodamiento");
+    pasos["materiales: se busca la refacción por nombre y la lista se reduce"] =
+      refaccion.opciones > 0 && /Rodamiento/i.test(refaccion.elegida);
     await teclear(t, 'input[aria-label="Cantidad"]', "1");
     await tocar(t, "Cargar a la OT", "#materiales");
     await esperar(1500);

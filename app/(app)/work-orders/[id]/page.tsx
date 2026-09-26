@@ -288,6 +288,16 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const medidores = wo.assetId
     ? await prisma.meter.findMany({ where: { organizationId: user.organizationId, assetId: wo.assetId }, select: { id: true, name: true, unit: true, currentValue: true }, orderBy: { name: "asc" } })
     : [];
+  /*
+   * Lecturas tomadas EN esta orden, no del medidor en general: el horometro
+   * que capturo el operador en su ronda no dice nada de este trabajo. Solo se
+   * pregunta si el equipo tiene medidores; si no, la seccion ni existe.
+   */
+  const lecturasDeLaOrden = medidores.length
+    ? await prisma.meterReading.count({
+        where: { organizationId: user.organizationId, workOrderId: wo.id, estado: { not: "ANULADA" } },
+      })
+    : 0;
   const vencida = Boolean(wo.dueDate && wo.dueDate < new Date() && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status));
 
   // Orden activa sin responsable: se dice en la orden, no solo al presionar «Iniciar».
@@ -388,10 +398,18 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     { id: "actividades", texto: "Actividades", estado: seña("actividades", wo.tasks.length > 0 && datosCierre.actividadesSinResolver === 0) },
     ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad", estado: "neutro" as EstadoDeSeccion }] : []),
     { id: "tiempo", texto: "Tiempo", estado: seña("tiempo", conHoras) },
-    { id: "materiales", texto: "Materiales", estado: "neutro" },
-    ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas", estado: "neutro" as EstadoDeSeccion }] : []),
+    /*
+     * Estos tres no detienen el cierre —una orden no se queda «sin bitacora»—
+     * pero SI se ponen en verde cuando ya tienen algo capturado. Estaban fijos
+     * en gris, asi que cargar una refaccion o registrar el horometro no movia
+     * nada y parecia que no se habia guardado. Lo reporto Rafael.
+     */
+    { id: "materiales", texto: "Materiales", estado: wo.partsCost > 0 || wo.serviceCost > 0 ? "hecho" : "neutro" },
+    ...(medidores.length
+      ? [{ id: "lecturas", texto: "Lecturas", estado: (lecturasDeLaOrden > 0 ? "hecho" : "neutro") as EstadoDeSeccion }]
+      : []),
     { id: "evidencias", texto: "Evidencias", estado: seña("evidencias", wo.attachments.length > 0) },
-    { id: "bitacora", texto: "Bitácora", estado: "neutro" },
+    { id: "bitacora", texto: "Bitácora", estado: wo.comments.length > 0 ? "hecho" : "neutro" },
     // El faltante dice «resultado»; el ancla del teléfono es «resultado-movil».
     { id: "resultado-movil", texto: "Resultado", estado: seña("resultado", motivoValido(wo.resolution)) },
   ];
@@ -710,7 +728,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                     <p className="mb-2 text-sm font-medium text-slate-800">
                       {m.name} <span className="font-normal text-slate-500">· actual {m.currentValue === null ? "sin lectura" : `${formatNumber(m.currentValue, 1)} ${m.unit}`}</span>
                     </p>
-                    {canExecute && !["CLOSED", "CANCELLED"].includes(wo.status) ? <MeterReadingForm meterId={m.id} unit={m.unit} current={m.currentValue} /> : null}
+                    {canExecute && !["CLOSED", "CANCELLED"].includes(wo.status) ? <MeterReadingForm meterId={m.id} unit={m.unit} current={m.currentValue} workOrderId={wo.id} /> : null}
                   </li>
                 ))}
               </ul>

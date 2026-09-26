@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MapPin, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import { ProponerCentros } from "./proponer-centros";
 import { enlaceMapa } from "@/lib/geografia";
 import { cn } from "@/lib/utils";
 
@@ -48,11 +49,14 @@ export function GestorCatalogos({
   datos,
   activoInicial,
   editable,
+  instalacion,
 }: {
   definiciones: Record<string, Definicion>;
   datos: Record<string, Fila[]>;
   activoInicial: string;
   editable: boolean;
+  /** Como se describe la instalación del cliente, para ofrecerle lo suyo. */
+  instalacion?: string | null;
 }) {
   const router = useRouter();
   const [activo, setActivo] = useState(activoInicial);
@@ -250,6 +254,16 @@ export function GestorCatalogos({
             </Button>
           ) : null}
         </div>
+
+        {/*
+          La propuesta aparece SOLO en centros de costo y SOLO mientras no haya
+          ninguno: es ayuda para arrancar, no un botón permanente. Una vez que
+          el cliente capturó los suyos, ofrecerle otros sería invitarlo a
+          duplicar su plan de cuentas.
+        */}
+        {activo === "cost-centers" && editable && (tablas[activo] ?? []).length === 0 && instalacion ? (
+          <ProponerCentros instalacion={instalacion} />
+        ) : null}
 
         {aviso ? (
           <p className="border-b border-emerald-100 bg-emerald-50 px-5 py-2 text-xs text-emerald-800">{aviso}</p>

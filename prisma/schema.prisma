@@ -873,13 +873,24 @@ model MeterReading {
   correccionEl     DateTime?
   correccionMotivo String?
 
+  /// De que orden de trabajo salio, si se capturo durante un trabajo.
+  ///
+  /// Sin esto no se podia saber si el horometro lo tomo el tecnico en ESA
+  /// orden o el operador en su ronda: la ficha de la orden no podia decir si
+  /// ya se habia registrado la lectura de ese trabajo. Nulo es lo normal —la
+  /// mayoria se capturan desde Medidores— y no se borra la lectura si la
+  /// orden desaparece: el dato del medidor vale por si mismo.
+  workOrderId String?
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meter        Meter        @relation(fields: [meterId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
 
   @@index([meterId])
   @@index([organizationId])
   @@index([meterId, readingAt])
+  @@index([workOrderId])
 }
 
 // --------------------------------------------------- Planes de mantenimiento ---
@@ -1119,6 +1130,8 @@ model WorkOrder {
   @@index([organizationId, completedAt])
   @@index([organizationId, createdAt])
   @@index([organizationId, maintenanceType, dueDate])
+  meterReadings    MeterReading[]
+
   @@index([assetId, createdAt])
 }
 

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { pedir } from "@/lib/cliente/pedir";
 import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export function PartsPanel({
   actividades,
@@ -26,7 +27,13 @@ export function PartsPanel({
   editable: boolean;
 }) {
   const router = useRouter();
-  const [partId, setPartId] = useState(catalog[0]?.id ?? "");
+  /*
+   * Arranca VACIO. Antes venia preseleccionada la primera del catalogo, asi
+   * que un toque en «Cargar a la OT» sacaba del almacen la que estuviera
+   * hasta arriba —y eso mueve inventario y escribe kardex—. Ahora hay que
+   * elegir a proposito.
+   */
+  const [partId, setPartId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [taskId, setTaskId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,6 +41,7 @@ export function PartsPanel({
 
   async function add() {
     if (loading) return; // un doble toque no saca dos veces del almacén
+    if (!partId) { setError("Elija la refacción que se cargó."); return; }
     setLoading(true);
     setError(null);
     const r = await pedir(`/api/work-orders/${workOrderId}/parts`, {
@@ -43,6 +51,7 @@ export function PartsPanel({
     setLoading(false);
     if (!r.ok) { setError(r.error); return; }
     setQuantity("1");
+    setPartId("");
     router.refresh();
   }
 
@@ -105,13 +114,24 @@ export function PartsPanel({
           <p className="text-[0.6875rem] text-slate-400">No hay refacciones con existencia en el almacén.</p>
         ) : (
           <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-            <select className="field" aria-label="Refacción" value={partId} onChange={(e) => setPartId(e.target.value)}>
-              {catalog.map((part) => (
-                <option key={part.id} value={part.id}>
-                  {part.code} — {part.name} ({formatNumber(part.quantityOnHand, 0)} {part.unit})
-                </option>
-              ))}
-            </select>
+            {/*
+              Buscador y no un desplegable: el almacen de una planta tiene
+              cientos de refacciones y el tecnico esta buscando UNA, en el
+              piso y con el telefono. Recorrer la lista no es una opcion. Se
+              busca por clave o por cualquier palabra del nombre, sin acentos
+              —«refrigerante» encuentra «Refrigerante glicol»— igual que en
+              compras y en el calendario.
+            */}
+            <SelectorBuscable
+              valor={partId}
+              onCambio={setPartId}
+              vacio="Elija una refacción"
+              marcador="Busque por clave o nombre"
+              opciones={catalog.map((part) => ({
+                id: part.id,
+                etiqueta: `${part.code} — ${part.name} (${formatNumber(part.quantityOnHand, 0)} ${part.unit})`,
+              }))}
+            />
             <div className="flex gap-2">
               <input
                 type="number" inputMode="decimal"
@@ -122,7 +142,7 @@ export function PartsPanel({
                 onChange={(e) => setQuantity(e.target.value)}
                 aria-label="Cantidad"
               />
-              <Button size="sm" onClick={add} disabled={loading} className="flex-1">
+              <Button size="sm" onClick={add} disabled={loading || !partId} className="flex-1">
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Cargar a la OT
               </Button>

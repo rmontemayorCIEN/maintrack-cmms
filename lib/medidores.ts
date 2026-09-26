@@ -352,6 +352,8 @@ export async function registrarLectura(params: {
   source?: string;
   confirmar?: boolean;
   justificacion?: string | null;
+  /** De que orden sale, cuando se captura durante un trabajo. */
+  workOrderId?: string | null;
   ahora?: Date;
   /**
    * La transacción en curso. La importación registra lecturas iniciales
@@ -399,6 +401,7 @@ export async function registrarLectura(params: {
         readingAt,
         source: params.source ?? "MANUAL",
         note: params.note ?? null,
+        workOrderId: params.workOrderId ?? null,
         tipo,
         valorAnterior: tipo === "LECTURA" ? null : valorAntes,
         atipica: validacion.nivel === "ADVERTENCIA",
