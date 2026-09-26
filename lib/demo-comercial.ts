@@ -186,7 +186,11 @@ const REFACCIONES = [
   { code: "FIL-ACE", familia: "Filtros", name: "Filtro de aceite para compresor", unit: "pza", costo: 1150, min: 2, inicial: 3, prov: "aire" },
   { code: "FIL-SEP", familia: "Filtros", name: "Elemento separador aire-aceite", unit: "pza", costo: 4800, min: 1, inicial: 0, prov: "aire" }, // agotado: historia 4
   { code: "ACE-CMP", familia: "Lubricantes", name: "Aceite sintético para compresor (cubeta 20 L)", unit: "pza", costo: 3900, min: 2, inicial: 3, prov: "aire" },
-  { code: "GRS-ALI", familia: "Lubricantes", name: "Grasa grado alimenticio (cartucho 400 g)", unit: "pza", costo: 210, min: 10, inicial: 16, prov: "rod" },
+  // 30 y no 16: el preventivo la pide 18 veces en los 90 dias de historia
+  // —semanal en la llenadora, mensual en taponadora y transportador— y con 16
+  // el sembrado se quedaba sin existencia a media historia. Queda en 12, arriba
+  // de su minimo, que es como se ve un almacen que si repone.
+  { code: "GRS-ALI", familia: "Lubricantes", name: "Grasa grado alimenticio (cartucho 400 g)", unit: "pza", costo: 210, min: 10, inicial: 30, prov: "rod" },
   { code: "EMP-TAP", familia: "Sellos y empaques", name: "Juego de empaques para cabezal de taponadora", unit: "jgo", costo: 1600, min: 2, inicial: 3, prov: "rod" },
   { code: "FUS-30", familia: "Eléctrico", name: "Fusible 30 A clase J", unit: "pza", costo: 180, min: 6, inicial: 10, prov: "elec" },
 
@@ -206,7 +210,8 @@ const REFACCIONES = [
   { code: "VAR-3K", familia: "Eléctrico", name: "Variador de frecuencia 3 kW", unit: "pza", costo: 12800, min: 1, inicial: 0, prov: "elec" },
 
   // ── Filtros ──
-  { code: "FIL-AIR", familia: "Filtros", name: "Filtro de aire para compresor", unit: "pza", costo: 620, min: 3, inicial: 5, prov: "aire" },
+  // La revision mensual de aire comprimido cubre dos equipos: seis al trimestre.
+  { code: "FIL-AIR", familia: "Filtros", name: "Filtro de aire para compresor", unit: "pza", costo: 620, min: 3, inicial: 12, prov: "aire" },
   { code: "FIL-SEC", familia: "Filtros", name: "Filtro coalescente para secador", unit: "pza", costo: 980, min: 2, inicial: 1, prov: "aire" },
   { code: "FIL-AGU", familia: "Filtros", name: "Cartucho de filtro de agua de 10 pulgadas", unit: "pza", costo: 320, min: 6, inicial: 24, prov: "frio" },
 
@@ -260,30 +265,53 @@ const CORRECTIVOS = [
 
 type Plan = {
   clave: string; nombre: string; activos: string[]; tipo: "CALENDAR" | "METER"; cada: number; horas: number; paro: boolean; quien: ClavePersona;
-  prioridad: string; ultimaHaceDias: number; tareas: Array<{ t: string; tipo?: string; unit?: string; min?: number; max?: number }>; refacciones?: Array<[string, number]>;
+  prioridad: string; ultimaHaceDias: number;
+  /**
+   * Lo que consume CADA actividad, no el plan.
+   *
+   * Estaba a nivel plan y el sembrador lo colgaba de la primera actividad,
+   * que es un atajo: la grasa la pide la de lubricar, no la de medir
+   * presion. Con el consumo en su actividad, la proyeccion de compras dice
+   * la verdad —cada frecuencia tira de lo suyo— y el plan se lee como un
+   * plan de verdad.
+   */
+  tareas: Array<{ t: string; tipo?: string; unit?: string; min?: number; max?: number; refs?: Array<[string, number]> }>;
 };
+
+/**
+ * Todo lo que un plan consume en una visita: la suma de sus actividades.
+ *
+ * El historico de la demo carga a la orden lo que se gasto, y eso es la suma
+ * de lo que pidio cada actividad. Antes venia de una lista a nivel plan, que
+ * dejo de existir cuando el consumo se mudo a la actividad.
+ */
+function refaccionesDelPlan(p: Plan): Array<[string, number]> {
+  const suma = new Map<string, number>();
+  for (const t of p.tareas) for (const [code, q] of t.refs ?? []) suma.set(code, (suma.get(code) ?? 0) + q);
+  return [...suma.entries()];
+}
 
 const PLANES: Plan[] = [
   { clave: "lln-lub", nombre: "Lubricación y revisión de válvulas de la llenadora", activos: ["LLN-101"], tipo: "CALENDAR", cada: 7, horas: 1.5, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 6,
-    tareas: [{ t: "Lubricar estrella y carrusel con grasa grado alimenticio" }, { t: "Revisar empaques de las 24 válvulas" }, { t: "Medir presión de llenado", tipo: "MEASUREMENT", unit: "bar", min: 1.8, max: 2.4 }, { t: "Limpieza sanitaria y liberación con calidad" }], refacciones: [["GRS-ALI", 1]] },
+    tareas: [{ t: "Lubricar estrella y carrusel con grasa grado alimenticio", refs: [["GRS-ALI", 1]] }, { t: "Revisar empaques de las 24 válvulas" }, { t: "Medir presión de llenado", tipo: "MEASUREMENT", unit: "bar", min: 1.8, max: 2.4 }, { t: "Limpieza sanitaria y liberación con calidad" }] },
   { clave: "tap", nombre: "Inspección mensual de la taponadora", activos: ["TAP-102"], tipo: "CALENDAR", cada: 30, horas: 2, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 25,
-    tareas: [{ t: "Revisar desgaste de cabezales" }, { t: "Medir torque de tapado", tipo: "MEASUREMENT", unit: "N·m", min: 1.8, max: 2.6 }, { t: "Lubricar leva y guías" }] },
+    tareas: [{ t: "Revisar desgaste de cabezales" }, { t: "Medir torque de tapado", tipo: "MEASUREMENT", unit: "N·m", min: 1.8, max: 2.6 }, { t: "Lubricar leva y guías", refs: [["GRS-ALI", 1]] }] },
   { clave: "etq", nombre: "Mantenimiento trimestral de la etiquetadora", activos: ["ETQ-103"], tipo: "CALENDAR", cada: 90, horas: 3, paro: true, quien: "mecanico", prioridad: "MEDIUM", ultimaHaceDias: 50,
-    tareas: [{ t: "Limpiar túnel de vapor y boquillas" }, { t: "Revisar cuchillas de corte" }, { t: "Calibrar sensor de registro de manga" }] },
+    tareas: [{ t: "Limpiar túnel de vapor y boquillas" }, { t: "Revisar cuchillas de corte" }, { t: "Cambiar juego de o-rings del túnel", refs: [["ORN-KIT", 1]] }, { t: "Calibrar sensor de registro de manga" }] },
   { clave: "trn", nombre: "Revisión de bandas y rodillos del transportador", activos: ["TRN-104"], tipo: "CALENDAR", cada: 30, horas: 1, paro: false, quien: "mecanico", prioridad: "MEDIUM", ultimaHaceDias: 34,
-    tareas: [{ t: "Revisar tensión y eslabones de la banda" }, { t: "Revisar rodillos y guías laterales" }] },
+    tareas: [{ t: "Revisar tensión y eslabones de la banda" }, { t: "Engrasar rodillos y chumaceras", refs: [["GRS-ALI", 1]] }, { t: "Revisar rodillos y guías laterales" }] },
   { clave: "cmp-aceite", nombre: "Cambio de aceite y filtros del compresor (cada 2,000 h)", activos: ["CMP-201"], tipo: "METER", cada: 2000, horas: 3, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 0,
-    tareas: [{ t: "Cambiar aceite" }, { t: "Cambiar filtro de aceite" }, { t: "Cambiar elemento separador aire-aceite" }, { t: "Registrar horómetro" }], refacciones: [["ACE-CMP", 1], ["FIL-ACE", 1], ["FIL-SEP", 1]] },
+    tareas: [{ t: "Cambiar aceite", refs: [["ACE-CMP", 1]] }, { t: "Cambiar filtro de aceite", refs: [["FIL-ACE", 1]] }, { t: "Cambiar elemento separador aire-aceite", refs: [["FIL-SEP", 1]] }, { t: "Registrar horómetro" }] },
   { clave: "aire", nombre: "Revisión mensual de compresor y secador", activos: ["CMP-201", "SEC-202"], tipo: "CALENDAR", cada: 30, horas: 1, paro: false, quien: "mecanico", prioridad: "MEDIUM", ultimaHaceDias: 27,
-    tareas: [{ t: "Purgar condensados" }, { t: "Revisar fugas de aire en tuberías y conexiones" }, { t: "Revisar indicadores de presión y temperatura" }] },
+    tareas: [{ t: "Purgar condensados" }, { t: "Cambiar filtro de aire", refs: [["FIL-AIR", 1]] }, { t: "Revisar fugas de aire en tuberías y conexiones" }, { t: "Revisar indicadores de presión y temperatura" }] },
   { clave: "cal", nombre: "Revisión mensual de la caldera", activos: ["CAL-203"], tipo: "CALENDAR", cada: 30, horas: 2, paro: false, quien: "electrico", prioridad: "HIGH", ultimaHaceDias: 32,
     tareas: [{ t: "Purga de fondo y de columna de nivel" }, { t: "Probar válvula de seguridad" }, { t: "Medir presión de operación", tipo: "MEASUREMENT", unit: "kg/cm²", min: 7, max: 9 }, { t: "Revisar quemador y flama" }] },
   { clave: "chl", nombre: "Mantenimiento trimestral del chiller", activos: ["CHL-204"], tipo: "CALENDAR", cada: 90, horas: 4, paro: true, quien: "electrico", prioridad: "MEDIUM", ultimaHaceDias: 70,
-    tareas: [{ t: "Limpiar condensadores" }, { t: "Revisar presiones de alta y baja" }, { t: "Apretar conexiones eléctricas" }] },
+    tareas: [{ t: "Limpiar condensadores" }, { t: "Cambiar cartuchos del filtro de agua", refs: [["FIL-AGU", 2]] }, { t: "Revisar presiones de alta y baja" }, { t: "Apretar conexiones eléctricas" }] },
   { clave: "sub", nombre: "Termografía semestral de la subestación", activos: ["SUB-206"], tipo: "CALENDAR", cada: 180, horas: 2, paro: false, quien: "electrico", prioridad: "MEDIUM", ultimaHaceDias: 120,
     tareas: [{ t: "Termografía de conexiones de media y baja tensión" }, { t: "Revisar nivel y temperatura del aceite del transformador", tipo: "MEASUREMENT", unit: "°C", min: 20, max: 80 }] },
   { clave: "mon", nombre: "Servicio del montacargas (cada 250 h)", activos: ["MON-301"], tipo: "METER", cada: 250, horas: 1.5, paro: false, quien: "electrico", prioridad: "MEDIUM", ultimaHaceDias: 0,
-    tareas: [{ t: "Revisar nivel y densidad de la batería" }, { t: "Revisar frenos y cadenas del mástil" }, { t: "Lubricar puntos de engrase" }], refacciones: [["GRS-ALI", 1]] },
+    tareas: [{ t: "Revisar nivel y densidad de la batería" }, { t: "Revisar frenos y cadenas del mástil" }, { t: "Lubricar puntos de engrase", refs: [["GRS-ALI", 1]] }] },
 ];
 
 /** Horómetros: uso diario y en qué valor quedan hoy. Los planes por horas se calculan contra esto. */
@@ -479,9 +507,9 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
       name: p.nombre, maintenanceType: "PREVENTIVE", triggerType: p.tipo, intervalDays: p.tipo === "CALENDAR" ? p.cada : null, intervalMeter: p.tipo === "METER" ? p.cada : null,
       leadTimeDays: p.tipo === "METER" ? 7 : 3, toleranceDays: 2, priority: p.prioridad, estimatedHours: p.horas, requiresShutdown: p.paro, active: true, assignedToId: u[p.quien].id,
       assetIds: p.activos.map((x) => activo[x].id), desde: p.tipo === "CALENDAR" ? dia(hace(c, p.ultimaHaceDias)) : null, desdeEsUltima: true,
-      tasks: p.tareas.map((t, i) => ({
+      tasks: p.tareas.map((t) => ({
         title: t.t, taskType: t.tipo ?? "CHECK", unit: t.unit ?? null, minValue: t.min ?? null, maxValue: t.max ?? null, required: true,
-        labor: [], services: [], parts: i === 0 ? (p.refacciones ?? []).map(([code, q]) => ({ partId: parte[code].id, quantity: q })) : [],
+        labor: [], services: [], parts: (t.refs ?? []).map(([code, q]) => ({ partId: parte[code].id, quantity: q })),
       })),
     });
     if ("error" in alta) throw new Error(`Plan «${p.nombre}»: ${alta.error}`);
@@ -504,7 +532,7 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
         eventos.push({ cuando: inicio, hacer: () => ordenCerrada(c, {
           titulo: p.nombre, tipo: "PREVENTIVE", activo: cod, prioridad: p.prioridad, creada: hace(c, d + 5), vence: hace(c, tarde ? d + 3 : d - 1),
           inicio, horas: p.horas, paroMin: p.paro ? Math.round(p.horas * 60) : 0, paroPlaneado: true, quien: p.quien,
-          solucion: `Rutina completa. ${p.tareas.length} actividades sin hallazgos que requieran correctivo.`, tareas: p.tareas, refacciones: p.refacciones ?? [], planId: planes[p.clave].id,
+          solucion: `Rutina completa. ${p.tareas.length} actividades sin hallazgos que requieran correctivo.`, tareas: p.tareas, refacciones: refaccionesDelPlan(p), planId: planes[p.clave].id,
         }) });
       }
     }
@@ -520,7 +548,7 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
       inicio, horas: p.horas, paroMin: p.paro ? Math.round(p.horas * 60) : 0, paroPlaneado: true, quien: p.quien,
       solucion: `Servicio completo a ${m.ultimoServicio!.toLocaleString("es-MX")} h de horómetro.`, tareas: p.tareas,
       // El separador del compresor se cambia en cada servicio; el montacargas solo lleva grasa.
-      refacciones: p.refacciones ?? [], planId: planes[p.clave].id,
+      refacciones: refaccionesDelPlan(p), planId: planes[p.clave].id,
     }) });
   }
   for (const k of CORRECTIVOS) {

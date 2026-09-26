@@ -154,6 +154,30 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/inventory/proyeccion": {
+    titulo: "Lo que va a pedir el preventivo",
+    que: "Las refacciones que los planes van a consumir en los próximos meses, con la fecha en que tocan. Es para comprar antes de que haga falta, no cuando ya paró el equipo.",
+    hacer: [
+      "Ver qué refacciones se van a necesitar y cuándo",
+      "Elegir el horizonte: 3 meses, 6 meses o un año",
+      "Verlo por semana, por mes o por trimestre",
+      "Saber cuánto NO alcanza con lo que hay hoy",
+    ],
+    flujo: [
+      "Sale de cruzar dos cosas que el sistema ya sabía por separado: el calendario de qué actividad toca en qué equipo y qué día, y las refacciones que cada actividad tiene cargadas. Es la misma proyección que pinta el calendario, no un cálculo aparte: si fueran dos, un día dejarían de coincidir y nadie sabría cuál vale.",
+      "Arriba dice SIEMPRE a cuántas actividades cubre. Si los planes no tienen refacciones cargadas, la tabla sale corta y eso se leería como «no hay que comprar nada», que es lo contrario de la verdad. Mientras la cobertura sea baja, la cifra es un piso.",
+      "Para subir la cobertura se cargan las refacciones en cada plan, en «Recursos» de la actividad: qué se consume y cuánto. Los planes que redactó la IA ya las traen; los que se importaron o se capturaron a mano, normalmente no.",
+      "«Falta» es lo que NO alcanza: lo que va a consumir más el mínimo, menos lo que hay hoy. Si hay doce y el plan va a pedir ocho, no hay nada que comprar por este concepto. El mínimo entra porque quedarse en cero justo cuando toca el preventivo es igual que no tenerlo.",
+      "El orden es por lo que más pesa en dinero, no por cantidad: veinte tornillos no son el problema, un rodamiento de doce mil sí.",
+      "Esto es lo que el PLAN compromete, no el consumo total del almacén. Lo correctivo no se puede proyectar —una falla no tiene fecha— así que comprar exactamente esta cantidad deja sin margen el día que algo se rompa.",
+      "Solo entran los planes por calendario con equipos asignados y fecha próxima. Los planes por medidor dependen del uso y se proyectan en Predictivo.",
+    ],
+    campos: [
+      { nombre: "Hay", explica: "La existencia actual de esa refacción, sumando todos los almacenes." },
+      { nombre: "Falta", explica: "Cuánto comprar para llegar al horizonte sin quedarse corto, contando el mínimo. En blanco significa que alcanza con lo que hay." },
+      { nombre: "Las columnas de periodo", explica: "Cuánto cae en cada tramo. La primera es la más cercana y es la que decide si hay que pedir hoy: si el tiempo de entrega del proveedor es de dos semanas, lo de la primera columna ya va tarde." },
+    ],
+  },
   "/inventory/analisis": {
     titulo: "Análisis de almacén",
     camposBuscables: true,

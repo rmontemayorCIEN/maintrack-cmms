@@ -67,6 +67,7 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/inventory", roles: ALMACEN },
   // Valor del inventario, costo de reponer, kardex valuado: dinero.
   { ruta: "/inventory/analisis", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
+  { ruta: "/inventory/proyeccion", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/indicadores", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/kardex", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/requisiciones", roles: ALMACEN },
@@ -259,6 +260,7 @@ const SUBPANTALLAS: ItemMenu[] = [
   // Dentro de Almacen, cada una detras de su boton.
   { href: "/inventory/kardex", etiqueta: "Kardex de almacén", icono: "kardex" },
   { href: "/inventory/analisis", etiqueta: "Análisis de almacén", icono: "analisis" },
+  { href: "/inventory/proyeccion", etiqueta: "Lo que va a pedir el preventivo", icono: "calendario" },
   { href: "/inventory/indicadores", etiqueta: "Indicadores de almacén", icono: "indicadores" },
   { href: "/inventory/conteos", etiqueta: "Conteos cíclicos", icono: "conteos" },
   { href: "/inventory/traspasos", etiqueta: "Traspasos entre almacenes", icono: "traspasos" },
