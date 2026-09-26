@@ -1235,6 +1235,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/requests": {
     titulo: "Solicitudes de servicio",
     camposBuscables: true,
+    tablaConfigurable: true,
     que: "Lo que reporta quien no es de mantenimiento: se revisa y se convierte en orden, o se descarta. Quien reporta ve aquí solo sus reportes («Mis reportes») y en qué van.",
     hacer: [
       "Levantar una solicitud a mano",
@@ -1244,6 +1245,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Es la puerta de entrada del trabajo correctivo desde el resto de la empresa.",
+      "La lista se agrupa por estado, prioridad, equipo o quien reportó, se ordena tocando el título de una columna y se le eligen columnas; su arreglo se guarda y es suyo. Quien ve solo sus reportes no tiene la agrupación por solicitante, porque ahí todo es suyo.",
       "Lo que llega por código QR trae el contexto que ese punto tenga: un QR pegado a un equipo trae el equipo; uno a la entrada de un área trae solo el área. Quien reporta nunca escoge equipo, y es a propósito — quien no trae el código tampoco se sabe la clave, y un equipo mal escogido ensucia el historial de uno que no falló y deja sin registro al que sí.",
       "Por eso el equipo lo pone QUIEN REVISA. Al aprobar aparece el buscador de equipos; si la solicitud llegó sin uno, la pantalla lo advierte: una orden sin activo no entra al expediente de ningún equipo ni cuenta en su historial de fallas.",
       "Quien tiene cuenta en el sistema no necesita ningún QR: levanta la solicitud desde aquí, con el buscador de equipos y su foto. El portal público existe para quien NO tiene cuenta.",
