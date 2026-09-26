@@ -54,7 +54,20 @@ const EsquemaRecursos = z.object({
   sinCatalogo: z.array(
     z.object({
       numero: z.number(),
-      queFalta: textoIa(120, "Que refaccion haria falta y no existe en el catalogo de la empresa."),
+      queFalta: textoIa(160, "Que refaccion haria falta y por que la del catalogo no sirve. En una frase."),
+      /**
+       * Lo que hace falta, ya listo para darse de alta.
+       *
+       * Sin esto la lista solo servia para leerla: quien la veia tenia que ir
+       * al almacen, inventar un codigo y capturar todo a mano, que es justo el
+       * trabajo que nadie hace. Con el alta propuesta, el ciclo se cierra en la
+       * misma pantalla —y el codigo sale en el estilo que la empresa YA usa,
+       * porque el modelo tiene su catalogo enfrente—.
+       */
+      codigoSugerido: textoIa(30, "Un codigo corto para darla de alta, en el MISMO estilo de los que ya usa la empresa. No repita uno que ya exista."),
+      nombreSugerido: textoIa(120, "Como lo pondria el almacen, con la medida o especificacion si importa."),
+      unidadSugerida: textoIa(20, "pza, jgo, L, kg, m. Use una de las unidades que ya aparecen en su catalogo."),
+      cantidad: z.number().describe("Cuantas se consumen cada vez que se hace la actividad."),
     }),
   ).describe("Actividades que SI consumen algo, pero ese algo no esta dado de alta. Es lo que hay que capturar antes."),
 });
@@ -68,7 +81,8 @@ Reglas que no se rompen:
 - La cantidad es por EJECUCION de la actividad, no al ano.
 - La mayoria de las actividades de un preventivo no consumen material. Revisar, medir, inspeccionar, limpiar, probar y apretar no gastan nada: esas van en sinConsumo. Es la respuesta mas comun y es correcta.
 - No proponga material "por si acaso". Si la actividad no lo consume siempre, no lo ponga.
-- Cada actividad tiene que aparecer EXACTAMENTE UNA VEZ, en actividades, en sinConsumo o en sinCatalogo.`;
+- Cada actividad tiene que aparecer EXACTAMENTE UNA VEZ, en actividades, en sinConsumo o en sinCatalogo.
+- En sinCatalogo, proponga el codigo con el MISMO estilo que ya usa la empresa: si sus codigos son GRS-ALI y FIL-AIR, uno nuevo se parece a esos. Nunca repita un codigo que ya exista.`;
 
 export async function proponerRecursosDePlan(
   org: OrgConIa,
@@ -187,9 +201,29 @@ export function aterrizarPropuesta(
     .map((n) => porNumero.get(n))
     .filter((a): a is { numero: number; id: string; titulo: string } => Boolean(a));
 
+  /**
+   * Lo que falta dar de alta, con su alta ya armada.
+   *
+   * El codigo propuesto se comprueba contra el catalogo: si el modelo repitio
+   * uno que ya existe, se marca `codigoOcupado` y la pantalla pide otro. Dejar
+   * pasar un codigo repetido habria reventado al guardar, con un error de
+   * indice unico que no le dice nada a nadie.
+   */
   const sinCatalogo = (propuesta.sinCatalogo ?? []).flatMap((x) => {
     const act = porNumero.get(x.numero);
-    return act ? [{ taskId: act.id, titulo: act.titulo, queFalta: x.queFalta }] : [];
+    if (!act) return [];
+    const codigo = (x.codigoSugerido ?? "").trim().toUpperCase();
+    const cantidad = Number(x.cantidad);
+    return [{
+      taskId: act.id,
+      titulo: act.titulo,
+      queFalta: x.queFalta,
+      codigo,
+      codigoOcupado: Boolean(codigo) && porCodigo.has(codigo),
+      nombre: (x.nombreSugerido ?? "").trim(),
+      unidad: (x.unidadSugerida ?? "").trim() || "pza",
+      cantidad: Number.isFinite(cantidad) && cantidad > 0 && cantidad <= 500 ? cantidad : 1,
+    }];
   });
 
   return { lineas, sinConsumo, sinCatalogo, inventadas: [...new Set(inventadas)] };

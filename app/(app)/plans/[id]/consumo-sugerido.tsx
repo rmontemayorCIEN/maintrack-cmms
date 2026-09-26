@@ -31,7 +31,10 @@ type Linea = {
 type Propuesta = {
   lineas: Linea[];
   sinConsumo: Array<{ numero: number; id: string; titulo: string }>;
-  sinCatalogo: Array<{ taskId: string; titulo: string; queFalta: string }>;
+  sinCatalogo: Array<{
+    taskId: string; titulo: string; queFalta: string;
+    codigo: string; codigoOcupado: boolean; nombre: string; unidad: string; cantidad: number;
+  }>;
   inventadas: string[];
 };
 
@@ -43,6 +46,15 @@ export function ConsumoSugerido({ planId, disponible }: { planId: string; dispon
   const [listo, setListo] = useState<string | null>(null);
   // Clave «tarea|refacción»: se acepta renglón por renglón.
   const [elegidas, setElegidas] = useState<Set<string>>(new Set());
+  /**
+   * Las altas se editan antes de crearse, y NO vienen marcadas.
+   *
+   * Lo demas se marca solo porque solo cuelga material que ya existe; esto
+   * crea un renglon nuevo en el catalogo del almacen, que es de otra persona y
+   * dura para siempre. Un catalogo se ensucia una vez y se limpia durante
+   * meses (para eso existe la pantalla de duplicados): que cueste un clic mas.
+   */
+  const [altas, setAltas] = useState<Map<string, { code: string; name: string; unit: string; cantidad: string; on: boolean }>>(new Map());
 
   if (!disponible) return null;
   const clave = (t: string, r: string) => `${t}|${r}`;
@@ -60,6 +72,11 @@ export function ConsumoSugerido({ planId, disponible }: { planId: string; dispon
       // Todo marcado de entrada, pero visible: lo que se quita es más rápido
       // de ver que lo que falta por marcar.
       setElegidas(new Set((d.lineas as Linea[]).flatMap((l) => l.refacciones.map((r) => clave(l.taskId, r.partId)))));
+      setAltas(new Map((d.sinCatalogo as Propuesta["sinCatalogo"]).map((x) => [
+        x.taskId,
+        // El código repetido llega vacío: se pide uno, en vez de reventar al guardar.
+        { code: x.codigoOcupado ? "" : x.codigo, name: x.nombre, unit: x.unidad || "pza", cantidad: String(x.cantidad), on: false },
+      ])));
     } catch {
       setError("Se perdió la conexión.");
     } finally { setCargando(false); }
@@ -73,16 +90,23 @@ export function ConsumoSugerido({ planId, disponible }: { planId: string; dispon
         refacciones: l.refacciones.filter((r) => elegidas.has(clave(l.taskId, r.partId))).map((r) => ({ partId: r.partId, cantidad: r.cantidad })),
       }))
       .filter((l) => l.refacciones.length);
-    if (!lineas.length) { setError("No hay nada marcado para guardar."); return; }
+    const nuevas = [...altas.entries()]
+      .filter(([, a]) => a.on && a.code.trim() && a.name.trim() && Number(a.cantidad) > 0)
+      .map(([taskId, a]) => ({ taskId, code: a.code.trim(), name: a.name.trim(), unit: a.unit.trim() || "pza", cantidad: Number(a.cantidad) }));
+    if (!lineas.length && !nuevas.length) { setError("No hay nada marcado para guardar."); return; }
     setGuardando(true); setError(null);
     try {
       const res = await fetch("/api/ia/recursos-plan", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, lineas }),
+        body: JSON.stringify({ planId, lineas, altas: nuevas }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setError(d.error ?? "No se pudo guardar."); return; }
-      setListo(`Se cargó el consumo de ${d.actividades} actividad(es): ${d.refacciones} refacción(es).`);
+      setListo(
+        `Se cargó el consumo de ${d.actividades} actividad(es): ${d.refacciones} refacción(es)`
+        + (d.creadas ? `, ${d.creadas} dada(s) de alta en el almacén` : "")
+        + (d.ocupados?.length ? `. Estos códigos ya existían y no se crearon: ${d.ocupados.join(", ")}` : "."),
+      );
       setP(null);
       // La pantalla la pinta el servidor: al recargar se ve lo guardado.
       setTimeout(() => window.location.reload(), 1200);
@@ -91,7 +115,10 @@ export function ConsumoSugerido({ planId, disponible }: { planId: string; dispon
     } finally { setGuardando(false); }
   }
 
-  const marcadas = p ? p.lineas.flatMap((l) => l.refacciones.filter((r) => elegidas.has(clave(l.taskId, r.partId)))).length : 0;
+  const marcadas = p
+    ? p.lineas.flatMap((l) => l.refacciones.filter((r) => elegidas.has(clave(l.taskId, r.partId)))).length
+      + [...altas.values()].filter((a) => a.on && a.code.trim() && a.name.trim()).length
+    : 0;
 
   return (
     <div className="mt-3 border-t border-slate-100 pt-3">
@@ -164,12 +191,61 @@ export function ConsumoSugerido({ planId, disponible }: { planId: string; dispon
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[0.6875rem] text-amber-900">
               <p className="font-medium">
                 <PackagePlus className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-                {p.sinCatalogo.length} actividad(es) consumen algo que no está en su catálogo:
+                {p.sinCatalogo.length} actividad(es) consumen algo que NO está en su catálogo. Puede darlo de alta aquí:
               </p>
-              <ul className="mt-0.5 grid gap-0.5 pl-5">
-                {p.sinCatalogo.map((x) => <li key={x.taskId} className="list-disc">{x.titulo}: {x.queFalta}</li>)}
+              <ul className="mt-1.5 grid gap-2">
+                {p.sinCatalogo.map((x) => {
+                  const a = altas.get(x.taskId);
+                  if (!a) return null;
+                  const set = (campo: "code" | "name" | "unit" | "cantidad", v: string) =>
+                    setAltas((m) => new Map(m).set(x.taskId, { ...a, [campo]: v }));
+                  return (
+                    <li key={x.taskId} className="rounded-lg border border-amber-200 bg-white p-2">
+                      <label className="flex cursor-pointer items-start gap-2">
+                        <input
+                          type="checkbox" checked={a.on}
+                          onChange={() => setAltas((m) => new Map(m).set(x.taskId, { ...a, on: !a.on }))}
+                          className="mt-0.5 h-3.5 w-3.5"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium text-slate-800">{x.titulo}</span>
+                          <span className="block text-slate-600">{x.queFalta}</span>
+                        </span>
+                      </label>
+                      {a.on ? (
+                        <div className="mt-2 grid gap-1.5 pl-5 sm:grid-cols-[7rem_minmax(0,1fr)_4rem_4rem]">
+                          <label className="text-[0.625rem] text-slate-500">
+                            Código
+                            <input className="field" value={a.code} onChange={(e) => set("code", e.target.value.toUpperCase().slice(0, 40))}
+                              placeholder={x.codigoOcupado ? "Ya existe: ponga otro" : ""} />
+                          </label>
+                          <label className="text-[0.625rem] text-slate-500">
+                            Nombre
+                            <input className="field" value={a.name} onChange={(e) => set("name", e.target.value.slice(0, 160))} />
+                          </label>
+                          <label className="text-[0.625rem] text-slate-500">
+                            Unidad
+                            <input className="field" value={a.unit} onChange={(e) => set("unit", e.target.value.slice(0, 20))} />
+                          </label>
+                          <label className="text-[0.625rem] text-slate-500">
+                            Cantidad
+                            <input className="field" inputMode="decimal" value={a.cantidad} onChange={(e) => set("cantidad", e.target.value.replace(/[^\d.]/g, "").slice(0, 8))} />
+                          </label>
+                          {x.codigoOcupado && !a.code ? (
+                            <p className="text-[0.625rem] text-amber-800 sm:col-span-4">
+                              El código que propuso ya existe en su catálogo. Escriba otro.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
-              <p className="mt-1">Déelas de alta en Almacén y vuelva a pedir la sugerencia.</p>
+              <p className="mt-1.5">
+                Lo que marque se da de alta en el almacén y queda colgado de su actividad, en un solo paso. Nace sin
+                existencia ni mínimo: eso se captura después en Almacén, con el primer conteo o la primera compra.
+              </p>
             </div>
           ) : null}
 

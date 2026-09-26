@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { aterrizarPropuesta, proponerRecursosDePlan } from "@/lib/ia/recursos-plan";
 import { agregarRefaccionesAActividades } from "@/lib/plan-tasks";
+import { can } from "@/lib/rbac";
 
 const pedir = z.object({ planId: z.string().min(1) });
 
@@ -55,6 +56,20 @@ const guardar = z.object({
       cantidad: z.coerce.number().positive().max(500),
     })),
   })),
+  /**
+   * Refacciones que hay que DAR DE ALTA y colgar de su actividad.
+   *
+   * Van en la misma peticion que lo demas a proposito: dar de alta la pieza y
+   * olvidarse de colgarla deja el catalogo mas grande y el plan igual de
+   * mudo, que es la mitad del trabajo y ninguno del beneficio.
+   */
+  altas: z.array(z.object({
+    taskId: z.string().min(1),
+    code: z.string().trim().min(1).max(40),
+    name: z.string().trim().min(2).max(160),
+    unit: z.string().trim().min(1).max(20),
+    cantidad: z.coerce.number().positive().max(500),
+  })).optional(),
 });
 
 /** Guarda lo que la persona aceptó. Agrega; nunca pisa lo ya capturado. */
@@ -66,7 +81,44 @@ export async function PUT(request: Request) {
     });
     if (!plan) return fail("Ese plan no existe en esta empresa", 404);
 
-    const r = await agregarRefaccionesAActividades(orgId, plan.id, d.lineas);
+    /**
+     * Primero el alta, luego el colgado: la refaccion tiene que existir antes
+     * de poder referirla. Se exige ademas `inventory:write` —dar de alta en el
+     * almacen no es lo mismo que editar un plan— y un codigo repetido se
+     * rechaza con su nombre, no con un error de indice unico.
+     */
+    const creadas: Array<{ taskId: string; partId: string; cantidad: number }> = [];
+    const ocupados: string[] = [];
+    if (d.altas?.length) {
+      if (!can(user.role, "inventory:write")) {
+        return fail("Para dar de alta refacciones hace falta permiso de almacén. Pida que las capture quien lo tenga, o guarde solo lo demás.", 403);
+      }
+      const tareas = new Set(
+        (await prisma.planTask.findMany({ where: { planId: plan.id, id: { in: d.altas.map((a) => a.taskId) } }, select: { id: true } })).map((t) => t.id),
+      );
+      for (const a of d.altas) {
+        if (!tareas.has(a.taskId)) continue;
+        const code = a.code.toUpperCase();
+        const ya = await prisma.part.findFirst({ where: { organizationId: orgId, code }, select: { id: true } });
+        if (ya) { ocupados.push(code); continue; }
+        const nueva = await prisma.part.create({
+          data: { organizationId: orgId, code, name: a.name, unit: a.unit, active: true },
+          select: { id: true },
+        });
+        await logAudit({
+          organizationId: orgId, userId: user.id, entity: "Part", entityId: nueva.id, action: "CREATED",
+          summary: `${code} — ${a.name}`,
+          changes: { origen: `alta desde el plan «${plan.name}»`, unidad: a.unit },
+        });
+        creadas.push({ taskId: a.taskId, partId: nueva.id, cantidad: a.cantidad });
+      }
+    }
+
+    const todas = [
+      ...d.lineas,
+      ...creadas.map((c) => ({ taskId: c.taskId, refacciones: [{ partId: c.partId, cantidad: c.cantidad }] })),
+    ];
+    const r = await agregarRefaccionesAActividades(orgId, plan.id, todas);
     if (r.refacciones) {
       await logAudit({
         organizationId: orgId, userId: user.id, entity: "MaintenancePlan", entityId: plan.id,
@@ -75,6 +127,6 @@ export async function PUT(request: Request) {
         changes: { refaccionesAgregadas: r.refacciones, origen: "propuesta de IA aceptada" },
       });
     }
-    return ok(r);
+    return ok({ ...r, creadas: creadas.length, ocupados });
   });
 }

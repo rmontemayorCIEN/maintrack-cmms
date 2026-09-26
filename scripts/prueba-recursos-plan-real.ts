@@ -81,13 +81,22 @@ async function main() {
       a.lineas.flatMap((l) => l.refacciones.map((x) => `${x.code}:${x.cantidad}`)));
     revisar("contestó algo útil: o propuso material, o dijo que no consume",
       a.lineas.length + a.sinConsumo.length + a.sinCatalogo.length > 0);
+    // Lo que falta en el catálogo tiene que venir LISTO para darse de alta: sin
+    // código, nombre y unidad, la lista solo sirve para leerla.
+    revisar("lo que falta en catálogo viene con su alta armada, y el código no choca con uno existente",
+      a.sinCatalogo.every((x) => x.nombre.length > 2 && x.unidad.length > 0 && x.cantidad > 0)
+      && a.sinCatalogo.every((x) => !x.codigoOcupado || x.codigo.length > 0),
+      a.sinCatalogo.map((x) => `${x.codigo || "(sin código)"} · ${x.nombre} (${x.unidad}) x${x.cantidad}${x.codigoOcupado ? " ¡OCUPADO!" : ""}`));
 
     for (const l of a.lineas) {
       console.log(`    ${l.titulo}`);
       for (const x of l.refacciones) console.log(`      · ${x.cantidad} ${x.unit} de ${x.code} — ${x.porQue}`);
     }
     if (a.sinConsumo.length) console.log(`    sin consumo: ${a.sinConsumo.map((s) => s.titulo).join("; ")}`);
-    if (a.sinCatalogo.length) console.log(`    falta en catálogo: ${a.sinCatalogo.map((s) => `${s.titulo} → ${s.queFalta}`).join("; ")}`);
+    for (const x of a.sinCatalogo) {
+      console.log(`    falta: ${x.codigo} · ${x.nombre} (${x.unidad}) x${x.cantidad}${x.codigoOcupado ? "  ← código ocupado" : ""}`);
+      console.log(`       para: ${x.titulo} — ${x.queFalta}`);
+    }
   }
 
   console.log(`\nCosto del ciclo: ${costo.toFixed(4)} USD`);
