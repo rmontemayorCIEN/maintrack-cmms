@@ -257,6 +257,7 @@ model Organization {
   assetIntakes       AssetIntake[]
   specialties        Specialty[]
   externalServices   ExternalService[]
+  vigencias          Vigencia[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
   teams              Team[]
@@ -377,6 +378,8 @@ model User {
   acknowledgedAlerts   PredictiveAlert[]
   completedTasks       WorkOrderTask[]
   attachments          Attachment[]
+  vigencias            Vigencia[]              @relation("VigenciaDeUsuario")
+  vigenciasCreadas     Vigencia[]              @relation("VigenciaAutor")
   links                ReferenceLink[]
   planRequests         PlanRequest[]
   solicitudesSoporte   SolicitudSoporte[]
@@ -737,6 +740,7 @@ model Asset {
   rondinParadas    RondinParada[]
   rondinHallazgos  RondinHallazgo[]
   attachments      Attachment[]
+  vigencias        Vigencia[]
   links            ReferenceLink[]
   reportPoints     ReportPoint[]
   planesAsignados  PlanAsset[]
@@ -1418,6 +1422,78 @@ model Compromiso {
   @@index([responsableId, estado])
 }
 
+/// Un documento con fecha de vencimiento, colgado de lo que cubre.
+///
+/// ── Por que es UNO y no siete ──
+///
+/// Garantia, poliza de seguro, fianza, contrato de servicio, calibracion,
+/// permiso de operacion, licencia y certificado son el mismo objeto: un papel
+/// con vigencia, colgado de algo, que tiene que avisar antes de vencerse y
+/// aparecer en el expediente de lo que cuelga. Siete modelos habrian sido la
+/// misma estructura siete veces, con siete pantallas que se desincronizan.
+/// Lo que cambia entre ellos es el nombre y a quien se le reclama, y eso es
+/// un campo.
+///
+/// ── De que cuelga ──
+///
+/// Exactamente UNA de assetId / partId / userId / serviceId, como en
+/// `Attachment`. No es un modelo generico con entidad+entidadId porque estas
+/// se consultan al abrir un equipo y al revisar que vence este mes: hacen
+/// falta las llaves de verdad y el indice.
+model Vigencia {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// Del catalogo de `lib/vigencias-tipos.ts`: GARANTIA, POLIZA_SEGURO,
+  /// FIANZA, CONTRATO_SERVICIO, CALIBRACION, PERMISO, LICENCIA, CERTIFICADO,
+  /// OTRO. Sin enum nativo: el esquema tiene que servir en SQLite y Postgres.
+  tipo           String
+  /// Como la llama la gente: «Garantia de fabrica», «Poliza GNP 44812».
+  titulo         String
+  /// Folio del documento: numero de poliza, de contrato, de certificado.
+  folio          String?
+  desde          DateTime?
+  /// Nulo cuando no caduca. Una vigencia sin `hasta` no avisa nunca, y esta
+  /// bien: un certificado de fabrica no se renueva.
+  hasta          DateTime?
+  /// Cuantos dias antes avisar. Nulo toma el del tipo: una poliza se renueva
+  /// con mas anticipacion que una calibracion.
+  avisarDias     Int?
+  /// Que cubre y que no. Es lo que alguien necesita leer cuando llega la
+  /// falla, y por eso no es la nota: es su propio campo.
+  cubre          String?
+  /// A quien se le reclama: el proveedor, la aseguradora, el laboratorio.
+  supplierId     String?
+
+  /// De que cuelga. Exactamente uno; lo cuida `lib/vigencias.ts`.
+  assetId   String?
+  partId    String?
+  userId    String?
+  serviceId String?
+
+  /// Apagada sin borrarla: una poliza que se cancelo antes de vencer sigue
+  /// siendo historia, y borrarla dejaria sin explicacion los avisos que ya
+  /// salieron.
+  activa      Boolean   @default(true)
+  canceladaEl DateTime?
+  nota        String?
+  creadoPorId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
+  asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  part         Part?            @relation(fields: [partId], references: [id], onDelete: Cascade)
+  user         User?            @relation("VigenciaDeUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  service      ExternalService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  creadoPor    User?            @relation("VigenciaAutor", fields: [creadoPorId], references: [id])
+
+  @@index([organizationId, tipo])
+  @@index([organizationId, hasta])
+  @@index([assetId])
+  @@index([supplierId])
+}
+
 model Comentario {
   id             String    @id @default(cuid())
   organizationId String
@@ -1606,6 +1682,7 @@ model Supplier {
   parts             Part[]
   services          ExternalService[]
   compras           PurchaseRequest[]
+  vigencias         Vigencia[]
   recepciones       GoodsReceipt[]
   cotizaciones      Quote[]
   ordenes           PurchaseOrder[]
@@ -1655,6 +1732,7 @@ model Part {
   planTaskParts    PlanTaskPart[]
   usedIn           WorkOrderPart[]
   attachments      Attachment[]
+  vigencias        Vigencia[]
   links            ReferenceLink[]
   tareasBloqueadas WorkOrderTask[]
   equivalenciasA   EquivalenciaRefaccion[] @relation("EquivalenciaA")
@@ -2271,6 +2349,7 @@ model ExternalService {
   supplier     Supplier?          @relation(fields: [supplierId], references: [id])
   planServices PlanTaskService[]
   workOrders   WorkOrderService[]
+  vigencias    Vigencia[]
 
   @@unique([organizationId, code])
   @@index([organizationId])

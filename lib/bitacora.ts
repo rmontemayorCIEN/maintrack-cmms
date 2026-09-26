@@ -19,6 +19,10 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   ORDENES: { titulo: "Órdenes de trabajo", entidades: ["WorkOrder", "WorkOrderTask", "WorkRequest"] },
   ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "Meter", "MeterReading", "Sensor", "PredictiveAlert", "PlanRequest", "Conjunto"] },
   ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier"] },
+  // Las vigencias van con activos y no en configuracion: una garantia o un
+  // permiso de operacion son datos del equipo, y quien audita «que paso con
+  // la caldera» los busca ahi.
+  VIGENCIAS: { titulo: "Garantías y vigencias", entidades: ["Vigencia"] },
   CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink"] },
   IMPORTACION: { titulo: "Importaciones y puesta en marcha", entidades: ["Importacion", "ImportBatch"] },
 };

@@ -1,6 +1,7 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { Compromisos } from "@/components/compromisos";
 import { Comentarios } from "@/components/comentarios";
+import { Vigencias } from "@/components/vigencias";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
@@ -590,6 +591,18 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </Card>
+
+      {/* Los papeles del equipo que se vencen. Va ANTES de la conversación
+          porque es dato del equipo, no charla sobre él: quien abre el
+          expediente porque el equipo falló tiene que ver aquí si todavía está
+          cubierto, sin bajar hasta el final. */}
+      <div className="mt-4">
+        <Vigencias
+          ancla="assetId" anclaId={asset.id} zona={user.organization.timezone}
+          puedeEscribir={can(user.role, "vigencia:write")}
+          tiposSugeridos={["GARANTIA", "POLIZA_SEGURO", "CALIBRACION", "PERMISO", "CONTRATO_SERVICIO", "CERTIFICADO", "OTRO"]}
+        />
+      </div>
 
       {/* Lo que se hable de este registro queda aquí, no en un chat
           suelto donde se pierde en veinte minutos. */}

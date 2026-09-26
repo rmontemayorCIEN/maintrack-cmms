@@ -12,6 +12,7 @@ import { aprobarSolicitud, rechazarSolicitud } from "./solicitudes";
 import { autorizar, crearRequisicionDeCompra, elegirCotizacion, emitirOrdenDeCompra, recibir, registrarCotizacion } from "./compras";
 import { detectar } from "./avisos/detectores";
 import { configDe } from "./avisos/config";
+import { guardarVigencia } from "./vigencias";
 import { logAudit } from "./audit";
 import { sembrarCatalogosEstandar } from "./catalogos-estandar";
 import { alertaAbierta } from "./alertas";
@@ -79,6 +80,39 @@ const ACTIVOS = [
   { code: "SUB-206", name: "Transformador de subestación 500 kVA", loc: "SUB", crit: "A", costo: 900_000, para: true, modelo: "13.2 kV / 440 V" },
   { code: "MON-301", name: "Montacargas eléctrico 2.5 t", loc: "PAT", crit: "C", costo: 520_000, para: false, modelo: "Eléctrico, 48 V" },
 ];
+
+/**
+ * Los papeles que se vencen, con la historia que cuentan.
+ *
+ * Son seis a proposito, y con estados repartidos: uno VENCIDO, dos POR VENCER
+ * y tres vigentes. Una demo con todo vigente no ensena para que sirve el
+ * modulo, y una con todo vencido se lee como una planta mal llevada —que es lo
+ * ultimo que uno quiere proyectar delante de un prospecto—.
+ *
+ * El permiso de la caldera vencido no es adorno: en Mexico una caldera sin
+ * permiso vigente es una parada de planta, y es el ejemplo que hace entender
+ * de un golpe por que esto no puede vivir en un Excel.
+ *
+ * La garantia de la llenadora esta VIGENTE porque es la que se ensena en vivo:
+ * al abrir una correctiva de LLN-101 en la demostracion, el sistema advierte
+ * que el proveedor todavia la cubre.
+ *
+ * `dias` es contra la fecha de la demo: negativo ya vencio.
+ */
+const VIGENCIAS = [
+  { tipo: "GARANTIA", titulo: "Garantía de fábrica", folio: "G-2024-8841", activo: "LLN-101", prov: "rod", desdeDias: -300, dias: 240,
+    cubre: "Cubre motor, tarjeta de control y válvulas de llenado. No cubre consumibles, empaques ni daño por sobretensión." },
+  { tipo: "PERMISO", titulo: "Permiso de operación de caldera", folio: "STPS-RSP-4471", activo: "CAL-203", prov: null, desdeDias: -730, dias: -12,
+    cubre: "Recipiente sujeto a presión. Requiere prueba hidrostática y dictamen de unidad verificadora para renovarse." },
+  { tipo: "CONTRATO_SERVICIO", titulo: "Póliza de servicio del chiller", folio: "PS-KAPPA-2026", activo: "CHL-204", prov: "frio", desdeDias: -320, dias: 40,
+    cubre: "Dos visitas preventivas al año y atención de urgencias en 24 h. No cubre refrigerante ni compresor." },
+  { tipo: "LICENCIA", titulo: "Licencia de operador de montacargas", folio: "LIC-MTC-2026-19", persona: "mecanico", prov: null, desdeDias: -700, dias: 35,
+    cubre: "Acreditación para operar montacargas eléctrico hasta 3 toneladas. Se renueva con curso y evaluación práctica." },
+  { tipo: "POLIZA_SEGURO", titulo: "Póliza de daños de la subestación", folio: "POL-88-112340", activo: "SUB-206", prov: "elec", desdeDias: -120, dias: 245,
+    cubre: "Daño eléctrico y por descarga atmosférica. Deducible de 10% con mínimo de 50 mil pesos." },
+  { tipo: "CALIBRACION", titulo: "Calibración del manómetro de vapor", folio: "CAL-LAB-7781", activo: "CAL-203", prov: null, desdeDias: -90, dias: 275,
+    cubre: "Certificado trazable a patrón nacional. Se agenda con el laboratorio con tres semanas de anticipación." },
+] as const;
 
 const PROVEEDORES = [
   { clave: "rod", name: "Rodamientos y Transmisiones Omega", leadTimeDays: 3 },
@@ -501,6 +535,26 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
     justificacion: "Aceite para los próximos dos cambios del compresor (plan por horas).",
     renglones: [{ partId: parte["ACE-CMP"].id, descripcion: "Aceite sintético para compresor (cubeta 20 L)", cantidadSolicitada: 4, costoEstimado: 3900 }],
   });
+
+  /**
+   * Los papeles que se vencen. Van ANTES de `detectar` a proposito: asi el
+   * permiso vencido de la caldera y las dos por vencer producen sus avisos
+   * solos, con la misma regla que en produccion, en vez de quedar como filas
+   * mudas en una pantalla.
+   */
+  for (const v of VIGENCIAS) {
+    const cuelga = "activo" in v && v.activo
+      ? { assetId: activo[v.activo].id }
+      : { userId: u[(v as { persona: ClavePersona }).persona].id };
+    await guardarVigencia({
+      organizationId: orgId, userId: u.gerencia.id,
+      tipo: v.tipo, titulo: v.titulo, folio: v.folio, cubre: v.cubre,
+      desde: new Date(ahora.getTime() + v.desdeDias * DIA),
+      hasta: new Date(ahora.getTime() + v.dias * DIA),
+      supplierId: v.prov ? prov[v.prov] : null,
+      cuelgaDe: cuelga,
+    });
+  }
 
   // Avisos: los que el propio sistema detecta con estos datos, no mensajes escritos a mano.
   await detectar(orgId, await configDe(orgId, ahora), ahora);

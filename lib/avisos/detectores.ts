@@ -26,6 +26,8 @@ import { calcularPrioridad, tiempoPendiente } from "./prioridad";
 import type { ConfigEmpresa } from "./config";
 import type { TipoEvento } from "./catalogo";
 import { consumoDe, planDe } from "../planes";
+import { comoSeLlama, deQueCuelga, vigenciasQueVencen } from "../vigencias";
+import { diasParaVencer } from "../vigencias-tipos";
 
 const ACTIVAS = ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"];
 const HORA = 3_600_000;
@@ -195,6 +197,9 @@ export async function detectar(organizationId: string, cfg: ConfigEmpresa, ahora
   // ─────────────────────────────────────────── Almacén
   for (const [k, v] of Object.entries(await avisarInventario(organizationId))) suma(k, v);
 
+  // ─────────────────────────────────────────── Vigencias
+  for (const [k, v] of Object.entries(await avisarVigencias(organizationId, ahora))) suma(k, v);
+
   // ─────────────────────────────────────────── Compras
   const porAutorizar = await prisma.purchaseRequest.findMany({
     where: { organizationId, estado: "SOLICITADA" },
@@ -294,6 +299,56 @@ export async function detectar(organizationId: string, cfg: ConfigEmpresa, ahora
   const rec = await reconciliar({ organizationId, ahora, cfg });
   if (rec.atendidos) suma("atendidos", rec.atendidos);
   if (rec.unificados) suma("unificados", rec.unificados);
+  return r;
+}
+
+/**
+ * Garantías, pólizas, contratos, calibraciones y permisos que se vencen.
+ *
+ * Uno por documento, no uno agrupado: cada uno se renueva con un trámite
+ * distinto, con un proveedor distinto, y quien lo atiende necesita saber cuál
+ * es. Un aviso que dijera «se vencen 12 vigencias» obligaría a entrar a
+ * buscarlas, y su regla de cierre no podría decidir nada —doce documentos no
+ * se renuevan al mismo tiempo—.
+ *
+ * Los días de anticipación salen del tipo (`lib/vigencias-tipos.ts`): una
+ * póliza avisa con 60 días porque hay que cotizar; una calibración con 30
+ * porque se agenda con el laboratorio.
+ */
+export async function avisarVigencias(organizationId: string, ahora = new Date()): Promise<ResultadoDeteccion> {
+  const r: ResultadoDeteccion = {};
+  const suma = (k: string, n = 1) => { r[k] = (r[k] ?? 0) + n; };
+  const porVencer = await vigenciasQueVencen(organizationId, ahora);
+
+  for (const v of porVencer) {
+    const dias = diasParaVencer(v.hasta, ahora) ?? 0;
+    const vencida = v.estado === "VENCIDA";
+    const cuelga = deQueCuelga(v);
+    await emitirAviso({
+      organizationId,
+      tipo: vencida ? "VIGENCIA_VENCIDA" : "VIGENCIA_POR_VENCER",
+      entidad: "Vigencia", entidadId: v.id,
+      titulo: `${vencida ? "Venció" : "Por vencer"}: ${comoSeLlama(v)}`,
+      cuerpo:
+        `${cuelga}${v.folio ? ` · ${v.folio}` : ""}. `
+        + (vencida
+          ? `Venció hace ${Math.abs(dias)} día(s).`
+          : `Vence en ${dias} día(s)${v.hasta ? ` (${v.hasta.toISOString().slice(0, 10)})` : ""}.`)
+        + (v.supplier?.name ? ` Se renueva con ${v.supplier.name}.` : ""),
+      porQue: vencida
+        ? "Sin este documento vigente, lo que cubre quedó sin cobertura."
+        : "Renovarlo tarde deja sin cobertura justo cuando se necesita, y algunos trámites no son de un día.",
+      accion: "Renuévelo y registre la nueva vigencia; la vieja se conserva como historia.",
+      enlace: "/vigencias",
+      contexto: { siteId: v.asset?.siteId ?? undefined },
+      datos: { tipo: v.tipo, hasta: v.hasta?.toISOString() ?? null, dias },
+    });
+    suma(vencida ? "VIGENCIA_VENCIDA" : "VIGENCIA_POR_VENCER");
+  }
+
+  // Lo ya renovado se atiende con el mismo criterio de la reconciliación.
+  const rec = await reconciliar({ organizationId, tipos: ["VIGENCIA_POR_VENCER", "VIGENCIA_VENCIDA"], ahora });
+  if (rec.atendidos) suma("atendidos", rec.atendidos);
   return r;
 }
 

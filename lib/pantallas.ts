@@ -74,6 +74,10 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   // él pide material con un vale en Requisiciones y el almacén lo escala.
   { ruta: "/compras", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/suppliers", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
+  // Las vigencias las VE tambien el tecnico: saber que el equipo esta en
+  // garantia antes de abrirlo es justo para el. Capturarlas es otra cosa
+  // («vigencia:write»).
+  { ruta: "/vigencias", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS", "TECHNICIAN"] },
 
   { ruta: "/paros", roles: ANALISIS },
   { ruta: "/reports", roles: ANALISIS },
@@ -187,6 +191,7 @@ const MENU: GrupoMenu[] = [
       { href: "/requisiciones", etiqueta: "Requisiciones", icono: "requisiciones" },
       { href: "/compras", etiqueta: "Compras", icono: "compras" },
       { href: "/suppliers", etiqueta: "Proveedores", icono: "proveedores" },
+      { href: "/vigencias", etiqueta: "Garantías y vigencias", icono: "vigencias" },
     ],
   },
   {

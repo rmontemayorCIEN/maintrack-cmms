@@ -262,6 +262,38 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/vigencias": {
+    titulo: "Garantías y vigencias",
+    que: "Los papeles que se vencen y que alguien tiene que renovar a tiempo: garantías de equipo, pólizas de seguro, fianzas, contratos de servicio, calibraciones de instrumentos, permisos de operación, licencias del personal y certificados. Lo que en casi toda planta vive en una carpeta o en un Excel que solo una persona sabe abrir.",
+    hacer: [
+      "Registrar un documento con su vigencia y a quién se le reclama",
+      "Ver de un golpe qué está vencido y qué se vence pronto",
+      "Anotar qué cubre y qué no, para cuando llegue la falla",
+      "Cancelar uno que dejó de aplicar, sin borrar la historia",
+    ],
+    flujo: [
+      "Todo cuelga de algo: un equipo, una refacción, una persona o un servicio externo. De una sola cosa, y es a propósito: una vigencia que no aparece en ningún expediente está viva y nadie la ve, y una que aparece en dos deja la duda de cuál manda al renovar. Si una póliza cubre cinco equipos, se registra una por equipo.",
+      "El tipo decide de qué puede colgar. Una licencia de montacargas es de una persona y una calibración es de un instrumento; ofrecer siempre las cuatro opciones invitaba a colgar la póliza del seguro de un usuario.",
+      "Cada tipo avisa con su propia anticipación, y no es un detalle: una póliza avisa con 60 días porque hay que cotizar, y una calibración con 30 porque se agenda con el laboratorio. Poner el mismo plazo a todo era garantizar que la mitad avisara tarde y la otra demasiado pronto.",
+      "El aviso se cierra solo cuando se registra otra vigencia DEL MISMO TIPO, sobre lo mismo, que cubra más lejos. Así se renueva de verdad: la póliza vieja se queda como historia de la planta y se carga la nueva. No hay que ir a apagar el aviso a mano.",
+      "La GARANTÍA hace algo más que avisar: cuando alguien abre una orden correctiva, de seguridad o de mejora de un equipo que todavía está cubierto, se le dice antes de guardarla, y al responsable del trabajo le llega un aviso. Es el momento en que el dato vale dinero — repararlo con gente y refacciones propias es pagar lo que el proveedor ya cubrió, y en algunos contratos abrirlo sin avisar cancela la garantía.",
+      "No se avisa en preventivo. Un engrasado programado no se le reclama al proveedor, y avisar ahí habría convertido la advertencia en ruido que se aprende a ignorar — y entonces no sirve el día que importa.",
+      "La fecha de garantía que ya estaba en la ficha del equipo sigue ahí y sigue funcionando: ahora es un reflejo de la vigencia. La verdad es el documento, que además dice a quién reclamarle y qué cubre.",
+      "Nada se borra. Una póliza cancelada antes de vencer se apaga y se conserva: borrarla dejaría sin explicación los avisos que ya salieron.",
+      "Un documento sin fecha de vencimiento es válido y no avisa nunca. Un certificado de fábrica no se renueva.",
+      "Tres descuidos que cuestan: registrar una garantía sin decir a quién se le reclama —el aviso llega y nadie sabe con quién renovar—; capturar una póliza que cubre cinco equipos como un solo documento; y suponer que mover la fecha de la vieja es renovar. Se puede, pero lo que el sistema reconoce como renovación es que exista la nueva.",
+    ],
+    botones: [
+      { nombre: "Registrar documento", explica: "Da de alta una garantía, póliza, fianza, contrato, calibración, permiso, licencia o certificado. Pregunta de qué cuelga, desde y hasta cuándo, y a quién se le reclama." },
+      { nombre: "Cancelar (la ✕ de cada renglón)", explica: "Lo apaga sin borrarlo: deja de avisar y se queda en la lista como cancelado. Se puede reactivar." },
+    ],
+    campos: [
+      { nombre: "Cómo le llaman", explica: "El nombre con el que su gente lo pide: «Garantía de fábrica», «Póliza GNP 44812». No es el tipo: el tipo ya está aparte." },
+      { nombre: "Qué cubre y qué no", explica: "Lo que alguien va a leer el día que llegue la falla, con el equipo parado y el proveedor al teléfono. Vale más que el folio: «cubre motor y tarjeta, no cubre consumibles ni daño por sobretensión»." },
+      { nombre: "¿A quién se le reclama?", explica: "El proveedor, la aseguradora o el laboratorio. Es lo que convierte el aviso en una llamada: sin esto, quien lo recibe sabe que se vence y no a quién marcarle." },
+      { nombre: "Hasta", explica: "La fecha de vencimiento. Vacía significa que no caduca, y entonces no avisa." },
+    ],
+  },
   "/rondines": {
     titulo: "Rondines",
     que: "El recorrido por la planta: lo que se ve, dónde y cuándo. Lo que hoy se queda en el pasillo o en una libreta que nadie vuelve a leer.",
