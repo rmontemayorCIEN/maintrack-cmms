@@ -422,7 +422,7 @@ async function main() {
       ADMIN: ["/dashboard", "/settings?s=usuarios", "/inventory", "/puesta-en-marcha", "/plans", "/notificaciones"],
       SUPERVISOR: ["/dashboard", "/work-orders", `/work-orders/${ots[0].id}`, "/calendar", "/requests", "/board", "/backlog", "/compras", "/meters"],
       TECHNICIAN: ["/dashboard", "/work-orders?mias=1", `/work-orders/${otTec.id}`, "/escanear", `/assets/${activos[0].id}`, "/search?q=bomba", "/notificaciones", "/meters", "/inventory", "/requisiciones"],
-      COMPRAS: ["/dashboard", "/compras", `/compras/${compra.id}`, "/requisiciones", "/inventory", "/suppliers"],
+      COMPRAS: ["/dashboard", "/compras", `/compras/${compra.id}`, "/compras/planificador", "/requisiciones", "/inventory", "/suppliers"],
       REQUESTER: ["/dashboard", "/requests", `/requests/${solicitudes[0].id}`, "/escanear", `/reportar/${punto.token}`],
       VIEWER: ["/dashboard", "/search?q=bom", "/assets", "/reports", "/work-orders", "/meters"],
     };

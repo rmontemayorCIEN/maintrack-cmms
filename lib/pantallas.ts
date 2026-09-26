@@ -191,6 +191,7 @@ const MENU: GrupoMenu[] = [
       { href: "/inventory", etiqueta: "Almacén", icono: "almacen" },
       { href: "/requisiciones", etiqueta: "Requisiciones", icono: "requisiciones" },
       { href: "/compras", etiqueta: "Compras", icono: "compras" },
+      { href: "/compras/planificador", etiqueta: "Qué hay que comprar", icono: "compras" },
       { href: "/suppliers", etiqueta: "Proveedores", icono: "proveedores" },
       { href: "/vigencias", etiqueta: "Garantías y vigencias", icono: "vigencias" },
     ],

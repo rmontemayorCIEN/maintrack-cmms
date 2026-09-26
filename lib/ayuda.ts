@@ -1132,6 +1132,36 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/compras/planificador": {
+    titulo: "Qué hay que comprar",
+    que: "Lo que se va a acabar antes de que alcance a llegar, para pedirlo a tiempo en vez de cuando ya falta.",
+    hacer: [
+      "Ver qué urge, ordenado por lo que ya va tarde",
+      "Cambiar el horizonte: 30, 90 o 180 días",
+      "Abrir cualquier renglón para ver de dónde salió la cifra",
+      "Desmarcar lo que no quiera y mandar el resto a una requisición de compra",
+    ],
+    flujo: [
+      "Cruza tres cosas: lo que los preventivos programados van a pedir y qué día, lo que de verdad ha salido del almacén en los últimos 180 días, y lo que tarda cada proveedor.",
+      "La urgencia no es una escala inventada: compara cuándo se acaba el material contra cuánto tarda en llegar. Una pieza que se acaba en diez días y tarda quince aparece como «Ya va tarde», porque pedirla hoy ya no alcanza.",
+      "Lo que ya está pedido y no ha llegado se descuenta. Si lo que viene en camino alcanza, la refacción no aparece: no hay que pedirla otra vez.",
+      "Lo planeado y lo consumido NO se suman: el consumo real ya incluye los preventivos que se hicieron, así que sumarlos compraría de más. Se toma el mayor de los dos y cada renglón dice cuál mandó.",
+      "La cantidad repone hasta el máximo del almacén si está declarado; si no, cubre la demanda del horizonte más el mínimo.",
+      "No crea nada solo. Propone, usted ajusta y la requisición se levanta con los renglones ya cargados.",
+      "Lo correctivo no tiene fecha, así que la parte de la demanda que sale del historial es un ritmo, no una predicción. El día en que se acaba se calcula solo con lo que el plan compromete, que es lo único que sí tiene calendario.",
+    ],
+    campos: [
+      { nombre: "Cuándo", explica: "«Ya va tarde» significa que no alcanza a llegar aunque se pida hoy: el material se acaba antes que el tiempo de entrega del proveedor. Debajo dice en cuántos días se acaba y cuántos tarda." },
+      { nombre: "Viene", explica: "Lo que ya está pedido en una compra viva y todavía no llega. Se resta de lo que hay que pedir, y por eso una refacción en cero puede no aparecer: ya viene en camino." },
+      { nombre: "Va a hacer falta", explica: "La demanda del horizonte. La etiqueta de al lado dice de dónde salió: «plan» si mandaron los preventivos, «uso» si mandó el consumo real, «mín.» si solo se está reponiendo el mínimo." },
+      { nombre: "Pedir", explica: "La cantidad propuesta, ya descontado lo que viene en camino. Se puede cambiar en la requisición: esto propone, no decide." },
+    ],
+    noPuedo: [
+      { sintoma: "Sale vacío o con muy poco, y sé que falta material", porque: "Si sus planes no tienen refacciones cargadas, lo que consumen no entra. Arriba se lo dice, con el nombre de los planes. Cárgueselas al plan y vuelva a mirar." },
+      { sintoma: "Una refacción que está en cero no aparece", porque: "Porque ya está pedida y lo que viene en camino alcanza. Ábrala en el almacén y verá en qué compra viene." },
+      { sintoma: "No me cuadra la cantidad con lo que consumimos", porque: "Lo planeado y lo consumido no se suman: el consumo real ya incluye los preventivos que se hicieron. Se toma el mayor de los dos, y el renglón desplegado dice cuál mandó." },
+    ],
+  },
   "/compras": {
     titulo: "Requisiciones de compra",
     camposBuscables: true,
