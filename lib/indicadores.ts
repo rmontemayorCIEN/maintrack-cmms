@@ -30,6 +30,7 @@ import {
 import {
   ESTADOS_ABIERTOS, ESTADOS_TERMINADOS, estadoDeVencimiento, diaDelCompromiso, filtroDeVencidas,
 } from "./vencimiento";
+import { MAINTENANCE_TYPE_LABELS } from "./constants";
 
 const HORA = 3_600_000;
 
@@ -719,4 +720,128 @@ export async function costoPorCentroDeCosto(
   // porque no es un centro: es un pendiente de captura.
   filas.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.total - a.total);
   return filas;
+}
+
+// ─────────────────────────────────────────── Mezcla de mantenimiento ───
+
+/**
+ * Por donde se puede cortar la mezcla. Cerrado a proposito.
+ *
+ * No es un constructor de reportes: son las cuatro preguntas que alguien hace
+ * de verdad —que tipo de trabajo hacemos, en que familia de equipo, en que
+ * area, y a cargo de quien—. Un selector generico de «esto contra aquello»
+ * suena flexible y termina sin usarse porque hay que armarlo cada vez.
+ */
+export const EJES_DE_MEZCLA = {
+  categoria: "Tipo de equipo",
+  area: "Área",
+  centro: "Centro de costo",
+  sitio: "Sitio",
+} as const;
+export type EjeDeMezcla = keyof typeof EJES_DE_MEZCLA;
+export const esEjeDeMezcla = (v: string): v is EjeDeMezcla => v in EJES_DE_MEZCLA;
+
+/** Lo que se puede confrontar: la misma mezcla medida de tres maneras. */
+export const UNIDADES_DE_MEZCLA = {
+  ordenes: "Órdenes",
+  horas: "Horas",
+  costo: "Costo",
+} as const;
+export type UnidadDeMezcla = keyof typeof UNIDADES_DE_MEZCLA;
+export const esUnidadDeMezcla = (v: string): v is UnidadDeMezcla => v in UNIDADES_DE_MEZCLA;
+
+export type CeldaDeMezcla = { ordenes: number; horas: number; costo: number };
+export type GrupoDeMezcla = {
+  id: string | null;
+  nombre: string;
+  total: CeldaDeMezcla;
+  /** Por tipo de mantenimiento, con las claves de MAINTENANCE_TYPE_LABELS. */
+  porTipo: Record<string, CeldaDeMezcla>;
+};
+
+/**
+ * Preventivo contra correctivo contra predictivo, cortado por donde se pida.
+ *
+ * ── Que NO cuenta, y por que ──
+ *
+ * Las ordenes de APOYO quedan fuera (`TIPOS_FUERA_DE_MANTENIMIENTO`). Prestar
+ * manos a produccion o mover un equipo consume horas y cuesta dinero, pero no
+ * es trabajo sobre la salud de una maquina: mezclarlo diria que las maquinas
+ * fallan mas de lo que fallan, que es justo el error que este reporte existe
+ * para no cometer.
+ *
+ * Tampoco se «interpreta» el tipo. Se usa el que la orden tiene, tal cual. Un
+ * preventivo bien ejecutado no se reclasifica como falla aunque haya
+ * encontrado algo: eso meteria un evento que nunca ocurrio.
+ *
+ * ── Lo que no tiene grupo ──
+ *
+ * Una orden sin equipo, sin categoria o sin centro sale en «Sin asignar», no
+ * se reparte ni se esconde: repartirla daria un numero preciso y falso, y
+ * esconderla haria que la suma no cuadre con el total del periodo.
+ */
+export async function mezclaDeMantenimiento(
+  organizationId: string,
+  periodo: { desde: Date; hasta: Date },
+  eje: EjeDeMezcla,
+) {
+  const ordenes = await prisma.workOrder.findMany({
+    where: {
+      organizationId,
+      status: { in: [...ESTADOS_TERMINADOS] },
+      completedAt: dentroDe(periodo),
+      maintenanceType: { notIn: [...TIPOS_FUERA_DE_MANTENIMIENTO] },
+    },
+    select: {
+      maintenanceType: true, actualHours: true, totalCost: true,
+      asset: { select: { category: { select: { id: true, name: true } } } },
+      location: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true } },
+      centroDeCosto: { select: { id: true, code: true, name: true } },
+    },
+  });
+
+  const vacia = (): CeldaDeMezcla => ({ ordenes: 0, horas: 0, costo: 0 });
+  const grupos = new Map<string, GrupoDeMezcla>();
+
+  for (const o of ordenes) {
+    const g = eje === "categoria" ? o.asset?.category
+      : eje === "area" ? o.location
+      : eje === "centro" ? o.centroDeCosto
+      : o.site;
+    const id = g?.id ?? null;
+    const nombre = !g
+      ? "Sin asignar"
+      : "code" in g && g.code
+        ? `${g.code} · ${g.name}`
+        : g.name;
+    const k = id ?? "SIN";
+    const fila = grupos.get(k) ?? { id, nombre, total: vacia(), porTipo: {} };
+    const celda = (fila.porTipo[o.maintenanceType] ??= vacia());
+    for (const c of [fila.total, celda]) {
+      c.ordenes += 1;
+      c.horas += o.actualHours;
+      c.costo += o.totalCost;
+    }
+    grupos.set(k, fila);
+  }
+
+  const filas = [...grupos.values()];
+  // De mayor a menor, y lo sin asignar al final: no es un grupo, es un
+  // pendiente de captura.
+  filas.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.total.ordenes - a.total.ordenes);
+
+  // Los tipos que de verdad aparecen, en el orden del catálogo: una columna
+  // vacía por cada tipo que la empresa no usa es ruido.
+  const presentes = Object.keys(MAINTENANCE_TYPE_LABELS)
+    .filter((t) => !(TIPOS_FUERA_DE_MANTENIMIENTO as readonly string[]).includes(t))
+    .filter((t) => filas.some((f) => f.porTipo[t]));
+
+  const total = filas.reduce<CeldaDeMezcla>((a, f) => ({
+    ordenes: a.ordenes + f.total.ordenes,
+    horas: a.horas + f.total.horas,
+    costo: a.costo + f.total.costo,
+  }), vacia());
+
+  return { filas, tipos: presentes, total };
 }

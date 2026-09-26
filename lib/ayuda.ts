@@ -1528,12 +1528,18 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/reports": {
     titulo: "Reportes",
     que: "Los cortes de información para llevar a una junta o a un cierre de mes.",
-    hacer: ["Elegir periodo (30 días, 90 días, 6 meses, 12 meses) y exportar", "Abrir cualquier indicador para ver su fórmula y los registros que lo forman"],
+    hacer: ["Elegir periodo (30 días, 90 días, 6 meses, 12 meses) y exportar", "Abrir cualquier indicador para ver su fórmula y los registros que lo forman", "Cortar la mezcla de mantenimiento por tipo de equipo, área, centro de costo o sitio, y medirla en órdenes, horas o costo"],
     flujo: [
       "Los indicadores son los mismos del Panel de control y del Diagnóstico IA: una sola fuente de cálculo.",
       "El periodo son días completos en la zona horaria de la empresa, hoy incluido.",
       "El costo cuenta órdenes TERMINADAS en el periodo; las canceladas no suman. El paro sale de los eventos de paro, y el planeado se reporta aparte: no resta disponibilidad.",
       "El costo de material por tipo de mantenimiento se atribuye a la ACTIVIDAD que consumió la refacción. Una orden preventiva que además atendió una falla reparte su material entre los dos tipos; lo que se cargó sin actividad se cuenta con el tipo de la orden y se muestra en su propia columna.",
+      "«Preventivo, correctivo y predictivo» contesta en qué se está yendo el mantenimiento. Se agrupa por tipo de equipo, área, centro de costo o sitio, y se mide en órdenes, horas o costo: la misma mezcla vista de tres maneras. La barra es proporcional —de un golpe se ve si un grupo es mayormente preventivo o mayormente correctivo— y el tamaño real está en la tabla.",
+      "Las órdenes de APOYO no entran en esa mezcla. Prestar manos a producción o mover un equipo consume horas y cuesta dinero, pero no es trabajo sobre la salud de una máquina: contarlas diría que los equipos fallan más de lo que fallan.",
+      "Tampoco se reinterpreta el tipo: se usa el que la orden tiene. Un preventivo bien ejecutado no se vuelve falla aunque haya encontrado algo — eso metería un evento que nunca ocurrió.",
+      "Lo que no tiene ese dato capturado sale como «Sin asignar», aparte y al final. No se reparte entre los demás, porque una regla inventada daría un número preciso y falso, ni se esconde, porque entonces la suma no cuadraría con el total del periodo.",
+      "«Costo por centro de costo» es el mismo gasto en el idioma de su contabilidad, con mano de obra, refacciones y servicios separados. Para que caiga en su centro, cada equipo necesita el suyo en su ficha: la orden lo hereda al crearse.",
+      "Los filtros viven en la dirección, así que el corte que arme se puede guardar en favoritos, mandar por mensaje y volver a abrir igual. Cambiar el periodo conserva el corte.",
     ],
   },
 

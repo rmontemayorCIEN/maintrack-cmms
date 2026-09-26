@@ -147,6 +147,39 @@ async function main() {
     revisar("9. la suma de la tabla cuadra con el total de la empresa: es lo primero que revisa contabilidad",
       suma === totalReal, { suma, totalReal });
 
+    // ═══════════════════════════════════════════ 9b La mezcla de mantenimiento
+    console.log("\n9b. Preventivo contra correctivo, cortado por donde se pida");
+    const { mezclaDeMantenimiento, EJES_DE_MEZCLA } = await import("../lib/indicadores");
+
+    // Una de apoyo y una preventiva, para probar la exclusión y el corte.
+    await crear(equipo.id, { maintenanceType: "SUPPORT", totalCost: 777, laborCost: 777, partsCost: 0 });
+    await crear(equipo.id, { maintenanceType: "PREVENTIVE", totalCost: 500, laborCost: 500, partsCost: 0, actualHours: 2 });
+
+    const porCentroMezcla = await mezclaDeMantenimiento(A.id, periodo, "centro");
+    const tieneApoyo = porCentroMezcla.filas.some((f) => f.porTipo.SUPPORT);
+    revisar("9b. las órdenes de APOYO no entran: no son trabajo sobre la salud de una máquina",
+      !tieneApoyo && !porCentroMezcla.tipos.includes("SUPPORT")
+      && porCentroMezcla.total.costo === 3500,
+      { tipos: porCentroMezcla.tipos, total: porCentroMezcla.total.costo });
+
+    const servMezcla = porCentroMezcla.filas.find((f) => f.id === servicios.id);
+    revisar("    cada grupo trae su desglose por tipo, y solo salen los tipos que existen",
+      servMezcla?.porTipo.CORRECTIVE?.ordenes === 1 && servMezcla?.porTipo.PREVENTIVE?.ordenes === 1
+      && porCentroMezcla.tipos.every((t) => porCentroMezcla.filas.some((f) => f.porTipo[t])),
+      servMezcla?.porTipo);
+
+    const porArea = await mezclaDeMantenimiento(A.id, periodo, "area");
+    revisar("    los cuatro ejes existen y cada uno agrupa distinto",
+      Object.keys(EJES_DE_MEZCLA).length === 4
+      && porArea.total.costo === porCentroMezcla.total.costo,
+      { ejes: Object.keys(EJES_DE_MEZCLA), totalIgual: porArea.total.costo === porCentroMezcla.total.costo });
+
+    const sumaTipos = porCentroMezcla.tipos.reduce(
+      (a, t) => a + porCentroMezcla.filas.reduce((b, f) => b + (f.porTipo[t]?.costo ?? 0), 0), 0);
+    revisar("    y la suma del desglose cuadra con el total, en cualquier eje",
+      Math.abs(sumaTipos - porCentroMezcla.total.costo) < 0.01,
+      { sumaTipos, total: porCentroMezcla.total.costo });
+
     // ═══════════════════════════════════════════ 10 Aislamiento
     console.log("\n10. Cada empresa lo suyo");
     const deOtra = await costoPorCentroDeCosto(B.id, periodo);

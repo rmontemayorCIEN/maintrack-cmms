@@ -124,6 +124,35 @@ const VIGENCIAS = [
  * que se vea el renglon «Sin centro de costo» —que es el que explica por que
  * la suma cuadra y por que conviene asignarlos todos—.
  */
+/**
+ * Las familias de equipo de la planta demostrativa.
+ *
+ * Sin ellas, el reporte de «preventivo contra correctivo por tipo de equipo»
+ * —que es el corte por omision, y el que un gerente pide primero— salia entero
+ * en «Sin asignar». La funcion existia y la demo no podia enseñarla.
+ *
+ * Siete para trece equipos: agrupadas mas grueso se pierde el contraste que
+ * hace util el reporte (el aire comprimido se come todo el correctivo), y mas
+ * fino queda un renglon por maquina, que ya es el Pareto de activos.
+ */
+const CATEGORIAS = [
+  { code: "ENV", name: "Envasado" },
+  { code: "EMP", name: "Empaque y paletizado" },
+  { code: "AIR", name: "Aire comprimido" },
+  { code: "TER", name: "Vapor y frío" },
+  { code: "BOM", name: "Bombeo" },
+  { code: "ELE", name: "Eléctrico" },
+  { code: "MAN", name: "Manejo de materiales" },
+] as const;
+
+const CATEGORIA_POR_ACTIVO: Record<string, string> = {
+  "LLN-101": "ENV", "TAP-102": "ENV", "ETQ-103": "ENV", "TRN-104": "ENV",
+  "EMP-105": "EMP", "PAL-106": "EMP",
+  "CMP-201": "AIR", "SEC-202": "AIR",
+  "CAL-203": "TER", "CHL-204": "TER",
+  "BOM-205": "BOM", "SUB-206": "ELE", "MON-301": "MAN",
+};
+
 const CENTROS_DE_COSTO = [
   { code: "5010-ENV", name: "Línea de envasado", descripcion: "Llenado, taponado, etiquetado y transporte de botella. Lo que para producción.", area: "L1" },
   { code: "5020-SERV", name: "Servicios auxiliares", descripcion: "Aire comprimido, vapor, agua helada y subestación. El gasto que sirve a toda la planta.", area: "SRV" },
@@ -391,7 +420,17 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   for (const f of CAUSAS) causa[f.k] = await asegurar("rootCause", f.code, f.description);
 
   const activo: Contexto["activo"] = {};
-  // El eje contable, antes de los activos porque el activo lo refiere.
+  // Las familias de equipo y el eje contable, antes de los activos porque el
+  // activo refiere a los dos.
+  const categoria: Record<string, string> = {};
+  for (const x of CATEGORIAS) {
+    const cat = await prisma.assetCategory.create({
+      data: { organizationId: orgId, code: x.code, name: x.name },
+      select: { id: true },
+    });
+    categoria[x.code] = cat.id;
+  }
+
   const centro: Record<string, string> = {};
   for (const x of CENTROS_DE_COSTO) {
     const cc = await prisma.centroDeCosto.create({
@@ -404,6 +443,7 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   for (const x of ACTIVOS) {
     const a = await prisma.asset.create({
       data: { organizationId: orgId, siteId: sitio.id, locationId: locs[x.loc], code: x.code, name: x.name, model: x.modelo, criticality: x.crit, detieneLinea: x.para,
+        categoryId: categoria[CATEGORIA_POR_ACTIVO[x.code]] ?? null,
         centroDeCostoId: centro[CENTRO_POR_ACTIVO[x.code]] ?? null,
         purchaseCost: x.costo, replacementCost: Math.round(x.costo * 1.15), commissionedAt: new Date(ahora.getTime() - 6 * 365 * DIA), expectedLifeYears: 15 },
     });

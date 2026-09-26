@@ -16,7 +16,8 @@ import {
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { agruparPorCodigo, agruparPorFamiliaDeCausa, fallasCodificadas } from "@/lib/fallas";
-import { costoPorCentroDeCosto } from "@/lib/indicadores";
+import { costoPorCentroDeCosto, esEjeDeMezcla, esUnidadDeMezcla, mezclaDeMantenimiento, type EjeDeMezcla, type UnidadDeMezcla } from "@/lib/indicadores";
+import { MezclaDeMantenimiento } from "./mezcla";
 import { PorQueFalla } from "@/components/por-que-falla";
 
 export const metadata = { title: "Reportes" };
@@ -26,16 +27,20 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; eje?: string; mide?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
   const days = diasDeParametro(params.days);
+  // Los cortes de la mezcla viven en la dirección: así el filtro se puede
+  // guardar, mandar por mensaje y volver a abrir igual.
+  const eje: EjeDeMezcla = params.eje && esEjeDeMezcla(params.eje) ? params.eje : "categoria";
+  const mide: UnidadDeMezcla = params.mide && esUnidadDeMezcla(params.mide) ? params.mide : "ordenes";
   const currency = user.organization.currency;
   const orgId = user.organizationId;
   const periodo = await periodoDeLaEmpresa(orgId, days);
 
-  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo, porCentro] = await Promise.all([
+  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo, porCentro, mezcla] = await Promise.all([
     calcularIndicadores(orgId, periodo),
     tendenciaMensual(orgId, 12),
     costoYParoPorActivo(orgId, periodo, 10),
@@ -59,6 +64,7 @@ export default async function ReportsPage({
     }),
     costoDeMaterialPorTipo(orgId, periodo.desde, periodo.hasta),
     costoPorCentroDeCosto(orgId, periodo),
+    mezclaDeMantenimiento(orgId, periodo, eje),
   ]);
 
   const failureCodes = agruparPorCodigo(fallas);
@@ -117,7 +123,9 @@ export default async function ReportsPage({
             {Object.entries(PERIODOS_INDICADORES).map(([d, label]) => ({ days: Number(d), label })).map((period) => (
               <Link
                 key={period.days}
-                href={`/reports?days=${period.days}`}
+                // Cambiar el periodo conserva el corte de la mezcla: perderlo
+                // obligaba a volver a elegirlo en cada rango.
+                href={`/reports?days=${period.days}&eje=${eje}&mide=${mide}`}
                 className={`rounded-lg border px-2.5 py-1.5 text-xs ${
                   days === period.days
                     ? "border-brand-600 bg-brand-600 text-white"
@@ -253,6 +261,11 @@ export default async function ReportsPage({
       {/* `grid-cols-[minmax(0,1fr)]`: en el telefono es una sola columna, y una
           columna implicita se mide por el contenido —las tablas de aqui abajo la
           inflaban y sacaban de lado la pantalla completa. */}
+      <MezclaDeMantenimiento
+        filas={mezcla.filas} tipos={mezcla.tipos} total={mezcla.total}
+        eje={eje} unidad={mide} days={days} moneda={currency}
+      />
+
       {/* El gasto en el idioma de contabilidad. Va antes del Pareto de activos
           porque contesta otra pregunta y a otra persona: el Pareto es del jefe
           de mantenimiento —qué equipo me está costando— y esto es de quien
