@@ -394,6 +394,7 @@ model User {
   materialRequests     MaterialRequest[]
   purchaseRequests     PurchaseRequest[]       @relation("CompraSolicitante")
   presupuestos         Presupuesto[]           @relation("PresupuestoCapturadoPor")
+  seguridadLeida       WorkOrder[]             @relation("SeguridadLeidaPor")
   purchaseAuthorized   PurchaseRequest[]       @relation("CompraAutorizador")
   goodsReceipts        GoodsReceipt[]
   quotesCapturadas     Quote[]
@@ -1084,6 +1085,21 @@ model WorkOrder {
   /// Requeria paro pero al final no hubo: se confirma expresamente al
   /// completar. Distingue «no hubo paro» de «no se capturo».
   sinParoConfirmado    Boolean  @default(false)
+
+  /// Quien confirmo haber leido el procedimiento y las indicaciones de
+  /// seguridad, y cuando. No detiene nada: es un registro, y obligar a
+  /// marcarlo para iniciar invita a marcarlo sin leer, que es peor que no
+  /// tenerlo.
+  seguridadLeidaPorId String?
+  seguridadLeidaEl    DateTime?
+  /// Huella del texto que se leyo.
+  ///
+  /// Si despues alguien edita el procedimiento o las notas de seguridad, lo
+  /// confirmado ya no corresponde a lo que ahora dice la orden: la pantalla
+  /// avisa que cambio y pide confirmar de nuevo. Sin esto, bastaria confirmar
+  /// un texto y cambiarlo luego para que el registro siguiera diciendo
+  /// «leido», y un registro que no aguanta esa pregunta no sirve para nada.
+  seguridadLeidaHuella String?
   /// En una falla, por que queda sin codigo o sin causa raiz («Sin determinar»).
   motivoSinDiagnostico String?
   /// Por que esta en espera. Se limpia al reanudar; la historia queda en auditoria.
@@ -1131,6 +1147,7 @@ model WorkOrder {
   @@index([organizationId, createdAt])
   @@index([organizationId, maintenanceType, dueDate])
   meterReadings    MeterReading[]
+  seguridadLeidaPor User?           @relation("SeguridadLeidaPor", fields: [seguridadLeidaPorId], references: [id])
 
   @@index([assetId, createdAt])
 }

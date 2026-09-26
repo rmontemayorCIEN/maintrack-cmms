@@ -43,6 +43,8 @@ import { Row } from "./fila";
 import { AceptarOrden } from "./aceptar";
 import { Plegable } from "@/components/plegable";
 import { SeccionPlegable } from "./seccion";
+import { ConfirmarSeguridad } from "./confirmar-seguridad";
+import { estadoDeSeguridad } from "@/lib/seguridad-ot";
 import { naceAbierta } from "@/lib/secciones-orden";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
@@ -75,6 +77,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       location: { select: { name: true } },
       plan: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true, color: true } },
+      // Quien confirmo haber leido la seguridad: sin esto el aviso diria
+      // «Alguien confirmó» en vez del nombre, y el registro pierde su valor.
+      seguridadLeidaPor: { select: { name: true } },
       createdBy: { select: { name: true } },
       failureCode: true,
       rootCause: true,
@@ -298,6 +303,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         where: { organizationId: user.organizationId, workOrderId: wo.id, estado: { not: "ANULADA" } },
       })
     : 0;
+  const seguridad = estadoDeSeguridad(wo);
   const vencida = Boolean(wo.dueDate && wo.dueDate < new Date() && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status));
 
   // Orden activa sin responsable: se dice en la orden, no solo al presionar «Iniciar».
@@ -396,7 +402,20 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     faltaEn.has(id as SeccionDeOrden) ? "falta" : hecho ? "hecho" : "neutro";
   const indice: SeccionDelIndice[] = [
     { id: "actividades", texto: "Actividades", estado: seña("actividades", wo.tasks.length > 0 && datosCierre.actividadesSinResolver === 0) },
-    ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad", estado: "neutro" as EstadoDeSeccion }] : []),
+    /*
+     * Seguridad era el unico paso sin nada que hacer: puro texto, y su chip
+     * nunca cambiaba. Ahora se confirma haberlo leido —queda quien y cuando—
+     * y el chip lo refleja. En ambar cuando el texto cambio DESPUES de
+     * confirmarse: lo que esa persona leyo ya no es lo que la orden dice.
+     */
+    ...(wo.procedure || wo.safetyNotes
+      ? [{
+          id: "seguridad", texto: "Seguridad",
+          estado: (seguridad.estado === "CONFIRMADO" ? "hecho"
+            : seguridad.estado === "CAMBIO_DESPUES" ? "falta"
+            : "neutro") as EstadoDeSeccion,
+        }]
+      : []),
     { id: "tiempo", texto: "Tiempo", estado: seña("tiempo", conHoras) },
     /*
      * Estos tres no detienen el cierre —una orden no se queda «sin bitacora»—
@@ -624,6 +643,16 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">{wo.safetyNotes}</p>
                 </div>
               ) : null}
+              <ConfirmarSeguridad
+                workOrderId={wo.id}
+                estado={seguridad}
+                puedeConfirmar={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
+                cuandoTexto={
+                  seguridad.estado === "CONFIRMADO" || seguridad.estado === "CAMBIO_DESPUES"
+                    ? formatDateTime(seguridad.cuando, zona)
+                    : null
+                }
+              />
             </SeccionPlegable>
           ) : null}
           <section id="tiempo" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
