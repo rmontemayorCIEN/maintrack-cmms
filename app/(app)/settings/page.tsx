@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PanelAtajos } from "./atajos";
+import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { favoritosDe } from "@/lib/favoritos";
 import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -203,6 +204,7 @@ export default async function SettingsPage({
 
       {activa === "atajos" ? (
         <PanelAtajos
+          nombreDelMapa={nombreDelMapa(terminoConjunto(org))}
           grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })}
           iniciales={(await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })).map((i) => i.href)}
         />

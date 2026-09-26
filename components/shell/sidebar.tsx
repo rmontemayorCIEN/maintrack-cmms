@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight, Menu, Wrench, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { menuDe, type ItemMenu } from "@/lib/pantallas";
+import { etiquetaDeItem, menuDe, type ItemMenu } from "@/lib/pantallas";
 import { IconoMenu } from "./iconos";
 
 /**
@@ -168,7 +168,7 @@ export function Sidebar({
                       )}
                     >
                       <span className={active ? "text-brand-600" : "text-slate-400"}><IconoMenu nombre={item.icono} /></span>
-                      {item.porInstalacion ? terminoConjuntoPlural ?? item.etiqueta : item.etiqueta}
+                      {etiquetaDeItem(item, terminoConjuntoPlural)}
                     </Link>
                   </li>
                 );

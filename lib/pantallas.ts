@@ -231,6 +231,20 @@ const MENU: GrupoMenu[] = [
  * de voz: «llevame a rondines» no encontraba nada. Con esto, la proxima
  * pantalla nueva ya nace diciendose.
  */
+/**
+ * Como se llama esta pantalla en ESTA empresa.
+ *
+ * «Conjuntos» se llama «Mapa de lineas», «Mapa de sistemas» o como esa empresa
+ * llame a los suyos. La traduccion la hacia SOLO el menu lateral, asi que en
+ * «Lo que mas uso» la misma pantalla aparecia como «Conjuntos»: quien la
+ * buscaba por el nombre que ve todos los dias no la encontraba y concluia que
+ * no se podia anclar. Es el defecto de siempre —un dato que un solo lector
+ * mira— y por eso la decision vive aqui y no en un componente.
+ */
+export function etiquetaDeItem(item: ItemMenu, nombreDelMapa?: string | null): string {
+  return item.porInstalacion && nombreDelMapa?.trim() ? nombreDelMapa : item.etiqueta;
+}
+
 export function pantallasDelMenu(): ItemMenu[] {
   return MENU.flatMap((g) => g.items);
 }

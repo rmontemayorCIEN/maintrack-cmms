@@ -5,7 +5,7 @@ import { Loader2, Star } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui";
 import { IconoMenu } from "@/components/shell/iconos";
 import { MAXIMO_FAVORITOS } from "@/lib/favoritos";
-import type { GrupoMenu } from "@/lib/pantallas";
+import { etiquetaDeItem, type GrupoMenu } from "@/lib/pantallas";
 
 /**
  * Las pantallas que cada quien quiere a la mano.
@@ -23,11 +23,17 @@ import type { GrupoMenu } from "@/lib/pantallas";
  * nombres, elegir sería un ejercicio de traducción.
  */
 export function PanelAtajos({
-  grupos, iniciales,
+  grupos, iniciales, nombreDelMapa,
 }: {
   /** El menú de esta persona, tal como lo ve. */
   grupos: GrupoMenu[];
   iniciales: string[];
+  /**
+   * Como llama esta empresa a sus conjuntos («Mapa de líneas»). Sin esto la
+   * pantalla aparecia aqui como «Conjuntos» y en el menu con su otro nombre:
+   * quien la buscaba por el que ve a diario no la encontraba.
+   */
+  nombreDelMapa?: string | null;
 }) {
   const [elegidas, setElegidas] = useState<string[]>(iniciales);
   const [guardando, setGuardando] = useState(false);
@@ -96,7 +102,7 @@ export function PanelAtajos({
                   >
                     <span className="text-brand-400">{i + 1}.</span>
                     {item ? <IconoMenu nombre={item.icono} className="h-3.5 w-3.5" /> : null}
-                    {item?.etiqueta ?? href}
+                    {item ? etiquetaDeItem(item, nombreDelMapa) : href}
                     <span aria-hidden>×</span>
                   </button>
                 </li>
@@ -122,7 +128,7 @@ export function PanelAtajos({
                         className="h-3.5 w-3.5"
                       />
                       <IconoMenu nombre={item.icono} className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="min-w-0 truncate">{item.etiqueta}</span>
+                      <span className="min-w-0 truncate">{etiquetaDeItem(item, nombreDelMapa)}</span>
                       {on ? <Star className="ml-auto h-3.5 w-3.5 shrink-0 fill-current text-brand-500" aria-hidden /> : null}
                     </label>
                   </li>

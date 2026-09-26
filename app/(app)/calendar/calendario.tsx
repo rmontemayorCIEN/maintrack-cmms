@@ -6,7 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarClock, X } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
-import { SelectorBuscable } from "@/components/selector-buscable";
+import { EquiposElegidos, FiltrosTrabajo } from "@/components/filtros-trabajo";
+import {
+  FILTRO_VACIO, coincide, enSeleccion as enSeleccionDe,
+  type FiltroTrabajo,
+} from "@/lib/filtros-trabajo";
 import { MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, OPEN_STATUSES } from "@/lib/constants";
 import { claveDia, cn, diaDeCalendario } from "@/lib/utils";
 
@@ -64,30 +68,24 @@ export function Calendario({
 }) {
   const zona = useZona();
   const router = useRouter();
-  const [tecnico, setTecnico] = useState("");
-  const [tipo, setTipo] = useState("");
-  /** Varios equipos a la vez: vacio significa todos. */
-  const [equipos, setEquipos] = useState<string[]>([]);
-  const [familia, setFamilia] = useState("");
-  const [unEquipo, setUnEquipo] = useState("");
+  const [filtro, setFiltro] = useState<FiltroTrabajo>(FILTRO_VACIO);
   const [soloAbiertas, setSoloAbiertas] = useState(false);
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
 
-  // Los equipos elegidos mandan sobre la familia: si alguien escogio tres
-  // compresores concretos, no tiene sentido que la familia se los quite.
-  const enSeleccion = (assetId?: string | null, categoryId?: string | null) => {
-    if (equipos.length) return !!assetId && equipos.includes(assetId);
-    if (familia) return categoryId === familia;
-    return true;
-  };
+  // La regla —los equipos elegidos mandan sobre la familia— vive en
+  // lib/filtros-trabajo, compartida con el Tablero.
+  const enSeleccion = (assetId?: string | null, categoryId?: string | null) =>
+    enSeleccionDe(filtro, assetId, categoryId);
 
   const filtrar = (lista: Orden[]) =>
     lista.filter(
       (o) =>
-        (!tecnico || o.assignedTo?.id === tecnico || (tecnico === "__sin" && !o.assignedTo)) &&
-        (!tipo || o.maintenanceType === tipo) &&
-        (!soloAbiertas || OPEN_STATUSES.includes(o.status)) &&
-        enSeleccion(o.asset?.id, o.asset?.categoryId),
+        coincide(filtro, {
+          maintenanceType: o.maintenanceType,
+          responsableId: o.assignedTo?.id ?? null,
+          assetId: o.asset?.id ?? null,
+          categoryId: o.asset?.categoryId ?? null,
+        }) && (!soloAbiertas || OPEN_STATUSES.includes(o.status)),
     );
 
   // La lista de dependencias tiene que traer TODOS los filtros. Si falta uno,
@@ -95,13 +93,12 @@ export function Calendario({
   // pantalla no cambia y no hay error en ningun lado que lo delate.
   const visibles = useMemo(
     () => filtrar(ordenes),
-    [ordenes, tecnico, tipo, soloAbiertas, equipos, familia],
+    [ordenes, filtro, soloAbiertas],
   );
   const vencidasVisibles = useMemo(
     () => filtrar(vencidas),
-    [vencidas, tecnico, tipo, soloAbiertas, equipos, familia],
+    [vencidas, filtro, soloAbiertas],
   );
-  const hayFiltro = Boolean(tecnico || tipo || soloAbiertas || equipos.length || familia);
 
   const primero = diaDeCalendario(dias[0], zona);
   const offset = (primero.getDay() + 6) % 7;
@@ -154,7 +151,7 @@ export function Calendario({
   // seguirian apareciendo las lineas punteadas de todos los demas.
   const proyeccionesVisibles = useMemo(
     () => proyecciones.filter((p) => enSeleccion(p.assetId, p.categoryId)),
-    [proyecciones, equipos, familia],
+    [proyecciones, filtro],
   );
   const proyeccionesDe = (fecha: string) =>
     proyeccionesVisibles.filter((p) => mismoDia(p.date, fecha));
@@ -204,68 +201,26 @@ export function Calendario({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="mr-1 text-sm font-semibold capitalize text-slate-900">{etiquetaMes}</h2>
 
-            <select
-              className="field compacto h-8 min-w-32"
-              value={tecnico}
-              onChange={(e) => setTecnico(e.target.value)}
-            >
-              <option value="">Todo el equipo</option>
-              <option value="__sin">Sin responsable</option>
-              {tecnicos.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-
-            <select
-              className="field compacto h-8 min-w-32"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-            >
-              <option value="">Todos los tipos</option>
-              {Object.entries(MAINTENANCE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-
-            {familias.length > 0 ? (
-              <select
-                className="field compacto h-8 min-w-32"
-                value={familia}
-                onChange={(e) => { setFamilia(e.target.value); setEquipos([]); }}
-                disabled={equipos.length > 0}
-                title={equipos.length ? "Quite los equipos elegidos para filtrar por familia" : undefined}
-              >
-                <option value="">Toda la planta</option>
-                {familias.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            ) : null}
-
-            <div className="w-44">
-              <SelectorBuscable
-                className="[&_button]:h-8 [&_button]:py-0 [&_button]:text-xs"
-                valor={unEquipo}
-                onCambio={(id) => {
-                  if (id && !equipos.includes(id)) { setEquipos((p) => [...p, id]); setFamilia(""); }
-                  setUnEquipo("");
-                }}
-                vacio={equipos.length ? `${equipos.length} equipo(s)` : "Cualquier equipo"}
-                marcador="Busque por clave o nombre"
-                opciones={activos
-                  .filter((a) => !equipos.includes(a.id))
-                  .map((a) => ({ id: a.id, etiqueta: `${a.code} — ${a.name}` }))}
-              />
-            </div>
-
-            <label className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
-              <input type="checkbox" className="h-3.5 w-3.5" checked={soloAbiertas} onChange={(e) => setSoloAbiertas(e.target.checked)} />
-              Solo abiertas
-            </label>
-
-            {hayFiltro ? (
-              <button
-                type="button"
-                onClick={() => { setTecnico(""); setTipo(""); setSoloAbiertas(false); setEquipos([]); setFamilia(""); setUnEquipo(""); }}
-                className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50"
-              >
-                Limpiar
-              </button>
-            ) : null}
+            <FiltrosTrabajo
+              valor={filtro}
+              alCambiar={setFiltro}
+              tecnicos={tecnicos}
+              activos={activos}
+              familias={familias}
+              extraActivo={soloAbiertas}
+              alLimpiarExtra={() => setSoloAbiertas(false)}
+              extra={
+                <label className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5"
+                    checked={soloAbiertas}
+                    onChange={(e) => setSoloAbiertas(e.target.checked)}
+                  />
+                  Solo abiertas
+                </label>
+              }
+            />
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
               <div className="flex overflow-hidden rounded-lg border border-slate-200">
@@ -296,30 +251,15 @@ export function Calendario({
           </div>
         </div>
 
-        {equipos.length > 0 ? (
+        {filtro.equipos.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50/40 px-4 py-2">
             <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-400">
               Solo estos equipos
             </span>
-            {equipos.map((id) => {
-              const a = activos.find((x) => x.id === id);
-              return (
-                <span key={id} className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-xs text-slate-700 ring-1 ring-slate-200">
-                  {a?.code ?? id}
-                  <button
-                    type="button"
-                    onClick={() => setEquipos((p) => p.filter((x) => x !== id))}
-                    className="text-slate-400 hover:text-slate-700"
-                    aria-label={`Quitar ${a?.code}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              );
-            })}
+            <EquiposElegidos valor={filtro} alCambiar={setFiltro} activos={activos} />
             <button
               type="button"
-              onClick={() => setEquipos([])}
+              onClick={() => setFiltro({ ...filtro, equipos: [] })}
               className="ml-1 text-[0.6875rem] font-medium text-brand-600 hover:underline"
             >
               Ver todos

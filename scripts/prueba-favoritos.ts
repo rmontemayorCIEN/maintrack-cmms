@@ -13,7 +13,7 @@
  */
 import { prisma } from "../lib/db";
 import { ErrorDeFavoritos, MAXIMO_FAVORITOS, anclables, favoritosDe, guardarFavoritos } from "../lib/favoritos";
-import { pantallasDelMenu } from "../lib/pantallas";
+import { etiquetaDeItem, pantallasDelMenu } from "../lib/pantallas";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -97,6 +97,26 @@ async function main() {
       todas.length > 20 && todas.every((i) => i.etiqueta && i.icono)
       && todas.every((i) => pantallasDelMenu().some((p) => p.href === i.href && p.etiqueta === i.etiqueta)),
       { anclables: todas.length });
+
+
+    // ═══════════════════════════════════════════ 8 El mismo nombre en todos lados
+    console.log("\n8. Se llama igual aquí y en el menú");
+    /*
+     * «Conjuntos» se llama «Mapa de lineas» —o como esa empresa llame a los
+     * suyos—. La traduccion la hacia SOLO el menu lateral, asi que en «Lo que
+     * mas uso» aparecia con el nombre de fabrica: quien la buscaba por el que
+     * ve a diario no la encontraba y concluia que no se podia anclar.
+     */
+    const delMenu = pantallasDelMenu().find((i) => i.porInstalacion);
+    revisar("8. hay una pantalla cuyo nombre depende de la instalación", Boolean(delMenu), delMenu?.href);
+    revisar("   con nombre propio, se llama como la empresa la llama",
+      etiquetaDeItem(delMenu!, "Mapa de líneas") === "Mapa de líneas", etiquetaDeItem(delMenu!, "Mapa de líneas"));
+    revisar("   sin nombre propio, se queda con el de fábrica",
+      etiquetaDeItem(delMenu!, null) === delMenu!.etiqueta && etiquetaDeItem(delMenu!, "   ") === delMenu!.etiqueta,
+      etiquetaDeItem(delMenu!, null));
+    const fija = pantallasDelMenu().find((i) => !i.porInstalacion)!;
+    revisar("   y a las demás no les cambia el nombre nadie",
+      etiquetaDeItem(fija, "Mapa de líneas") === fija.etiqueta, etiquetaDeItem(fija, "Mapa de líneas"));
 
   } finally {
     await prisma.organization.delete({ where: { id: A.id } }).catch(() => undefined);

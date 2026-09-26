@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, Badge } from "@/components/ui";
@@ -16,6 +16,8 @@ import {
 import { pideMotivo } from "@/lib/reglas-ot";
 import { cn, formatNumber } from "@/lib/utils";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
+import { EquiposElegidos, FiltrosTrabajo } from "@/components/filtros-trabajo";
+import { FILTRO_VACIO, coincide, hayFiltro, type FiltroTrabajo } from "@/lib/filtros-trabajo";
 
 type Item = {
   id: string;
@@ -27,14 +29,42 @@ type Item = {
   dueDate: string | null;
   completedAt: string | null;
   asset: string | null;
+  assetId: string | null;
+  categoryId: string | null;
   assignee: string | null;
+  assigneeId: string | null;
   assigneeColor: string | null;
   estimatedHours: number;
 };
 
-export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: string }) {
+export function KanbanBoard({
+  workOrders, zona, tecnicos, activos, familias,
+}: {
+  workOrders: Item[];
+  zona: string;
+  tecnicos: { id: string; name: string }[];
+  activos: { id: string; code: string; name: string }[];
+  familias: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [items, setItems] = useState(workOrders);
+  const [filtro, setFiltro] = useState<FiltroTrabajo>(FILTRO_VACIO);
+
+  /*
+   * Se filtra ANTES de repartir en columnas, asi que los conteos y las horas
+   * de cada columna son los de lo que se esta viendo. Arrastrar sigue igual:
+   * `move` trabaja sobre la tarjeta, no sobre la columna, y el filtro se
+   * conserva porque vive aqui y no en la direccion.
+   */
+  const visibles = useMemo(
+    () => items.filter((i) => coincide(filtro, {
+      maintenanceType: i.maintenanceType,
+      responsableId: i.assigneeId,
+      assetId: i.assetId,
+      categoryId: i.categoryId,
+    })),
+    [items, filtro],
+  );
   const [dragging, setDragging] = useState<Item | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorOrden, setErrorOrden] = useState<string | null>(null);
@@ -95,9 +125,31 @@ export function KanbanBoard({ workOrders, zona }: { workOrders: Item[]; zona: st
         </p>
       ) : null}
 
+      <div className="mb-3 grid gap-2">
+        <FiltrosTrabajo
+          valor={filtro}
+          alCambiar={setFiltro}
+          tecnicos={tecnicos}
+          activos={activos}
+          familias={familias}
+        />
+        <EquiposElegidos valor={filtro} alCambiar={setFiltro} activos={activos} />
+        {/*
+          Con filtro puesto, los conteos de cada columna son de lo que se ve.
+          Decir cuantas quedaron fuera evita leer «2» y concluir que solo hay
+          dos ordenes en la planta.
+        */}
+        {hayFiltro(filtro) ? (
+          <p className="text-xs text-slate-600" role="status">
+            Mostrando <strong>{visibles.length}</strong> de {items.length} órdenes.
+            {visibles.length === 0 ? " Ninguna coincide con este filtro." : ""}
+          </p>
+        ) : null}
+      </div>
+
       <div className="grid gap-3 overflow-x-auto lg:grid-cols-5">
         {BOARD_STATUSES.map((status) => {
-          const column = items.filter((i) => i.status === status);
+          const column = visibles.filter((i) => i.status === status);
           const hours = column.reduce((sum, i) => sum + i.estimatedHours, 0);
           return (
             <div

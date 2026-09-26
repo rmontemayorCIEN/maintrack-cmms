@@ -1352,10 +1352,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/board": {
     titulo: "Tablero",
     que: "Las órdenes por estado, para mover trabajo de una etapa a otra.",
-    hacer: ["Arrastrar órdenes entre columnas para cambiar su estado"],
+    hacer: [
+      "Arrastrar órdenes entre columnas para cambiar su estado",
+      "Acotar el tablero a una familia de equipo, a equipos concretos, a un responsable o a un tipo de mantenimiento",
+    ],
     flujo: [
       "Es la misma información que la lista de órdenes, vista por avance en vez de por renglones.",
       "Arrastrar sirve para los pasos que no piden datos. Completar, pausar, cancelar o iniciar una orden sin responsable se hacen desde la orden: el tablero le dice qué falta y le da el enlace.",
+      "Los filtros son los MISMOS del calendario, con los mismos nombres: responsable, tipo de mantenimiento, familia de equipo y equipos concretos. Quien aprende a acotar una pantalla ya sabe acotar la otra.",
+      "Elegir equipos concretos manda sobre la familia: si escogió tres compresores y luego una familia distinta, siguen mandando los equipos, porque es lo último que usted señaló.",
+      "Con filtro puesto, el conteo y las horas de cada columna son de lo que se está viendo, y arriba se dice cuántas órdenes quedaron fuera. Arrastrar sigue funcionando igual, y el filtro se conserva al mover una tarjeta.",
     ],
   },
 
