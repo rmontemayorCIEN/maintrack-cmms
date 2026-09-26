@@ -172,6 +172,7 @@ const MENU: GrupoMenu[] = [
     seccion: "El trabajo", clave: "trabajo", items: [
       { href: "/work-orders", etiqueta: "Órdenes de trabajo", icono: "ordenes" },
       { href: "/work-orders/armar", etiqueta: "Armar una orden", icono: "armar" },
+      { href: "/work-orders/cierre", etiqueta: "Qué falta para cerrar", icono: "ordenes" },
       { href: "/backlog", etiqueta: "Trabajo pendiente", icono: "backlog" },
       // «Personal» y no «Equipo»: en el mismo menú, «equipos» son las máquinas.
       { href: "/equipo", etiqueta: "Personal", icono: "personal" },

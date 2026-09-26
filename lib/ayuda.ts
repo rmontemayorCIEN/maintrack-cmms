@@ -595,6 +595,36 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/work-orders/cierre": {
+    titulo: "Qué falta para cerrar",
+    tablaConfigurable: true,
+    que: "El estado de cada orden ya trabajada, bloque por bloque, para saber cuáles se pueden cerrar sin abrirlas una por una.",
+    hacer: [
+      "Ver de un golpe cuáles órdenes están listas para cerrar",
+      "Tocar «Listas para cerrar» para dejar en la lista solo esas",
+      "Leer qué le falta exactamente a cada una, en palabras",
+      "Agrupar por responsable para ver qué trae cada quien sin cerrar",
+      "Ordenar por lo que lleva más tiempo esperando validación",
+    ],
+    flujo: [
+      "Es el cierre administrativo visto de arriba: la ficha de la orden dice qué le falta a ESA orden, y esta pantalla lo dice de todas a la vez.",
+      "Cada casilla es un bloque de la orden. Verde: ya tiene lo suyo. Ámbar: es lo que detiene el cierre. Gris: no se capturó y no se exige —hay trabajos que legítimamente no consumen material—. El color va con ícono y con texto, para quien no distingue colores.",
+      "Es EL MISMO criterio que aplica el sistema al cerrar, no uno parecido: si aquí dice «lista», al cerrar no le van a pedir nada más. Un semáforo que hubiera que verificar orden por orden no serviría de nada.",
+      "Solo entran las órdenes que ya se trabajaron: completadas, en proceso y en espera. Una recién abierta saldría con todo en ámbar —claro que le falta todo, no ha empezado— y eso es ruido, no información.",
+      "Se ordena de entrada por lo que lleva más tiempo esperando validación, que es lo que primero se atora en el cierre de mes.",
+    ],
+    campos: [
+      { nombre: "Falta", explica: "Cuántos bloques detienen el cierre. «Lista» significa cero: se puede cerrar ya." },
+      { nombre: "Esperando", explica: "Días desde que el técnico la completó. Es el tiempo que lleva parada en el escritorio de quien valida, no el tiempo del trabajo." },
+      { nombre: "Qué falta", explica: "Lo mismo que le diría la orden al intentar cerrarla, con sus palabras. Así no hay que adivinar qué significa el ámbar." },
+    ],
+    noPuedo: [
+      { sintoma: "Una orden que sí trabajé no aparece", porque: "Si sigue abierta o asignada no entra: el tablero es de trabajo ya empezado. Iníciela y aparecerá." },
+      { sintoma: "Dice «lista» pero no me deja cerrarla", porque: "No debería pasar: es el mismo criterio. Si ocurre, abra la orden —ahí verá el motivo exacto— y avísenos, porque significa que el tablero se desincronizó del servidor." },
+      { sintoma: "El bloque de materiales está en gris y sí usé refacciones", porque: "El gris dice que no hay costo de refacciones ni de servicios cargado en la orden. Cárguelas en Materiales y se pone verde." },
+    ],
+  },
+
   "/work-orders/armar": {
     titulo: "Armar una orden",
     que: "Junta en una sola orden todo lo que se le debe a un equipo: el preventivo que ya toca, las fallas que le reportaron y lo que quedó trabado la vez pasada.",
