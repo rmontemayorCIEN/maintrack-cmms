@@ -36,7 +36,7 @@ import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
 import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable, motivoValido, type SeccionDeOrden } from "@/lib/reglas-ot";
 import { puedeVerRuta, verCostos } from "@/lib/pantallas";
 import { MeterReadingForm } from "../../meters/reading-form";
-import { FichaDeEjecucion, IndiceDeSecciones, IndiceEscritorio, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
+import { FichaDeEjecucion, IndiceDeSecciones, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
 import { FaltaParaCerrar } from "./faltantes";
 import { ResultadoDelTrabajo } from "./resultado";
 import { Row } from "./fila";
@@ -817,7 +817,6 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </div>
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
-          <IndiceEscritorio secciones={indice} />
           <Plegable titulo="Datos completos de la orden">
           <Card>
             <CardHeader title="Resumen" />

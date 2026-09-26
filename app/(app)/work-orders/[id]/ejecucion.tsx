@@ -75,52 +75,23 @@ const CHIP: Record<EstadoDeSeccion, string> = {
 };
 
 /**
- * El índice de la orden en el teléfono: la secuencia del trabajo, a un toque
- * cada paso. Se desliza de lado dentro de sí mismo; la página no.
+ * El índice de la orden: la secuencia del trabajo, a un toque cada paso. Se
+ * desliza de lado dentro de sí mismo; la página no.
+ *
+ * Va ARRIBA en los dos tamaños, no al costado en escritorio. Se probó al
+ * costado y competía con Resumen, Costos y Resultado, que viven en esa misma
+ * columna; además se lee después del contenido en vez de antes. Arriba hay una
+ * sola forma de recorrer la orden, igual en la laptop que en el teléfono: dos
+ * modelos distintos para la misma pantalla confunden a quien usa los dos.
  *
  * Además de llevar, ahora MARCA: de un vistazo se ve qué sección detiene el
  * cierre sin recorrer las nueve tarjetas. El número de paso se queda porque es
  * la secuencia real del trabajo, y el ícono se acompaña de texto para quien no
  * distingue los colores.
  */
-/**
- * El mismo índice en escritorio, de pie y pegado al costado.
- *
- * En el teléfono el índice es una tira que se desliza arriba; en escritorio
- * hay ancho de sobra al costado y la orden es larga —nueve secciones—, así que
- * ahí vive mejor de pie y acompañando el desplazamiento. Es la misma lista y
- * las mismas señas: cambiarlas en un lado y no en el otro seria tener dos
- * respuestas para «qué me falta».
- *
- * `hidden lg:block` y el `lg:hidden` del otro son excluyentes a propósito:
- * nunca se ven los dos, y quien navega con teclado recorre uno solo.
- */
-export function IndiceEscritorio({ secciones }: { secciones: SeccionDelIndice[] }) {
-  return (
-    <nav aria-label="Secciones de la orden" className="hidden lg:sticky lg:top-20 lg:block">
-      <p className="label mb-1.5">En esta orden</p>
-      <ol className="grid gap-1">
-        {secciones.map((s, i) => (
-          <li key={s.id}>
-            <a
-              href={`#${s.id}`}
-              className={`flex min-h-9 items-center gap-2 rounded-lg border px-2.5 text-xs font-medium ${CHIP[s.estado]}`}
-            >
-              <span className={`tabular-nums ${s.estado === "neutro" ? "text-slate-400" : "opacity-70"}`}>{i + 1}.</span>
-              <span className="min-w-0 flex-1 truncate">{s.texto}</span>
-              {s.estado === "falta" ? <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-label="falta algo aquí" /> : null}
-              {s.estado === "hecho" ? <Check className="h-3.5 w-3.5 shrink-0" aria-label="listo" /> : null}
-            </a>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
 export function IndiceDeSecciones({ secciones }: { secciones: SeccionDelIndice[] }) {
   return (
-    <nav aria-label="Secciones de la orden" className="sticky top-14 z-10 -mx-3 border-b border-slate-200 bg-slate-50/95 px-3 py-2 sm:-mx-4 sm:px-4 lg:hidden">
+    <nav aria-label="Secciones de la orden" className="sticky top-14 z-10 -mx-3 border-b border-slate-200 bg-slate-50/95 px-3 py-2 sm:-mx-4 sm:px-4 lg:top-16">
       <ol className="flex gap-1.5 overflow-x-auto pb-0.5">
         {secciones.map((s, i) => (
           <li key={s.id} className="shrink-0">

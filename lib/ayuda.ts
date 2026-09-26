@@ -538,8 +538,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/backlog": {
     titulo: "Trabajo pendiente",
+    tablaConfigurable: true,
     que: "Todo el trabajo que falta: órdenes abiertas y actividades que no se pudieron hacer, separadas por lo que les impide avanzar.",
     hacer: [
+      "Tocar un recuadro de arriba para ver solo esa categoría, y tocarlo otra vez para quitar el filtro",
+      "Reagrupar por equipo, responsable, motivo u origen, cuando la pregunta no es «qué lo detiene» sino «de quién es» o «de qué máquina es»",
       "Ver de un vistazo cuántas órdenes están en espera, vencidas, sin responsable, sin programar o a tiempo, y cuántas actividades no se realizaron",
       "Leer por cada renglón su origen, activo, prioridad, horas estimadas, motivo, responsable, antigüedad y la próxima acción",
       "Ver qué quedó pendiente en cada equipo y por qué",
@@ -547,6 +550,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Ver cuánto lleva esperando cada actividad",
     ],
     flujo: [
+      "La lista nace agrupada por lo que impide avanzar, que es la pregunta de todos los días. Los recuadros de arriba no solo cuentan: tocar uno deja en la lista solo esa categoría, y el filtro queda escrito para poder afinarlo o quitarlo.",
       "Cada orden abierta cae en UNA categoría, la más urgente de resolver: en espera, vencida, sin responsable, sin programar o programada a tiempo. Si además le pasa otra cosa (vencida y sin responsable), aparece como aviso debajo del folio; no se cuenta dos veces.",
       "Una actividad suelta no se mezcla con una orden completa: las actividades no realizadas tienen su propia sección.",
       "Cuando una actividad de una orden no se puede hacer —no hay refacción, no hay quien, no se pudo parar el equipo— el técnico la libera indicando el motivo («Otro motivo» exige explicarlo).",
