@@ -882,19 +882,36 @@ async function main() {
     donde = "flujo abrir";
     await t.ir(urlFlujo, 1000);
     await captura("390-flujo-1-abrir");
-    const estructura = await t.evaluar<{ ficha: string; orden: string[]; plegados: number; abiertos: number; barra: string[] }>(`(() => {
+    const estructura = await t.evaluar<{
+      ficha: string; orden: string[]; plegados: number; abiertos: number; barra: string[];
+      bitacoraAbierta: boolean; lecturasAbiertas: boolean;
+    }>(`(() => {
       const r = document.createRange(); r.setStartBefore(document.querySelector("main")); r.setEndBefore(document.querySelector("#actividades"));
       const ids = ["actividades", "seguridad", "tiempo", "materiales", "lecturas", "evidencias", "bitacora", "resultado-movil"];
       const orden = ids.map((id) => [id, document.getElementById(id)]).filter(([, e]) => e && e.getBoundingClientRect().height > 0).sort((a, b) => a[1].getBoundingClientRect().top - b[1].getBoundingClientRect().top).map(([id]) => id);
       const detalles = [...document.querySelectorAll("main details")].filter((d) => d.getBoundingClientRect().height > 0);
+      // Lo SECUNDARIO es lo que no vive dentro de una seccion del trabajo:
+      // «Mas de la orden» y «Datos completos». Las secciones se pliegan segun
+      // el estado (lib/secciones-orden.ts) y algunas nacen abiertas a proposito.
+      const secundarios = detalles.filter((d) => !d.closest("section[id]"));
       const barra = [...document.querySelectorAll("div.fixed button, div.fixed a")].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.textContent.trim());
-      return { ficha: r.toString(), orden, plegados: detalles.filter((d) => !d.open).length, abiertos: detalles.filter((d) => d.open).length, barra };
+      return {
+        ficha: r.toString(), orden, barra,
+        plegados: secundarios.filter((d) => !d.open).length,
+        abiertos: secundarios.filter((d) => d.open).length,
+        bitacoraAbierta: Boolean(document.querySelector("#bitacora details")?.open),
+        lecturasAbiertas: Boolean(document.querySelector("#lecturas details")?.open),
+      };
     })()`);
     pasos["ficha: trabajo, activo y ubicación, estado, prioridad y vencimiento antes de las actividades"] =
       ["Lubricar rodamientos y revisar", "BOM-001", "Planta Norte", "Asignada", "Alta"].every((x) => estructura.ficha.includes(x)) && /Para\s*\d{1,2} \w{3} \d{4}/.test(estructura.ficha);
     pasos["secciones en orden: verificación, riesgos, tiempo, materiales, lecturas, evidencias, bitácora, resultado"] =
       estructura.orden.join(",") === "actividades,seguridad,tiempo,materiales,lecturas,evidencias,bitacora,resultado-movil";
     pasos["lo secundario plegado en el teléfono"] = estructura.plegados >= 1 && estructura.abiertos === 0;
+    // Donde el tecnico ESCRIBE no se pliega mientras la orden vive: recogerlas
+    // tumbo pedir apoyo, la nota sin enviar y la captura del horometro.
+    pasos["y lo que se captura —bitácora y lecturas— queda a la mano, sin abrirlo"] =
+      estructura.bitacoraAbierta && estructura.lecturasAbiertas;
     pasos["barra fija: Aceptar, Iniciar, … Pedir apoyo"] = estructura.barra[0]?.includes("Aceptar") && estructura.barra.some((b) => b.includes("Iniciar")) && estructura.barra.at(-1)!.includes("Pedir apoyo");
     // Aceptar.
     donde = "flujo aceptar";

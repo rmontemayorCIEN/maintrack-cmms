@@ -36,12 +36,14 @@ import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
 import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable, motivoValido, type SeccionDeOrden } from "@/lib/reglas-ot";
 import { puedeVerRuta, verCostos } from "@/lib/pantallas";
 import { MeterReadingForm } from "../../meters/reading-form";
-import { FichaDeEjecucion, IndiceDeSecciones, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
+import { FichaDeEjecucion, IndiceDeSecciones, IndiceEscritorio, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
 import { FaltaParaCerrar } from "./faltantes";
 import { ResultadoDelTrabajo } from "./resultado";
 import { Row } from "./fila";
 import { AceptarOrden } from "./aceptar";
 import { Plegable } from "@/components/plegable";
+import { SeccionPlegable } from "./seccion";
+import { naceAbierta } from "@/lib/secciones-orden";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
 import { PasarRegistros } from "@/components/paso-registros";
@@ -587,10 +589,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
           </section>
           {wo.procedure || wo.safetyNotes ? (
-          <section id="seguridad" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-          {wo.procedure || wo.safetyNotes ? (
-            <Card>
-              <CardHeader title="Procedimiento y seguridad" />
+            <SeccionPlegable
+              id="seguridad"
+              titulo="Procedimiento y seguridad"
+              abiertaPorOmision={naceAbierta("seguridad", wo.status)}
+            >
               {wo.procedure ? (
                 <div className="mb-4">
                   <p className="label">Procedimiento</p>
@@ -603,10 +606,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">{wo.safetyNotes}</p>
                 </div>
               ) : null}
-            </Card>
-          ) : null}
-
-          </section>
+            </SeccionPlegable>
           ) : null}
           <section id="tiempo" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
@@ -697,9 +697,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
           </section>
           {medidores.length > 0 ? (
-          <section id="lecturas" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-            <Card>
-              <CardHeader title="Lecturas del equipo" subtitle="Registre el horómetro o contador si lo tomó en este trabajo." />
+            <SeccionPlegable
+              id="lecturas"
+              titulo="Lecturas del equipo"
+              subtitulo={`${medidores.length} medidor(es)`}
+              abiertaPorOmision={naceAbierta("lecturas", wo.status)}
+            >
+              <p className="mb-2 text-xs text-slate-500">Registre el horómetro o contador si lo tomó en este trabajo.</p>
               <ul className="grid gap-3">
                 {medidores.map((m) => (
                   <li key={m.id} className="rounded-lg border border-slate-200 p-3">
@@ -710,8 +714,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   </li>
                 ))}
               </ul>
-            </Card>
-          </section>
+            </SeccionPlegable>
           ) : null}
           <section id="evidencias" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
@@ -734,9 +737,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
 
           </section>
-          <section id="bitacora" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-          <Card>
-            <CardHeader title="Bitácora" subtitle="Notas del equipo. Si necesita ayuda, pida apoyo aquí." />
+          <SeccionPlegable
+            id="bitacora"
+            titulo="Bitácora"
+            subtitulo={wo.comments.length ? `${wo.comments.length} nota(s)` : "Sin notas"}
+            abiertaPorOmision={naceAbierta("bitacora", wo.status)}
+          >
+            <p className="mb-2 text-xs text-slate-500">Notas del equipo. Si necesita ayuda, pida apoyo aquí.</p>
             <CommentsPanel
               workOrderId={wo.id}
               comments={wo.comments.map((c) => ({
@@ -748,9 +755,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               }))}
               editable={canExecute}
             />
-          </Card>
-
-          </section>
+          </SeccionPlegable>
           {/* 10. Resultado: qué se pedirá al terminar (o lo que quedó). El botón está en la barra de abajo. */}
           <section id="resultado-movil" className="grid min-w-0 scroll-mt-28 lg:hidden">
             <Card>
@@ -812,6 +817,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </div>
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <IndiceEscritorio secciones={indice} />
           <Plegable titulo="Datos completos de la orden">
           <Card>
             <CardHeader title="Resumen" />
