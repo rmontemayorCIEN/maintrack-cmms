@@ -455,6 +455,24 @@ async function main() {
       const escribe = await pedir("POST", "/api/assets", cR, { code: "X-1", name: "Equipo" });
       const soporteVencida = await pedir("POST", "/api/soporte", cR, { asunto: "Quiero contratar", descripcion: "Terminó mi prueba y quiero seguir." });
       revisar("   al vencer la prueba: solo lectura (no registra, 402), pero puede pedir soporte y no se cobra nada retroactivo", estadoSuscripcion(vencida).soloLectura && escribe.status === 402 && soporteVencida.status === 201, { escribe: escribe.status, soporte: soporteVencida.status });
+
+      /*
+       * Y el camino de vuelta: la prueba se termina ACTIVANDO la cuenta.
+       *
+       * Ese camino no existia —el unico boton de estado alternaba entre
+       * suspender y reactivar, asi que desde «En prueba» lo que hacia era
+       * suspenderla—. Quedaba dejar vencer la prueba, que pone la cuenta en
+       * solo lectura: lo contrario de lo que uno quiere al cobrarle a alguien.
+       */
+      const activada = await pedir("PATCH", `/api/admin/organizations/${nuevaOrg.id}`, cOp, { status: "ACTIVE" });
+      const yaActiva = await prisma.organization.findUniqueOrThrow({ where: { id: nuevaOrg.id } });
+      const escribeActiva = await pedir("POST", "/api/assets", cR, { code: "X-2", name: "Equipo" });
+      revisar("   al activarla desde el panel, deja de estar en solo lectura",
+        activada.status === 200 && !estadoSuscripcion(yaActiva).soloLectura
+        && yaActiva.status === "ACTIVE" && escribeActiva.status !== 402,
+        { activada: activada.status, estado: yaActiva.status, escribe: escribeActiva.status });
+      revisar("   y se le borra la fecha de prueba, para que no la herede si algún día vuelve a prueba",
+        yaActiva.trialEndsAt === null, { trialEndsAt: yaActiva.trialEndsAt });
     }
     // Con el alta cerrada —la operación de hoy— la misma pantalla solo registra la solicitud.
     const { POST: contratarCerrado } = await import("../app/api/contratar/route");

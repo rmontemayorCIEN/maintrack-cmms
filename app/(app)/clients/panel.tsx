@@ -437,6 +437,27 @@ export function PanelClientes({
                                 {ocupado === org.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogIn className="h-3 w-3" />}
                                 Entrar
                               </button>
+                              {/*
+                                Una cuenta en prueba que ya compro necesita
+                                pasar a activa, y ese camino no existia: el
+                                unico boton alternaba entre suspender y
+                                reactivar, asi que desde «En prueba» lo que
+                                hacia era SUSPENDERLA. Quedaba la opcion de
+                                dejar vencer la prueba, que pone la cuenta en
+                                solo lectura y es justo lo contrario de lo que
+                                uno quiere al cobrarle a alguien.
+                              */}
+                              {org.status === "TRIAL" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => cambiar(org, "status", "ACTIVE")}
+                                  disabled={ocupado === org.id}
+                                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[0.6875rem] font-medium text-emerald-700 hover:bg-emerald-100"
+                                  title="Termina la prueba y deja la cuenta activa, sin fecha de vencimiento"
+                                >
+                                  Activar
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => cambiar(org, "status", org.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED")}

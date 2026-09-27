@@ -38,10 +38,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (org.esDemo && (input.status === "SUSPENDED" || input.status === "CANCELLED")) {
     return fail("La empresa demostrativa no se suspende ni se cancela; si ya no se usa, avísele a quien administra la plataforma.", 409);
   }
+  /*
+   * Al dejarla ACTIVA se borra la fecha de prueba.
+   *
+   * Mientras el estado no sea TRIAL esa fecha no hace nada, asi que es
+   * tentador dejarla. Pero es un dato que miente esperando: el dia que alguien
+   * vuelva a poner la cuenta en prueba heredaria una fecha ya vencida y la
+   * cuenta quedaria en solo lectura de inmediato, sin que nadie entienda por
+   * que. Se limpia donde se causa.
+   */
+  const datos = input.status === "ACTIVE" ? { ...input, trialEndsAt: null } : input;
+
   const actualizada = await prisma.organization.update({
     where: { id },
-    data: input,
-    select: { id: true, name: true, plan: true, status: true },
+    data: datos,
+    select: { id: true, name: true, plan: true, status: true, trialEndsAt: true },
   });
 
   await logAudit({
