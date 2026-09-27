@@ -118,6 +118,18 @@ volver a activar su telefono a mano.
 **Permisos**: matriz en `lib/rbac.ts` — 7 roles. VIEWER no tiene ninguno, o sea
 que es de solo lectura por construccion, no por revisar cada pantalla.
 
+### El servidor MCP del operador
+
+`/api/mcp` deja que un agente de IA en claude.ai consulte cifras agregadas del
+negocio, con OAuth y solo para el operador de la plataforma. Guia completa en
+`Docs/mcp-operador.md`. Dos reglas:
+
+- **Las herramientas (`lib/mcp/herramientas.ts`) usan `lectura`, nunca
+  `prisma`.** `lectura` truena ante cualquier escritura; importar `prisma` ahi
+  es saltarse la garantia de solo lectura, y `scripts/prueba-mcp.ts` lo detiene.
+- **Solo agregados.** Una herramienta nueva no devuelve descripciones, equipos
+  ni personas de los clientes: conteos, fechas y sumas por empresa.
+
 ### Las funciones de IA
 
 Registradas en `lib/ia/funciones.ts`. Todas entran por `analizarConIa()` o

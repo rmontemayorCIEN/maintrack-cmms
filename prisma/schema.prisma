@@ -449,6 +449,8 @@ model User {
   observa              Observador[]
   compromisos          Compromiso[]            @relation("CompromisoResponsable")
   compromisosCreados   Compromiso[]            @relation("CompromisoAutor")
+  codigosOAuth         CodigoOAuth[]
+  tokensOAuth          TokenOAuth[]
 
   @@index([organizationId])
 }
@@ -4175,4 +4177,84 @@ model AmarreDeCumplimiento {
   @@index([organizationId])
   /// Para la impresion de la orden: que normas responde este plan.
   @@index([planId])
+}
+
+// ------------------------------------------- Agentes de IA del operador (MCP)
+
+/// Una aplicacion que se registro sola para pedir acceso al servidor MCP
+/// (registro dinamico, RFC 7591). Hoy la unica que puede completar el flujo es
+/// Claude: las direcciones de regreso se aceptan solo de una lista cerrada
+/// (lib/mcp/oauth.ts), asi que registrarse no le da a nadie un lugar a donde
+/// mandar el codigo.
+///
+/// Es de la plataforma, no de una empresa cliente: no lleva organizationId.
+model ClienteOAuth {
+  id            String    @id @default(cuid())
+  /// Lo que viaja como client_id. Aleatorio, no el id interno.
+  clientId      String    @unique
+  nombre        String
+  /// JSON: ["https://claude.ai/api/mcp/auth_callback"]
+  redirectUris  String    @default("[]")
+  /// none | client_secret_post | client_secret_basic
+  metodoAuth    String    @default("none")
+  /// SHA-256 del secreto, si el cliente pidio uno. El secreto no se guarda.
+  huellaSecreto String?
+  ultimoUsoEl   DateTime?
+  createdAt     DateTime  @default(now())
+
+  codigos CodigoOAuth[]
+  tokens  TokenOAuth[]
+
+  @@index([createdAt])
+}
+
+/// El codigo de autorizacion: vive cinco minutos y sirve una sola vez.
+model CodigoOAuth {
+  id            String    @id @default(cuid())
+  /// SHA-256 del codigo. El codigo en claro solo existe en la redireccion.
+  huella        String    @unique
+  clienteId     String
+  userId        String
+  redirectUri   String
+  /// PKCE S256: el reto que manda el cliente al pedir el codigo.
+  codeChallenge String
+  /// El recurso para el que se pidio (RFC 8707): la URL de /api/mcp.
+  recurso       String
+  expiraEl      DateTime
+  usadoEl       DateTime?
+  createdAt     DateTime  @default(now())
+
+  cliente ClienteOAuth @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Tokens de acceso y de renovacion. Se guardan por su huella, nunca en claro.
+///
+/// `familia` junta el acceso original y todas sus renovaciones: si un token de
+/// renovacion ya usado vuelve a presentarse, alguien lo copio, y se revoca la
+/// familia entera. `autorizadoEl` es cuando el operador dio el permiso; se
+/// compara contra User.sessionsValidFrom, asi que «cerrar sesion en todos
+/// lados» tambien desconecta al agente.
+model TokenOAuth {
+  id           String    @id @default(cuid())
+  huella       String    @unique
+  /// ACCESO | RENOVACION
+  tipo         String
+  clienteId    String
+  userId       String
+  recurso      String
+  familia      String
+  autorizadoEl DateTime
+  expiraEl     DateTime
+  revocadoEl   DateTime?
+  /// Solo en renovacion: cuando se canjeo por un par nuevo.
+  usadoEl      DateTime?
+  ultimoUsoEl  DateTime?
+  createdAt    DateTime  @default(now())
+
+  cliente ClienteOAuth @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familia])
+  @@index([userId])
 }

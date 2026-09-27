@@ -34,6 +34,9 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   INTELIGENCIA: { titulo: "Inteligencia artificial", entidades: ["AiReport"] },
   CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink", "DiaFestivo", "Invoice"] },
   IMPORTACION: { titulo: "Importaciones y puesta en marcha", entidades: ["Importacion", "ImportBatch"] },
+  // Lo que consultan los agentes de IA del operador por el servidor MCP
+  // (lib/mcp). Cada llamada deja su renglon con herramienta y parametros.
+  AGENTES: { titulo: "Agentes de IA (MCP)", entidades: ["AgenteMcp"] },
 };
 
 /** Acciones que vale la pena poder aislar de un vistazo. */
@@ -42,6 +45,7 @@ export const ACCIONES_SENSIBLES = [
   "USER_CREATED", "USER_ROLE_CHANGED", "USER_DEACTIVATED", "USER_UPDATED",
   "PASSWORD_CHANGED", "PASSWORD_RESET", "PASSWORD_RESET_ISSUED", "PASSWORD_RESET_USED",
   "EXPORTED", "FILE_ACCESSED", "CLIENT_UPDATED",
+  "MCP_ACCESS", "MCP_RECHAZADO", "MCP_AUTORIZADO",
 ];
 
 export type FiltroBitacora = {

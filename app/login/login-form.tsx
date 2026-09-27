@@ -17,7 +17,7 @@ import { LEMA, MARCA, SUBLEMA, TEXTO_PRUEBA } from "@/lib/comercial";
  *
  * Al sistema entra solo quien fue dado de alta desde Configuracion.
  */
-export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
+export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { permiteAlta?: boolean; destino?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,7 +39,7 @@ export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
       setError(data.error ?? "No fue posible iniciar sesión");
       return;
     }
-    router.push("/dashboard");
+    router.push(destino);
     router.refresh();
   }
 
