@@ -18,6 +18,7 @@ type Org = {
   industry: string | null; tipoInstalacion: string | null; trialEndsAt: string | null; createdAt: string;
   iaComplemento: boolean;
   registrosPropios: boolean;
+  cumplimientoNormas: boolean;
   /// Consumo de IA del mes en curso: operaciones y costo real en dolares.
   ia: { operaciones: number; incluidas: number; costoUsd: number } | null;
   /// Avance de puesta en marcha: predice que cuentas se van a caer.
@@ -102,7 +103,7 @@ export function PanelClientes({
     router.refresh();
   }
 
-  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "registrosPropios" | "tipoInstalacion", valor: string | boolean) {
+  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "registrosPropios" | "cumplimientoNormas" | "tipoInstalacion", valor: string | boolean) {
     setOcupado(org.id);
     setError(null);
     const res = await fetch(`/api/admin/organizations/${org.id}`, {
@@ -403,6 +404,18 @@ export function PanelClientes({
                           />
                           <span className="text-[0.6875rem] text-slate-500">
                             {org.registrosPropios ? "registros" : "—"}
+                          </span>
+                        </label>
+                        <label className="mt-1 flex cursor-pointer items-center gap-1.5" title="Cumplimiento normativo: catálogo de normas y expediente">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
+                            checked={org.cumplimientoNormas}
+                            disabled={ocupado === org.id}
+                            onChange={(e2) => cambiar(org, "cumplimientoNormas", e2.target.checked)}
+                          />
+                          <span className="text-[0.6875rem] text-slate-500">
+                            {org.cumplimientoNormas ? "normas" : "—"}
                           </span>
                         </label>
                       </td>

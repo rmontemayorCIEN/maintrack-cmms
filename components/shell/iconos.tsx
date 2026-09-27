@@ -2,7 +2,7 @@ import { LifeBuoy, Presentation,
   Activity, AlertTriangle, BarChart3, Bell, BookOpen, Boxes, Building2, CalendarDays, ClipboardCheck, ClipboardList,
   Cpu, Factory, Flame, Gauge, Home, Inbox, KanbanSquare, Library, LineChart, ListChecks, MessageCircleQuestion,
   PackageX, PauseCircle, Plus, QrCode, Rocket, ScanLine, Search, Settings, ShoppingCart, Sparkles, Truck, Upload,
-  UsersRound, Waypoints, Wrench, Footprints, ShieldCheck, Table2, FileSignature, Fuel, Droplets, HardHat, Zap,
+  UsersRound, Waypoints, Wrench, Footprints, ShieldCheck, Table2, FileSignature, Fuel, Droplets, HardHat, Zap, ScrollText,
 } from "lucide-react";
 
 /**
@@ -16,7 +16,7 @@ const ICONOS: Record<string, React.ComponentType<{ className?: string }>> = {
   predictivo: Activity, almacen: Boxes, requisiciones: ClipboardList, compras: ShoppingCart, proveedores: Truck,
   indicadores: LineChart, paros: Flame, reportes: BarChart3, consulta: MessageCircleQuestion, diagnostico: Sparkles,
   puesta: Rocket, catalogos: Library, importar: Upload, glosario: BookOpen, soporte: LifeBuoy, demo: Presentation, ajustes: Settings, clientes: Building2,
-  vigencias: ShieldCheck, registros: Table2,
+  vigencias: ShieldCheck, registros: Table2, normas: ScrollText,
   // Iconos de las plantillas de registros propios (lib/registros-plantillas.ts).
   contrato: FileSignature, combustible: Fuel, agua: Droplets, proteccion: HardHat,
   herramienta: Wrench, contratista: HardHat, energia: Zap,

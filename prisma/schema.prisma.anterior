@@ -204,6 +204,26 @@ model Organization {
   /// de IA, y por eso es una bandera y no una funcion del plan: se vende a
   /// quien la necesita sin obligarlo a subir de plan.
   registrosPropios   Boolean   @default(false)
+  /// Si la empresa contrato «Cumplimiento normativo»: el catalogo de normas,
+  /// el semaforo y el expediente de inspeccion. Se cobra aparte igual que los
+  /// registros propios, y por la misma razon: tiene comprador propio
+  /// —seguridad e higiene suele ser otra area con otro presupuesto—.
+  ///
+  /// El codigo de formato controlado de la orden impresa NO depende de esta
+  /// bandera: le sirve a cualquier cliente certificado aunque nunca contrate
+  /// el modulo.
+  cumplimientoNormas Boolean   @default(false)
+  /// Como identifica ESTA empresa el formato impreso de la orden de trabajo
+  /// dentro de su sistema de calidad: «FOR-MTTO-012» y su revision «3».
+  ///
+  /// No es la norma, y la distincion importa: el auditor de ISO no busca que
+  /// el papel diga «ISO 9001», busca que sea el formato registrado en el
+  /// sistema documental del cliente, con su codigo y su revision. Por eso
+  /// esto lo escribe el cliente y no sale de ningun catalogo nuestro.
+  ///
+  /// Vacio: el pie no lo muestra, y la orden se imprime como siempre.
+  codigoFormatoOT    String?
+  revisionFormatoOT  String?
   /// Direccion del aviso de privacidad de la empresa, si tiene uno propio.
   /// Se enlaza desde el formulario publico del QR. Vacio: se enlaza el aviso
   /// del sistema, que explica que se hace con los datos de quien reporta.
@@ -267,6 +287,8 @@ model Organization {
   presupuestos       Presupuesto[]
   tablasPropias      TablaPropia[]
   renglonesPropios   RenglonPropio[]
+  normasAdoptadas    NormaAdoptada[]
+  amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
@@ -392,6 +414,8 @@ model User {
   vigenciasCreadas     Vigencia[]              @relation("VigenciaAutor")
   tablasPropiasCreadas TablaPropia[]           @relation("TablaPropiaAutor")
   renglonesPropios     RenglonPropio[]         @relation("RenglonPropioAutor")
+  normasACargo         NormaAdoptada[]         @relation("NormaResponsable")
+  obligacionesACargo   ObligacionAdoptada[]    @relation("ObligacionResponsable")
   favoritos            PantallaFavorita[]
   links                ReferenceLink[]
   planRequests         PlanRequest[]
@@ -958,6 +982,7 @@ model MaintenancePlan {
   links        ReferenceLink[]
   asignaciones PlanAsset[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@index([organizationId])
   @@index([assetId])
 }
@@ -1146,6 +1171,7 @@ model WorkOrder {
   requisiciones MaterialRequest[]
   comentarios   Comentario[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@unique([organizationId, number])
   @@index([organizationId])
   @@index([status])
@@ -1549,6 +1575,7 @@ model Vigencia {
   service      ExternalService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   creadoPor    User?            @relation("VigenciaAutor", fields: [creadoPorId], references: [id])
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@index([organizationId, tipo])
   @@index([organizationId, hasta])
   @@index([assetId])
@@ -3780,6 +3807,7 @@ model Rondin {
   paradas      RondinParada[]
   hallazgos    RondinHallazgo[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@unique([organizationId, numero])
   @@index([organizationId])
   @@index([organizationId, estado])
@@ -3941,6 +3969,7 @@ model TablaPropia {
   campos       CampoPropio[]
   renglones    RenglonPropio[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@unique([organizationId, clave])
   @@index([organizationId, activa])
 }
@@ -4029,4 +4058,121 @@ model ValorPropio {
   @@index([campoId, refId])
   @@index([campoId, numero])
   @@index([campoId, fecha])
+}
+
+/// ─────────────────────────────────────── Cumplimiento normativo
+///
+/// Una norma que ESTA empresa decidio seguir.
+///
+/// Se COPIA del catalogo (`lib/normas-catalogo.ts`) al adoptarla, en vez de
+/// referenciarlo. Tres razones: el cliente puede marcar obligaciones como «no
+/// aplica» sin tocar el catalogo de todos; las normas propias del cliente
+/// necesitan exactamente la misma estructura y asi hay un solo camino; y
+/// guardar la version con que se adopto es lo que permite avisarle «esto
+/// cambio desde que usted lo adopto» sin leer el Diario Oficial.
+model NormaAdoptada {
+  id             String @id @default(cuid())
+  organizationId String
+  /// «NOM-002-STPS», o la que invente el cliente para un requisito propio.
+  clave          String
+  titulo         String
+  emisor         String?
+  resumen        String?
+  /// Lo que la norma pide y este modulo NO cubre. Se muestra en pantalla: es
+  /// lo que evita que el cliente crea que con esto ya cumplio todo.
+  fueraDeAlcance String?
+
+  /// CATALOGO (la mantenemos nosotros y avisa si cambia) o PROPIA (la escribio
+  /// el cliente y no la actualiza nadie). No es un dato interno: se muestra,
+  /// porque las dos NO ofrecen la misma promesa.
+  origen          String @default("CATALOGO")
+  /// Con que version del catalogo se adopto. Si el catalogo va mas adelante,
+  /// la pantalla avisa que revise. Cero en las propias.
+  versionAdoptada Int    @default(0)
+
+  activa       Boolean   @default(true)
+  responsableId String?
+  nota         String?
+  adoptadaEl   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsable  User?                @relation("NormaResponsable", fields: [responsableId], references: [id])
+  obligaciones ObligacionAdoptada[]
+
+  @@unique([organizationId, clave])
+  @@index([organizationId, activa])
+}
+
+/// Cada cosa concreta que una norma exige.
+model ObligacionAdoptada {
+  id      String @id @default(cuid())
+  normaId String
+  clave   String
+  titulo  String
+  detalle String?
+  /// De `lib/normas-tipos.ts`: ACTIVIDAD, DOCUMENTO, DATO, RECORRIDO,
+  /// CAPACITACION. Decide con que pieza del sistema se cumple y como se mide.
+  tipo     String
+  /// Cada cuantos dias, cuando es periodica.
+  cadaDias Int?
+  evidencia String?
+  orden    Int     @default(0)
+
+  /// «No aplica» con su razon TAMBIEN es evidencia: en una inspeccion
+  /// preguntan por que no tiene algo, y «no tenemos recipientes a presion» es
+  /// una respuesta valida que conviene tener escrita y fechada.
+  aplica        Boolean @default(true)
+  razonNoAplica String?
+  responsableId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  norma       NormaAdoptada          @relation(fields: [normaId], references: [id], onDelete: Cascade)
+  responsable User?                  @relation("ObligacionResponsable", fields: [responsableId], references: [id])
+  amarres     AmarreDeCumplimiento[]
+
+  @@unique([normaId, clave])
+  @@index([normaId, aplica])
+}
+
+/// Con que pieza del sistema se cumple una obligacion.
+///
+/// Exactamente UNA por renglon, y puede haber varias por obligacion: «revisar
+/// extintores cada mes» puede ser tres planes si hay tres sitios.
+///
+/// Son llaves foraneas de verdad y no un id de texto —al reves que
+/// `ValorPropio`— porque aqui la pieza SI se puede borrar: un plan se elimina.
+/// Con la llave, el amarre se va con el, la obligacion vuelve a quedar «sin
+/// nada que lo respalde» y el semaforo lo dice. Con un id suelto, el sistema
+/// seguiria contando como cumplida una obligacion cuyo plan ya no existe, que
+/// es la peor de las mentiras posibles en este modulo.
+model AmarreDeCumplimiento {
+  id             String @id @default(cuid())
+  organizationId String
+  obligacionId   String
+
+  planId    String?
+  vigenciaId String?
+  tablaId   String?
+  rondinId  String?
+  ordenId   String?
+
+  nota      String?
+  createdAt DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  obligacion   ObligacionAdoptada @relation(fields: [obligacionId], references: [id], onDelete: Cascade)
+  plan         MaintenancePlan?   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  vigencia     Vigencia?          @relation(fields: [vigenciaId], references: [id], onDelete: Cascade)
+  tabla        TablaPropia?       @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  rondin       Rondin?            @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  orden        WorkOrder?         @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+
+  @@index([obligacionId])
+  @@index([organizationId])
+  /// Para la impresion de la orden: que normas responde este plan.
+  @@index([planId])
 }

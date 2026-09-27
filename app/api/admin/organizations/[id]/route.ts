@@ -16,6 +16,8 @@ const schema = z.object({
   /// «Registros propios»: se activa cuando el cliente lo contrata. Es lo
   /// unico que hace alcanzable el modulo, asi que vive donde se cobra.
   registrosPropios: z.boolean().optional(),
+  /// «Cumplimiento normativo»: el otro que se cobra aparte.
+  cumplimientoNormas: z.boolean().optional(),
 });
 
 /** Cambio de plan o suspension de una empresa cliente. */

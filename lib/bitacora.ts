@@ -28,6 +28,7 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   // la caldera» los busca ahi.
   VIGENCIAS: { titulo: "Garantías y vigencias", entidades: ["Vigencia"] },
   REGISTROS: { titulo: "Registros propios", entidades: ["TablaPropia", "CampoPropio", "RenglonPropio"] },
+  NORMAS: { titulo: "Cumplimiento normativo", entidades: ["NormaAdoptada", "ObligacionAdoptada"] },
   AVISOS: { titulo: "Avisos", entidades: ["ConfigAvisos", "Notification", "EntregaAviso"] },
   INTEGRACION: { titulo: "Integración con otros sistemas", entidades: ["CredencialApi", "Webhook"] },
   INTELIGENCIA: { titulo: "Inteligencia artificial", entidades: ["AiReport"] },

@@ -46,14 +46,14 @@ export function pantallasInventariadas(): GrupoInventariado[] {
   // SISTEMA, no que contrato una cuenta. Sin esto, el modulo que se cobra
   // aparte desaparecia del inventario —y de la pagina publica que sale de
   // el— justamente por ser opcional.
-  return menuDe("OWNER", { registrosPropios: true }).map((g) => ({
+  return menuDe("OWNER", { registrosPropios: true, cumplimientoNormas: true }).map((g) => ({
     seccion: g.seccion,
     pantallas: g.items.map((i) => ({
       href: i.href,
       etiqueta: i.etiqueta,
       que: ayuda[i.href]?.que ?? "",
       hacer: ayuda[i.href]?.hacer ?? [],
-      roles: ROLES.filter((r) => menuDe(r, { registrosPropios: true }).some((x) => x.items.some((y) => y.href === i.href))),
+      roles: ROLES.filter((r) => menuDe(r, { registrosPropios: true, cumplimientoNormas: true }).some((x) => x.items.some((y) => y.href === i.href))),
     })),
   })).filter((g) => g.pantallas.length);
 }
@@ -62,7 +62,7 @@ export function pantallasInventariadas(): GrupoInventariado[] {
 export function pantallasPorRol(): Array<{ rol: Rol; cuantas: number }> {
   return ROLES.map((rol) => ({
     rol,
-    cuantas: menuDe(rol, { registrosPropios: true }).reduce((a, g) => a + g.items.length, 0),
+    cuantas: menuDe(rol, { registrosPropios: true, cumplimientoNormas: true }).reduce((a, g) => a + g.items.length, 0),
   }));
 }
 

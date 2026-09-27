@@ -4,7 +4,7 @@
 
 > MainTrack es una plataforma de gestión y confiabilidad del mantenimiento que conecta activos, trabajo, inventario, condición y costos para anticipar fallas y mostrar dónde se está perdiendo capacidad productiva.
 
-**37 pantallas** en 8 grupos · **23 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
+**38 pantallas** en 8 grupos · **23 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
 
 Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capturado: tener la función y tenerla en marcha son cosas distintas.
 
@@ -21,6 +21,7 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 - **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro.
 - **Avisos:** En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega.
 - **Conversaciones y compromisos:** Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple.
+- **Cumplimiento normativo:** Se contrata aparte. Las normas que su empresa debe cumplir, con el índice de qué plan, qué documento y qué registro responden a cada obligación, y el expediente listo para una inspección. La evidencia no se palomea: sale del trabajo que de verdad se hizo, con su fecha, su responsable y su foto. Le ayuda a organizar y conservar esa evidencia; no dictamina si cumple con la ley.
 - **Registros propios:** Se contrata aparte. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo.
 - **Integración con su ERP:** API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas.
 
@@ -206,6 +207,13 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Cambiar de mes o ver el año completo
   - Ver en qué se fue: mano de obra, refacciones, servicios y otros
 
+**Cumplimiento normativo** — Las normas que su empresa debe cumplir, y con qué las está cumpliendo. No es un módulo aparte del trabajo: es el índice que dice qué plan, qué documento y qué registro de los que ya tiene responden a cada obligación, y si están al corriente.
+  - Elegir las normas que le aplican, de las que le proponemos por su giro
+  - Dar de alta una norma propia: un requisito de su corporativo o de su cliente
+  - Decir con qué se cumple cada obligación, amarrándola a lo que ya existe
+  - Marcar lo que no le aplica, con su razón
+  - Sacar el expediente de una norma para una inspección
+
 **Dónde para la planta** — Qué áreas detuvieron la producción, cuánto costó y si va mejorando.
   - Ver de un vistazo qué área concentra el daño
   - Saber cuánto costó en dinero, no solo en horas
@@ -278,13 +286,13 @@ Nadie ve todo. El menú se arma según el rol, así que un solicitante entra a u
 
 | Rol | Pantallas |
 |---|---|
-| Propietario | 37 |
-| Administración | 37 |
-| Supervisión | 34 |
+| Propietario | 38 |
+| Administración | 38 |
+| Supervisión | 35 |
 | Técnico | 22 |
 | Compras | 11 |
 | Solicitante | 7 |
-| Consulta | 23 |
+| Consulta | 24 |
 
 Además, cada persona puede poner sus pantallas de diario hasta arriba de su menú, sin cambiarle el menú a nadie más.
 

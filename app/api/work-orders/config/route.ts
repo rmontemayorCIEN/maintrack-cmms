@@ -15,6 +15,14 @@ const schema = z.object({
   otDiasHabiles: z.boolean().optional(),
   otGeneracion: z.enum(["AUTOMATICA", "MANUAL"]).optional(),
   otEvidenciaCriticas: z.boolean().optional(),
+  /**
+   * Como identifica ESTA empresa el formato impreso de la orden dentro de su
+   * sistema de calidad. Vacio lo quita del pie. Se recorta en vez de
+   * rechazarse: un codigo largo es un descuido, no un error que valga la pena
+   * pelear con el usuario.
+   */
+  codigoFormatoOT: z.string().trim().max(40).nullable().optional(),
+  revisionFormatoOT: z.string().trim().max(12).nullable().optional(),
 });
 
 /** Como se arman las ordenes de trabajo en esta organizacion. */
@@ -29,6 +37,8 @@ export async function PATCH(request: Request) {
     if (datos.otDiasHabiles !== undefined) actualizacion.otDiasHabiles = datos.otDiasHabiles;
     if (datos.otGeneracion !== undefined) actualizacion.otGeneracion = datos.otGeneracion;
     if (datos.otEvidenciaCriticas !== undefined) actualizacion.otEvidenciaCriticas = datos.otEvidenciaCriticas;
+    if (datos.codigoFormatoOT !== undefined) actualizacion.codigoFormatoOT = datos.codigoFormatoOT || null;
+    if (datos.revisionFormatoOT !== undefined) actualizacion.revisionFormatoOT = datos.revisionFormatoOT || null;
 
     if (!Object.keys(actualizacion).length) return ok({ sinCambios: true });
 

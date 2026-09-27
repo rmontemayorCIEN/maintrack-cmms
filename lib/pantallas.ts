@@ -90,6 +90,12 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/registros/nueva", roles: ADMINISTRACION },
   { ruta: "/registros/armar", roles: ADMINISTRACION },
 
+  // Cumplimiento normativo: lo VE quien analiza y quien supervisa —el tecnico
+  // no necesita el indice, necesita su orden— y lo CONFIGURA quien tiene
+  // Ajustes: decidir a que se obliga la empresa no es operacion.
+  { ruta: "/normas", roles: ANALISIS },
+  { ruta: "/normas/nueva", roles: ADMINISTRACION },
+
   { ruta: "/paros", roles: ANALISIS },
   { ruta: "/reports", roles: ANALISIS },
   { ruta: "/indicadores", roles: ANALISIS },
@@ -166,6 +172,8 @@ export type ItemMenu = {
    * el menu solo deja de ofrecerlo.
    */
   requiereRegistros?: boolean;
+  /** Igual que `requiereRegistros`, para «Cumplimiento normativo». */
+  requiereNormas?: boolean;
 };
 export type GrupoMenu = { seccion: string; clave: string; items: ItemMenu[] };
 
@@ -201,6 +209,23 @@ const MENU: GrupoMenu[] = [
       { href: "/backlog", etiqueta: "Trabajo pendiente", icono: "backlog" },
       // «Personal» y no «Equipo»: en el mismo menú, «equipos» son las máquinas.
       { href: "/equipo", etiqueta: "Personal", icono: "personal" },
+    ],
+  },
+  {
+    /*
+     * Un cajon propio, y no dentro de «El trabajo».
+     *
+     * Ahi estaba mal por dos razones: ese grupo es el ciclo de la orden
+     * —abrirla, armarla, cerrarla, lo pendiente— y un registro propio no
+     * participa en el; y lo que se lleva aqui es transversal, asi que no cabe
+     * en ningun grupo existente: la bitacora del diesel es de equipos, la
+     * entrega de proteccion es de personal y los contratos son de
+     * administracion.
+     *
+     * El grupo entero desaparece si la empresa no contrato el modulo, porque
+     * `menuDe` quita los grupos que se quedan sin items.
+     */
+    seccion: "Sus registros", clave: "registros", items: [
       { href: "/registros", etiqueta: "Registros propios", icono: "registros", requiereRegistros: true },
     ],
   },
@@ -228,6 +253,7 @@ const MENU: GrupoMenu[] = [
     seccion: "Cómo me fue", clave: "analisis", items: [
       { href: "/indicadores", etiqueta: "Indicadores", icono: "indicadores" },
       { href: "/presupuestos", etiqueta: "Presupuestos", icono: "reportes" },
+      { href: "/normas", etiqueta: "Cumplimiento normativo", icono: "normas", requiereNormas: true },
       { href: "/paros", etiqueta: "Dónde para la planta", icono: "paros" },
       { href: "/reports", etiqueta: "Reportes", icono: "reportes" },
       { href: "/consulta", etiqueta: "Pregunte a sus datos", icono: "consulta" },
@@ -238,6 +264,7 @@ const MENU: GrupoMenu[] = [
     seccion: "Configuración", clave: "config", items: [
       { href: "/puesta-en-marcha", etiqueta: "Puesta en marcha", icono: "puesta" },
       { href: "/catalogs", etiqueta: "Catálogos", icono: "catalogos" },
+      { href: "/registros/nueva", etiqueta: "Armar un registro", icono: "registros", requiereRegistros: true },
       { href: "/import", etiqueta: "Importar datos", icono: "importar" },
       { href: "/settings", etiqueta: "Ajustes", icono: "ajustes" },
     ],
@@ -296,7 +323,7 @@ export function pantallasDelMenu(): ItemMenu[] {
  * sigue decidiendo `puedeVerRuta`, con la misma tabla de arriba.
  */
 const SUBPANTALLAS: ItemMenu[] = [
-  { href: "/registros/nueva", etiqueta: "Armar un registro propio", icono: "registros" },
+  { href: "/normas/nueva", etiqueta: "Agregar una norma propia", icono: "normas" },
   // Del dia a dia, aunque no esten en el menu.
   { href: "/search", etiqueta: "Búsqueda", icono: "buscar" },
   { href: "/notificaciones", etiqueta: "Avisos", icono: "avisos" },
@@ -359,13 +386,15 @@ export const SIN_VOZ: Record<string, string> = {
 
 export function menuDe(
   rol: string | undefined,
-  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean } = {},
+  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean } = {},
 ): GrupoMenu[] {
   const grupos = MENU
     .map((g) => ({
       ...g,
       items: g.items.filter(
-        (i) => puedeVerRuta(rol, i.href, opciones) && (!i.requiereRegistros || opciones.registrosPropios),
+        (i) => puedeVerRuta(rol, i.href, opciones)
+          && (!i.requiereRegistros || opciones.registrosPropios)
+          && (!i.requiereNormas || opciones.cumplimientoNormas),
       ),
     }))
     .filter((g) => g.items.length);

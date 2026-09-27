@@ -205,7 +205,7 @@ export default async function SettingsPage({
       {activa === "atajos" ? (
         <PanelAtajos
           nombreDelMapa={nombreDelMapa(terminoConjunto(org))}
-          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo, registrosPropios: org.registrosPropios })}
+          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo, registrosPropios: org.registrosPropios, cumplimientoNormas: org.cumplimientoNormas })}
           iniciales={(await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })).map((i) => i.href)}
         />
       ) : null}
@@ -253,6 +253,8 @@ export default async function SettingsPage({
           diasHabiles={org.otDiasHabiles}
           generacion={org.otGeneracion}
           evidenciaCriticas={org.otEvidenciaCriticas}
+          codigoFormato={org.codigoFormatoOT}
+          revisionFormato={org.revisionFormatoOT}
           jornadaDias={org.diasHabiles}
           editable={can(user.role, "settings:write")}
         />

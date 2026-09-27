@@ -228,7 +228,7 @@ async function main() {
   const DIA = 86_400_000;
   try {
     // ── Datos: una empresa exclusiva con algo en cada pantalla, y otra para el aislamiento.
-    const A = await prisma.organization.create({ data: { name: `${sello} Planta Norte`, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", diasHabiles: "1,2,3,4,5,6,7", registrosPropios: true } });
+    const A = await prisma.organization.create({ data: { name: `${sello} Planta Norte`, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", diasHabiles: "1,2,3,4,5,6,7", registrosPropios: true, cumplimientoNormas: true, tipoInstalacion: "PLANTA" } });
     creadas.push(A.id);
     const B = await prisma.organization.create({ data: { name: `${sello} Otra empresa`, slug: `${sello}-b`, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey" } });
     creadas.push(B.id);
@@ -1626,6 +1626,103 @@ async function main() {
             { avisa: textoCerrada.includes("no está disponible para su rol"), filtra: !textoCerrada.includes("Los contratos con terceros") });
           void cerrada;
         }
+      }
+    }
+
+    // ═══════════════════════════════════════════ 53: cumplimiento normativo
+    console.log("\n53. Cumplimiento normativo");
+    {
+      const { adoptarDelCatalogo, amarrar, normaPorClave } = await import("../lib/normas");
+      const adopcion = await adoptarDelCatalogo(A.id, "NOM-002-STPS", u.ADMIN.id);
+      if (!adopcion.ok) {
+        revisar("53. se adoptó la norma de prueba", false, adopcion.motivos);
+      } else {
+        const planNormas = await prisma.maintenancePlan.create({
+          data: { organizationId: A.id, name: "Revisión mensual de extintores", intervalDays: 30, active: true, nextDueDate: new Date(Date.now() + 20 * DIA) },
+        });
+        const n0 = (await normaPorClave(A.id, "NOM-002-STPS"))!;
+        await amarrar(A.id, n0.obligaciones[0].id, "plan", planNormas.id, u.ADMIN.id);
+
+        await sesion("ADMIN");
+        await pantalla(1440, 900);
+        donde = "normas";
+        await t.ir(`${base}/normas`);
+        const lista = await medir();
+        const enLista = await t.evaluar<{ norma: boolean; noPromete: boolean; sinRespaldo: boolean }>(`(() => {
+          const txt = document.body.innerText;
+          return {
+            norma: txt.includes("NOM-002-STPS"),
+            // La frontera del producto tiene que estar A LA VISTA, no en letra
+            // chica: es lo que separa ayudar de vender falsa seguridad.
+            noPromete: txt.includes("No dictamina si cumple con la ley"),
+            sinRespaldo: txt.toLowerCase().includes("sin respaldo"),
+          };
+        })()`);
+        revisar("53. el listado trae la norma, el semáforo y lo que el módulo NO promete",
+          !lista.desborde && enLista.norma && enLista.noPromete && enLista.sinRespaldo, { ...enLista, desborde: lista.desborde });
+        await captura("1440-admin-normas");
+
+        await t.ir(`${base}/normas/NOM-002-STPS`);
+        const detalle = await medir();
+        const dentro = await t.evaluar<{ obligaciones: number; plan: boolean; fuera: boolean; alCorriente: boolean }>(`(() => {
+          const txt = document.body.innerText;
+          return {
+            obligaciones: (txt.match(/se cumple con/gi) || []).length,
+            plan: txt.includes("Revisión mensual de extintores"),
+            // Decir lo que la norma pide y aquí NO se lleva es parte del trato.
+            fuera: txt.includes("Lo que esta norma pide y aquí no se lleva"),
+            alCorriente: txt.includes("Al corriente"),
+          };
+        })()`);
+        revisar("    el detalle muestra las obligaciones, el respaldo amarrado y lo que queda fuera de alcance",
+          !detalle.desborde && dentro.obligaciones === 3 && dentro.plan && dentro.fuera && dentro.alCorriente, { ...dentro, desborde: detalle.desborde });
+        await captura("1440-admin-norma-detalle");
+
+        await t.ir(`${base}/normas/NOM-002-STPS/expediente`);
+        const expediente = await medir();
+        const exp = await t.evaluar<{ encabezado: boolean; periodo: boolean; sinRespaldo: boolean }>(`(() => {
+          const txt = document.body.innerText;
+          return {
+            encabezado: txt.includes("EXPEDIENTE DE CUMPLIMIENTO"),
+            periodo: /Periodo del .* al /.test(txt),
+            // Lo que quedó sin respaldo se DICE: mejor que lo vea aquí que
+            // enfrente del inspector.
+            sinRespaldo: txt.toLowerCase().includes("sin respaldo en el sistema"),
+          };
+        })()`);
+        revisar("    el expediente sale con su periodo y dice qué quedó sin respaldo",
+          !expediente.desborde && exp.encabezado && exp.periodo && exp.sinRespaldo, { ...exp, desborde: expediente.desborde });
+        await captura("1440-admin-norma-expediente");
+
+        // El código del formato controlado en la orden impresa: le sirve a
+        // cualquier cliente certificado, contrate o no el módulo.
+        await prisma.organization.update({ where: { id: A.id }, data: { codigoFormatoOT: "FOR-MTTO-012", revisionFormatoOT: "3" } });
+        const otConPlan = await prisma.workOrder.create({
+          data: { organizationId: A.id, number: "OT-NOR-1", title: "Revisión de extintores", assetId: activos[0].id, planId: planNormas.id, status: "CLOSED", completedAt: new Date() },
+        });
+        await t.ir(`${base}/work-orders/${otConPlan.id}/print`);
+        const impresa = await t.evaluar<{ codigo: boolean; norma: boolean }>(`(() => {
+          const txt = document.body.innerText;
+          return { codigo: txt.includes("FOR-MTTO-012") && txt.includes("Rev. 3"), norma: txt.includes("NOM-002-STPS") };
+        })()`);
+        revisar("    la orden impresa lleva el código del formato y la norma a la que responde",
+          impresa.codigo && impresa.norma, impresa);
+        await captura("1440-orden-impresa-formato");
+
+        // En el teléfono: el semáforo se consulta caminando.
+        await pantalla(390, 844);
+        await t.ir(`${base}/normas`);
+        const movil = await medir();
+        revisar("    en el teléfono el semáforo no se desborda de lado",
+          !movil.desborde && !movil.fuera.length, { desborde: movil.desborde, fuera: movil.fuera });
+        await captura("390-admin-normas");
+
+        // El técnico NO la ve: el índice es de quien analiza, no de quien ejecuta.
+        await sesion("TECHNICIAN");
+        await pantalla(1440, 900);
+        await t.ir(`${base}/normas`);
+        const delTecnico = await medir();
+        revisar("    el técnico no entra al cumplimiento normativo", delTecnico.sinPermiso, { sinPermiso: delTecnico.sinPermiso });
       }
     }
 

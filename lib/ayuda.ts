@@ -1895,7 +1895,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Lo que hace que esto no sea una hoja de cálculo son las columnas que apuntan a SUS datos. La columna «Equipo» de la bitácora de diésel no es texto que alguien volvió a escribir: es el equipo del padrón. Por eso se puede preguntar cuánto diésel lleva ese generador, y el Excel nunca pudo.",
       "Quién VE una tabla y quién CAPTURA en ella son dos cosas distintas, y cada tabla las declara por separado. El técnico puede consultar una tabla que solo administración llena. Su rol puede no ver ninguna: entonces esta pantalla sale vacía, y eso es lo correcto, no un problema de accesos.",
-      "Armar una tabla es definir esquema, o sea configuración: lo hace quien tiene permiso de Ajustes. Capturar lo hace quien la tabla diga.",
+      "Armar una tabla y capturar en ella son dos cosas distintas, y por eso viven en dos lugares. Armar es definir esquema —o sea configuración— y está en el menú bajo Configuración, para quien tenga permiso de Ajustes. Capturar es del día a día y está aquí, en «Sus registros», para quien la tabla diga.",
       "Cada tabla pide una explicación de para qué es, y no es un adorno: es lo que lee esta ayuda y lo que le permite a la IA contestar preguntas sobre ella. Una tabla llamada «Control 2» sin explicación queda muda para el sistema y para quien entre el año que viene.",
       "Las columnas se pueden renombrar sin perder nada: por dentro cada columna guarda su propia clave, que se fija al crearla y no cambia. Lo que NO se cambia es el tipo de una columna que ya tiene datos —de número a texto, por ejemplo—: los valores viven en la columna del tipo y cambiarlo los dejaría invisibles sin un solo mensaje de error. Para eso se agrega una columna nueva.",
       "Una tabla se apaga, no se borra: se sigue consultando y deja de recibir captura. Lo mismo un renglón. Lo que se capturó es historia de la planta.",
@@ -1904,7 +1904,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Los límites son doce tablas por empresa y veinticuatro columnas por tabla. No es burocracia: es lo que mantiene esto como un módulo que se puede soportar y no como una plataforma con tablas que nadie explicó.",
     ],
     botones: [
-      { nombre: "Armar una tabla", explica: "Abre los formatos ya hechos —contratos, combustible, equipo de protección, análisis de agua, herramienta, contratistas, energía— para ajustar uno, o empezar en blanco. Pide el nombre, la explicación, quién captura y quién ve." },
+      { nombre: "Armar una tabla", explica: "Abre los formatos ya hechos —contratos, combustible, equipo de protección, análisis de agua, herramienta, contratistas, energía— para ajustar uno, o empezar en blanco. Pide el nombre, la explicación, quién captura y quién ve. También está en el menú, en Configuración: armar una tabla es definir esquema, no capturar." },
       { nombre: "Capturar", explica: "Abre el formulario de esa tabla, armado a partir de sus columnas. Las que apuntan a equipos, refacciones, personal o proveedores traen buscador." },
     ],
     campos: [
@@ -1967,6 +1967,76 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { pregunta: "¿Puedo cambiar las columnas después?", respuesta: "Puede renombrarlas, hacerlas obligatorias o no, cambiar su orden, agregar nuevas y apagar las que ya no usa. Lo único que no cambia es el tipo de una que ya tiene datos." },
     ],
   },
+  "/normas": {
+    titulo: "Cumplimiento normativo",
+    que: "Las normas que su empresa debe cumplir, y con qué las está cumpliendo. No es un módulo aparte del trabajo: es el índice que dice qué plan, qué documento y qué registro de los que ya tiene responden a cada obligación, y si están al corriente.",
+    hacer: [
+      "Elegir las normas que le aplican, de las que le proponemos por su giro",
+      "Dar de alta una norma propia: un requisito de su corporativo o de su cliente",
+      "Decir con qué se cumple cada obligación, amarrándola a lo que ya existe",
+      "Marcar lo que no le aplica, con su razón",
+      "Sacar el expediente de una norma para una inspección",
+    ],
+    flujo: [
+      "La idea de fondo: una obligación periódica ES un plan de mantenimiento; un dictamen que vence ES una vigencia; un dato de laboratorio ES un registro propio. El sistema ya sabe hacer todo eso. Lo que este módulo agrega es saber cuál responde a cuál, y avisar si se atrasó.",
+      "Por eso la evidencia no se inventa: sale del trabajo que de verdad se hizo. La orden se generó sola, se asignó, se cerró con foto y con fecha. Nadie palomeó una lista — y eso es lo que la hace valer en una inspección.",
+      "Hay dos clases de norma y NO prometen lo mismo. Las del catálogo las mantenemos nosotros y le avisamos cuando cambian. Las que usted da de alta no las actualiza nadie: si el requisito cambia, hay que cambiarlo aquí. Va marcado en la lista.",
+      "Una obligación sin nada amarrado NO se cuenta como incumplida ni como cumplida: dice «sin respaldo». El sistema no tiene con qué opinar, y contarla de cualquiera de los dos lados sería inventar.",
+      "Cuando una obligación tiene varios respaldos, manda el peor. Si una de sus tres plantas trae el plan vencido, la obligación no está al corriente: lo contrario sería una máquina de presumir cumplimiento.",
+      "No verá ningún porcentaje de cumplimiento. Un «87% cumplido» es una cifra que se ve seria, que nadie puede reproducir y que se acaba presumiendo en una junta. Lo que verá son conteos, que sí se pueden verificar uno por uno.",
+      "Cada norma dice lo que pide y que aquí NO se lleva. Eso está a propósito: el peor servicio sería dejarle creer que con esto ya cumplió todo.",
+      "El expediente saca lo real del periodo: las órdenes cerradas con su evidencia, los documentos con su vigencia y los registros capturados. Y al final dice qué quedó sin respaldo — mejor que lo descubra ahí que enfrente del inspector.",
+      "Si su empresa está certificada, el código de su formato impreso se configura en Ajustes, en «Órdenes», y aparece al pie de cada orden. Eso NO depende de este módulo: le sirve aunque no lo contrate.",
+    ],
+    botones: [
+      { nombre: "Seguir (en el catálogo)", explica: "Agrega esa norma a su lista, con todas sus obligaciones. No crea ningún plan ni documento: usted decide después con qué cumple cada una." },
+      { nombre: "Agregar una norma propia", explica: "Para un requisito que no está en el catálogo. Usted define sus obligaciones y de qué tipo es cada una." },
+      { nombre: "Decir con qué se cumple", explica: "Amarra un plan, un documento, un registro propio, un rondín o una orden a esa obligación. Puede amarrar varios." },
+      { nombre: "No nos aplica", explica: "Pide la razón, y la guarda con fecha. En una inspección preguntan por qué NO tiene algo, y tenerlo escrito es la respuesta." },
+      { nombre: "Expediente", explica: "La evidencia del periodo, lista para imprimir: trabajo realizado, documentos, registros y lo que quedó sin respaldo." },
+      { nombre: "Actualizar desde el catálogo", explica: "Aparece cuando la norma cambió. Solo agrega lo que falta: no borra ni pisa lo que usted ya amarró." },
+    ],
+    campos: [
+      { nombre: "Sin respaldo", explica: "No es incumplimiento: es que nada del sistema está amarrado a esa obligación. Puede que se cumpla por fuera; si es así, conviene registrarlo aquí." },
+      { nombre: "Del catálogo / Propia", explica: "Quién la mantiene. Del catálogo: nosotros, y le avisamos si cambia. Propia: usted, y nadie le va a avisar." },
+      { nombre: "Cambió", explica: "El catálogo va en una versión más nueva que la que usted adoptó. Al actualizar se agregan las obligaciones nuevas sin tocar su trabajo." },
+      { nombre: "Cada cuántos días", explica: "El periodo con el que se mide si está al corriente. Sin periodo, basta con que exista el respaldo." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo «Cumplimiento normativo» en el menú", porque: "Se contrata aparte y su cuenta no lo tiene activo. No es un permiso que falte." },
+      { sintoma: "Veo las normas pero no puedo amarrar nada", porque: "Decidir a qué se obliga la empresa es configuración: hace falta permiso de Ajustes. Consultar sí puede." },
+      { sintoma: "No me deja marcar algo como «no aplica»", porque: "Falta la razón. Un hueco sin explicar no sirve de nada en una inspección; uno explicado y fechado sí." },
+      { sintoma: "Al amarrar me dice que eso «no existe en esta empresa»", porque: "El plan o el documento que eligió se borró mientras tenía la pantalla abierta. Vuelva a elegir." },
+      { sintoma: "Una obligación sigue en rojo aunque acabo de cerrar la orden", porque: "Lo que se mide es el plan, no la última orden: si el plan quedó vencido o apagado, la obligación lo refleja. Revise la próxima fecha del plan." },
+      { sintoma: "Amarré el plan correcto y aun así aparece vencida", porque: "Manda el peor de los respaldos. Si hay otro plan amarrado que sí está vencido, ese decide. Quite lo que no corresponda." },
+    ],
+    preguntas: [
+      { pregunta: "¿Esto garantiza que cumplo con la ley?", respuesta: "No, y es importante que quede claro: le ayuda a organizar y conservar la evidencia de lo que su empresa hace. Si cumple o no lo determina la autoridad o su especialista en seguridad e higiene." },
+      { pregunta: "¿El contenido de las normas está verificado?", respuesta: "Mientras la pantalla lo diga, está en revisión. Úselo para organizarse y confírmelo con su especialista antes de darlo por definitivo." },
+      { pregunta: "¿Puedo llevar un requisito de mi cliente o de mi corporativo?", respuesta: "Sí, con «Agregar una norma propia». Es el caso de una maquila con matriz afuera o de una planta automotriz: se auditan igual de duro y la evidencia sale del mismo lugar." },
+      { pregunta: "¿Qué pasa si borro el plan que tenía amarrado?", respuesta: "El respaldo se va con él y la obligación vuelve a «sin respaldo». Es a propósito: seguir contándola como cumplida cuando su plan ya no existe sería la peor mentira posible aquí." },
+      { pregunta: "¿Puedo amarrar la misma obligación a varias cosas?", respuesta: "Sí. «Revisar extintores cada mes» pueden ser tres planes si tiene tres sitios. Pero recuerde que manda el peor: amarre solo lo que de verdad sostiene esa obligación." },
+      { pregunta: "¿Dónde sale la norma en la orden impresa?", respuesta: "Al pie, junto al código de su formato. La orden hereda las normas del plan que la generó, y también se le puede amarrar una directamente." },
+    ],
+  },
+  "/normas/nueva": {
+    titulo: "Agregar una norma propia",
+    que: "Dar de alta un requisito que no está en nuestro catálogo: el estándar de su corporativo, lo que exige su cliente, o una norma que todavía no hemos incluido.",
+    hacer: [
+      "Ponerle la clave con la que su gente la nombra",
+      "Desglosar qué exige, una obligación por renglón",
+      "Elegir de qué tipo es cada una, que decide con qué se cumple",
+    ],
+    flujo: [
+      "Lo primero que verá es lo que NO se promete: una norma propia no la actualiza nadie. Si el requisito cambia, hay que cambiarlo aquí a mano.",
+      "El tipo de cada obligación es la decisión importante, porque decide con qué pieza del sistema se cumple y cómo se mide: lo que se hace cada cierto tiempo es una actividad y se cumple con un plan; lo que vence es un documento y se cumple con una vigencia; lo que se anota es un dato y se cumple con un registro propio.",
+      "La clave es lo que va a ver en la lista y lo que aparece al pie de la orden impresa. Conviene que sea la que usa su gente: «COR-14» y no «Estándar corporativo número catorce».",
+    ],
+    noPuedo: [
+      { sintoma: "No me deja guardar sin obligaciones", porque: "Una norma sin obligaciones no tiene nada que seguir: no habría qué amarrar ni qué medir." },
+      { sintoma: "Me dice que la clave ya existe", porque: "Ya tiene una norma con esa clave. Use otra o edite la que ya tiene." },
+    ],
+  },
 };
 
 /**
@@ -1981,6 +2051,9 @@ export const SIN_AYUDA = [
   // y la propia pantalla explica lo unico que hay que saber.
   "/restablecer",
   "/work-orders/[id]/print",
+  // El expediente es una SALIDA para imprimir y entregar, no una pantalla con
+  // la que se interactua: lo que hay que saber de el se explica en /normas.
+  "/normas/[clave]/expediente",
   "/billing/[id]/print",
   "/requests/puntos/imprimir",
   "/clients/cobranza",

@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS, WO_STATUS_LABELS } from "@/lib/constants";
 import { formatDate, formatDateTime, formatNumber, formatDia } from "@/lib/utils";
+import { normasDeLaOrden } from "@/lib/normas";
 import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,9 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
     },
   });
   if (!wo) notFound();
+
+  // A que normas responde: por su plan, o amarrada directo.
+  const normas = await normasDeLaOrden(user.organizationId, wo.id);
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-slate-900 print:p-0">
@@ -153,8 +157,33 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         </div>
       </section>
 
+      {/*
+        El pie de un formato controlado.
+
+        El codigo y la revision los pone el cliente en Ajustes, y NO salen de
+        ningun catalogo nuestro: el auditor de ISO no busca que el papel diga
+        «ISO 9001», busca que sea el formato registrado en el sistema
+        documental de la empresa, con su codigo y su revision. Las normas a las
+        que responde la orden son otra cosa, y van aparte.
+      */}
       <footer className="mt-8 border-t border-slate-300 pt-2 text-[0.625rem] text-slate-500">
-        Impreso {formatDateTime(new Date(), zona)} · MainTrack
+        <div className="flex items-start justify-between gap-4">
+          <span>
+            {user.organization.codigoFormatoOT ? (
+              <span className="font-medium text-slate-700">
+                {user.organization.codigoFormatoOT}
+                {user.organization.revisionFormatoOT ? ` · Rev. ${user.organization.revisionFormatoOT}` : ""}
+              </span>
+            ) : null}
+            {user.organization.codigoFormatoOT ? " · " : ""}
+            Impreso {formatDateTime(new Date(), zona)} · MainTrack
+          </span>
+          {normas.length ? (
+            <span className="text-right">
+              Responde a: {normas.map((n) => n.clave).join(" · ")}
+            </span>
+          ) : null}
+        </div>
       </footer>
     </div>
   );
