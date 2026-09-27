@@ -1,350 +1,83 @@
 /**
- * El catalogo de normas que mantenemos nosotros.
+ * El lector del catálogo normativo.
  *
- * ── Por que vive en codigo y no en la base
+ * El CONTENIDO ya no vive aquí: vive en `catalogo-normativo/normas.json`, un
+ * paquete neutral y versionado que se comparte copiándolo. Este archivo solo
+ * lo carga, lo valida y lo expone con tipos. El porqué de esa separación está
+ * en `catalogo-normativo/LEEME.md`.
  *
- * Porque es contenido con consecuencias legales, y en git cada cambio queda
- * con fecha, con autor y con el texto exacto de lo que decia antes. Eso es lo
- * que permite contestar «que decia su catalogo en marzo» —una pregunta que
- * puede aparecer despues de una inspeccion—. Una tabla editable no puede
- * contestar eso.
+ * Hoy el único consumidor es MainTrack. Está preparado para más, no conectado
+ * a más.
  *
- * Lo que el cliente da de alta por su cuenta SI vive en la base: son sus
- * requisitos, no los nuestros, y nadie promete mantenerlos. Ver `ORIGENES_NORMA`.
+ * ── Por qué se valida al cargar
  *
- * ── EL CONTENIDO ESTA EN BORRADOR
- *
- * Esto lo redacto alguien que NO es especialista en seguridad e higiene, a
- * partir de lo que se sabe de estas normas. Las NOM se actualizan, cambian de
- * numero y cambian lo que exigen.
- *
- * Antes de que esto se le ofrezca a un cliente como cumplimiento, tiene que
- * revisarlo alguien que sepa. Mientras `REVISADO_POR` este vacio, la pantalla
- * lo dice (`CATALOGO_EN_BORRADOR`). No es un tramite: vender falsa seguridad
- * en este tema es peor que no ofrecer el modulo.
- *
- * ── Como se versiona
- *
- * Cada norma lleva `version`. Cuando se cambia lo que exige, SE SUBE. La
- * empresa guarda con que version la adopto, asi que el sistema puede decirle
- * «esto cambio desde que usted lo adopto, revise». Ese es el aviso de cambio
- * sin tener que leer el Diario Oficial.
+ * Porque un catálogo mal formado no puede servirse a medias. Si una norma se
+ * queda sin `fueraDeAlcance`, el cliente ve una pantalla que le deja creer que
+ * con eso ya cumplió todo — y ese es exactamente el daño que este módulo no
+ * puede hacer. Mejor que truene al arrancar, y por eso además
+ * `scripts/revisar-catalogo-normativo.ts` corre en el despliegue y bloquea
+ * antes de que llegue a producción.
  */
-import type { TipoObligacion } from "./normas-tipos";
+import { z } from "zod";
+import paquete from "../catalogo-normativo/normas.json";
+import { ORDEN_TIPOS_OBLIGACION, type TipoObligacion } from "./normas-tipos";
 
-/** Quien reviso el catalogo y cuando. Vacio: el contenido va marcado como borrador. */
-export const REVISADO_POR: { nombre: string; fecha: string } | null = null;
+export const esquemaObligacion = z.object({
+  clave: z.string().min(1),
+  titulo: z.string().min(3),
+  detalle: z.string().min(10),
+  tipo: z.enum(ORDEN_TIPOS_OBLIGACION as [TipoObligacion, ...TipoObligacion[]]),
+  cadaDias: z.number().int().min(1).max(3650).optional(),
+  // Sin esto nadie sabe qué tiene que quedar guardado, y la obligación se
+  // vuelve un buen deseo.
+  evidencia: z.string().min(10),
+});
 
-export type ObligacionDeCatalogo = {
-  clave: string;
-  titulo: string;
-  /** Que exige, en palabras de quien tiene que cumplirlo. */
-  detalle: string;
-  tipo: TipoObligacion;
-  /** Cada cuantos dias, cuando la norma fija un periodo. Nulo: no es periodica. */
-  cadaDias?: number;
-  /** Que tiene que quedar guardado para poder demostrarlo. */
-  evidencia: string;
-};
+export const esquemaNorma = z.object({
+  clave: z.string().min(3),
+  titulo: z.string().min(3),
+  emisor: z.string().nullable(),
+  giros: z.array(z.string().min(2)).min(1),
+  resumen: z.string().min(20),
+  /**
+   * Obligatorio a propósito. Es el único campo que está ahí para proteger al
+   * usuario de nosotros: dice lo que la norma pide y el sistema NO lleva.
+   */
+  fueraDeAlcance: z.string().min(30),
+  version: z.number().int().min(1),
+  obligaciones: z.array(esquemaObligacion).min(1),
+});
 
-export type NormaDeCatalogo = {
-  clave: string;
-  titulo: string;
-  emisor: string;
-  /** Giros de `lib/instalaciones.ts` a los que se propone. */
-  giros: string[];
-  /** Que busca la norma, en una linea. */
-  resumen: string;
-  /** Lo que esta norma pide y que este modulo NO cubre. Se muestra: es lo que evita la falsa seguridad. */
-  fueraDeAlcance: string;
-  version: number;
-  obligaciones: ObligacionDeCatalogo[];
-};
+export const esquemaPaquete = z.object({
+  contrato: z.literal(1),
+  version: z.number().int().min(1),
+  publicado: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  revisadoPor: z.object({ nombre: z.string(), fecha: z.string() }).nullable(),
+  normas: z.array(esquemaNorma).min(1),
+});
 
-const PLANTA = ["PLANTA"];
-const PLANTA_Y_MAS = ["PLANTA", "EDIFICIO", "BODEGA", "HOSPITAL", "HOTEL", "PLAZA", "ESCUELA", "DEPORTIVO", "RESTAURANTE"];
+const leido = esquemaPaquete.safeParse(paquete);
+if (!leido.success) {
+  // El mensaje dice DÓNDE, porque quien edite el JSON necesita encontrarlo.
+  const donde = leido.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(" | ");
+  throw new Error(`El catálogo normativo (catalogo-normativo/normas.json) no es válido — ${donde}`);
+}
+
+export type ObligacionDeCatalogo = z.infer<typeof esquemaObligacion>;
+export type NormaDeCatalogo = z.infer<typeof esquemaNorma>;
+
+/** La versión del CONTENIDO que trae esta copia del paquete. */
+export const VERSION_CATALOGO = leido.data.version;
+export const PUBLICADO_CATALOGO = leido.data.publicado;
 
 /**
- * Las ocho primeras: todas caen en mantenimiento.
- *
- * Se dejaron fuera a proposito las que compra otra area —ruido, iluminacion,
- * riesgo psicosocial, ergonomia—: son reales y son obligatorias, pero su
- * evidencia no sale del trabajo de mantenimiento, y prometerlas sin poder
- * respaldarlas es justo el error que este modulo no puede cometer.
+ * Quién revisó el contenido y cuándo. `null` significa BORRADOR: lo redactó
+ * alguien que no es especialista en seguridad e higiene, y mientras siga en
+ * null la pantalla tiene que decirlo (`CATALOGO_EN_BORRADOR`).
  */
-export const NORMAS: NormaDeCatalogo[] = [
-  {
-    clave: "NOM-002-STPS",
-    titulo: "Prevención y protección contra incendios",
-    emisor: "STPS",
-    giros: PLANTA_Y_MAS,
-    resumen: "Que el equipo contra incendio esté completo, accesible y en condiciones de usarse el día que haga falta.",
-    fueraDeAlcance:
-      "El plan de atención a emergencias, las brigadas, los simulacros y la capacitación del personal no se llevan desde aquí: aquí va la revisión del equipo y su evidencia.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "extintores",
-        titulo: "Revisión mensual de los extintores",
-        detalle:
-          "Revisar cada extintor una vez al mes: que esté en su lugar y accesible, con su señalización, sin obstrucciones, con la presión en el rango y con el sello y la etiqueta en regla.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 30,
-        evidencia: "El registro de la revisión de cada extintor, con su fecha y quién la hizo.",
-      },
-      {
-        clave: "recarga-extintores",
-        titulo: "Recarga y mantenimiento anual de extintores",
-        detalle: "El servicio anual de cada extintor, hecho por un proveedor, con su constancia.",
-        tipo: "DOCUMENTO",
-        evidencia: "La constancia del servicio, con su vencimiento.",
-      },
-      {
-        clave: "sistemas-fijos",
-        titulo: "Revisión de los sistemas fijos contra incendio",
-        detalle:
-          "Revisar los sistemas fijos —red de hidrantes, rociadores, bombas contra incendio, detección y alarma— conforme al programa.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 90,
-        evidencia: "El registro de cada revisión, con lo encontrado y lo corregido.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-004-STPS",
-    titulo: "Sistemas de protección y dispositivos de seguridad en maquinaria",
-    emisor: "STPS",
-    giros: PLANTA,
-    resumen: "Que la maquinaria tenga sus guardas y dispositivos de seguridad, y que se le dé mantenimiento con un programa.",
-    fueraDeAlcance:
-      "El estudio de riesgo por máquina lo elabora un especialista; aquí se conserva como documento y se programa su actualización.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "estudio-riesgo",
-        titulo: "Estudio del riesgo potencial de la maquinaria",
-        detalle: "El análisis del riesgo de cada máquina, que sustenta qué protecciones y dispositivos debe tener.",
-        tipo: "DOCUMENTO",
-        evidencia: "El estudio firmado, vigente, por máquina o por conjunto de máquinas.",
-      },
-      {
-        clave: "programa-mantenimiento",
-        titulo: "Programa de mantenimiento de la maquinaria",
-        detalle:
-          "El mantenimiento preventivo de la maquinaria, con su programa, ejecutado y registrado. Incluye las protecciones y los dispositivos de seguridad, no solo la parte productiva.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 180,
-        evidencia: "Las órdenes de trabajo cerradas, con lo hecho, quién lo hizo y cuándo.",
-      },
-      {
-        clave: "revision-protecciones",
-        titulo: "Revisión de protecciones y paros de emergencia",
-        detalle:
-          "Verificar que las guardas estén puestas y completas, y que los paros de emergencia, enclavamientos y sensores de seguridad respondan.",
-        tipo: "RECORRIDO",
-        cadaDias: 30,
-        evidencia: "El recorrido con sus puntos revisados y los hallazgos que se levantaron.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-006-STPS",
-    titulo: "Manejo y almacenamiento de materiales",
-    emisor: "STPS",
-    giros: ["PLANTA", "BODEGA", "PLAZA"],
-    resumen: "Que los montacargas y el equipo de izaje estén revisados y los opere gente capacitada.",
-    fueraDeAlcance: "El acomodo y la estiba de los materiales en almacén no se lleva desde aquí.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "revision-montacargas",
-        titulo: "Revisión del montacargas antes de cada turno",
-        detalle:
-          "La revisión que hace el operador antes de usarlo: niveles, frenos, dirección, claxon, luces, horquillas, llantas, fugas y batería.",
-        tipo: "DATO",
-        cadaDias: 1,
-        evidencia: "El registro por turno, con el equipo, el operador y lo que encontró.",
-      },
-      {
-        clave: "mantenimiento-izaje",
-        titulo: "Mantenimiento del equipo de izaje y transporte",
-        detalle: "El mantenimiento preventivo de montacargas, grúas, polipastos y eslingas, según su programa.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 90,
-        evidencia: "Las órdenes cerradas con su evidencia.",
-      },
-      {
-        clave: "capacitacion-operador",
-        titulo: "Capacitación del operador",
-        detalle: "Que quien opera el equipo esté capacitado y pueda demostrarlo con su constancia vigente.",
-        tipo: "CAPACITACION",
-        evidencia: "La constancia de cada operador, con su vencimiento.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-020-STPS",
-    titulo: "Recipientes sujetos a presión, criogénicos y generadores de vapor",
-    emisor: "STPS",
-    giros: ["PLANTA", "HOSPITAL", "HOTEL", "EDIFICIO"],
-    resumen: "Que cada recipiente a presión y cada caldera tenga su expediente, sus revisiones y su dictamen vigente.",
-    fueraDeAlcance:
-      "El dictamen lo emite una unidad de verificación acreditada; aquí se conserva, se vigila su vencimiento y se programan las revisiones.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "listado-equipos",
-        titulo: "Expediente de cada equipo",
-        detalle:
-          "Tener identificado cada recipiente y cada generador de vapor, con sus datos de placa, su categoría y su historial.",
-        tipo: "DOCUMENTO",
-        evidencia: "El expediente del equipo, con sus documentos.",
-      },
-      {
-        clave: "dictamen",
-        titulo: "Dictamen de la unidad de verificación",
-        detalle: "El dictamen vigente que emite la unidad de verificación acreditada para los equipos que lo requieren.",
-        tipo: "DOCUMENTO",
-        evidencia: "El dictamen, con su fecha de vencimiento.",
-      },
-      {
-        clave: "revision-periodica",
-        titulo: "Revisión y prueba periódica",
-        detalle:
-          "Las revisiones y pruebas que corresponden al equipo según su categoría: dispositivos de relevo de presión, instrumentos, estado del recipiente.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 365,
-        evidencia: "Las órdenes cerradas con los resultados de la prueba.",
-      },
-      {
-        clave: "operador-caldera",
-        titulo: "Personal capacitado para operar la caldera",
-        detalle: "Que quien opera el generador de vapor esté capacitado y lo pueda demostrar.",
-        tipo: "CAPACITACION",
-        evidencia: "La constancia del operador, vigente.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-029-STPS",
-    titulo: "Mantenimiento de las instalaciones eléctricas",
-    emisor: "STPS",
-    giros: PLANTA_Y_MAS,
-    resumen: "Que el trabajo eléctrico lo haga personal autorizado, con permiso y con un programa de mantenimiento.",
-    fueraDeAlcance: "El diseño de la instalación eléctrica y su memoria de cálculo no se llevan desde aquí.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "programa-electrico",
-        titulo: "Programa de mantenimiento de las instalaciones eléctricas",
-        detalle:
-          "El mantenimiento de subestación, tableros, canalizaciones y sistemas de tierra, conforme al programa: limpieza, apriete de conexiones y revisión de protecciones.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 365,
-        evidencia: "Las órdenes cerradas con lo hecho y lo encontrado.",
-      },
-      {
-        clave: "personal-autorizado",
-        titulo: "Personal autorizado para trabajo eléctrico",
-        detalle:
-          "El listado de quién está autorizado a hacer trabajo eléctrico, con su capacitación vigente.",
-        tipo: "CAPACITACION",
-        evidencia: "La constancia de cada persona autorizada.",
-      },
-      {
-        clave: "revision-tierras",
-        titulo: "Revisión del sistema de puesta a tierra",
-        detalle: "La medición de la resistencia del sistema de tierras y la revisión de sus conexiones.",
-        tipo: "DATO",
-        cadaDias: 365,
-        evidencia: "Las mediciones registradas, con su fecha y su valor.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-017-STPS",
-    titulo: "Equipo de protección personal",
-    emisor: "STPS",
-    giros: PLANTA_Y_MAS,
-    resumen: "Que se entregue el equipo de protección que cada puesto necesita, y que quede constancia de la entrega.",
-    fueraDeAlcance:
-      "El análisis de riesgos por puesto que determina QUÉ equipo corresponde a cada actividad lo hace seguridad e higiene; aquí se conserva y se registra la entrega.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "entrega-epp",
-        titulo: "Registro de entrega del equipo de protección",
-        detalle: "Qué se le entregó a cada persona, cuándo y de qué talla.",
-        tipo: "DATO",
-        evidencia: "El registro de entrega por persona.",
-      },
-      {
-        clave: "analisis-puesto",
-        titulo: "Determinación del equipo por puesto",
-        detalle: "El documento que dice qué equipo de protección corresponde a cada puesto y actividad.",
-        tipo: "DOCUMENTO",
-        evidencia: "El análisis vigente.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-001-STPS",
-    titulo: "Edificios, locales, instalaciones y áreas",
-    emisor: "STPS",
-    giros: PLANTA_Y_MAS,
-    resumen: "Que el inmueble y sus áreas estén en condiciones seguras: pisos, escaleras, barandales, rampas y salidas.",
-    fueraDeAlcance: "El dictamen estructural del inmueble no se lleva desde aquí.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "verificacion-areas",
-        titulo: "Verificación de las condiciones del inmueble",
-        detalle:
-          "Recorrer y revisar pisos, escaleras, rampas, barandales, techos, patios y salidas, y levantar lo que esté mal.",
-        tipo: "RECORRIDO",
-        cadaDias: 90,
-        evidencia: "El recorrido con sus hallazgos y su seguimiento.",
-      },
-      {
-        clave: "mantenimiento-inmueble",
-        titulo: "Mantenimiento de lo que se encuentre",
-        detalle: "Atender y dejar registro de las correcciones que salen de la verificación.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 180,
-        evidencia: "Las órdenes de trabajo derivadas, cerradas.",
-      },
-    ],
-  },
-  {
-    clave: "NOM-019-STPS",
-    titulo: "Comisión de Seguridad e Higiene",
-    emisor: "STPS",
-    giros: PLANTA_Y_MAS,
-    resumen: "Que exista la comisión, que recorra la instalación y que sus actas queden.",
-    fueraDeAlcance:
-      "La constitución de la comisión y sus actas formales son un trámite de la empresa; desde aquí se lleva el recorrido y el seguimiento de lo que encuentra.",
-    version: 1,
-    obligaciones: [
-      {
-        clave: "recorrido-comision",
-        titulo: "Recorrido de verificación de la comisión",
-        detalle:
-          "El recorrido que hace la comisión para detectar condiciones peligrosas, con lo que encuentra y a quién se le asigna.",
-        tipo: "RECORRIDO",
-        cadaDias: 90,
-        evidencia: "El recorrido registrado con sus hallazgos y su cierre.",
-      },
-      {
-        clave: "seguimiento-hallazgos",
-        titulo: "Atención de lo que encuentra la comisión",
-        detalle: "Que lo detectado se corrija y quede constancia de la corrección.",
-        tipo: "ACTIVIDAD",
-        cadaDias: 90,
-        evidencia: "Las órdenes o solicitudes derivadas, atendidas y cerradas.",
-      },
-    ],
-  },
-];
+export const REVISADO_POR = leido.data.revisadoPor;
+
+export const NORMAS: NormaDeCatalogo[] = leido.data.normas;
 
 export const NORMAS_POR_CLAVE: Record<string, NormaDeCatalogo> = Object.fromEntries(
   NORMAS.map((n) => [n.clave, n]),
@@ -356,8 +89,8 @@ export const normaDeCatalogo = (clave: string): NormaDeCatalogo | null => NORMAS
 export function normasParaGiro(giro: string | null | undefined): NormaDeCatalogo[] {
   if (!giro) return NORMAS;
   const suyas = NORMAS.filter((n) => n.giros.includes(giro));
-  // Un giro que no reconocemos ve todo el catalogo en vez de una lista vacia:
-  // es mejor que elija de mas a que concluya que no le aplica nada.
+  // Un giro que no reconocemos ve todo el catálogo en vez de una lista vacía:
+  // es mejor que elija de más a que concluya que no le aplica nada.
   return suyas.length ? suyas : NORMAS;
 }
 
