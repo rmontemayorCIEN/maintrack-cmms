@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { darDeAltaEmpresa } from "./alta-empresa";
 import { aplicarMovimiento } from "./almacen";
 import { altaDePlan } from "./alta-de-plan";
+import { huellaDeSeguridad } from "./seguridad-ot";
 import { registrarLectura } from "./medidores";
 import { ingestSensorReading } from "./predictive";
 import { generateScheduledWorkOrders } from "./scheduler";
@@ -276,6 +277,17 @@ type Plan = {
    * plan de verdad.
    */
   tareas: Array<{ t: string; tipo?: string; unit?: string; min?: number; max?: number; refs?: Array<[string, number]> }>;
+  /**
+   * Como se hace el trabajo y que cuidados tiene.
+   *
+   * No lo llevan todos los planes a proposito: una revision de bandas no
+   * necesita un procedimiento escrito, y llenar de texto lo que no lo pide
+   * enseña a saltarselo. Lo llevan los que de verdad tienen riesgo —equipo a
+   * presion, energia almacenada, agua caliente— que es donde el tecnico
+   * agradece leerlo y donde la confirmacion de haberlo leido significa algo.
+   */
+  procedimiento?: string;
+  seguridad?: string;
 };
 
 /**
@@ -293,6 +305,15 @@ function refaccionesDelPlan(p: Plan): Array<[string, number]> {
 
 const PLANES: Plan[] = [
   { clave: "lln-lub", nombre: "Lubricación y revisión de válvulas de la llenadora", activos: ["LLN-101"], tipo: "CALENDAR", cada: 7, horas: 1.5, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 6,
+    procedimiento:
+      "Trabajo en zona de contacto con producto: manos limpias, guantes nuevos y grasa grado alimenticio. Nada de grasa común «porque es la que había».\n\n"
+      + "Lubrique estrella y carrusel con el equipo detenido y bloqueado. Revise los empaques de las 24 válvulas uno por uno: uno vencido gotea y se ve como falla de llenado, no como fuga.\n\n"
+      + "Mida la presión de llenado y déjela entre 1.8 y 2.4 bar. Fuera de rango, ajuste y vuelva a medir.\n\n"
+      + "Termine con limpieza sanitaria y libere con calidad antes de devolver la línea.",
+    seguridad:
+      "Bloquee y etiquete el arrancador antes de meter las manos al carrusel: el giro puede arrancar por señal de la línea aunque el tablero local esté en manual.\n"
+      + "Cada quien pone su propio candado. Si entran dos, van dos candados.\n"
+      + "No retire las guardas fijas con la máquina energizada.",
     tareas: [{ t: "Lubricar estrella y carrusel con grasa grado alimenticio", refs: [["GRS-ALI", 1]] }, { t: "Revisar empaques de las 24 válvulas" }, { t: "Medir presión de llenado", tipo: "MEASUREMENT", unit: "bar", min: 1.8, max: 2.4 }, { t: "Limpieza sanitaria y liberación con calidad" }] },
   { clave: "tap", nombre: "Inspección mensual de la taponadora", activos: ["TAP-102"], tipo: "CALENDAR", cada: 30, horas: 2, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 25,
     tareas: [{ t: "Revisar desgaste de cabezales" }, { t: "Medir torque de tapado", tipo: "MEASUREMENT", unit: "N·m", min: 1.8, max: 2.6 }, { t: "Lubricar leva y guías", refs: [["GRS-ALI", 1]] }] },
@@ -301,10 +322,33 @@ const PLANES: Plan[] = [
   { clave: "trn", nombre: "Revisión de bandas y rodillos del transportador", activos: ["TRN-104"], tipo: "CALENDAR", cada: 30, horas: 1, paro: false, quien: "mecanico", prioridad: "MEDIUM", ultimaHaceDias: 34,
     tareas: [{ t: "Revisar tensión y eslabones de la banda" }, { t: "Engrasar rodillos y chumaceras", refs: [["GRS-ALI", 1]] }, { t: "Revisar rodillos y guías laterales" }] },
   { clave: "cmp-aceite", nombre: "Cambio de aceite y filtros del compresor (cada 2,000 h)", activos: ["CMP-201"], tipo: "METER", cada: 2000, horas: 3, paro: true, quien: "mecanico", prioridad: "HIGH", ultimaHaceDias: 0,
+    procedimiento:
+      "Coordine el paro con producción: sin compresor se quedan sin aire la llenadora y la paletizadora.\n\n"
+      + "Pare el equipo y déjelo templado, no frío ni caliente: alrededor de 40 °C el aceite escurre completo y no quema.\n\n"
+      + "Drene por el tapón de fondo del tanque separador, cambie filtro de aceite y elemento separador, y limpie el asiento antes de montar el nuevo. "
+      + "Apriete el filtro a mano más un cuarto de vuelta: apretado de más se deforma el sello y escurre.\n\n"
+      + "Llene al nivel de la mirilla con el equipo parado, arranque y verifique a los 10 minutos: el nivel baja al llenarse el circuito.\n\n"
+      + "Registre el horómetro al terminar. De ahí se cuentan las próximas 2,000 h.",
+    seguridad:
+      "Bloquee y etiquete (LOTO) el interruptor del compresor en el tablero y verifique ausencia de tensión antes de abrir nada.\n"
+      + "DESPRESURICE el tanque separador y confirme el manómetro en cero antes de aflojar el tapón de drenado: el aceite sale a presión aunque el compresor esté apagado, y sale caliente.\n"
+      + "No confíe en la purga automática para despresurizar; abra la válvula manual y escuche.\n"
+      + "Aceite caliente: guantes y careta. Recoja el derrame antes de moverse, el piso queda resbaloso.",
     tareas: [{ t: "Cambiar aceite", refs: [["ACE-CMP", 1]] }, { t: "Cambiar filtro de aceite", refs: [["FIL-ACE", 1]] }, { t: "Cambiar elemento separador aire-aceite", refs: [["FIL-SEP", 1]] }, { t: "Registrar horómetro" }] },
   { clave: "aire", nombre: "Revisión mensual de compresor y secador", activos: ["CMP-201", "SEC-202"], tipo: "CALENDAR", cada: 30, horas: 1, paro: false, quien: "mecanico", prioridad: "MEDIUM", ultimaHaceDias: 27,
     tareas: [{ t: "Purgar condensados" }, { t: "Cambiar filtro de aire", refs: [["FIL-AIR", 1]] }, { t: "Revisar fugas de aire en tuberías y conexiones" }, { t: "Revisar indicadores de presión y temperatura" }] },
   { clave: "cal", nombre: "Revisión mensual de la caldera", activos: ["CAL-203"], tipo: "CALENDAR", cada: 30, horas: 2, paro: false, quien: "electrico", prioridad: "HIGH", ultimaHaceDias: 32,
+    procedimiento:
+      "Avise a producción antes de purgar: la purga de fondo baja la presión y el vapor tarda en recuperarse.\n\n"
+      + "Purgue con la caldera a presión de trabajo y nivel normal, abriendo y cerrando rápido —purgas cortas y repetidas, no una larga—. "
+      + "Después purgue la columna de nivel y verifique que el flotador regresa solo: si se queda pegado, el corte por bajo nivel no va a actuar.\n\n"
+      + "Pruebe la válvula de seguridad levantando la palanca a presión de trabajo y suéltela; debe reasentar sin gotear. Si gotea, repórtelo: no la apriete.\n\n"
+      + "Revise la flama por la mirilla: azul y estable. Amarilla o con hollín es aire mal ajustado y se corrige, no se deja para la próxima.",
+    seguridad:
+      "Equipo a presión, con agua arriba de 100 °C. Careta, guantes de carnaza y mangas largas para purgar; nunca con la línea de descarga obstruida ni apuntando a un paso de gente.\n"
+      + "NO aísle ni puentee el corte por bajo nivel para «terminar más rápido»: es lo único que impide que la caldera trabaje en seco.\n"
+      + "Si va a intervenir el control de nivel, saque la caldera de servicio y espere a que baje la presión. Con presión no se abre nada.\n"
+      + "Cierre el gas antes de trabajar en el quemador y ventile antes de encender.",
     tareas: [{ t: "Purga de fondo y de columna de nivel" }, { t: "Probar válvula de seguridad" }, { t: "Medir presión de operación", tipo: "MEASUREMENT", unit: "kg/cm²", min: 7, max: 9 }, { t: "Revisar quemador y flama" }] },
   { clave: "chl", nombre: "Mantenimiento trimestral del chiller", activos: ["CHL-204"], tipo: "CALENDAR", cada: 90, horas: 4, paro: true, quien: "electrico", prioridad: "MEDIUM", ultimaHaceDias: 70,
     tareas: [{ t: "Limpiar condensadores" }, { t: "Cambiar cartuchos del filtro de agua", refs: [["FIL-AGU", 2]] }, { t: "Revisar presiones de alta y baja" }, { t: "Apretar conexiones eléctricas" }] },
@@ -506,6 +550,8 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
     const alta = await altaDePlan(orgId, u.supervision.id, {
       name: p.nombre, maintenanceType: "PREVENTIVE", triggerType: p.tipo, intervalDays: p.tipo === "CALENDAR" ? p.cada : null, intervalMeter: p.tipo === "METER" ? p.cada : null,
       leadTimeDays: p.tipo === "METER" ? 7 : 3, toleranceDays: 2, priority: p.prioridad, estimatedHours: p.horas, requiresShutdown: p.paro, active: true, assignedToId: u[p.quien].id,
+      // El programador copia esto a cada orden que nace del plan.
+      procedure: p.procedimiento ?? null, safetyNotes: p.seguridad ?? null,
       assetIds: p.activos.map((x) => activo[x].id), desde: p.tipo === "CALENDAR" ? dia(hace(c, p.ultimaHaceDias)) : null, desdeEsUltima: true,
       tasks: p.tareas.map((t) => ({
         title: t.t, taskType: t.tipo ?? "CHECK", unit: t.unit ?? null, minValue: t.min ?? null, maxValue: t.max ?? null, required: true,
@@ -614,8 +660,16 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
   }
 
   // Correctivos abiertos.
-  const correctivo = async (titulo: string, codigo: string, quien: ClavePersona | null, prioridad: string, horasAtras: number, venceEnDias: number) => prisma.workOrder.create({
+  const correctivo = async (
+    titulo: string, codigo: string, quien: ClavePersona | null, prioridad: string,
+    horasAtras: number, venceEnDias: number,
+    // Lo que hay que saber y cuidar. No todas lo llevan: una correctiva de
+    // diagnostico no necesita procedimiento escrito, y ponerlo en todas
+    // enseña a saltarselo.
+    con: { procedimiento?: string; seguridad?: string } = {},
+  ) => prisma.workOrder.create({
     data: { organizationId: orgId, number: await siguienteFolio(orgId, "ordenTrabajo"), title: titulo, maintenanceType: "CORRECTIVE", status: quien ? "ASSIGNED" : "OPEN", priority: prioridad,
+      procedure: con.procedimiento ?? null, safetyNotes: con.seguridad ?? null,
       assetId: activo[codigo].id, siteId: sitio.id, locationId: activo[codigo].locationId, assignedToId: quien ? u[quien].id : null, createdById: u.supervision.id,
       // La demo hereda el centro igual que el sistema: si no, el reporte de
       // contabilidad sale entero en «Sin centro de costo» y no enseña nada.
@@ -623,12 +677,51 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
       createdAt: new Date(ahora.getTime() - horasAtras * 3_600_000), dueDate: new Date(ahora.getTime() + venceEnDias * DIA), estimatedHours: 2,
       tasks: { create: [{ position: 0, title: "Localizar y corregir la falla; probar el equipo antes de entregarlo", maintenanceType: "CORRECTIVE" }] } },
   });
-  const ruido = await correctivo("Revisar ruido en el motorreductor del transportador", "TRN-104", "electrico", "MEDIUM", 26, 1);
+  const ruido = await correctivo("Revisar ruido en el motorreductor del transportador", "TRN-104", "electrico", "MEDIUM", 26, 1, {
+    procedimiento:
+      "Escuche primero con el equipo en marcha y la guarda puesta: identifique si el ruido viene del motor, del reductor o del acoplamiento antes de desarmar nada.\n\n"
+      + "Mida temperatura de chumaceras con el infrarrojo y compare los dos lados; una diferencia grande apunta a rodamiento.\n\n"
+      + "Con el equipo bloqueado, revise nivel y estado del aceite del reductor —si sale lechoso hay agua, si sale con brillo metálico hay desgaste—, la tensión de la cadena y la alineación.",
+    seguridad:
+      "Bloquee y etiquete (LOTO) el interruptor en el tablero y verifique ausencia de tensión antes de abrir la caja de conexiones o retirar la guarda.\n"
+      + "Las mediciones con el equipo en marcha se hacen CON la guarda puesta. Si para medir hay que quitarla, no se mide en marcha.\n"
+      + "Nada de ropa suelta ni guantes flojos cerca de la transmisión.",
+  });
   await mover2(ruido.id, "IN_PROGRESS", "electrico");
-  await correctivo("Alarma intermitente de nivel en el tanque de condensados", "CAL-203", null, "MEDIUM", 5, 2);
+  await correctivo("Alarma intermitente de nivel en el tanque de condensados", "CAL-203", null, "MEDIUM", 5, 2, {
+    procedimiento:
+      "Intermitente casi nunca es el transmisor: revise primero el flotador y la columna, que se ensucian y se pegan.\n\n"
+      + "Purgue la columna de nivel y compruebe que el flotador baja y sube solo. Después revise continuidad y aterrizamiento del transmisor; una señal que fluctúa con la bomba encendida es problema de tierra, no de nivel.",
+    seguridad:
+      "NO aísle la alarma «mientras se arregla». Esa alarma es la que avisa que el tanque se está quedando sin agua, y una caldera sin agua de reposición se queda seca en minutos.\n"
+      + "Si hay que sacarla de servicio para intervenirla, avise a producción y deje a alguien vigilando el nivel a la vista.\n"
+      + "Condensado caliente: guantes y careta al purgar la columna.",
+  });
   // Un trabajo ya terminado por el técnico que espera la revisión de supervisión.
-  const cilindro = await correctivo("Fuga de aire en el cilindro de la paletizadora", "PAL-106", "electrico", "MEDIUM", 30, 1);
+  const cilindro = await correctivo("Fuga de aire en el cilindro de la paletizadora", "PAL-106", "electrico", "MEDIUM", 30, 1, {
+    procedimiento:
+      "Localice la fuga con agua jabonosa y el circuito presurizado, antes de desconectar nada: una vez desarmado ya no se ve de dónde salía.\n\n"
+      + "Si es por el vástago, son los sellos; si es por las conexiones, casi siempre es el racor o la manguera mordida.\n\n"
+      + "Al armar, limpie el vástago y no use herramienta sobre el cromado: una raya vuelve a cortar el sello nuevo.",
+    seguridad:
+      "DESPRESURICE el circuito y purgue el acumulador antes de desconectar mangueras: un cilindro con aire retenido se mueve solo al aflojar una conexión, y mueve lo que tenga encima.\n"
+      + "Bloquee la válvula de corte de aire de la paletizadora y verifique el manómetro en cero.\n"
+      + "Asegure mecánicamente el brazo si queda en alto; no confíe en que se quede por su peso.",
+  });
   await mover2(cilindro.id, "IN_PROGRESS", "electrico");
+  /*
+   * El electrico confirmo haber leido la seguridad antes de meter mano, que
+   * es el orden real: se lee, se bloquea, se trabaja. Asi la demo enseña el
+   * chip en verde y no solo el ambar de las que nadie ha confirmado.
+   */
+  await prisma.workOrder.update({
+    where: { id: cilindro.id },
+    data: {
+      seguridadLeidaPorId: u.electrico.id,
+      seguridadLeidaEl: new Date(ahora.getTime() - 29 * 3_600_000),
+      seguridadLeidaHuella: huellaDeSeguridad({ procedure: cilindro.procedure, safetyNotes: cilindro.safetyNotes }),
+    },
+  });
   await prisma.workOrderLabor.create({ data: { workOrderId: cilindro.id, userId: u.electrico.id, hours: 1, rate: 230, cost: 230, notes: "Cambio de sellos del cilindro" } });
   await prisma.workOrderTask.updateMany({ where: { workOrderId: cilindro.id }, data: { done: true, completedById: u.electrico.id, completedAt: ahora } });
   await mover2(cilindro.id, "COMPLETED", "electrico", {
