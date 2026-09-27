@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PanelAtajos } from "./atajos";
 import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
-import { favoritosDe } from "@/lib/favoritos";
+import { favoritosDe, gruposParaAnclar } from "@/lib/favoritos";
 import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -197,6 +197,14 @@ export default async function SettingsPage({
     usuarioId: params.usuario, modulo: params.modulo, accion: params.accion,
   });
 
+  /** Lo que esta persona puede ver, en un solo lugar: se pasa igual a todo. */
+  const accesoDe = (u: typeof user, o: typeof org) => ({
+    esSuperAdmin: u.isSuperAdmin,
+    esDemo: o.esDemo,
+    registrosPropios: o.registrosPropios,
+    cumplimientoNormas: o.cumplimientoNormas,
+  });
+
   return (
     <>
       <PageHeader title="Configuracion" description={DESCRIPCIONES[activa]} />
@@ -205,8 +213,12 @@ export default async function SettingsPage({
       {activa === "atajos" ? (
         <PanelAtajos
           nombreDelMapa={nombreDelMapa(terminoConjunto(org))}
-          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo, registrosPropios: org.registrosPropios, cumplimientoNormas: org.cumplimientoNormas })}
-          iniciales={(await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })).map((i) => i.href)}
+          /* Los grupos traen tambien las tablas propias, con SU nombre: es como
+             las busca quien las usa. Y las mismas banderas van a las dos
+             llamadas —antes iban solo al menu, y entonces un acceso ya elegido
+             no aparecia marcado—. */
+          grupos={await gruposParaAnclar(user.organizationId, user.role, accesoDe(user, org))}
+          iniciales={(await favoritosDe(user.organizationId, user.id, user.role, accesoDe(user, org))).map((i) => i.href)}
         />
       ) : null}
 

@@ -1,5 +1,6 @@
 import { prisma } from "./db";
-import { pantallasDelMenu, puedeVerRuta, type ItemMenu } from "./pantallas";
+import { pantallasDelMenu, puedeVerRuta, menuDe, type GrupoMenu, type ItemMenu } from "./pantallas";
+import { puedeVerTabla } from "./registros-tipos";
 
 /**
  * Los accesos rápidos de cada persona: sus pantallas, arriba del menú.
@@ -34,8 +35,15 @@ import { pantallasDelMenu, puedeVerRuta, type ItemMenu } from "./pantallas";
  */
 export const MAXIMO_FAVORITOS = 8;
 
-/** Las pantallas que esta persona puede anclar, agrupadas como su menú. */
-export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean } = {}) {
+export type OpcionesDeAcceso = {
+  esSuperAdmin?: boolean;
+  esDemo?: boolean;
+  registrosPropios?: boolean;
+  cumplimientoNormas?: boolean;
+};
+
+/** Las pantallas FIJAS que esta persona puede anclar. */
+export function pantallasAnclables(rol: string | undefined, opciones: OpcionesDeAcceso = {}) {
   // El contrato se revisa TAMBIEN aqui: `puedeVerRuta` solo sabe de roles, y
   // sin esto «Lo que mas uso» ofrecia anclar una pantalla que la empresa no
   // contrato —y el ancla llevaba a «se contrata aparte»—.
@@ -44,6 +52,69 @@ export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: bo
       && (!i.requiereRegistros || opciones.registrosPropios)
       && (!i.requiereNormas || opciones.cumplimientoNormas),
   );
+}
+
+/**
+ * Las tablas propias que esta persona puede anclar, como items de menú.
+ *
+ * ── Por qué las tablas SÍ se anclan y el menú NO se vuelve dinámico
+ *
+ * Nadie busca «Registros propios»: el almacenista busca «Bitácora de diésel».
+ * Meter las tablas del cliente al menú de todos resolvería eso y rompería
+ * cuatro cosas de golpe, porque `lib/pantallas.ts` no solo pinta el menú —de
+ * ahí salen también los permisos por ruta, los destinos del comando de voz y
+ * las fichas de ayuda indexadas por ruta—.
+ *
+ * Un favorito no toca nada de eso: es personal, no cambia el menú de nadie, y
+ * la voz y la ayuda siguen hablando de «Registros propios», que es la pantalla
+ * que de verdad existe. El almacenista se pone su bitácora arriba y ya.
+ *
+ * Quién ve cada tabla lo decide la tabla (`rolesVer`), igual que en su propia
+ * pantalla: no se puede anclar lo que no se puede abrir.
+ */
+export async function tablasAnclables(
+  organizationId: string,
+  rol: string | undefined,
+  opciones: OpcionesDeAcceso = {},
+): Promise<ItemMenu[]> {
+  if (!opciones.registrosPropios) return [];
+  if (!puedeVerRuta(rol, "/registros", opciones)) return [];
+
+  const tablas = await prisma.tablaPropia.findMany({
+    where: { organizationId, activa: true },
+    select: { clave: true, nombre: true, rolesVer: true },
+    orderBy: [{ orden: "asc" }, { nombre: "asc" }],
+  });
+
+  return tablas
+    .filter((t) => puedeVerTabla(rol, t, { esSuperAdmin: opciones.esSuperAdmin }))
+    .map((t) => ({ href: `/registros/${t.clave}`, etiqueta: t.nombre, icono: "registros" }));
+}
+
+/** Todo lo que se puede anclar: las pantallas fijas más las tablas propias. */
+export async function anclables(
+  organizationId: string,
+  rol: string | undefined,
+  opciones: OpcionesDeAcceso = {},
+): Promise<ItemMenu[]> {
+  return [...pantallasAnclables(rol, opciones), ...(await tablasAnclables(organizationId, rol, opciones))];
+}
+
+/**
+ * Lo anclable, agrupado como se ofrece en Ajustes.
+ *
+ * Las tablas propias van en su propio grupo y con SU nombre —«Bitácora de
+ * diésel»—, que es como las busca quien las usa.
+ */
+export async function gruposParaAnclar(
+  organizationId: string,
+  rol: string | undefined,
+  opciones: OpcionesDeAcceso = {},
+): Promise<GrupoMenu[]> {
+  const grupos = menuDe(rol, opciones);
+  const tablas = await tablasAnclables(organizationId, rol, opciones);
+  if (!tablas.length) return grupos;
+  return [...grupos, { seccion: "Sus tablas", clave: "tablas-propias", items: tablas }];
 }
 
 /**
@@ -56,9 +127,10 @@ export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: bo
  * una preferencia que no pidió cambiar.
  */
 export async function favoritosDe(
+  organizationId: string,
   userId: string,
   rol: string | undefined,
-  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean } = {},
+  opciones: OpcionesDeAcceso = {},
 ): Promise<ItemMenu[]> {
   const guardados = await prisma.pantallaFavorita.findMany({
     where: { userId },
@@ -66,7 +138,12 @@ export async function favoritosDe(
     select: { ruta: true },
   });
   if (!guardados.length) return [];
-  const porRuta = new Map(anclables(rol, opciones).map((i) => [i.href, i]));
+  /*
+   * Se cruza con lo anclable de HOY, y eso vale también para las tablas: si la
+   * tabla se apagó o le cerraron el rol, su acceso rápido desaparece en vez de
+   * llevarlo a un «Sin permiso». El registro se queda por si vuelve.
+   */
+  const porRuta = new Map((await anclables(organizationId, rol, opciones)).map((i) => [i.href, i]));
   return guardados.flatMap((f) => {
     const item = porRuta.get(f.ruta);
     return item ? [item] : [];
@@ -87,9 +164,11 @@ export async function guardarFavoritos(params: {
   userId: string;
   rutas: string[];
   rol: string | undefined;
-  opciones?: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean };
+  opciones?: OpcionesDeAcceso;
 }) {
-  const permitidas = new Set(anclables(params.rol, params.opciones ?? {}).map((i) => i.href));
+  const permitidas = new Set(
+    (await anclables(params.organizationId, params.rol, params.opciones ?? {})).map((i) => i.href),
+  );
   // Sin repetidas y solo lo que puede ver: un `href` inventado no entra.
   const limpias = [...new Set(params.rutas)].filter((r) => permitidas.has(r));
   if (limpias.length > MAXIMO_FAVORITOS) {

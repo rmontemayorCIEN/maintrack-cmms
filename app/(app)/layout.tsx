@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ruta = (await headers()).get("x-ruta") ?? "/dashboard";
   const esDemo = user.organization.esDemo;
   // Los accesos rápidos de esta persona: ya cruzados con lo que su rol ve hoy.
-  const favoritos = await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo, registrosPropios: user.organization.registrosPropios, cumplimientoNormas: user.organization.cumplimientoNormas });
+  const favoritos = await favoritosDe(user.organizationId, user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo, registrosPropios: user.organization.registrosPropios, cumplimientoNormas: user.organization.cumplimientoNormas });
   const permitida = puedeVerRuta(user.role, ruta, { esSuperAdmin: user.isSuperAdmin, esDemo });
   // Mientras se restaura la demo no se muestra ninguna pantalla a medio sembrar.
   const restaurando = esDemo && demoEnRestauracion(user.organization);
