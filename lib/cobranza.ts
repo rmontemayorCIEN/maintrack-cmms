@@ -42,7 +42,8 @@ export type ResultadoEmision = {
 /**
  * Emite los cargos de un periodo.
  *
- * Se omiten: la empresa demostrativa (nunca genera cargos), las cuentas
+ * Se omiten: la empresa demostrativa y las cuentas internas del operador
+ * (nunca generan cargos), las cuentas
  * canceladas, las que siguen en prueba vigente, y las que ya tienen cargo de
  * ese periodo. Es idempotente:
  * volver a ejecutarlo no duplica nada.
@@ -55,7 +56,7 @@ export async function emitirCargosDelPeriodo(
     where: opciones.organizationId ? { id: opciones.organizationId } : {},
     select: {
       id: true, name: true, plan: true, status: true, currency: true, trialEndsAt: true,
-      iaComplemento: true, esDemo: true,
+      iaComplemento: true, esDemo: true, cuentaInterna: true,
       invoices: { where: { periodo }, select: { id: true } },
     },
   });
@@ -72,6 +73,10 @@ export async function emitirCargosDelPeriodo(
     }
     if (org.esDemo) {
       resultado.omitidos.push({ empresa: org.name, motivo: "Empresa demostrativa: no genera cargos" });
+      continue;
+    }
+    if (org.cuentaInterna) {
+      resultado.omitidos.push({ empresa: org.name, motivo: "Cuenta interna del operador: no genera cargos" });
       continue;
     }
     if (org.status === "CANCELLED") {

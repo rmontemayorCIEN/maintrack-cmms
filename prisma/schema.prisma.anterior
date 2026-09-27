@@ -245,6 +245,16 @@ model Organization {
   /// credenciales, con su recorrido y su ayuda de demostracion, y
   /// restaurable a su estado inicial (lib/demo-comercial.ts).
   esDemo               Boolean   @default(false)
+  /// Cuenta de uso interno del operador: una empresa que se usa para
+  /// demostrar o probar pero que NO es la demostrativa restaurable.
+  ///
+  /// Existe porque `esDemo` no es solo una etiqueta: ofrece «Restaurar», que
+  /// borra todo y vuelve a sembrar la demo estandar. Una cuenta interna con
+  /// datos propios que valen no puede quedar expuesta a eso. Con esta bandera
+  /// solo sale de las cifras del negocio (servidor MCP) y de la cobranza; la
+  /// cuenta funciona igual que cualquier otra. Se pone por linea de comandos:
+  /// scripts/cuenta-interna.ts.
+  cuentaInterna        Boolean   @default(false)
   /// Mientras se restaura, la demo no atiende peticiones (lib/api.ts).
   demoRestaurandoDesde DateTime?
   demoRestauradaAt     DateTime?

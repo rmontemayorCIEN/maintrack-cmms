@@ -26,6 +26,7 @@ import { lectura, EscrituraRechazada } from "../lib/mcp/lectura";
 import { destinoSeguro } from "../lib/mcp/destino";
 import { buscarEnAyuda } from "../lib/mcp/documentacion";
 import { nivelDeAdopcion } from "../lib/mcp/adopcion";
+import { emitirCargosDelPeriodo } from "../lib/cobranza";
 
 const PUERTO = 3237;
 const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO}`;
@@ -90,6 +91,8 @@ async function main() {
   const hash = await bcrypt.hash(CLAVE, 10);
   const propia = await prisma.organization.create({ data: { name: `Operador ${sello}`, slug: `op-${sello}`, timezone: "America/Monterrey" } });
   const cliente = await prisma.organization.create({ data: { name: `Cliente ${sello}`, slug: `cl-${sello}`, status: "TRIAL" } });
+  // Una cuenta interna del operador: activa y pagando en apariencia, pero no es cliente.
+  const interna = await prisma.organization.create({ data: { name: `Interna ${sello}`, slug: `in-${sello}`, status: "ACTIVE", cuentaInterna: true } });
   const operador = await prisma.user.create({ data: { organizationId: propia.id, email: `op-${sello}@prueba.mx`, name: "Operador", role: "OWNER", passwordHash: hash, isSuperAdmin: true } });
   const dueno = await prisma.user.create({ data: { organizationId: cliente.id, email: `dueno-${sello}@prueba.mx`, name: "Dueño", role: "OWNER", passwordHash: hash } });
   // Uso de IA con las tres unidades que conviven en la tabla.
@@ -99,7 +102,12 @@ async function main() {
     { organizationId: cliente.id, userId: dueno.id, funcion: "DICTADO", modelo: "speech-v2", inputTokens: 45, costoUsd: 0.012, periodo: "2026-09", ok: false },
   ] });
   await prisma.auditLog.create({ data: { organizationId: cliente.id, userId: dueno.id, entity: "WorkOrder", entityId: "x", action: "CREATED" } });
-  const nuestras = [propia.id, cliente.id];
+  const nuestras = [propia.id, cliente.id, interna.id];
+
+  console.log("\nCuenta interna\n");
+  const cobro = await emitirCargosDelPeriodo("2026-09", { organizationId: interna.id });
+  revisar("la cobranza no le genera cargo a una cuenta interna", cobro.emitidos === 0 && cobro.omitidos.some((o) => o.motivo.includes("Cuenta interna")), cobro);
+  revisar("…y no quedó ninguna nota de cobro", (await prisma.invoice.count({ where: { organizationId: interna.id } })) === 0);
   const clientesCreados: string[] = [];
 
   let servidor: ChildProcess | null = null;
@@ -213,6 +221,11 @@ async function main() {
     revisar("listar_clientes incluye al cliente de la prueba", !!fila, clientes.texto.slice(0, 300));
     revisar("…con IA en uso, estado de prueba y nivel EN_ARRANQUE", !!fila && (fila.modulosEnUso as string[]).includes("Funciones de IA") && fila.estado === "TRIAL" && fila.nivelAdopcion === "EN_ARRANQUE", fila);
     revisar("…y sin correos ni nombres de personas", !clientes.texto.includes(dueno.email) && !clientes.texto.includes("Dueño"));
+    revisar("la cuenta interna no sale en la lista de clientes", !(clientes.datos.clientes as Array<Record<string, unknown>>).some((c) => c.organizacion_id === interna.id));
+    const conInternas = await llamar("listar_clientes", { limite: 20, incluir_demo: true, orden: "alta" });
+    const filaInterna = (conInternas.datos.clientes as Array<Record<string, unknown>>).find((c) => c.organizacion_id === interna.id);
+    revisar("…pero sí si se pide, marcada como interna", filaInterna?.esCuentaInterna === true, filaInterna);
+    revisar("el resumen cuenta las internas excluidas", ((resumen.datos.organizaciones as { cuentasInternasExcluidas?: number })?.cuentasInternasExcluidas ?? 0) >= 1, resumen.datos.organizaciones);
     const detalle = await llamar("detalle_cliente", { organizacion_id: cliente.id });
     ejemplos.detalle_cliente = detalle.datos;
     revisar("detalle_cliente", !detalle.res?.isError && (detalle.datos.tendencia as { semanas?: unknown[] })?.semanas?.length === 12, detalle.texto.slice(0, 300));
@@ -259,7 +272,7 @@ async function main() {
 
     console.log("\nBitácora\n");
     const bitacora = await prisma.auditLog.findMany({ where: { userId: operador.id, action: "MCP_ACCESS" }, orderBy: { createdAt: "asc" } });
-    const llamadasHechas = 5 + casos.length + 1;
+    const llamadasHechas = 6 + casos.length + 1;
     revisar(`cada llamada a herramienta dejó su renglón (${llamadasHechas})`, bitacora.length === llamadasHechas, bitacora.length);
     const uno = bitacora.find((x) => x.entityId === "consumo_ia");
     const cambios = JSON.parse(uno?.changes ?? "{}");

@@ -79,6 +79,30 @@ Requiere un plan de claude.ai que admita conectores personalizados.
 - **Cabeceras de seguridad.** Las de `next.config.ts` aplican igual a todas
   las rutas nuevas; la prueba lo verifica sobre `/api/mcp`.
 
+## Qué cuenta como cliente
+
+Las cifras de negocio (`resumen_plataforma`, `listar_clientes`) dejan fuera dos
+clases de empresa:
+
+- **La demostrativa** (`esDemo`): la que se restaura y se vuelve a sembrar.
+- **Las cuentas internas del operador** (`cuentaInterna`): empresas que usted
+  usa para demostrar o probar pero que tienen datos propios que valen. No
+  ofrecen «Restaurar» y funcionan igual que cualquier otra; solo salen de las
+  cifras y de la cobranza.
+
+`listar_clientes` con `incluir_demo: true` las muestra, marcadas con
+`esDemostrativa` o `esCuentaInterna`. `consumo_ia` siempre las incluye,
+marcadas, porque su consumo de IA se paga igual.
+
+La bandera de cuenta interna se pone por línea de comandos, nunca desde una
+pantalla:
+
+```bash
+npx tsx scripts/cuenta-interna.ts --listar
+./scripts/con-produccion.sh scripts/cuenta-interna.ts --org "<nombre exacto o id>"            # ensayo
+./scripts/con-produccion.sh scripts/cuenta-interna.ts --org "<nombre exacto o id>" --aplicar
+```
+
 ## Herramientas y ejemplo de respuesta
 
 Los ejemplos salen de la base de **desarrollo** (por eso las cifras de
@@ -132,7 +156,7 @@ Parámetros opcionales: `desde`, `hasta` (AAAA-MM-DD; por omisión, los últimos
 ### listar_clientes
 
 Parámetros: `estado` (ACTIVE, TRIAL, SUSPENDED, CANCELLED), `incluir_demo`
-(falso), `orden` (ultima_actividad, alta, nombre), `limite` (1–200, 50).
+(falso; incluye demostrativa y cuentas internas), `orden` (ultima_actividad, alta, nombre), `limite` (1–200, 50).
 
 ```json
 {

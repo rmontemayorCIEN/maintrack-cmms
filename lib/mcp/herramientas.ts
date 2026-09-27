@@ -71,6 +71,18 @@ export function rango(desde: string | undefined, hasta: string | undefined, ctx:
 export class ErrorDeHerramienta extends Error {}
 
 const fecha = (f: Date | null | undefined) => (f ? f.toISOString() : null);
+
+/**
+ * Lo que NO es un cliente: la demostrativa y las cuentas internas del
+ * operador (Organization.cuentaInterna). Un solo criterio para las cinco
+ * herramientas; si cada una lo decidiera, alguna se quedaria contando la demo.
+ */
+const noEsCliente = (o: { esDemo: boolean; cuentaInterna: boolean }) => o.esDemo || o.cuentaInterna;
+const SOLO_CLIENTES = { esDemo: false, cuentaInterna: false };
+const marcas = (o: { esDemo: boolean; cuentaInterna: boolean }) => ({
+  ...(o.esDemo ? { esDemostrativa: true } : {}),
+  ...(o.cuentaInterna ? { esCuentaInterna: true } : {}),
+});
 const redondear = (n: number, dec = 4) => Math.round(n * 10 ** dec) / 10 ** dec;
 
 async function idsDeOperadores(db: ClienteLectura) {
@@ -123,8 +135,8 @@ const resumenEntrada = z.object({
 async function resumenPlataforma(p: z.infer<typeof resumenEntrada>, ctx: Contexto) {
   const { db } = ctx;
   const periodo = rango(p.desde, p.hasta, ctx);
-  const orgs = await db.organization.findMany({ select: { id: true, status: true, esDemo: true, createdAt: true } });
-  const clientes = orgs.filter((o) => !o.esDemo);
+  const orgs = await db.organization.findMany({ select: { id: true, status: true, esDemo: true, cuentaInterna: true, createdAt: true } });
+  const clientes = orgs.filter((o) => !noEsCliente(o));
   const ids = clientes.map((o) => o.id);
   const operadores = await idsDeOperadores(db);
 
@@ -154,7 +166,8 @@ async function resumenPlataforma(p: z.infer<typeof resumenEntrada>, ctx: Context
       porEstado,
       nuevasEsteMes: clientes.filter((o) => o.createdAt >= inicioMes).length,
       mes: `${hoy.anio}-${String(hoy.mes).padStart(2, "0")}`,
-      empresasDemostrativasExcluidas: orgs.length - clientes.length,
+      empresasDemostrativasExcluidas: orgs.filter((o) => o.esDemo).length,
+      cuentasInternasExcluidas: orgs.filter((o) => o.cuentaInterna && !o.esDemo).length,
     },
     usuariosActivos: {
       ultimos7Dias: await activos(7),
@@ -168,7 +181,7 @@ async function resumenPlataforma(p: z.infer<typeof resumenEntrada>, ctx: Context
     },
     criterios: {
       activas: "Estado ACTIVE (pagando) o TRIAL (en prueba). No incluye SUSPENDED ni CANCELLED.",
-      demostrativas: "La empresa demostrativa no entra en ninguna cifra de este resumen.",
+      demostrativas: "La empresa demostrativa y las cuentas internas del operador no entran en ninguna cifra de este resumen.",
     },
     loQueNoSeVe: [
       "Quien solo consulta pantallas con una sesión abierta de días anteriores no deja huella y no cuenta como activo.",
@@ -179,7 +192,7 @@ async function resumenPlataforma(p: z.infer<typeof resumenEntrada>, ctx: Context
 
 const listarEntrada = z.object({
   estado: z.enum(["ACTIVE", "TRIAL", "SUSPENDED", "CANCELLED"]).optional().describe("Filtrar por estado comercial."),
-  incluir_demo: z.boolean().default(false).describe("Incluir la empresa demostrativa."),
+  incluir_demo: z.boolean().default(false).describe("Incluir la empresa demostrativa y las cuentas internas del operador."),
   orden: z.enum(["ultima_actividad", "alta", "nombre"]).default("ultima_actividad"),
   limite: z.number().int().min(1).max(200).default(50).describe("Máximo de empresas (1 a 200)."),
 }).strict();
@@ -187,9 +200,9 @@ const listarEntrada = z.object({
 async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
   const { db } = ctx;
   const orgs = await db.organization.findMany({
-    where: { ...(p.estado ? { status: p.estado } : {}), ...(p.incluir_demo ? {} : { esDemo: false }) },
+    where: { ...(p.estado ? { status: p.estado } : {}), ...(p.incluir_demo ? {} : SOLO_CLIENTES) },
     select: {
-      id: true, name: true, plan: true, status: true, esDemo: true, createdAt: true, trialEndsAt: true, operandoDesde: true,
+      id: true, name: true, plan: true, status: true, esDemo: true, cuentaInterna: true, createdAt: true, trialEndsAt: true, operandoDesde: true,
       iaComplemento: true, registrosPropios: true, cumplimientoNormas: true,
       _count: { select: { users: { where: { active: true, isSuperAdmin: false } } } },
     },
@@ -235,7 +248,7 @@ async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
       estado: o.status,
       ...(o.status === "TRIAL" ? { pruebaVence: fecha(o.trialEndsAt) } : {}),
       operandoDesde: fecha(o.operandoDesde),
-      ...(o.esDemo ? { esDemostrativa: true } : {}),
+      ...marcas(o),
       ultimaActividad: fecha(ultima),
       usuarios: { activos: o._count.users, conActividad30Dias: activas30.get(o.id)?.size ?? 0 },
       modulosEnUso: enUso,
@@ -281,7 +294,7 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
   const o = await db.organization.findUnique({
     where: { id: p.organizacion_id },
     select: {
-      id: true, name: true, plan: true, status: true, esDemo: true, createdAt: true, trialEndsAt: true,
+      id: true, name: true, plan: true, status: true, esDemo: true, cuentaInterna: true, createdAt: true, trialEndsAt: true,
       operandoDesde: true, industry: true, tipoInstalacion: true,
       iaComplemento: true, registrosPropios: true, cumplimientoNormas: true,
     },
@@ -356,7 +369,7 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
     complementos: [o.iaComplemento && "IA Avanzada", o.registrosPropios && "Registros propios", o.cumplimientoNormas && "Cumplimiento normativo"].filter(Boolean),
     estado: o.status,
     ...(o.status === "TRIAL" ? { pruebaVence: fecha(o.trialEndsAt) } : {}),
-    ...(o.esDemo ? { esDemostrativa: true } : {}),
+    ...marcas(o),
     fechaAlta: fecha(o.createdAt),
     operandoDesde: fecha(o.operandoDesde),
     usuariosActivosPorRol: Object.fromEntries(usuariosPorRol.map((u) => [u.role, u._count._all])),
@@ -426,7 +439,7 @@ async function consumoIa(p: z.infer<typeof consumoEntrada>, ctx: Contexto) {
     by: ["organizationId", "funcion"], where: { ...where, ok: false }, _count: { _all: true },
   });
   const nombres = new Map(
-    (await db.organization.findMany({ select: { id: true, name: true, esDemo: true } }))
+    (await db.organization.findMany({ select: { id: true, name: true, esDemo: true, cuentaInterna: true } }))
       .map((o) => [o.id, o]),
   );
   const fallas = new Map(fallidas.map((f) => [`${f.organizationId}|${f.funcion}`, f._count._all]));
@@ -466,7 +479,7 @@ async function consumoIa(p: z.infer<typeof consumoEntrada>, ctx: Contexto) {
     return {
       organizacion_id: id,
       nombre: nombres.get(id)?.name ?? "(empresa eliminada)",
-      ...(nombres.get(id)?.esDemo ? { esDemostrativa: true } : {}),
+      ...(nombres.get(id) ? marcas(nombres.get(id)!) : {}),
       costoUsd: redondear(funciones.reduce((s, x) => s + x.costoUsd, 0)),
       tokens: funciones.reduce((s, x) => s + tokensDe(x.tokens), 0),
       llamadas: funciones.reduce((s, x) => s + x.llamadas, 0),
@@ -504,6 +517,7 @@ async function consumoIa(p: z.infer<typeof consumoEntrada>, ctx: Contexto) {
     loQueNoSeVe: [
       "Las llamadas fallidas también cuestan y están incluidas en el costo.",
       "El consumo del operador trabajando dentro de una empresa cliente se registra a nombre de esa empresa.",
+      "La demostrativa y las cuentas internas SÍ se incluyen aquí, marcadas: su consumo de IA se paga igual.",
     ],
   };
 }
@@ -536,7 +550,7 @@ export const HERRAMIENTAS = [
   definir({
     nombre: "resumen_plataforma",
     titulo: "Resumen de la plataforma",
-    descripcion: "Cifras generales del negocio: organizaciones activas por estado, organizaciones nuevas del mes, personas activas en 7 y 30 días y órdenes de trabajo creadas en el periodo. Sin la empresa demostrativa.",
+    descripcion: "Cifras generales del negocio: organizaciones activas por estado, organizaciones nuevas del mes, personas activas en 7 y 30 días y órdenes de trabajo creadas en el periodo. Sin la empresa demostrativa ni las cuentas internas del operador.",
     entrada: resumenEntrada,
     ejecutar: resumenPlataforma,
   }),
