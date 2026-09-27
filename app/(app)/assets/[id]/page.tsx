@@ -2,6 +2,7 @@ import { zonaDeLaEmpresa } from "@/lib/indicadores";
 import { Compromisos } from "@/components/compromisos";
 import { Comentarios } from "@/components/comentarios";
 import { Vigencias } from "@/components/vigencias";
+import { RegistrosReferidos } from "@/components/registros-referidos";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
@@ -608,6 +609,18 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           ancla="assetId" anclaId={asset.id} zona={user.organization.timezone}
           puedeEscribir={can(user.role, "vigencia:write")}
           tiposSugeridos={["GARANTIA", "POLIZA_SEGURO", "CALIBRACION", "PERMISO", "CONTRATO_SERVICIO", "CERTIFICADO", "OTRO"]}
+        />
+      </div>
+
+      {/* Lo que la empresa lleva de este equipo en sus propias tablas: el
+          diésel que se le carga, sus análisis de agua, sus contratos. Aparece
+          solo/si hay algo, y solo si contrató el módulo. */}
+      <div className="mt-4">
+        <RegistrosReferidos
+          orgId={user.organizationId} llave="asset" refId={asset.id}
+          rol={user.role} esSuperAdmin={user.isSuperAdmin}
+          contratado={user.organization.registrosPropios}
+          zona={user.organization.timezone}
         />
       </div>
 

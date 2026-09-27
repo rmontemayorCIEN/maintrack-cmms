@@ -228,7 +228,7 @@ async function main() {
   const DIA = 86_400_000;
   try {
     // ── Datos: una empresa exclusiva con algo en cada pantalla, y otra para el aislamiento.
-    const A = await prisma.organization.create({ data: { name: `${sello} Planta Norte`, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", diasHabiles: "1,2,3,4,5,6,7" } });
+    const A = await prisma.organization.create({ data: { name: `${sello} Planta Norte`, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", diasHabiles: "1,2,3,4,5,6,7", registrosPropios: true } });
     creadas.push(A.id);
     const B = await prisma.organization.create({ data: { name: `${sello} Otra empresa`, slug: `${sello}-b`, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey" } });
     creadas.push(B.id);
@@ -1501,6 +1501,134 @@ async function main() {
 
     // ═══════════════════════════════════════════ 50: consola y peticiones
     console.log("\n50. Consola y peticiones fallidas");
+    // ═══════════════════════════════════════════ 52: registros propios
+    console.log("\n52. Registros propios");
+    {
+      const { crearTabla, guardarRenglon } = await import("../lib/registros");
+      const alta = await crearTabla(A.id, {
+        nombre: "Bitácora de diésel",
+        descripcion: "Cada carga de diésel a un equipo, con litros e importe, para ver el rendimiento por equipo.",
+        campos: [
+          { etiqueta: "Equipo", tipo: "ACTIVO", requerido: true },
+          { etiqueta: "Fecha", tipo: "FECHA", requerido: true },
+          { etiqueta: "Litros", tipo: "NUMERO", requerido: true },
+          { etiqueta: "Importe", tipo: "DINERO" },
+          { etiqueta: "Turno", tipo: "LISTA", opciones: ["Matutino", "Vespertino", "Nocturno"] },
+        ],
+      }, u.ADMIN.id);
+      if (!alta.ok) {
+        revisar("52. la tabla de prueba se armó", false, alta.motivos);
+      } else {
+        for (let i = 0; i < 4; i++) {
+          await guardarRenglon(A.id, alta.dato.id, {
+            equipo: activos[i].id,
+            fecha: new Date(Date.now() - i * DIA).toISOString().slice(0, 10),
+            litros: String(100 + i * 10),
+            importe: String(2500 + i * 100),
+            turno: ["Matutino", "Vespertino", "Nocturno"][i % 3],
+          }, u.SUPERVISOR.id);
+        }
+
+        await sesion("SUPERVISOR");
+        await pantalla(1440, 900);
+        donde = "registros";
+        await t.ir(`${base}/registros`);
+        const lista = await medir();
+        const enLista = await t.evaluar<{ tarjeta: boolean; explica: boolean; cuantos: string }>(`(() => {
+          const txt = document.body.innerText;
+          return { tarjeta: txt.includes("Bitácora de diésel"), explica: txt.includes("rendimiento por equipo"), cuantos: (txt.match(/(\\d+) renglones/) || [])[1] ?? "" };
+        })()`);
+        revisar("52. el listado muestra la tabla con su explicación y cuánto tiene capturado",
+          !lista.desborde && !lista.sinPermiso && enLista.tarjeta && enLista.explica && enLista.cuantos === "4", { ...enLista, desborde: lista.desborde });
+        await captura("1440-supervisor-registros");
+
+        await t.ir(`${base}/registros/${alta.dato.clave}`);
+        const tabla = await medir();
+        const dentro = await t.evaluar<{ equipo: boolean; suma: boolean; captura: boolean; renglones: number }>(`(() => {
+          const txt = document.body.innerText;
+          return {
+            // La columna que apunta al equipo tiene que mostrar el equipo de
+            // verdad, no un identificador: es lo que distingue esto de un Excel.
+            equipo: /BOM-001 — Bomba/.test(txt),
+            suma: txt.toLowerCase().includes("litros (suma)") && /\\b460\\b/.test(txt),
+            captura: [...document.querySelectorAll("button")].some((b) => /Capturar/.test(b.textContent)),
+            renglones: document.querySelectorAll("table.data tbody tr").length,
+          };
+        })()`);
+        revisar("    la tabla resuelve el equipo, suma los litros y ofrece capturar",
+          !tabla.desborde && dentro.equipo && dentro.suma && dentro.captura && dentro.renglones === 4, { ...dentro, desborde: tabla.desborde });
+        await captura("1440-supervisor-registro-tabla");
+
+        // El formulario se arma solo con las columnas, y la del equipo tiene que
+        // traer buscador: un desplegable con doscientos equipos no se usa.
+        const form = await t.evaluar<{ campos: number; buscador: boolean; vacio: boolean }>(`(async () => {
+          [...document.querySelectorAll("button")].find((b) => /Capturar/.test(b.textContent)).click();
+          await new Promise((r) => setTimeout(r, 400));
+          const etiquetas = [...document.querySelectorAll("label")].map((l) => l.textContent.trim());
+          const combo = document.querySelector('[role="combobox"], [aria-haspopup="listbox"]');
+          return {
+            campos: etiquetas.filter((x) => /Equipo|Fecha|Litros|Importe|Turno/.test(x)).length,
+            buscador: !!combo,
+            // Ninguna columna arranca con algo elegido: una refacción
+            // preseleccionada en la orden movía inventario con un solo toque.
+            vacio: !document.body.innerText.includes("BOM-001 — Bomba centrífuga de alimentación de agua 1Fecha"),
+          };
+        })()`);
+        revisar("    el formulario sale de las columnas, con buscador en la del equipo y sin nada preseleccionado",
+          form.campos >= 5 && form.buscador && form.vacio, form);
+        await captura("1440-supervisor-registro-captura");
+
+        await sesion("ADMIN");
+        await t.ir(`${base}/registros/nueva`);
+        const armador = await medir();
+        const formatos = await t.evaluar<{ cuantos: number; contratos: boolean; blanco: boolean; porQue: boolean }>(`(() => {
+          const txt = document.body.innerText;
+          return {
+            cuantos: [...document.querySelectorAll("button")].filter((b) => /columnas$/m.test(b.textContent)).length,
+            contratos: txt.includes("Gestión de contratos"),
+            blanco: txt.includes("En blanco"),
+            porQue: txt.includes("Garantías y vigencias"),
+          };
+        })()`);
+        revisar("    el armador abre en los formatos ya hechos, con «en blanco» al final",
+          !armador.desborde && formatos.cuantos === 7 && formatos.contratos && formatos.blanco && formatos.porQue, formatos);
+        await captura("1440-admin-registros-armar");
+
+        // En el telefono: es donde se captura una bitacora, caminando.
+        await sesion("SUPERVISOR");
+        await pantalla(390, 844);
+        await t.ir(`${base}/registros/${alta.dato.clave}`);
+        const movil = await medir();
+        revisar("    en el teléfono la tabla no se desborda de lado",
+          !movil.desborde && !movil.fuera.length, { desborde: movil.desborde, fuera: movil.fuera });
+        await captura("390-supervisor-registro-tabla");
+
+        // El tecnico ve la tabla pero no una restringida a administracion.
+        const restringida = await crearTabla(A.id, {
+          nombre: "Contratos de servicio",
+          descripcion: "Los contratos con terceros y lo que se les paga al mes.",
+          permiso: "settings:write", rolesVer: ["OWNER", "ADMIN"],
+          campos: [{ etiqueta: "Objeto", tipo: "TEXTO", requerido: true }],
+        }, u.ADMIN.id);
+        if (restringida.ok) {
+          await sesion("TECHNICIAN");
+          await pantalla(1440, 900);
+          await t.ir(`${base}/registros`);
+          const delTecnico = await t.evaluar<string>(`document.body.innerText`);
+          revisar("    el técnico ve la bitácora y NO la tabla restringida a administración",
+            delTecnico.includes("Bitácora de diésel") && !delTecnico.includes("Contratos de servicio"),
+            { bitacora: delTecnico.includes("Bitácora de diésel"), restringida: delTecnico.includes("Contratos de servicio") });
+          await t.ir(`${base}/registros/${restringida.dato.clave}`);
+          const cerrada = await medir();
+          const textoCerrada = await t.evaluar<string>(`document.body.innerText`);
+          revisar("    y si escribe la dirección a mano, lee «Sin permiso» y NO su contenido",
+            textoCerrada.includes("no está disponible para su rol") && !textoCerrada.includes("Los contratos con terceros"),
+            { avisa: textoCerrada.includes("no está disponible para su rol"), filtra: !textoCerrada.includes("Los contratos con terceros") });
+          void cerrada;
+        }
+      }
+    }
+
     revisar("50. sin errores en la consola en todo el recorrido", errores.length === 0, errores.slice(0, 5));
     revisar("    y ninguna petición fallida (4xx o 5xx)", fallidas.length === 0, fallidas.slice(0, 8));
     console.log(`\n  Capturas en ${CAPTURAS}`);

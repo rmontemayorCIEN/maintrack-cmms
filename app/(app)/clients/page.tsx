@@ -39,7 +39,7 @@ export default async function ClientsPage() {
     select: {
       id: true, name: true, slug: true, plan: true, status: true,
       industry: true, tipoInstalacion: true, trialEndsAt: true, createdAt: true,
-      iaComplemento: true, iaExtra: true,
+      iaComplemento: true, iaExtra: true, registrosPropios: true,
       _count: { select: { users: true, assets: true, workOrders: true } },
     },
   });

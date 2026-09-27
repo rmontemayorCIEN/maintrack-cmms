@@ -80,6 +80,16 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   // («vigencia:write»).
   { ruta: "/vigencias", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS", "TECHNICIAN"] },
 
+  // Registros propios: las tablas que arma el cliente. La ruta la ve
+  // cualquiera con sesion porque QUIEN VE CADA TABLA lo decide la tabla misma
+  // (`rolesVer` en `lib/registros.ts`), no la ruta: una empresa puede tener una
+  // bitacora abierta a todos y un registro contable solo para administracion.
+  // Sin tablas visibles la pantalla sale vacia, que es lo correcto.
+  { ruta: "/registros", roles: TODOS },
+  // Armar o ajustar una tabla es definir esquema, o sea configuracion.
+  { ruta: "/registros/nueva", roles: ADMINISTRACION },
+  { ruta: "/registros/armar", roles: ADMINISTRACION },
+
   { ruta: "/paros", roles: ANALISIS },
   { ruta: "/reports", roles: ANALISIS },
   { ruta: "/indicadores", roles: ANALISIS },
@@ -141,7 +151,22 @@ export function veTodasLasSolicitudes(rol: string | undefined): boolean {
 
 // ─────────────────────────────────────────── Menú
 
-export type ItemMenu = { href: string; etiqueta: string; icono: string; porInstalacion?: boolean };
+export type ItemMenu = {
+  href: string;
+  etiqueta: string;
+  icono: string;
+  porInstalacion?: boolean;
+  /**
+   * Solo aparece si la empresa contrato «Registros propios».
+   *
+   * Esto es contrato, no permiso, y por eso NO vive en `REGLAS`: un cliente
+   * que no lo contrato y escribe la direccion a mano tiene que leer «esto se
+   * contrata aparte» y no «Sin permiso», que es un mensaje equivocado y manda
+   * a la persona a pedirle accesos a su administrador. La pantalla lo explica;
+   * el menu solo deja de ofrecerlo.
+   */
+  requiereRegistros?: boolean;
+};
 export type GrupoMenu = { seccion: string; clave: string; items: ItemMenu[] };
 
 /**
@@ -176,6 +201,7 @@ const MENU: GrupoMenu[] = [
       { href: "/backlog", etiqueta: "Trabajo pendiente", icono: "backlog" },
       // «Personal» y no «Equipo»: en el mismo menú, «equipos» son las máquinas.
       { href: "/equipo", etiqueta: "Personal", icono: "personal" },
+      { href: "/registros", etiqueta: "Registros propios", icono: "registros", requiereRegistros: true },
     ],
   },
   {
@@ -270,6 +296,7 @@ export function pantallasDelMenu(): ItemMenu[] {
  * sigue decidiendo `puedeVerRuta`, con la misma tabla de arriba.
  */
 const SUBPANTALLAS: ItemMenu[] = [
+  { href: "/registros/nueva", etiqueta: "Armar un registro propio", icono: "registros" },
   // Del dia a dia, aunque no esten en el menu.
   { href: "/search", etiqueta: "Búsqueda", icono: "buscar" },
   { href: "/notificaciones", etiqueta: "Avisos", icono: "avisos" },
@@ -330,9 +357,17 @@ export const SIN_VOZ: Record<string, string> = {
   // silencio, que es como se pierden—.
 };
 
-export function menuDe(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}): GrupoMenu[] {
+export function menuDe(
+  rol: string | undefined,
+  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean } = {},
+): GrupoMenu[] {
   const grupos = MENU
-    .map((g) => ({ ...g, items: g.items.filter((i) => puedeVerRuta(rol, i.href, opciones)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter(
+        (i) => puedeVerRuta(rol, i.href, opciones) && (!i.requiereRegistros || opciones.registrosPropios),
+      ),
+    }))
     .filter((g) => g.items.length);
   if (opciones.esDemo) {
     grupos.unshift({ seccion: "Demostración", clave: "demo", items: [{ href: "/demo", etiqueta: "Guía de la demostración", icono: "demo" }] });

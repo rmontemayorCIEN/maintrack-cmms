@@ -42,14 +42,18 @@ export function pantallasInventariadas(): GrupoInventariado[] {
   const ayuda = AYUDA as Record<string, { que: string; hacer: string[] } | undefined>;
   // El menú del propietario es el completo: de ahí salen todas, y para cada una
   // se calcula qué roles la ven.
-  return menuDe("OWNER").map((g) => ({
+  // `registrosPropios: true` a proposito: este documento dice QUE TIENE EL
+  // SISTEMA, no que contrato una cuenta. Sin esto, el modulo que se cobra
+  // aparte desaparecia del inventario —y de la pagina publica que sale de
+  // el— justamente por ser opcional.
+  return menuDe("OWNER", { registrosPropios: true }).map((g) => ({
     seccion: g.seccion,
     pantallas: g.items.map((i) => ({
       href: i.href,
       etiqueta: i.etiqueta,
       que: ayuda[i.href]?.que ?? "",
       hacer: ayuda[i.href]?.hacer ?? [],
-      roles: ROLES.filter((r) => menuDe(r).some((x) => x.items.some((y) => y.href === i.href))),
+      roles: ROLES.filter((r) => menuDe(r, { registrosPropios: true }).some((x) => x.items.some((y) => y.href === i.href))),
     })),
   })).filter((g) => g.pantallas.length);
 }
@@ -58,7 +62,7 @@ export function pantallasInventariadas(): GrupoInventariado[] {
 export function pantallasPorRol(): Array<{ rol: Rol; cuantas: number }> {
   return ROLES.map((rol) => ({
     rol,
-    cuantas: menuDe(rol).reduce((a, g) => a + g.items.length, 0),
+    cuantas: menuDe(rol, { registrosPropios: true }).reduce((a, g) => a + g.items.length, 0),
   }));
 }
 

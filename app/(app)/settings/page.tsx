@@ -205,7 +205,7 @@ export default async function SettingsPage({
       {activa === "atajos" ? (
         <PanelAtajos
           nombreDelMapa={nombreDelMapa(terminoConjunto(org))}
-          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })}
+          grupos={menuDe(user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo, registrosPropios: org.registrosPropios })}
           iniciales={(await favoritosDe(user.id, user.role, { esSuperAdmin: user.isSuperAdmin, esDemo: org.esDemo })).map((i) => i.href)}
         />
       ) : null}

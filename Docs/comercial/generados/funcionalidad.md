@@ -4,7 +4,7 @@
 
 > MainTrack es una plataforma de gestión y confiabilidad del mantenimiento que conecta activos, trabajo, inventario, condición y costos para anticipar fallas y mostrar dónde se está perdiendo capacidad productiva.
 
-**33 pantallas** en 8 grupos · **23 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
+**37 pantallas** en 8 grupos · **23 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
 
 Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capturado: tener la función y tenerla en marcha son cosas distintas.
 
@@ -21,6 +21,7 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 - **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro.
 - **Avisos:** En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega.
 - **Conversaciones y compromisos:** Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple.
+- **Registros propios:** Se contrata aparte. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo.
 - **Integración con su ERP:** API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas.
 
 ## Qué no es
@@ -45,6 +46,7 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 
 **Tablero** — Las órdenes por estado, para mover trabajo de una etapa a otra.
   - Arrastrar órdenes entre columnas para cambiar su estado
+  - Acotar el tablero a una familia de equipo, a equipos concretos, a un responsable o a un tipo de mantenimiento
 
 **Calendario** — Lo que está programado, lo que se proyecta y si de verdad cabe en los días que quedan.
   - Ver el mes, la semana con el trabajo de cada persona, o un solo día a detalle
@@ -92,7 +94,16 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Elegir qué tan adelante mirar: esta semana, este mes, los próximos 30 días
   - Asignar responsable, fecha y prioridad
 
+**Qué falta para cerrar** — El estado de cada orden ya trabajada, bloque por bloque, para saber cuáles se pueden cerrar sin abrirlas una por una.
+  - Ver de un golpe cuáles órdenes están listas para cerrar
+  - Tocar «Listas para cerrar» para dejar en la lista solo esas
+  - Leer qué le falta exactamente a cada una, en palabras
+  - Agrupar por responsable para ver qué trae cada quien sin cerrar
+  - Ordenar por lo que lleva más tiempo esperando validación
+
 **Trabajo pendiente** — Todo el trabajo que falta: órdenes abiertas y actividades que no se pudieron hacer, separadas por lo que les impide avanzar.
+  - Tocar un recuadro de arriba para ver solo esa categoría, y tocarlo otra vez para quitar el filtro
+  - Reagrupar por equipo, responsable, motivo u origen, cuando la pregunta no es «qué lo detiene» sino «de quién es» o «de qué máquina es»
   - Ver de un vistazo cuántas órdenes están en espera, vencidas, sin responsable, sin programar o a tiempo, y cuántas actividades no se realizaron
   - Leer por cada renglón su origen, activo, prioridad, horas estimadas, motivo, responsable, antigüedad y la próxima acción
   - Ver qué quedó pendiente en cada equipo y por qué
@@ -104,6 +115,13 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Comparar el tiempo estimado contra el realmente aplicado
   - Ver en qué equipos trabaja cada persona
   - Pedirle a la IA que revise cómo está trabajando el equipo
+
+**Registros propios** — Las tablas que su empresa arma para lo que lleva aparte porque ni su ERP ni MainTrack lo tienen: el diésel que se carga a cada equipo, el equipo de protección que se entrega a cada persona, el análisis del agua de la torre, la gestión administrativa de sus contratos. Lo que hoy vive en un Excel que solo una persona sabe abrir.
+  - Capturar en las tablas que su empresa armó
+  - Filtrar, agrupar, ordenar y exportar lo capturado
+  - Ver la suma de las columnas de cantidad e importe
+  - Armar una tabla nueva desde un formato ya hecho, o en blanco (administración)
+  - Agregar columnas a una tabla que ya tiene datos, sin perder nada
 
 ### Equipos y planes
 
@@ -159,6 +177,12 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Autorizar o rechazar con motivo
   - Anotar la orden de compra y recibir la mercancía
 
+**Qué hay que comprar** — Lo que se va a acabar antes de que alcance a llegar, para pedirlo a tiempo en vez de cuando ya falta.
+  - Ver qué urge, ordenado por lo que ya va tarde
+  - Cambiar el horizonte: 30, 90 o 180 días
+  - Abrir cualquier renglón para ver de dónde salió la cifra
+  - Desmarcar lo que no quiera y mandar el resto a una requisición de compra
+
 **Proveedores** — Quién surte las refacciones y quién presta los servicios externos, con lo que cada uno representa.
   - Dar de alta y editar proveedores con sus condiciones
   - Ver cuántas refacciones surte cada uno y cuántas están bajo mínimo
@@ -175,6 +199,12 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 **Indicadores** — Todos los indicadores con su definición y fórmula, y el detalle de cada uno: qué órdenes y paros cuentan, y los registros exactos que forman la cifra.
   - Cambiar el periodo
   - Abrir un indicador y cada orden que aporta a su cifra
+
+**Presupuestos** — Cuánto se puede gastar en cada centro de costo, contra lo que de verdad se lleva gastado.
+  - Capturar el presupuesto de cada centro, mes por mes
+  - Ver cuánto se lleva ejercido y cuánto queda disponible
+  - Cambiar de mes o ver el año completo
+  - Ver en qué se fue: mano de obra, refacciones, servicios y otros
 
 **Dónde para la planta** — Qué áreas detuvieron la producción, cuánto costó y si va mejorando.
   - Ver de un vistazo qué área concentra el daño
@@ -228,6 +258,7 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Elegir qué avisos le llegan y por dónde; y, si administra, cómo avisa la empresa: canales, horario, resúmenes, recordatorios y escalamiento
   - Crear credenciales de API y webhooks para otros sistemas, y revisar el historial de entregas
   - Poner a la mano las pantallas que usa a diario, hasta arriba de su menú
+  - Plegar la columna del menú con el botón de junto al logotipo, para ganar ancho en el tablero, el calendario o los reportes
   - Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información
 
 ### Ayuda
@@ -247,13 +278,13 @@ Nadie ve todo. El menú se arma según el rol, así que un solicitante entra a u
 
 | Rol | Pantallas |
 |---|---|
-| Propietario | 33 |
-| Administración | 33 |
-| Supervisión | 30 |
-| Técnico | 20 |
-| Compras | 9 |
-| Solicitante | 6 |
-| Consulta | 20 |
+| Propietario | 37 |
+| Administración | 37 |
+| Supervisión | 34 |
+| Técnico | 22 |
+| Compras | 11 |
+| Solicitante | 7 |
+| Consulta | 23 |
 
 Además, cada persona puede poner sus pantallas de diario hasta arriba de su menú, sin cambiarle el menú a nadie más.
 

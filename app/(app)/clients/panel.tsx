@@ -17,6 +17,7 @@ type Org = {
   id: string; name: string; slug: string; plan: string; status: string;
   industry: string | null; tipoInstalacion: string | null; trialEndsAt: string | null; createdAt: string;
   iaComplemento: boolean;
+  registrosPropios: boolean;
   /// Consumo de IA del mes en curso: operaciones y costo real en dolares.
   ia: { operaciones: number; incluidas: number; costoUsd: number } | null;
   /// Avance de puesta en marcha: predice que cuentas se van a caer.
@@ -101,7 +102,7 @@ export function PanelClientes({
     router.refresh();
   }
 
-  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "tipoInstalacion", valor: string | boolean) {
+  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "registrosPropios" | "tipoInstalacion", valor: string | boolean) {
     setOcupado(org.id);
     setError(null);
     const res = await fetch(`/api/admin/organizations/${org.id}`, {
@@ -300,7 +301,7 @@ export function PanelClientes({
                   <th>Plan</th>
                   <th title="Comercial: prueba, activa o suspendida. Lo maneja el operador.">Estado comercial</th>
                   <th title="Operativo: en configuración, lista para operar u operando. Sale de la puesta en marcha.">Puesta en marcha</th>
-                  <th>IA</th>
+                  <th title="Complementos que se cobran aparte: IA Avanzada y Registros propios.">Complementos</th>
                   <th className="text-right">Usuarios</th>
                   <th className="text-right">Activos</th>
                   <th className="text-right">OT</th>
@@ -387,6 +388,21 @@ export function PanelClientes({
                             {org.ia && org.ia.incluidas > 0
                               ? `${org.ia.operaciones}/${org.ia.incluidas}`
                               : org.iaComplemento ? "activo" : "—"}
+                          </span>
+                        </label>
+                        {/* «Registros propios» se cobra aparte igual que la IA,
+                            y esta casilla es lo UNICO que lo hace alcanzable:
+                            sin ella el modulo existe y nadie puede entrar. */}
+                        <label className="mt-1 flex cursor-pointer items-center gap-1.5" title="Registros propios: tablas que arma el cliente">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
+                            checked={org.registrosPropios}
+                            disabled={ocupado === org.id}
+                            onChange={(e2) => cambiar(org, "registrosPropios", e2.target.checked)}
+                          />
+                          <span className="text-[0.6875rem] text-slate-500">
+                            {org.registrosPropios ? "registros" : "—"}
                           </span>
                         </label>
                       </td>

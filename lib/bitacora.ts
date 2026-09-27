@@ -27,6 +27,7 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   // permiso de operacion son datos del equipo, y quien audita «que paso con
   // la caldera» los busca ahi.
   VIGENCIAS: { titulo: "Garantías y vigencias", entidades: ["Vigencia"] },
+  REGISTROS: { titulo: "Registros propios", entidades: ["TablaPropia", "CampoPropio", "RenglonPropio"] },
   AVISOS: { titulo: "Avisos", entidades: ["ConfigAvisos", "Notification", "EntregaAviso"] },
   INTEGRACION: { titulo: "Integración con otros sistemas", entidades: ["CredencialApi", "Webhook"] },
   INTELIGENCIA: { titulo: "Inteligencia artificial", entidades: ["AiReport"] },

@@ -13,6 +13,9 @@ const schema = z.object({
   iaComplemento: z.boolean().optional(),
   /// Operaciones de IA sueltas para el periodo en curso.
   iaExtra: z.coerce.number().int().min(0).max(10_000).optional(),
+  /// «Registros propios»: se activa cuando el cliente lo contrata. Es lo
+  /// unico que hace alcanzable el modulo, asi que vive donde se cobra.
+  registrosPropios: z.boolean().optional(),
 });
 
 /** Cambio de plan o suspension de una empresa cliente. */

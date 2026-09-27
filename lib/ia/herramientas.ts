@@ -7,6 +7,7 @@ import { AYUDA, CONTROLES_TABLA } from "../ayuda";
 import { agruparPorCodigo, fallasCodificadas, filtroDeFalla } from "@/lib/fallas";
 import { contiene } from "../busqueda-texto";
 import { verCostos, verCostosDeAlmacen } from "../pantallas";
+import { renglonesParaIa, resumenParaIa } from "../registros";
 
 /**
  * Herramientas de consulta para la IA.
@@ -121,6 +122,23 @@ export const HERRAMIENTAS = [
     },
   },
   {
+    // Las tablas que armo el cliente. Sin esto el constructor de registros
+    // propios dejaria muda a la consulta: una tabla inventada por el cliente no
+    // tiene semantica, y por eso cada tabla y cada columna llevan descripcion
+    // obligatoria. Esto es lo que la lee.
+    name: "registros_propios",
+    description:
+      "Las tablas que esta empresa armo para lo que lleva aparte de mantenimiento: bitacoras de combustible, entrega de equipo de proteccion, analisis de agua, gestion de contratos, y cualquier otra que ella haya definido. SIN el parametro «tabla» devuelve que tablas existen y que significa cada columna: uselo PRIMERO para saber si la pregunta se puede contestar con alguna. CON «tabla» devuelve sus renglones y las sumas de sus columnas numericas. Si la empresa no tiene tablas propias, devuelve la lista vacia y entonces la pregunta no se contesta por aqui.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        tabla: { type: "string", description: "La clave de la tabla, como la devuelve esta misma herramienta sin parametros. Omitala para ver el catalogo." },
+      },
+      required: [] as string[],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "fallas_frecuentes",
     description:
       "Que fallas y que causas raiz se repiten mas, con su conteo. Uselo para «por que se para tanto», «cual es mi problema principal».",
@@ -210,17 +228,37 @@ export async function ejecutarHerramienta(
   // entonces se depura todo.
   opciones: { rol: string | undefined },
 ): Promise<unknown> {
-  return depurarPorRol(nombre, await ejecutar(organizationId, nombre, entrada), opciones.rol);
+  return depurarPorRol(nombre, await ejecutar(organizationId, nombre, entrada, opciones.rol), opciones.rol);
 }
 
 async function ejecutar(
   organizationId: string,
   nombre: string,
   entrada: Record<string, unknown>,
+  /**
+   * El rol, para lo que se filtra ANTES de consultar y no al depurar la
+   * respuesta.
+   *
+   * `depurarPorRol` alcanza para quitar importes de una respuesta ya armada,
+   * pero no para decidir que una tabla propia entera no es de este rol: eso hay
+   * que saberlo al consultar. Sin esto, un tecnico obtendria por la IA la tabla
+   * que el sistema le esconde en el menu.
+   */
+  rol: string | undefined,
 ): Promise<unknown> {
   const dias = typeof entrada.dias === "number" ? Math.min(1095, Math.max(1, entrada.dias)) : undefined;
 
   switch (nombre) {
+    case "registros_propios": {
+      const clave = typeof entrada.tabla === "string" ? entrada.tabla.trim() : "";
+      if (!clave) {
+        const tablas = await resumenParaIa(organizationId, { rol });
+        return tablas.length
+          ? { tablas }
+          : { tablas: [], nota: "Esta empresa no tiene tablas propias, o ninguna está disponible para este rol." };
+      }
+      return renglonesParaIa(organizationId, clave, { rol });
+    }
     case "documentacion": {
       const ruta = typeof entrada.ruta === "string" ? entrada.ruta : null;
       if (!ruta || !AYUDA[ruta]) {

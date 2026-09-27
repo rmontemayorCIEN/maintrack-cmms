@@ -35,8 +35,13 @@ import { pantallasDelMenu, puedeVerRuta, type ItemMenu } from "./pantallas";
 export const MAXIMO_FAVORITOS = 8;
 
 /** Las pantallas que esta persona puede anclar, agrupadas como su menú. */
-export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {}) {
-  return pantallasDelMenu().filter((i) => puedeVerRuta(rol, i.href, opciones));
+export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean } = {}) {
+  // El contrato se revisa TAMBIEN aqui: `puedeVerRuta` solo sabe de roles, y
+  // sin esto «Lo que mas uso» ofrecia anclar una pantalla que la empresa no
+  // contrato —y el ancla llevaba a «se contrata aparte»—.
+  return pantallasDelMenu().filter(
+    (i) => puedeVerRuta(rol, i.href, opciones) && (!i.requiereRegistros || opciones.registrosPropios),
+  );
 }
 
 /**
@@ -51,7 +56,7 @@ export function anclables(rol: string | undefined, opciones: { esSuperAdmin?: bo
 export async function favoritosDe(
   userId: string,
   rol: string | undefined,
-  opciones: { esSuperAdmin?: boolean; esDemo?: boolean } = {},
+  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean } = {},
 ): Promise<ItemMenu[]> {
   const guardados = await prisma.pantallaFavorita.findMany({
     where: { userId },
@@ -80,7 +85,7 @@ export async function guardarFavoritos(params: {
   userId: string;
   rutas: string[];
   rol: string | undefined;
-  opciones?: { esSuperAdmin?: boolean; esDemo?: boolean };
+  opciones?: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean };
 }) {
   const permitidas = new Set(anclables(params.rol, params.opciones ?? {}).map((i) => i.href));
   // Sin repetidas y solo lo que puede ver: un `href` inventado no entra.

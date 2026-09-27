@@ -199,6 +199,11 @@ model Organization {
   iaComplemento      Boolean   @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
   iaExtra            Int       @default(0)
+  /// Si la empresa contrato «Registros propios»: armar sus propias tablas de
+  /// captura amarradas a sus datos. Se cobra aparte, igual que el complemento
+  /// de IA, y por eso es una bandera y no una funcion del plan: se vende a
+  /// quien la necesita sin obligarlo a subir de plan.
+  registrosPropios   Boolean   @default(false)
   /// Direccion del aviso de privacidad de la empresa, si tiene uno propio.
   /// Se enlaza desde el formulario publico del QR. Vacio: se enlaza el aviso
   /// del sistema, que explica que se hace con los datos de quien reporta.
@@ -260,6 +265,8 @@ model Organization {
   vigencias          Vigencia[]
   centrosDeCosto     CentroDeCosto[]
   presupuestos       Presupuesto[]
+  tablasPropias      TablaPropia[]
+  renglonesPropios   RenglonPropio[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
@@ -383,6 +390,8 @@ model User {
   attachments          Attachment[]
   vigencias            Vigencia[]              @relation("VigenciaDeUsuario")
   vigenciasCreadas     Vigencia[]              @relation("VigenciaAutor")
+  tablasPropiasCreadas TablaPropia[]           @relation("TablaPropiaAutor")
+  renglonesPropios     RenglonPropio[]         @relation("RenglonPropioAutor")
   favoritos            PantallaFavorita[]
   links                ReferenceLink[]
   planRequests         PlanRequest[]
@@ -3869,4 +3878,155 @@ model RondinHallazgo {
   @@index([organizationId])
   @@index([rondinId])
   @@index([organizationId, estado])
+}
+
+/// ─────────────────────────────────────── Registros propios
+///
+/// Lo que cada empresa lleva en Excel porque ni su ERP ni el CMMS lo tienen:
+/// la bitacora del diesel, la entrega de equipo de proteccion, el analisis del
+/// agua de la torre. No es mantenimiento —si lo fuera seria un modulo— pero se
+/// consulta junto al equipo y hoy vive en el archivo de una sola persona.
+///
+/// Las dos decisiones que sostienen esto, y por que:
+///
+/// 1. Los valores NO se guardan como JSON en el renglon, sino en columnas
+///    tipadas (`ValorPropio`). Un JSON se ve mas simple y convierte cualquier
+///    suma o filtro en un recorrido en memoria: con columnas tipadas la base
+///    ordena, filtra y suma como en cualquier otra tabla del sistema.
+///
+/// 2. La referencia a los datos de MainTrack es un `refId` de texto y NO ocho
+///    llaves foraneas. Con ocho FK habria integridad de base, pero tambien
+///    ocho columnas nulas por valor y una relacion inversa en ocho modelos, y
+///    la superficie no la paga el beneficio: los catalogos de este sistema no
+///    se borran, se desactivan (`Asset.active`). El costo real es que un id
+///    puede quedar huerfano si alguien borra de verdad, y por eso la pantalla
+///    NO muestra un guion en ese caso: dice «ya no existe». Un dato que
+///    desaparece sin decirlo es el defecto que mas caro ha salido aqui.
+model TablaPropia {
+  id             String  @id @default(cuid())
+  organizationId String
+  /// Para la direccion: /registros/bitacora-de-diesel. Unica por empresa.
+  clave          String
+  nombre         String
+  /// Para que es esta tabla, en una linea. OBLIGATORIA, y no es cortesia: es
+  /// lo que lee la ayuda y lo que lee la IA para poder contestar sobre ella.
+  /// Una tabla llamada «Control 2» sin descripcion es ilegible para el sistema
+  /// y para el companero que entra el año que viene.
+  descripcion    String
+  icono          String?
+  /// Permiso de `lib/rbac.ts` que se necesita para CAPTURAR aqui. Se elige de
+  /// los que ya existen: inventar un permiso por tabla habria obligado a
+  /// mantener una matriz de permisos que nadie revisa, y habria roto la
+  /// garantia de que VIEWER es de solo lectura por construccion.
+  permiso        String  @default("workorder:execute")
+  /// Roles que la VEN, separados por coma. Texto y no arreglo, porque el
+  /// esquema corre en SQLite y en PostgreSQL con el mismo archivo.
+  rolesVer       String  @default("OWNER,ADMIN,SUPERVISOR,TECHNICIAN,VIEWER")
+  /// De que plantilla de `lib/registros-plantillas.ts` nacio, si nacio de una.
+  plantilla      String?
+  /// Consecutivo de los renglones de ESTA tabla. Por tabla y no global: el
+  /// renglon 14 de la bitacora de diesel no tiene nada que ver con el 14 del
+  /// analisis de agua.
+  consecutivo    Int     @default(0)
+  /// Apagada sin borrarla: lo capturado sigue siendo historia de la planta.
+  activa         Boolean @default(true)
+  orden          Int     @default(0)
+  creadoPorId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creadoPor    User?           @relation("TablaPropiaAutor", fields: [creadoPorId], references: [id])
+  campos       CampoPropio[]
+  renglones    RenglonPropio[]
+
+  @@unique([organizationId, clave])
+  @@index([organizationId, activa])
+}
+
+/// Una columna de una tabla propia.
+model CampoPropio {
+  id      String @id @default(cuid())
+  tablaId String
+  /// La clave interna del campo. Se fija al crearlo y NO cambia al renombrar
+  /// la etiqueta: si saliera de la etiqueta cada vez, renombrar «Litros» a
+  /// «Litros cargados» dejaria huerfanos todos los valores ya capturados y la
+  /// columna se veria vacia sin un solo mensaje de error.
+  clave   String
+  /// Como se llama en pantalla. Esta si se puede cambiar.
+  etiqueta String
+  /// Del catalogo cerrado de `lib/registros-tipos.ts`: TEXTO, NUMERO, DINERO,
+  /// FECHA, SI_NO, LISTA, ACTIVO, REFACCION, PERSONA, UBICACION, SITIO,
+  /// PROVEEDOR, CENTRO_COSTO, ORDEN. Sin enum nativo, como todo el esquema.
+  tipo    String
+  /// Que significa esta columna. La lee la IA y la ayuda de la pantalla.
+  descripcion String?
+  requerido   Boolean @default(false)
+  /// Las opciones de un campo LISTA, una por renglon.
+  opciones    String?
+  /// Si aparece en la lista sin tener que abrir el renglon. Una tabla de
+  /// veinte campos con los veinte en la lista no se lee en un telefono.
+  enLista     Boolean @default(true)
+  orden       Int     @default(0)
+  /// Apagado sin borrarlo: borrar el campo se llevaria lo ya capturado en esa
+  /// columna, que es informacion de la empresa y no del esquema.
+  activo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tabla   TablaPropia   @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  valores ValorPropio[]
+
+  @@unique([tablaId, clave])
+  @@index([tablaId, activo])
+}
+
+/// Un renglon capturado en una tabla propia.
+model RenglonPropio {
+  id             String @id @default(cuid())
+  organizationId String
+  tablaId        String
+  /// Consecutivo dentro de la tabla, para poder referirse a el.
+  folio          Int
+  activo         Boolean  @default(true)
+  creadoPorId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tabla        TablaPropia   @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  creadoPor    User?         @relation("RenglonPropioAutor", fields: [creadoPorId], references: [id])
+  valores      ValorPropio[]
+
+  @@unique([tablaId, folio])
+  @@index([organizationId, tablaId, activo])
+}
+
+/// El valor de un campo en un renglon. Exactamente una columna con dato.
+model ValorPropio {
+  id        String @id @default(cuid())
+  renglonId String
+  campoId   String
+
+  texto    String?
+  numero   Float?
+  fecha    DateTime?
+  booleano Boolean?
+  /// El id del registro de MainTrack al que apunta un campo llave. Ver la nota
+  /// de `TablaPropia`: es texto a proposito, y quien lo pinta tiene que decir
+  /// «ya no existe» cuando no lo encuentra.
+  refId    String?
+
+  renglon RenglonPropio @relation(fields: [renglonId], references: [id], onDelete: Cascade)
+  campo   CampoPropio   @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([renglonId, campoId])
+  /// Para contestar «donde se uso este equipo»: el indice por campo y
+  /// referencia es lo que permite mirar los registros propios desde el
+  /// expediente del equipo sin recorrer toda la tabla.
+  @@index([campoId, refId])
+  @@index([campoId, numero])
+  @@index([campoId, fecha])
 }

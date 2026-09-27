@@ -13,6 +13,7 @@ import { aprobarSolicitud, rechazarSolicitud } from "./solicitudes";
 import { autorizar, crearRequisicionDeCompra, elegirCotizacion, emitirOrdenDeCompra, recibir, registrarCotizacion } from "./compras";
 import { detectar } from "./avisos/detectores";
 import { configDe } from "./avisos/config";
+import { crearTabla, guardarRenglon } from "./registros";
 import { guardarVigencia } from "./vigencias";
 import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { logAudit } from "./audit";
@@ -465,7 +466,7 @@ export async function crearEmpresaDemostrativa(p: { contrasena: string; ahora?: 
 
 /** Llena una empresa demostrativa vacía (recién creada o recién limpiada) con su historia. */
 export async function poblarDemo(orgId: string, ahora = new Date()) {
-  await prisma.organization.update({ where: { id: orgId }, data: { timezone: "America/Monterrey", montoAutorizacion: 5_000, esDemo: true, status: "ACTIVE", trialEndsAt: null } });
+  await prisma.organization.update({ where: { id: orgId }, data: { timezone: "America/Monterrey", montoAutorizacion: 5_000, esDemo: true, status: "ACTIVE", trialEndsAt: null, registrosPropios: true } });
   const usuarios = await prisma.user.findMany({ where: { organizationId: orgId } });
   const u = Object.fromEntries(PERSONAS.map((x) => {
     // Por la parte local del correo: la demo de pruebas usa otro dominio.
@@ -757,9 +758,126 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
     });
   }
 
+  await registrosPropiosDeLaDemo(c);
+
   // Avisos: los que el propio sistema detecta con estos datos, no mensajes escritos a mano.
   await detectar(orgId, await configDe(orgId, ahora), ahora);
   return resumenDemo(orgId);
+}
+
+/**
+ * Dos registros propios, para que la demostracion los ensene con datos.
+ *
+ * Se arman con `crearTabla` y `guardarRenglon` —las mismas funciones que usa la
+ * pantalla— y no escribiendo en las tablas a mano. Es la regla que mas caro ha
+ * salido romper en este proyecto: una siembra que replica los pasos del sistema
+ * puede quedar correcta mientras el sistema hace algo distinto, y las dos se
+ * ven bien.
+ *
+ * Los dos casos salen de la operacion de ESTA demo: una planta de bebidas con
+ * caldera y chiller lleva analisis de agua, y sus cuatro proveedores tienen
+ * contrato. Una bitacora de diesel no venia al caso: aqui el montacargas es
+ * electrico.
+ *
+ * `createdAt` queda en hoy para todos, y esta bien: lo que se lee en pantalla es
+ * la fecha de la muestra, que si va escalonada. Poder fijar la fecha de captura
+ * obligaria a escribir por debajo de `guardarRenglon`, que es justo lo que no
+ * se quiere.
+ */
+async function registrosPropiosDeLaDemo(c: Contexto) {
+  const agua = await crearTabla(c.orgId, {
+    nombre: "Análisis de agua",
+    descripcion:
+      "Los resultados del análisis del agua de la caldera y del chiller: pH, conductividad, dureza y cloruros, con la acción que se tomó si salió fuera de rango.",
+    icono: "agua",
+    plantilla: "analisis-agua",
+    campos: [
+      { etiqueta: "Equipo", tipo: "ACTIVO", requerido: true },
+      { etiqueta: "Fecha de la muestra", tipo: "FECHA", requerido: true },
+      { etiqueta: "pH", tipo: "NUMERO" },
+      { etiqueta: "Conductividad (µS/cm)", tipo: "NUMERO" },
+      { etiqueta: "Dureza (ppm)", tipo: "NUMERO" },
+      { etiqueta: "Dentro de rango", tipo: "SI_NO" },
+      { etiqueta: "Quién tomó la muestra", tipo: "PERSONA" },
+      { etiqueta: "Acción que se tomó", tipo: "TEXTO_LARGO", enLista: false },
+    ],
+  }, c.u.gerencia.id);
+
+  if (agua.ok) {
+    // Ocho muestras en 90 dias, alternando caldera y chiller. La dureza de la
+    // caldera sube al final: es lo que hace que la tabla cuente algo cuando
+    // alguien la ordena por fecha en la demostracion.
+    const muestras = [
+      { equipo: "CAL-203", dias: 84, ph: 10.8, cond: 2400, dureza: 2, bien: true },
+      { equipo: "CHL-204", dias: 77, ph: 8.1, cond: 640, dureza: 48, bien: true },
+      { equipo: "CAL-203", dias: 70, ph: 10.6, cond: 2650, dureza: 3, bien: true },
+      { equipo: "CHL-204", dias: 56, ph: 8.3, cond: 710, dureza: 52, bien: true },
+      { equipo: "CAL-203", dias: 42, ph: 10.2, cond: 3100, dureza: 9, bien: false,
+        accion: "Se purgo la caldera y se ajusto la dosificacion de secuestrante. Se reviso el suavizador: resina agotada." },
+      { equipo: "CHL-204", dias: 28, ph: 8.2, cond: 690, dureza: 50, bien: true },
+      { equipo: "CAL-203", dias: 14, ph: 10.7, cond: 2500, dureza: 2, bien: true },
+      { equipo: "CHL-204", dias: 5, ph: 8.4, cond: 760, dureza: 55, bien: true },
+    ];
+    for (const m of muestras) {
+      await guardarRenglon(c.orgId, agua.dato.id, {
+        equipo: c.activo[m.equipo].id,
+        fecha_de_la_muestra: new Date(c.ahora.getTime() - m.dias * DIA).toISOString().slice(0, 10),
+        ph: m.ph,
+        conductividad_s_cm: m.cond,
+        dureza_ppm: m.dureza,
+        dentro_de_rango: m.bien,
+        quien_tomo_la_muestra: c.u.calidad.id,
+        accion_que_se_tomo: m.accion ?? "",
+      }, c.u.mecanico.id);
+    }
+  }
+
+  const contratos = await crearTabla(c.orgId, {
+    nombre: "Gestión de contratos",
+    descripcion:
+      "El seguimiento administrativo de cada contrato con un tercero: qué se contrató, cuánto cuesta al mes, qué incluye y quién responde por él adentro de la planta. El aviso de vencimiento vive en Garantías y vigencias.",
+    icono: "contrato",
+    plantilla: "contratos",
+    permiso: "settings:write",
+    rolesVer: ["OWNER", "ADMIN", "SUPERVISOR"],
+    campos: [
+      { etiqueta: "Proveedor", tipo: "PROVEEDOR", requerido: true },
+      { etiqueta: "Objeto del contrato", tipo: "TEXTO", requerido: true },
+      { etiqueta: "Número de contrato", tipo: "TEXTO" },
+      { etiqueta: "Estado", tipo: "LISTA", requerido: true,
+        opciones: ["En trámite", "Vigente", "Por renovar", "Terminado"] },
+      { etiqueta: "Importe mensual", tipo: "DINERO" },
+      { etiqueta: "Vigente hasta", tipo: "FECHA" },
+      { etiqueta: "Responsable dentro de la empresa", tipo: "PERSONA" },
+      { etiqueta: "Qué incluye y qué no", tipo: "TEXTO_LARGO", enLista: false },
+    ],
+  }, c.u.gerencia.id);
+
+  if (contratos.ok) {
+    const filas = [
+      { prov: "aire", objeto: "Mantenimiento del compresor y el secador", folio: "CTO-2026-04",
+        estado: "Vigente", importe: 12_500, dias: 210,
+        incluye: "Incluye dos servicios mayores al ano, filtros y aceite. No incluye el elemento compresor ni fallas por falta de agua de enfriamiento." },
+      { prov: "frio", objeto: "Poliza de servicio del chiller de agua helada", folio: "CTO-2026-11",
+        estado: "Por renovar", importe: 9_800, dias: 38,
+        incluye: "Incluye revision trimestral, carga de refrigerante y atencion de emergencia en 4 horas. No incluye compresor ni condensador." },
+      { prov: "elec", objeto: "Mantenimiento de la subestacion y estudio termografico", folio: "CTO-2025-33",
+        estado: "Vigente", importe: 6_400, dias: 150,
+        incluye: "Incluye limpieza anual con planta parada, apriete de conexiones y termografia semestral. No incluye el transformador de reemplazo." },
+    ];
+    for (const f of filas) {
+      await guardarRenglon(c.orgId, contratos.dato.id, {
+        proveedor: c.prov[f.prov],
+        objeto_del_contrato: f.objeto,
+        numero_de_contrato: f.folio,
+        estado: f.estado,
+        importe_mensual: f.importe,
+        vigente_hasta: new Date(c.ahora.getTime() + f.dias * DIA).toISOString().slice(0, 10),
+        responsable_dentro_de_la_empresa: c.u.gerencia.id,
+        que_incluye_y_que_no: f.incluye,
+      }, c.u.gerencia.id);
+    }
+  }
 }
 
 async function compraCompleta(c: Contexto) {
@@ -806,13 +924,14 @@ const dia = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Mont
 /** Lo que tiene la demo, para la vista previa de la restauración y para las pruebas. */
 export async function resumenDemo(orgId: string) {
   const w = { organizationId: orgId };
-  const [activos, planes, ordenes, abiertas, solicitudes, refacciones, compras, lecturas, alertas, usuarios] = await Promise.all([
+  const [activos, planes, ordenes, abiertas, solicitudes, refacciones, compras, lecturas, alertas, usuarios, tablasPropias, renglonesPropios] = await Promise.all([
     prisma.asset.count({ where: w }), prisma.maintenancePlan.count({ where: w }), prisma.workOrder.count({ where: w }),
     prisma.workOrder.count({ where: { ...w, status: { notIn: ["CLOSED", "CANCELLED"] } } }), prisma.workRequest.count({ where: w }),
     prisma.part.count({ where: w }), prisma.purchaseRequest.count({ where: w }), prisma.meterReading.count({ where: w }),
     prisma.predictiveAlert.count({ where: { ...w, ...alertaAbierta() } }), prisma.user.count({ where: w }),
+    prisma.tablaPropia.count({ where: w }), prisma.renglonPropio.count({ where: w }),
   ]);
-  return { activos, planes, ordenes, abiertas, solicitudes, refacciones, compras, lecturas, alertas, usuarios };
+  return { activos, planes, ordenes, abiertas, solicitudes, refacciones, compras, lecturas, alertas, usuarios, tablasPropias, renglonesPropios };
 }
 
 // ───────────────────────────────────────────────────────── Restauración
@@ -880,7 +999,7 @@ export async function vistaPreviaRestauracion(orgId: string) {
   return {
     empresa: org.name, ultimaRestauracion: org.demoRestauradaAt, hoy: await resumenDemo(orgId),
     seConserva: ["La empresa y su configuración", "Las cuentas de usuario y sus contraseñas"],
-    seRestaura: ["Activos, planes, medidores y lecturas", "Órdenes de trabajo, solicitudes e historial de 90 días", "Almacén, existencias, compras y proveedores", "Alertas, avisos e indicadores", "Todo lo capturado durante las demostraciones"],
+    seRestaura: ["Activos, planes, medidores y lecturas", "Órdenes de trabajo, solicitudes e historial de 90 días", "Almacén, existencias, compras y proveedores", "Alertas, avisos e indicadores", "Los registros propios y lo capturado en ellos", "Todo lo capturado durante las demostraciones"],
   };
 }
 

@@ -79,6 +79,33 @@ async function main() {
     const demo = await crearEmpresaDemostrativa({ contrasena: "prueba-demo-123", slug: `demo-${sello}`, dominio });
     creadas.push(demo.id);
     console.log(`  info  demo sembrada en ${Math.round((Date.now() - inicio) / 1000)} s:`, JSON.stringify(await resumenDemo(demo.id)));
+
+    /*
+     * Los registros propios de la demo. Se revisan aqui porque sembrar algo
+     * que nadie cuenta es sembrar a ciegas: si la siembra dejara de funcionar
+     * —una etiqueta renombrada cambia la clave del valor— las tablas
+     * apareceriran vacias en la demostracion y nada lo diria.
+     */
+    {
+      const r = await resumenDemo(demo.id);
+      revisar("la demo trae sus registros propios, con datos", r.tablasPropias === 2 && r.renglonesPropios === 11, r);
+      const { listarTablas, leerRenglones, tablaPorClave } = await import("../lib/registros");
+      const tablas = await listarTablas(demo.id);
+      revisar("las dos tablas explican para que son (es lo que lee la IA)",
+        tablas.length === 2 && tablas.every((t) => t.descripcion.length > 60), tablas.map((t) => t.nombre));
+      const aguaT = await tablaPorClave(demo.id, "analisis_de_agua");
+      if (aguaT) {
+        const { renglones } = await leerRenglones(demo.id, aguaT);
+        const conEquipo = renglones.filter((x) => x.valores.equipo?.texto.includes("—"));
+        revisar("las columnas que apuntan a un equipo lo resolvieron de verdad",
+          conEquipo.length === 8 && !renglones.some((x) => x.valores.equipo?.referenciaPerdida),
+          conEquipo[0]?.valores.equipo?.texto);
+        revisar("el pH quedo como numero, no como texto",
+          renglones.every((x) => typeof x.valores.ph?.crudo === "number"));
+      } else {
+        revisar("existe la tabla de analisis de agua de la demo", false);
+      }
+    }
     const B = await prisma.organization.create({ data: { name: `${sello} Normal`, slug: `${sello}-b`, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" } });
     creadas.push(B.id);
     const duenoB = await prisma.user.create({ data: { organizationId: B.id, email: `dueno@${dominio}b`, name: "Dueño Normal", role: "OWNER", passwordHash: "x" } });

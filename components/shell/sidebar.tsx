@@ -32,6 +32,7 @@ export function Sidebar({
   rol,
   esSuperAdmin = false,
   esDemo = false,
+  registrosPropios = false,
   tieneLogo = false,
   terminoConjuntoPlural,
   favoritos,
@@ -42,6 +43,8 @@ export function Sidebar({
   rol: string;
   esSuperAdmin?: boolean;
   esDemo?: boolean;
+  /** Si la empresa contrato «Registros propios». Es contrato, no permiso. */
+  registrosPropios?: boolean;
   /** Si la empresa subio su logotipo, sustituye al icono generico. */
   tieneLogo?: boolean;
   /** Como le llama esta cuenta a un conjunto de equipos: Lineas, Sistemas, Servicios, Rutas. */
@@ -69,7 +72,7 @@ export function Sidebar({
     ...(favoritos.length
       ? [{ seccion: "Lo que más uso", clave: "favoritos", items: favoritos }]
       : []),
-    ...menuDe(rol, { esSuperAdmin, esDemo }),
+    ...menuDe(rol, { esSuperAdmin, esDemo, registrosPropios }),
   ];
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(menu.map((g) => [g.clave, true])),
