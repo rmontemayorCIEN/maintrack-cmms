@@ -318,6 +318,23 @@ export function referenciaInicial(medidor: { currentValue: number; lastReadingAt
 }
 
 /** Recorre la meta de los planes por uso de un medidor, en la misma transaccion. */
+/**
+ * Cuanto se le da a una transaccion de medidores.
+ *
+ * El limite de Prisma son 5 segundos y alcanzan de sobra en la base local,
+ * donde cada consulta es instantanea. Contra PostgreSQL con latencia de red
+ * no: registrar una lectura recalcula los planes que cuelgan de ese medidor,
+ * y con varias consultas de ida y vuelta se pasa de los 5 s. La restauracion
+ * de la demo en produccion reventaba ahi —«Transaction already closed»— y
+ * dejaba la cuenta a medias: con activos y refacciones, pero sin un solo plan
+ * ni orden.
+ *
+ * El trabajo de adentro esta acotado (una lectura y sus planes), asi que el
+ * limite generoso no tapa un problema de volumen: cubre la latencia. Mismo
+ * criterio que la importacion y los lotes, que ya lo tenian.
+ */
+const LIMITE_TRANSACCION = { timeout: 60_000, maxWait: 20_000 };
+
 async function recorrerMetas(tx: Cliente, organizationId: string, meterId: string, desplazamiento: number) {
   if (Math.abs(desplazamiento) < 1e-9) return 0;
   const asignaciones = await tx.planAsset.findMany({
@@ -411,7 +428,7 @@ export async function registrarLectura(params: {
     if (tipo !== "LECTURA") await recorrerMetas(tx, params.organizationId, medidor.id, params.value - valorAntes);
     return { lecturaId: lectura.id, recalculo: await recalcularEn(tx, params.organizationId, medidor.id, params.ahora) };
   };
-  const { lecturaId, recalculo } = params.db ? await escribir(params.db) : await prisma.$transaction(escribir);
+  const { lecturaId, recalculo } = params.db ? await escribir(params.db) : await prisma.$transaction(escribir, LIMITE_TRANSACCION);
 
   if (tipo !== "LECTURA" || validacion.nivel === "ADVERTENCIA") {
     await logAudit({
@@ -542,7 +559,7 @@ export async function corregirLectura(params: {
     // Un evento que cambia de valor mueve el punto de partida de los planes.
     if (esEvento) await recorrerMetas(tx, params.organizationId, lectura.meterId, params.value - lectura.value);
     return recalcularEn(tx, params.organizationId, lectura.meterId, params.ahora);
-  });
+  }, LIMITE_TRANSACCION);
 
   await logAudit({
     organizationId: params.organizationId,
@@ -612,7 +629,7 @@ export async function anularLectura(params: {
     });
     if (esEvento) await recorrerMetas(tx, params.organizationId, lectura.meterId, (valorAnterior as number) - lectura.value);
     return recalcularEn(tx, params.organizationId, lectura.meterId, params.ahora);
-  });
+  }, LIMITE_TRANSACCION);
 
   await logAudit({
     organizationId: params.organizationId,
@@ -891,5 +908,5 @@ export async function recalcularEn(tx: Cliente, organizationId: string, meterId:
  * En una transaccion: o queda todo, o nada.
  */
 export async function recalcularMedidor(organizationId: string, meterId: string, ahora = new Date()): Promise<Recalculo> {
-  return prisma.$transaction((tx) => recalcularEn(tx, organizationId, meterId, ahora));
+  return prisma.$transaction((tx) => recalcularEn(tx, organizationId, meterId, ahora), LIMITE_TRANSACCION);
 }
