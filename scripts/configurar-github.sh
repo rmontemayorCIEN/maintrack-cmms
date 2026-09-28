@@ -45,6 +45,10 @@ CORREO="$CUENTA@$PROYECTO.iam.gserviceaccount.com"
 #   artifactregistry.writer   guardar esa imagen
 #   storage.objectAdmin    subir el codigo fuente al bucket de construccion
 #   secretmanager.secretAccessor  leer la cadena de conexion para migrar
+#   secretmanager.viewer   PREGUNTAR si un secreto existe. No sobra: sin esto
+#                          `deploy.sh` no distingue «no existe» de «no puedo
+#                          preguntar» y publica sin la IA y sin los avisos, en
+#                          silencio. Casi pasa en la primera liberacion.
 #   cloudsql.client        conectarse por el proxy
 #   cloudsql.viewer        preguntar el nombre de conexion de la instancia
 #
@@ -56,6 +60,7 @@ PERMISOS=(
   roles/artifactregistry.writer
   roles/storage.objectAdmin
   roles/secretmanager.secretAccessor
+  roles/secretmanager.viewer
   roles/cloudsql.client
   roles/cloudsql.viewer
 )
@@ -90,6 +95,20 @@ for p in "${PERMISOS[@]}"; do
   hacer gcloud projects add-iam-policy-binding "$PROYECTO" \
     --member="serviceAccount:$CORREO" --role="$p" --condition=None --quiet
 done
+
+# El bucket donde Cloud Build deja el codigo fuente. `storage.objectAdmin`
+# cubre los objetos pero NO el bucket, y `gcloud run deploy --source` necesita
+# `storage.buckets.get`: la primera liberacion murio justo ahi. Se concede
+# sobre ESE bucket y no sobre el proyecto, que seria darle todo el
+# almacenamiento a una cuenta que solo publica.
+BUCKET="gs://run-sources-$PROYECTO-us-central1"
+echo "3b/5 Permiso sobre el bucket de construccion (solo ese)..."
+if gcloud storage buckets describe "$BUCKET" --project "$PROYECTO" >/dev/null 2>&1; then
+  hacer gcloud storage buckets add-iam-policy-binding "$BUCKET" \
+    --member="serviceAccount:$CORREO" --role=roles/storage.admin --quiet
+else
+  echo "      todavia no existe; lo crea el primer despliegue. Vuelva a correr esto despues."
+fi
 
 echo "4/5  El deposito de identidades federadas..."
 if gcloud iam workload-identity-pools describe "$DEPOSITO" \
