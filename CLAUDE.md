@@ -272,7 +272,9 @@ prueba de "se ve bien".
 **Que hacer, siempre, sin excepcion:**
 
 1. `npx tsc --noEmit` — compila.
-2. **TODAS** las pruebas, no las del cambio: `for f in scripts/prueba-*.ts; do npx tsx "$f"; done`
+2. **TODAS** las pruebas, no las del cambio: `./scripts/suite.sh` — que ademas
+   hace el build y corre la prueba de interfaz. Correr a mano las del cambio no
+   es haber corrido la suite.
 3. Si toco interfaz, abrirla en el navegador. Guardar bien no es mostrar bien.
 4. Preguntarse **quien mas lee lo que toque**, y probar eso tambien:
    `grep -rn "loQueCambie" app/ lib/`
@@ -388,13 +390,23 @@ aplica al codigo Y a las pruebas.
 ### El cierre, siempre
 
 ```
-npx tsc --noEmit                                    # compila
-for f in scripts/prueba-*.ts; do npx tsx "$f"; done # TODAS, no solo las del cambio
-npm run build                                       # con el servidor detenido
+npx tsc --noEmit        # compila
+./scripts/suite.sh      # TODAS las pruebas, el build y la interfaz
 ```
 
-Las cinco `*-real` fallan sin `ANTHROPIC_API_KEY`: son de funciones de IA y se
-corren con `./scripts/con-produccion.sh`, que trae la llave de Secret Manager.
+`suite.sh` revisa primero que el entorno no las vaya a arruinar —el esquema en
+SQLite, ningun servidor de desarrollo compitiendo por `.next`— y al final
+separa las fallas ESPERADAS de las que hay que mirar. «10 fallas» no dice
+nada; «0 inesperadas» si.
+
+La prueba de interfaz va **al final, con su propio build**, y no por gusto: usa
+`next start`, y las trece pruebas que levantan `next dev` le pisan `.next`.
+Cuando corria dentro del bucle caia siempre en «esperadas» y sus 92 revisiones
+no se corrian NUNCA, con el resumen diciendo que no habia nada inesperado. Por
+ahi se escapo una regresion de verdad.
+
+Las `*-real` fallan sin `ANTHROPIC_API_KEY`: son de funciones de IA y se corren
+con `./scripts/con-produccion.sh`, que trae la llave de Secret Manager.
 
 Y la ficha de ayuda de la pantalla que se toco. Es regla, no cortesia.
 
