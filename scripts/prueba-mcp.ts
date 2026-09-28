@@ -83,8 +83,11 @@ async function main() {
   revisar("…ni a cualquier ruta interna", destinoSeguro("/clients") === "/dashboard");
   const ayuda = buscarEnAyuda("¿Por qué no puedo cerrar una orden de trabajo?", 3);
   revisar("la búsqueda en la ayuda encuentra fichas", ayuda.resultados.length > 0, ayuda.terminosBuscados);
-  revisar("una cuenta nueva sin uso está EN_ARRANQUE, no SIN_USO", nivelDeAdopcion(0, new Date()) === "EN_ARRANQUE");
-  revisar("una cuenta vieja sin uso está SIN_USO", nivelDeAdopcion(0, new Date(Date.now() - 90 * 86_400_000)) === "SIN_USO");
+  const hace90 = new Date(Date.now() - 90 * 86_400_000);
+  revisar("una cuenta nueva sin uso está EN_ARRANQUE, no SIN_USO", nivelDeAdopcion({ modulosEnUso: 0, altaEl: new Date(), personasDelCliente: 0 }) === "EN_ARRANQUE");
+  revisar("una cuenta vieja donde nadie del cliente entra es NADIE_DEL_CLIENTE", nivelDeAdopcion({ modulosEnUso: 5, altaEl: hace90, personasDelCliente: 0 }) === "NADIE_DEL_CLIENTE");
+  revisar("gente que entra pero no registra nada es SIN_USO", nivelDeAdopcion({ modulosEnUso: 0, altaEl: hace90, personasDelCliente: 2 }) === "SIN_USO");
+  revisar("con gente y cinco módulos es ALTA", nivelDeAdopcion({ modulosEnUso: 5, altaEl: hace90, personasDelCliente: 2 }) === "ALTA");
 
   // ── Datos de la prueba ──────────────────────────────────────────────────
   const sello = `mcp-${Date.now()}`;
@@ -100,9 +103,19 @@ async function main() {
     { organizationId: cliente.id, userId: dueno.id, funcion: "DIAGNOSTICO", modelo: "claude-sonnet-5", inputTokens: 1000, outputTokens: 200, costoUsd: 0.01, periodo: "2026-09" },
     { organizationId: cliente.id, userId: dueno.id, funcion: "VOZ", modelo: "es-US-Neural2", inputTokens: 5000, operaciones: 0, costoUsd: 0.08, periodo: "2026-09" },
     { organizationId: cliente.id, userId: dueno.id, funcion: "DICTADO", modelo: "speech-v2", inputTokens: 45, costoUsd: 0.012, periodo: "2026-09", ok: false },
+    // Sin autor, como lo que genera el sistema solo: tiene que contar como del cliente.
+    { organizationId: cliente.id, userId: null, funcion: "BRIEF", modelo: "claude-sonnet-5", costoUsd: 0, periodo: "2026-09" },
   ] });
   await prisma.auditLog.create({ data: { organizationId: cliente.id, userId: dueno.id, entity: "WorkOrder", entityId: "x", action: "CREATED" } });
-  const nuestras = [propia.id, cliente.id, interna.id];
+  // Una cuenta de dos meses donde SOLO se mueve el operador: el caso de
+  // «Acero Industrial del Norte», que salía con adopción ALTA y cero usuarios.
+  const soloOperador = await prisma.organization.create({ data: { name: `Solo operador ${sello}`, slug: `so-${sello}`, createdAt: new Date(Date.now() - 60 * 86_400_000) } });
+  await prisma.aiUsage.createMany({ data: [
+    { organizationId: soloOperador.id, userId: operador.id, funcion: "PLAN", modelo: "claude-sonnet-5", inputTokens: 10, costoUsd: 0.001, periodo: "2026-09" },
+    { organizationId: soloOperador.id, userId: operador.id, funcion: "PLAN", modelo: "claude-sonnet-5", inputTokens: 10, costoUsd: 0.001, periodo: "2026-09" },
+  ] });
+  await prisma.auditLog.create({ data: { organizationId: soloOperador.id, userId: operador.id, entity: "Asset", entityId: "x", action: "CREATED" } });
+  const nuestras = [propia.id, cliente.id, interna.id, soloOperador.id];
 
   console.log("\nCuenta interna\n");
   const cobro = await emitirCargosDelPeriodo("2026-09", { organizationId: interna.id });
@@ -226,10 +239,20 @@ async function main() {
     const filaInterna = (conInternas.datos.clientes as Array<Record<string, unknown>>).find((c) => c.organizacion_id === interna.id);
     revisar("…pero sí si se pide, marcada como interna", filaInterna?.esCuentaInterna === true, filaInterna);
     revisar("el resumen cuenta las internas excluidas", ((resumen.datos.organizaciones as { cuentasInternasExcluidas?: number })?.cuentasInternasExcluidas ?? 0) >= 1, resumen.datos.organizaciones);
+    const filaSolo = (clientes.datos.clientes as Array<Record<string, unknown>>).find((c) => c.organizacion_id === soloOperador.id);
+    revisar("una cuenta donde solo se mueve el operador es NADIE_DEL_CLIENTE", filaSolo?.nivelAdopcion === "NADIE_DEL_CLIENTE", filaSolo);
+    revisar("…su IA no cuenta como módulo en uso", !(filaSolo?.modulosEnUso as string[] | undefined)?.includes("Funciones de IA"), filaSolo?.modulosEnUso);
+    revisar("…y sale aparte como módulo solo del operador", (filaSolo?.modulosSoloDelOperador as string[] | undefined)?.includes("Funciones de IA") === true, filaSolo);
+    const detalleSolo = await llamar("detalle_cliente", { organizacion_id: soloOperador.id });
+    const iaSolo = ((detalleSolo.datos.adopcion as { modulos: Array<Record<string, unknown>> }).modulos).find((m) => m.clave === "ia");
+    revisar("en el detalle: 2 registros de IA, 0 del cliente, no en uso", iaSolo?.registros30Dias === 2 && iaSolo?.registros30DiasDelCliente === 0 && iaSolo?.enUso === false, iaSolo);
+    revisar("…y el mismo nivel que en la lista", (detalleSolo.datos.adopcion as { nivel: string }).nivel === "NADIE_DEL_CLIENTE");
     const detalle = await llamar("detalle_cliente", { organizacion_id: cliente.id });
     ejemplos.detalle_cliente = detalle.datos;
     revisar("detalle_cliente", !detalle.res?.isError && (detalle.datos.tendencia as { semanas?: unknown[] })?.semanas?.length === 12, detalle.texto.slice(0, 300));
     revisar("…sin personas del cliente", !detalle.texto.includes(dueno.email));
+    const iaCliente = ((detalle.datos.adopcion as { modulos: Array<Record<string, unknown>> }).modulos).find((m) => m.clave === "ia");
+    revisar("lo que no tiene autor cuenta como del cliente (4 de 4, no 3)", iaCliente?.registros30DiasDelCliente === 4 && iaCliente?.registros30Dias === 4, iaCliente);
     const hoy = new Date().toISOString().slice(0, 10);
     const consumo = await llamar("consumo_ia", { desde: "2026-01-01", hasta: hoy, organizacion_id: cliente.id });
     ejemplos.consumo_ia = consumo.datos;
@@ -272,7 +295,7 @@ async function main() {
 
     console.log("\nBitácora\n");
     const bitacora = await prisma.auditLog.findMany({ where: { userId: operador.id, action: "MCP_ACCESS" }, orderBy: { createdAt: "asc" } });
-    const llamadasHechas = 6 + casos.length + 1;
+    const llamadasHechas = 7 + casos.length + 1;
     revisar(`cada llamada a herramienta dejó su renglón (${llamadasHechas})`, bitacora.length === llamadasHechas, bitacora.length);
     const uno = bitacora.find((x) => x.entityId === "consumo_ia");
     const cambios = JSON.parse(uno?.changes ?? "{}");

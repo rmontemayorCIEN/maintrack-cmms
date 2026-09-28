@@ -18,7 +18,7 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ClienteLectura } from "./lectura";
-import { actividadPorModulo, DIAS_EN_USO, MODULOS, nivelDeAdopcion, NIVELES_ADOPCION } from "./adopcion";
+import { actividadPorModulo, DIAS_EN_USO, MODULOS, nivelDeAdopcion, NIVELES_ADOPCION, SIN_AUTOR } from "./adopcion";
 import { buscarEnAyuda } from "./documentacion";
 import { claveDiaEnZona, diaEnZona, medianocheEnZona } from "../periodos";
 import { FUNCIONES_IA } from "../ia/funciones";
@@ -213,7 +213,7 @@ async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
 
   // Sin lista de empresas en las consultas (ver personasActivas): se traen
   // todas y cada fila busca la suya.
-  const actividad = await actividadPorModulo(db, hace30);
+  const actividad = await actividadPorModulo(db, hace30, operadores);
   const activas30 = await personasActivas(db, hace30, operadores, ids);
   const ultimaBitacora = await db.auditLog.groupBy({
     by: ["organizationId"],
@@ -235,7 +235,10 @@ async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
 
   const filas = orgs.map((o) => {
     const mods = actividad.get(o.id) ?? new Map();
-    const enUso = MODULOS.filter((m) => (mods.get(m.clave)?.recientes ?? 0) > 0).map((m) => m.nombre);
+    // En uso = con registros DEL CLIENTE; lo que solo movio el operador va aparte.
+    const enUso = MODULOS.filter((m) => (mods.get(m.clave)?.delCliente ?? 0) > 0).map((m) => m.nombre);
+    const soloOperador = MODULOS.filter((m) => (mods.get(m.clave)?.recientes ?? 0) > 0 && (mods.get(m.clave)?.delCliente ?? 0) === 0).map((m) => m.nombre);
+    const personas = activas30.get(o.id)?.size ?? 0;
     const candidatas = [mB.get(o.id)?._max.createdAt, mE.get(o.id)?._max.lastLoginAt].filter((f): f is Date => !!f);
     const ultima = candidatas.length ? new Date(Math.max(...candidatas.map((f) => f.getTime()))) : null;
     const complementos = [o.iaComplemento && "IA Avanzada", o.registrosPropios && "Registros propios", o.cumplimientoNormas && "Cumplimiento normativo"].filter(Boolean);
@@ -250,9 +253,10 @@ async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
       operandoDesde: fecha(o.operandoDesde),
       ...marcas(o),
       ultimaActividad: fecha(ultima),
-      usuarios: { activos: o._count.users, conActividad30Dias: activas30.get(o.id)?.size ?? 0 },
+      usuarios: { activos: o._count.users, conActividad30Dias: personas },
       modulosEnUso: enUso,
-      nivelAdopcion: nivelDeAdopcion(enUso.length, o.createdAt, ctx.ahora),
+      ...(soloOperador.length ? { modulosSoloDelOperador: soloOperador } : {}),
+      nivelAdopcion: nivelDeAdopcion({ modulosEnUso: enUso.length, altaEl: o.createdAt, personasDelCliente: personas, ahora: ctx.ahora }),
       movimientosDelOperador30Dias: mO.get(o.id)?._count._all ?? 0,
     };
   });
@@ -270,14 +274,15 @@ async function listarClientes(p: z.infer<typeof listarEntrada>, ctx: Contexto) {
     mostradas: Math.min(filas.length, p.limite),
     clientes: filas.slice(0, p.limite),
     criterios: {
-      moduloEnUso: `Se crearon registros de ese módulo en los últimos ${DIAS_EN_USO} días.`,
+      moduloEnUso: `El cliente creó registros de ese módulo en los últimos ${DIAS_EN_USO} días. Lo que creó el operador no cuenta; lo automático (programador, QR, API) sí, porque es la cuenta operando.`,
+      modulosSoloDelOperador: "Módulos con actividad en 30 días hecha solo por el operador: no cuentan para la adopción.",
       nivelAdopcion: NIVELES_ADOPCION,
       ultimaActividad: "Lo más reciente entre la bitácora y el último inicio de sesión de la gente del cliente. No cuenta al operador.",
       conActividad30Dias: PERSONAS_ACTIVAS,
     },
     loQueNoSeVe: [
-      "Un módulo en uso puede serlo por trabajo del operador durante la implementación: compare con movimientosDelOperador30Dias.",
-      "Lo que entra por la API de integración o por el formulario público del QR cuenta como actividad del módulo, aunque nadie del cliente haya entrado.",
+      `${SIN_AUTOR.join(" y ")} no guardan quién creó cada registro: ahí no se puede separar al cliente del operador, y cuentan completos.`,
+      "Lo que entra por la API de integración o por el formulario público del QR cuenta como actividad del cliente, aunque nadie haya entrado.",
     ],
   };
 }
@@ -309,20 +314,24 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
     by: ["role"], where: { organizationId: o.id, active: true, isSuperAdmin: false }, _count: { _all: true },
   });
 
-  // Por modulo: total historico, 90 y 30 dias, y la ultima fecha.
+  // Por modulo: total historico, 90 y 30 dias, lo del cliente en 30, y la
+  // ultima fecha. «En uso» sale de lo del cliente, no del total.
   const modulos = [];
   for (const m of MODULOS) {
-    const [total, en90, en30, ultimo] = [
+    const [total, en90, en30, delCliente30, ultimo] = [
       await m.contar(db, new Date(0), orgs), await m.contar(db, hace(90), orgs),
-      await m.contar(db, hace(30), orgs), await m.ultimo(db, orgs),
+      await m.contar(db, hace(30), orgs), await m.contar(db, hace(30), orgs, operadores), await m.ultimo(db, orgs),
     ];
     const n = (x: typeof total) => x[0]?._count._all ?? 0;
     modulos.push({
-      modulo: m.nombre, clave: m.clave, enUso: n(en30) > 0,
-      registros30Dias: n(en30), registros90Dias: n(en90), registrosTotales: n(total),
+      modulo: m.nombre, clave: m.clave, enUso: n(delCliente30) > 0,
+      registros30Dias: n(en30),
+      registros30DiasDelCliente: m.autor ? n(delCliente30) : null,
+      registros90Dias: n(en90), registrosTotales: n(total),
       ultimoRegistro: fecha(ultimo[0]?._max.fecha),
     });
   }
+  const personasDelCliente = (await personasActivas(db, hace(30), operadores, orgs)).get(o.id)?.size ?? 0;
 
   // Tendencia semanal: bloques de 7 dias hacia atras desde hoy.
   const inicio = hace(SEMANAS * 7);
@@ -374,8 +383,9 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
     operandoDesde: fecha(o.operandoDesde),
     usuariosActivosPorRol: Object.fromEntries(usuariosPorRol.map((u) => [u.role, u._count._all])),
     adopcion: {
-      nivel: nivelDeAdopcion(enUso, o.createdAt, ctx.ahora),
+      nivel: nivelDeAdopcion({ modulosEnUso: enUso, altaEl: o.createdAt, personasDelCliente, ahora: ctx.ahora }),
       modulosEnUso: enUso,
+      personasDelClienteCon30DiasDeActividad: personasDelCliente,
       modulos,
     },
     tendencia: {
@@ -386,7 +396,8 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
     },
     movimientosDelOperador30Dias: delOperador,
     criterios: {
-      enUso: `Registros creados en los últimos ${DIAS_EN_USO} días.`,
+      enUso: `El cliente creó registros en los últimos ${DIAS_EN_USO} días (sin contar al operador; lo automático sí cuenta).`,
+      registros30DiasDelCliente: `null donde el módulo no guarda autor (${SIN_AUTOR.join(", ")}): ahí registros30Dias cuenta todo y no se puede separar.`,
       nivel: NIVELES_ADOPCION,
       movimientos: "Registros en la bitácora hechos por gente del cliente (no por el operador).",
       direccion: "Últimas 4 semanas contra las 4 anteriores: SUBE (+20 %), BAJA (−20 %), ESTABLE, SIN_BASE (no había actividad antes: no hay contra qué comparar) o SIN_ACTIVIDAD.",
@@ -394,7 +405,7 @@ async function detalleCliente(p: z.infer<typeof detalleEntrada>, ctx: Contexto) 
     loQueNoSeVe: [
       "No se incluye el contenido de ningún registro: ni descripciones, ni equipos, ni personas.",
       "Consultar pantallas no deja huella: una cuenta que solo mira reportes se ve con poca actividad.",
-      "Los registros por módulo incluyen los que creó el operador durante la implementación.",
+      `${SIN_AUTOR.join(" y ")} no guardan autor: sus registros cuentan completos, incluidos los que haya creado el operador.`,
     ],
   };
 }

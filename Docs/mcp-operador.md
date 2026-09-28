@@ -103,6 +103,25 @@ npx tsx scripts/cuenta-interna.ts --listar
 ./scripts/con-produccion.sh scripts/cuenta-interna.ts --org "<nombre exacto o id>" --aplicar
 ```
 
+## Cómo se mide la adopción
+
+Un módulo está **en uso** cuando **el cliente** creó registros ahí en los
+últimos 30 días. Lo que creó el operador (usted, implementando) no cuenta y
+sale aparte en `modulosSoloDelOperador`. Lo que no tiene autor —órdenes del
+programador, reportes por QR, lo que entra por la API— sí cuenta: es la
+cuenta del cliente operando.
+
+| Nivel | Qué significa |
+|---|---|
+| `EN_ARRANQUE` | Menos de 14 días y poca actividad: todavía no se puede juzgar |
+| `NADIE_DEL_CLIENTE` | Nadie del cliente entró ni registró nada en 30 días |
+| `SIN_USO` | Entraron, pero no crearon nada |
+| `BAJA` / `MEDIA` / `ALTA` | El cliente usa 1–2, 3–4 o 5 o más módulos |
+
+**Activos** y **cumplimiento normativo** no guardan quién creó cada registro:
+ahí no se puede separar al cliente del operador y cuentan completos. La
+respuesta lo dice en `loQueNoSeVe`.
+
 ## Herramientas y ejemplo de respuesta
 
 Los ejemplos salen de la base de **desarrollo** (por eso las cifras de
