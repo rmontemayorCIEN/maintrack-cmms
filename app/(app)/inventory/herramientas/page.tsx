@@ -115,7 +115,7 @@ export default async function HerramientasPage() {
                     <ul className="mt-1 space-y-1">
                       {p.cosas.map((r) => (
                         <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                          <span className="font-medium text-slate-700">{r.part.code} — {r.part.name}</span>
+                          <span className="font-medium text-slate-700">{r.articulo.code} — {r.articulo.name}</span>
                           {r.cantidad !== 1 ? <span className="text-slate-500">×{r.cantidad}</span> : null}
                           <span className="text-slate-400">
                             desde el {formatDate(r.entregadoEl, zona)}
@@ -131,7 +131,7 @@ export default async function HerramientasPage() {
                                 resguardoId={r.id}
                                 estadoSalida={r.estadoSalida}
                                 quien={p.persona.name}
-                                herramienta={`${r.part.code} — ${r.part.name}`}
+                                herramienta={`${r.articulo.code} — ${r.articulo.name}`}
                               />
                             </span>
                           ) : null}

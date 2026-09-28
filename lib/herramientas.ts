@@ -23,6 +23,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { ErrorDeAlmacen, aplicarMovimiento } from "./almacen";
+import { registrarLectura } from "./medidores";
 import { logAudit, notify } from "./audit";
 import {
   DIAS_PARA_AVISAR, diasFuera, disponible, esEstadoHerramienta, esMotivoBaja,
@@ -33,12 +34,33 @@ export type Resultado<T> = { ok: true; dato: T } | { ok: false; motivo: string; 
 
 const falla = (motivo: string, codigo = 409): Resultado<never> => ({ ok: false, motivo, codigo });
 
+/**
+ * Corre algo que puede rechazarse por regla de negocio dentro de una
+ * transacción, y devuelve ese rechazo como resultado.
+ *
+ * Sin esto, un `ErrorDeAlmacen` lanzado dentro de la transacción —«otro se la
+ * llevó primero»— escapaba como excepción y quien llamaba lo convertía en un
+ * 500 «ocurrió un error inesperado», que es justo lo contrario de lo que la
+ * persona necesita leer.
+ */
+async function conRechazo<T>(fn: () => Promise<T>): Promise<Resultado<T>> {
+  try {
+    return { ok: true, dato: await fn() };
+  } catch (e) {
+    if (e instanceof ErrorDeAlmacen) return falla(e.message, e.codigo);
+    throw e;
+  }
+}
+
 // ─────────────────────────────────────────── Prestar
 
 export type Prestamo = {
   organizationId: string;
-  partId: string;
-  warehouseId: string;
+  /** La herramienta generica del almacen. Excluyente con `assetId`. */
+  partId?: string | null;
+  warehouseId?: string | null;
+  /** La unidad serializada: el dado con su numero de serie. Excluyente con `partId`. */
+  assetId?: string | null;
   /** Quien se la lleva y responde por ella. */
   personaId: string;
   cantidad?: number;
@@ -61,13 +83,21 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
   if (!Number.isFinite(cantidad) || cantidad <= 0) return falla("La cantidad tiene que ser mayor que cero.", 400);
   if (p.estadoSalida && !esEstadoHerramienta(p.estadoSalida)) return falla("Ese estado de salida no existe.", 400);
 
+  // Exactamente uno de los dos. Los dos a la vez seria una herramienta que es
+  // a la vez generica y serializada, y ninguno no dice que prestar.
+  if (Boolean(p.partId) === Boolean(p.assetId)) {
+    return falla("Diga si presta una herramienta del almacén o una unidad con número de serie, no las dos.", 400);
+  }
+  if (p.assetId) return prestarUnidad(p);
+  if (!p.warehouseId) return falla("Falta de qué almacén sale.", 400);
+
   const [articulo, almacen, persona] = await Promise.all([
     prisma.part.findFirst({
-      where: { id: p.partId, organizationId: p.organizationId },
+      where: { id: p.partId!, organizationId: p.organizationId },
       select: { id: true, code: true, name: true, naturaleza: true, active: true },
     }),
     prisma.warehouse.findFirst({
-      where: { id: p.warehouseId, organizationId: p.organizationId },
+      where: { id: p.warehouseId!, organizationId: p.organizationId },
       select: { id: true, name: true, autoservicio: true, active: true },
     }),
     prisma.user.findFirst({
@@ -97,7 +127,7 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
   }
 
   const existencia = await prisma.partStock.findUnique({
-    where: { partId_warehouseId: { partId: p.partId, warehouseId: p.warehouseId } },
+    where: { partId_warehouseId: { partId: p.partId!, warehouseId: p.warehouseId! } },
     select: { quantity: true, enResguardo: true },
   });
   const libre = disponible(existencia?.quantity ?? 0, existencia?.enResguardo ?? 0);
@@ -109,7 +139,7 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
     );
   }
 
-  const creado = await prisma.$transaction(async (tx) => {
+  const intento = await conRechazo(() => prisma.$transaction(async (tx) => {
     /*
      * Se vuelve a leer DENTRO de la transacción y se condiciona el update: si
      * alguien ganó la carrera por la última pieza entre la revisión de arriba
@@ -117,7 +147,7 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
      * con la misma herramienta.
      */
     const actual = await tx.partStock.findUnique({
-      where: { partId_warehouseId: { partId: p.partId, warehouseId: p.warehouseId } },
+      where: { partId_warehouseId: { partId: p.partId!, warehouseId: p.warehouseId! } },
       select: { id: true, quantity: true, enResguardo: true },
     });
     if (!actual || disponible(actual.quantity, actual.enResguardo) < cantidad) {
@@ -130,8 +160,8 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
     return tx.resguardo.create({
       data: {
         organizationId: p.organizationId,
-        partId: p.partId,
-        warehouseId: p.warehouseId,
+        partId: p.partId!,
+        warehouseId: p.warehouseId!,
         personaId: p.personaId,
         cantidad,
         entregadoPorId: p.entregadoPorId ?? null,
@@ -141,15 +171,97 @@ export async function prestar(p: Prestamo): Promise<Resultado<{ id: string }>> {
       },
       select: { id: true },
     });
-  });
+  }));
+  if (!intento.ok) return intento;
 
   await logAudit({
     organizationId: p.organizationId,
     userId: p.entregadoPorId ?? p.personaId,
-    action: "CREATE", entity: "Resguardo", entityId: creado.id,
+    action: "CREATE", entity: "Resguardo", entityId: intento.dato.id,
     summary: `${persona.name} se llevó ${cantidad} ${articulo.code} — ${articulo.name}`,
   });
-  return { ok: true, dato: creado };
+  return intento;
+}
+
+/**
+ * Presta una unidad serializada: el dado con su número de serie.
+ *
+ * ── Por qué es un activo y no un modelo nuevo
+ *
+ * Una herramienta cara e individual ya está bien modelada como activo: tiene
+ * expediente, QR, ubicación, costo, calibración que vence y —lo que de verdad
+ * importa aquí— MEDIDOR con plan por uso. Un dado no se rectifica cada seis
+ * meses: se rectifica cada 5 000 piezas, y ese motor ya existe y funciona.
+ *
+ * Inventar una «unidad de herramienta» habría significado reconstruir todo eso
+ * al lado, y tener dos padrones que se desincronizan.
+ *
+ * A diferencia de la genérica, aquí no hay cantidades: la unidad está fuera o
+ * no lo está.
+ */
+async function prestarUnidad(p: Prestamo): Promise<Resultado<{ id: string }>> {
+  const [activo, persona] = await Promise.all([
+    prisma.asset.findFirst({
+      where: { id: p.assetId!, organizationId: p.organizationId },
+      select: { id: true, code: true, name: true, sePresta: true, active: true },
+    }),
+    prisma.user.findFirst({
+      where: { id: p.personaId, organizationId: p.organizationId },
+      select: { id: true, name: true, active: true },
+    }),
+  ]);
+
+  if (!activo) return falla("Ese equipo no existe en esta empresa.", 404);
+  if (!persona) return falla("Esa persona no es de esta empresa.", 404);
+  if (!activo.sePresta) {
+    return falla(`«${activo.name}» no está marcado como algo que se presta. Márquelo en su ficha si sale y regresa con un responsable.`, 422);
+  }
+  if (!activo.active) return falla(`«${activo.name}» está dado de baja.`);
+  if (!persona.active) return falla(`${persona.name} ya no está activo en la empresa.`);
+
+  if (p.entregadoPorId) {
+    const quien = await prisma.user.findFirst({
+      where: { id: p.entregadoPorId, organizationId: p.organizationId }, select: { id: true },
+    });
+    if (!quien) return falla("Quien entrega no es de esta empresa.", 404);
+  }
+
+  const intento = await conRechazo(() => prisma.$transaction(async (tx) => {
+    /*
+     * La unidad es una: si ya está fuera, no se puede prestar dos veces. Se
+     * revisa DENTRO de la transacción porque dos personas pueden pedirla a la
+     * vez, y el segundo tiene que enterarse en vez de quedarse con un
+     * resguardo que dice que la tiene.
+     */
+    const abierta = await tx.resguardo.findFirst({
+      where: { assetId: activo.id, devueltoEl: null },
+      select: { persona: { select: { name: true } } },
+    });
+    if (abierta) throw new ErrorDeAlmacen(`«${activo.name}» ya la tiene ${abierta.persona.name}.`);
+
+    return tx.resguardo.create({
+      data: {
+        organizationId: p.organizationId,
+        assetId: activo.id,
+        personaId: p.personaId,
+        cantidad: 1,
+        entregadoPorId: p.entregadoPorId ?? null,
+        estadoSalida: p.estadoSalida ?? null,
+        proposito: p.proposito?.trim() || null,
+        nota: p.nota?.trim() || null,
+      },
+      select: { id: true },
+    });
+  }));
+  if (!intento.ok) return intento;
+
+  await logAudit({
+    organizationId: p.organizationId,
+    userId: p.entregadoPorId ?? p.personaId,
+    action: "CREATE", entity: "Resguardo", entityId: intento.dato.id,
+    summary: `${persona.name} se llevó ${activo.code} — ${activo.name}`,
+  });
+  return intento;
 }
 
 // ─────────────────────────────────────────── Devolver
@@ -160,18 +272,30 @@ export type Devolucion = {
   recibidoPorId?: string | null;
   estadoRegreso?: string | null;
   nota?: string | null;
+  /**
+   * Cuánto se usó mientras estuvo fuera: la lectura del medidor de la unidad.
+   *
+   * Esto es lo que hace que un dado se rectifique cada 5 000 piezas y no cada
+   * seis meses. Se captura al devolver porque es el único momento en que
+   * alguien sabe el número; pasa por `registrarLectura`, que es quien recalcula
+   * los planes por uso —no se toca el contador a mano—.
+   */
+  lectura?: { meterId: string; valor: number } | null;
 };
 
 /** Cierra un resguardo: la herramienta volvió al almacén. */
-export async function devolver(d: Devolucion): Promise<Resultado<{ id: string; regresoPeor: boolean }>> {
+export async function devolver(
+  d: Devolucion,
+): Promise<Resultado<{ id: string; regresoPeor: boolean; avisoDeLectura: string | null }>> {
   if (d.estadoRegreso && !esEstadoHerramienta(d.estadoRegreso)) return falla("Ese estado de regreso no existe.", 400);
 
   const resguardo = await prisma.resguardo.findFirst({
     where: { id: d.resguardoId, organizationId: d.organizationId },
     select: {
-      id: true, partId: true, warehouseId: true, cantidad: true, devueltoEl: true,
+      id: true, partId: true, warehouseId: true, assetId: true, cantidad: true, devueltoEl: true,
       estadoSalida: true, personaId: true,
       part: { select: { code: true, name: true } },
+      asset: { select: { id: true, code: true, name: true } },
       persona: { select: { name: true } },
     },
   });
@@ -195,20 +319,59 @@ export async function devolver(d: Devolucion): Promise<Resultado<{ id: string; r
         nota: d.nota?.trim() || undefined,
       },
     });
-    // Vuelve a estar disponible. La existencia no se toca: nunca bajó.
-    await tx.partStock.updateMany({
-      where: { partId: resguardo.partId, warehouseId: resguardo.warehouseId },
-      data: { enResguardo: { decrement: resguardo.cantidad } },
-    });
+    /*
+     * Solo la generica mueve `enResguardo`: vuelve a estar disponible, y la
+     * existencia no se toca porque nunca bajo. La serializada no lleva
+     * existencia —es una unidad, esta fuera o no— asi que no hay nada que
+     * devolver al almacen.
+     */
+    if (resguardo.partId && resguardo.warehouseId) {
+      await tx.partStock.updateMany({
+        where: { partId: resguardo.partId, warehouseId: resguardo.warehouseId },
+        data: { enResguardo: { decrement: resguardo.cantidad } },
+      });
+    }
   });
+
+  /*
+   * La lectura va DESPUÉS de cerrar el resguardo y por su propio camino.
+   *
+   * Si fallara —un valor menor que el anterior, por ejemplo— la devolución ya
+   * quedó registrada: la herramienta SÍ regresó, y negarlo porque alguien
+   * tecleó mal el contador sería perder el dato importante por el accesorio.
+   * El motivo se devuelve para que la pantalla lo muestre.
+   */
+  let avisoDeLectura: string | null = null;
+  if (d.lectura) {
+    const medidor = await prisma.meter.findFirst({
+      where: { id: d.lectura.meterId, organizationId: d.organizationId, assetId: resguardo.assetId ?? undefined },
+      select: { id: true },
+    });
+    if (!medidor) {
+      avisoDeLectura = "Se registró la devolución, pero ese medidor no es de este equipo y la lectura no se guardó.";
+    } else {
+      try {
+        await registrarLectura({
+          organizationId: d.organizationId,
+          meterId: d.lectura.meterId,
+          userId: d.recibidoPorId ?? null,
+          value: d.lectura.valor,
+          source: "RESGUARDO",
+          note: `Al devolver ${resguardo.asset?.code ?? ""}`,
+        });
+      } catch (e) {
+        avisoDeLectura = `Se registró la devolución, pero la lectura no: ${e instanceof Error ? e.message : "no se pudo guardar"}`;
+      }
+    }
+  }
 
   const peor = regresoPeor(resguardo.estadoSalida, d.estadoRegreso);
   await logAudit({
     organizationId: d.organizationId, userId: d.recibidoPorId ?? undefined,
     action: "UPDATE", entity: "Resguardo", entityId: resguardo.id,
-    summary: `${resguardo.persona.name} devolvió ${resguardo.cantidad} ${resguardo.part.code}${peor ? " (regresó peor de como salió)" : ""}`,
+    summary: `${resguardo.persona.name} devolvió ${resguardo.cantidad} ${resguardo.part?.code ?? resguardo.asset?.code ?? ""}${peor ? " (regresó peor de como salió)" : ""}`,
   });
-  return { ok: true, dato: { id: resguardo.id, regresoPeor: peor } };
+  return { ok: true, dato: { id: resguardo.id, regresoPeor: peor, avisoDeLectura } };
 }
 
 // ─────────────────────────────────────────── Dar de baja
@@ -240,14 +403,19 @@ export async function darDeBaja(b: Baja): Promise<Resultado<{ costo: number }>> 
   let partId = b.partId ?? null;
   let warehouseId = b.warehouseId ?? null;
   let cantidad = b.cantidad ?? 1;
-  let resguardo: { id: string; personaId: string; cantidad: number; part: { code: string; name: string }; persona: { name: string } } | null = null;
+  let resguardo: {
+    id: string; personaId: string; cantidad: number; assetId: string | null;
+    part: { code: string; name: string } | null; persona: { name: string };
+  } | null = null;
 
   if (b.resguardoId) {
     const r = await prisma.resguardo.findFirst({
       where: { id: b.resguardoId, organizationId: b.organizationId },
       select: {
-        id: true, partId: true, warehouseId: true, cantidad: true, devueltoEl: true, personaId: true,
-        part: { select: { code: true, name: true } }, persona: { select: { name: true } },
+        id: true, partId: true, warehouseId: true, assetId: true, cantidad: true, devueltoEl: true, personaId: true,
+        part: { select: { code: true, name: true } },
+        asset: { select: { code: true, name: true } },
+        persona: { select: { name: true } },
       },
     });
     if (!r) return falla("Ese resguardo no existe en esta empresa.", 404);
@@ -257,6 +425,37 @@ export async function darDeBaja(b: Baja): Promise<Resultado<{ costo: number }>> 
     cantidad = b.cantidad ?? r.cantidad;
     if (cantidad > r.cantidad) return falla(`Ese resguardo es de ${r.cantidad}; no se pueden dar de baja ${cantidad}.`);
     resguardo = r;
+  }
+
+  /*
+   * Una unidad serializada no lleva existencia: no hay nada que descontar del
+   * almacén. Darla de baja es cerrar su resguardo y apagar el activo, que es
+   * lo que el sistema ya entiende por «este equipo dejó de existir».
+   */
+  if (resguardo?.assetId) {
+    const unidad = await prisma.asset.findFirst({
+      where: { id: resguardo.assetId, organizationId: b.organizationId },
+      select: { id: true, code: true, name: true, purchaseCost: true, replacementCost: true },
+    });
+    if (!unidad) return falla("Ese equipo ya no existe en esta empresa.", 404);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.resguardo.update({
+        where: { id: resguardo!.id },
+        data: { devueltoEl: new Date(), motivoBaja: b.motivo, nota: b.nota?.trim() || undefined },
+      });
+      await tx.asset.update({ where: { id: unidad.id }, data: { active: false } });
+    });
+
+    // Lo que costaria reponerla; si no se capturo, lo que costo.
+    const costoUnidad = unidad.replacementCost || unidad.purchaseCost || 0;
+    await logAudit({
+      organizationId: b.organizationId, userId: b.userId ?? undefined,
+      action: "DELETE", entity: "Resguardo", entityId: resguardo.id,
+      summary: `Baja de ${unidad.code} — ${unidad.name}: ${b.motivo} (la traía ${resguardo.persona.name})`,
+      changes: { motivo: b.motivo, costo: costoUnidad },
+    });
+    return { ok: true, dato: { costo: costoUnidad } };
   }
 
   if (!partId || !warehouseId) return falla("Falta decir qué herramienta y de qué almacén.", 400);
@@ -324,6 +523,7 @@ export async function loQueEstaFuera(
     orderBy: { entregadoEl: "asc" },
     include: {
       part: { select: { id: true, code: true, name: true, unit: true, unitCost: true } },
+      asset: { select: { id: true, code: true, name: true, purchaseCost: true, replacementCost: true } },
       persona: { select: { id: true, name: true } },
       warehouse: { select: { id: true, name: true } },
       entregadoPor: { select: { name: true } },
@@ -332,6 +532,18 @@ export async function loQueEstaFuera(
 
   return filas.map((r) => ({
     ...r,
+    /**
+     * Lo prestado, venga de una refacción del almacén o de una unidad
+     * serializada. Se normaliza aquí para que ni las pantallas ni los reportes
+     * tengan que preguntar de cuál de los dos se trata cada vez.
+     */
+    articulo: r.part
+      ? { id: r.part.id, code: r.part.code, name: r.part.name, costo: r.part.unitCost, serializada: false }
+      : {
+          id: r.asset!.id, code: r.asset!.code, name: r.asset!.name,
+          costo: r.asset!.replacementCost || r.asset!.purchaseCost || 0,
+          serializada: true,
+        },
     dias: diasFuera(r.entregadoEl, ahora),
     /** Lo que lleva demasiado tiempo fuera: es lo que hay que ir a buscar. */
     seTardo: diasFuera(r.entregadoEl, ahora) >= DIAS_PARA_AVISAR,
@@ -348,7 +560,7 @@ export async function quienTraeQue(organizationId: string, ahora = new Date()) {
       persona: r.persona, piezas: 0, valor: 0, masViejo: 0, cosas: [] as typeof fuera,
     };
     actual.piezas += r.cantidad;
-    actual.valor += r.cantidad * r.part.unitCost;
+    actual.valor += r.cantidad * r.articulo.costo;
     actual.masViejo = Math.max(actual.masViejo, r.dias);
     actual.cosas.push(r);
     porPersona.set(r.personaId, actual);
@@ -388,10 +600,17 @@ export async function perdidasPorPersona(
     },
     include: {
       part: { select: { id: true, code: true, name: true, unitCost: true } },
+      asset: { select: { id: true, code: true, name: true, purchaseCost: true, replacementCost: true } },
       persona: { select: { id: true, name: true } },
     },
     orderBy: { devueltoEl: "desc" },
   });
+
+  /** Lo perdido, sin importar si era del almacén o una unidad serializada. */
+  const queEra = (b: (typeof bajas)[number]) =>
+    b.part
+      ? { id: b.part.id, code: b.part.code, name: b.part.name, costo: b.part.unitCost }
+      : { id: b.asset!.id, code: b.asset!.code, name: b.asset!.name, costo: b.asset!.replacementCost || b.asset!.purchaseCost || 0 };
 
   const atribuibles = bajas.filter((b) => seLeAtribuye(b.motivoBaja!));
 
@@ -402,16 +621,17 @@ export async function perdidasPorPersona(
   }>();
 
   for (const b of atribuibles) {
-    const costo = b.cantidad * b.part.unitCost;
+    const era = queEra(b);
+    const costo = b.cantidad * era.costo;
     const actual = porPersona.get(b.personaId) ?? {
       persona: b.persona, piezas: 0, costo: 0, porHerramienta: new Map(),
     };
     actual.piezas += b.cantidad;
     actual.costo += costo;
-    const h = actual.porHerramienta.get(b.partId) ?? { code: b.part.code, name: b.part.name, piezas: 0, costo: 0 };
+    const h = actual.porHerramienta.get(era.id) ?? { code: era.code, name: era.name, piezas: 0, costo: 0 };
     h.piezas += b.cantidad;
     h.costo += costo;
-    actual.porHerramienta.set(b.partId, h);
+    actual.porHerramienta.set(era.id, h);
     porPersona.set(b.personaId, actual);
   }
 
@@ -435,7 +655,7 @@ export async function perdidasPorPersona(
      * escondería que la herramienta se está acabando.
      */
     porDesgaste: bajas.filter((b) => !seLeAtribuye(b.motivoBaja!)).reduce(
-      (a, b) => ({ piezas: a.piezas + b.cantidad, costo: a.costo + b.cantidad * b.part.unitCost }),
+      (a, b) => ({ piezas: a.piezas + b.cantidad, costo: a.costo + b.cantidad * queEra(b).costo }),
       { piezas: 0, costo: 0 },
     ),
   };
@@ -494,7 +714,7 @@ export async function avisarDeLoNoDevuelto(organizationId: string, ahora = new D
   if (!atrasadas.length) return { avisados: 0, piezas: 0 };
 
   const responsables = await prisma.warehouse.findMany({
-    where: { organizationId, id: { in: [...new Set(atrasadas.map((r) => r.warehouseId))] } },
+    where: { organizationId, id: { in: [...new Set(atrasadas.map((r) => r.warehouseId).filter((x): x is string => Boolean(x)))] } },
     select: { id: true, name: true, responsableId: true },
   });
 
@@ -510,7 +730,7 @@ export async function avisarDeLoNoDevuelto(organizationId: string, ahora = new D
       title: `${suyas.length} ${suyas.length === 1 ? "herramienta lleva" : "herramientas llevan"} más de ${DIAS_PARA_AVISAR} días fuera`,
       body: suyas
         .slice(0, 5)
-        .map((r) => `${r.part.code} — ${r.persona.name}, ${r.dias} días`)
+        .map((r) => `${r.articulo.code} — ${r.persona.name}, ${r.dias} días`)
         .join("; "),
       link: "/inventory/herramientas",
       modulo: "ALMACEN",

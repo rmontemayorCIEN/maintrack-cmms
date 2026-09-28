@@ -726,6 +726,19 @@ model Asset {
   centroDeCostoId   String?
   parentId          String?
   code              String
+  /// Si este activo SALE Y REGRESA con un responsable: un torquimetro, un
+  /// dado de fresadora, una camara termografica, un auto de cortesia.
+  ///
+  /// La herramienta cara e individual NO necesita un padron aparte: como
+  /// activo ya tiene expediente, QR, ubicacion, costo, calibracion que vence y
+  /// —lo que importa aqui— MEDIDOR con plan por uso. Un dado no se rectifica
+  /// cada seis meses: se rectifica cada 5 000 piezas, y ese motor ya existe.
+  ///
+  /// Lo generico por cantidad —diez pinzas— vive en el catalogo del almacen
+  /// como `Part` con naturaleza HERRAMIENTA. Son dos casos distintos a
+  /// proposito: serializar diez pinzas de 200 pesos es trabajo muerto que
+  /// nadie sostiene tres meses.
+  sePresta          Boolean   @default(false)
   name              String
   description       String?
   manufacturer      String?
@@ -806,6 +819,7 @@ model Asset {
   conjuntos        ConjuntoAsset[]
   comentarios      Comentario[]
 
+  resguardos        Resguardo[]
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
@@ -4316,8 +4330,16 @@ model TokenOAuth {
 model Resguardo {
   id             String @id @default(cuid())
   organizationId String
-  partId         String
-  warehouseId    String
+
+  /// De que cuelga: EXACTAMENTE uno de los dos, y lo cuida `lib/herramientas.ts`.
+  ///
+  /// `partId` es la herramienta generica del almacen, que se presta por
+  /// cantidad y necesita saber de que almacen salio. `assetId` es la unidad
+  /// serializada —el dado con su numero de serie—, que es unica: o esta fuera
+  /// o no lo esta, y no vive en un almacen.
+  partId         String?
+  warehouseId    String?
+  assetId        String?
 
   /// Quien la tiene. Es el responsable, no necesariamente quien la pidio.
   personaId String
@@ -4347,8 +4369,9 @@ model Resguardo {
   updatedAt DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  part         Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
-  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  part         Part?        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
   persona      User         @relation("ResguardoDe", fields: [personaId], references: [id])
   entregadoPor User?        @relation("ResguardoEntrego", fields: [entregadoPorId], references: [id])
   recibidoPor  User?        @relation("ResguardoRecibio", fields: [recibidoPorId], references: [id])
@@ -4358,4 +4381,6 @@ model Resguardo {
   /// Que trae cada quien.
   @@index([personaId, devueltoEl])
   @@index([partId, devueltoEl])
+  /// Si esta unidad esta fuera ahora: es la pregunta al prestar una serializada.
+  @@index([assetId, devueltoEl])
 }

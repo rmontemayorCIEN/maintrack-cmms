@@ -145,7 +145,7 @@ async function main() {
 
     console.log("\n5. Devolver\n");
     const fuera1 = await loQueEstaFuera(A.id);
-    revisar("hay tres cosas fuera", fuera1.length === 3, fuera1.map((r) => `${r.part.code}/${r.persona.name}`));
+    revisar("hay tres cosas fuera", fuera1.length === 3, fuera1.map((r) => `${r.articulo.code}/${r.persona.name}`));
 
     const deAna = fuera1.find((r) => r.personaId === ana.id)!;
     const dev = await devolver({ organizationId: A.id, resguardoId: deAna.id, recibidoPorId: almacenista.id, estadoRegreso: "PARA_REPARAR" });
@@ -165,7 +165,7 @@ async function main() {
       !(await devolver({ organizationId: B.id, resguardoId: deAna.id })).ok);
 
     console.log("\n6. Dar de baja: aquí SÍ se mueve el dinero\n");
-    const deQuienSePierde = (await loQueEstaFuera(A.id)).find((r) => r.personaId === pedro.id && r.part.id === calibrador.id)!;
+    const deQuienSePierde = (await loQueEstaFuera(A.id)).find((r) => r.personaId === pedro.id && r.articulo.id === calibrador.id)!;
     const baja = await darDeBaja({ organizationId: A.id, resguardoId: deQuienSePierde.id, motivo: "PERDIDA", userId: almacenista.id });
     revisar("se da de baja el calibrador que traía Pedro", baja.ok, baja.ok ? undefined : baja.motivo);
     revisar("y el costo sale del costo promedio del almacén, no de un número inventado",
@@ -192,7 +192,7 @@ async function main() {
     const otro = await prestar({ organizationId: A.id, partId: calibrador.id, warehouseId: almacen.id, personaId: pedro.id, entregadoPorId: almacenista.id });
     if (otro.ok) await darDeBaja({ organizationId: A.id, resguardoId: otro.dato.id, motivo: "PERDIDA", userId: almacenista.id });
 
-    const dePinza = (await loQueEstaFuera(A.id)).find((r) => r.part.id === pinzas.id)!;
+    const dePinza = (await loQueEstaFuera(A.id)).find((r) => r.articulo.id === pinzas.id)!;
     await darDeBaja({ organizationId: A.id, resguardoId: dePinza.id, motivo: "FIN_DE_VIDA", userId: almacenista.id });
 
     const reporte = await perdidasPorPersona(A.id);
@@ -248,6 +248,108 @@ async function main() {
     revisar("separa lo que hay, lo prestado y lo libre",
       pan.filas.every((f) => f.libres === Math.max(0, f.total - f.prestadas)), pan.filas.map((f) => ({ c: f.code, t: f.total, p: f.prestadas, l: f.libres })));
     revisar("y valúa el almacén de herramientas", pan.valorTotal > 0, pan.valorTotal);
+
+    console.log("\n10. La unidad serializada: el dado\n");
+    /*
+     * El caso que Rafael marcó con «ojo aquí»: un dado no se rectifica cada
+     * seis meses, se rectifica cada X piezas. Se modela como ACTIVO —no como
+     * un modelo nuevo— y por eso hereda el medidor y el plan por uso que ya
+     * existen.
+     */
+    const dado = await prisma.asset.create({
+      data: {
+        organizationId: A.id, siteId: sitio.id, code: "DAD-01", name: "Dado de fresadora 40 mm",
+        sePresta: true, purchaseCost: 18_000, replacementCost: 20_000,
+      },
+    });
+    const noPrestable = await prisma.asset.create({
+      data: { organizationId: A.id, siteId: sitio.id, code: "TOR-01", name: "Torno CNC", sePresta: false },
+    });
+    const medidor = await prisma.meter.create({
+      data: { organizationId: A.id, assetId: dado.id, name: "Piezas maquinadas", tipo: "CICLOS", unit: "pzas", currentValue: 4_200 },
+    });
+
+    revisar("un equipo que NO se presta se rechaza, y lo dice",
+      !(await prestar({ organizationId: A.id, assetId: noPrestable.id, personaId: pedro.id, entregadoPorId: almacenista.id })).ok);
+    revisar("no se puede pedir refacción y unidad a la vez",
+      !(await prestar({ organizationId: A.id, partId: pinzas.id, warehouseId: almacen.id, assetId: dado.id, personaId: pedro.id, entregadoPorId: almacenista.id })).ok);
+    revisar("ni ninguna de las dos",
+      !(await prestar({ organizationId: A.id, personaId: pedro.id, entregadoPorId: almacenista.id })).ok);
+    revisar("un equipo de otra empresa no se presta",
+      !(await prestar({ organizationId: B.id, assetId: dado.id, personaId: ajeno.id })).ok);
+
+    const conDado = await prestar({
+      organizationId: A.id, assetId: dado.id, personaId: pedro.id,
+      entregadoPorId: almacenista.id, estadoSalida: "BUENA", proposito: "Corrida de 800 piezas",
+    });
+    revisar("el dado se presta", conDado.ok, conDado.ok ? undefined : conDado.motivo);
+
+    const repetido = await prestar({ organizationId: A.id, assetId: dado.id, personaId: ana.id, entregadoPorId: almacenista.id });
+    revisar("una unidad ya prestada NO se presta dos veces, y dice quién la tiene",
+      !repetido.ok && repetido.motivo.includes("Pedro"), repetido.ok ? undefined : repetido.motivo);
+
+    const fueraConDado = await loQueEstaFuera(A.id);
+    const elDado = fueraConDado.find((r) => r.assetId === dado.id)!;
+    revisar("aparece entre lo que está fuera, con su nombre", elDado?.articulo.code === "DAD-01", elDado?.articulo);
+    revisar("y se valúa con lo que cuesta reponerlo", elDado?.articulo.costo === 20_000, elDado?.articulo.costo);
+    revisar("va marcado como serializada", elDado?.articulo.serializada === true);
+
+    console.log("\n11. Al devolverlo se captura el uso, y eso mueve el plan\n");
+    const devDado = await devolver({
+      organizationId: A.id, resguardoId: elDado.id, recibidoPorId: almacenista.id,
+      estadoRegreso: "USADA", lectura: { meterId: medidor.id, valor: 5_000 },
+    });
+    revisar("se devuelve y se registra la lectura", devDado.ok && devDado.dato.avisoDeLectura === null,
+      devDado.ok ? devDado.dato : devDado.motivo);
+    const trasUso = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id }, select: { currentValue: true } });
+    revisar("el contador del dado subió a lo que se capturó", trasUso.currentValue === 5_000, trasUso);
+    const lecturas = await prisma.meterReading.count({ where: { meterId: medidor.id } });
+    revisar("y quedó como lectura, por el mismo camino que cualquier otra", lecturas === 1, { lecturas });
+
+    // Una lectura mala NO debe tirar la devolucion: la herramienta si regreso.
+    await prestar({ organizationId: A.id, assetId: dado.id, personaId: ana.id, entregadoPorId: almacenista.id, estadoSalida: "USADA" });
+    const otraVez = (await loQueEstaFuera(A.id)).find((r) => r.assetId === dado.id)!;
+    const conLecturaMala = await devolver({
+      organizationId: A.id, resguardoId: otraVez.id, recibidoPorId: almacenista.id,
+      estadoRegreso: "USADA", lectura: { meterId: medidor.id, valor: 10 },
+    });
+    revisar("una lectura imposible NO tira la devolución: la herramienta sí regresó",
+      conLecturaMala.ok && Boolean(conLecturaMala.dato.avisoDeLectura),
+      conLecturaMala.ok ? conLecturaMala.dato.avisoDeLectura : conLecturaMala.motivo);
+    const sigueFuera = (await loQueEstaFuera(A.id)).some((r) => r.assetId === dado.id);
+    revisar("y el dado ya no aparece como prestado", !sigueFuera);
+    const contadorIgual = await prisma.meter.findUniqueOrThrow({ where: { id: medidor.id }, select: { currentValue: true } });
+    revisar("el contador NO retrocedió", contadorIgual.currentValue === 5_000, contadorIgual);
+
+    const deOtroEquipo = await prisma.meter.create({
+      data: { organizationId: A.id, assetId: noPrestable.id, name: "Horómetro", unit: "h", currentValue: 10 },
+    });
+    await prestar({ organizationId: A.id, assetId: dado.id, personaId: pedro.id, entregadoPorId: almacenista.id });
+    const tercera = (await loQueEstaFuera(A.id)).find((r) => r.assetId === dado.id)!;
+    const medidorAjeno = await devolver({
+      organizationId: A.id, resguardoId: tercera.id, recibidoPorId: almacenista.id,
+      lectura: { meterId: deOtroEquipo.id, valor: 99 },
+    });
+    revisar("un medidor que no es de ese equipo se rechaza, sin tirar la devolución",
+      medidorAjeno.ok && Boolean(medidorAjeno.dato.avisoDeLectura),
+      medidorAjeno.ok ? medidorAjeno.dato.avisoDeLectura : undefined);
+
+    console.log("\n12. Perder una unidad serializada\n");
+    await prestar({ organizationId: A.id, assetId: dado.id, personaId: pedro.id, entregadoPorId: almacenista.id });
+    const paraPerder = (await loQueEstaFuera(A.id)).find((r) => r.assetId === dado.id)!;
+    const bajaDado = await darDeBaja({ organizationId: A.id, resguardoId: paraPerder.id, motivo: "PERDIDA", userId: almacenista.id });
+    revisar("se da de baja con lo que cuesta reponerlo", bajaDado.ok && bajaDado.dato.costo === 20_000,
+      bajaDado.ok ? bajaDado.dato : bajaDado.motivo);
+    const dadoTrasBaja = await prisma.asset.findUniqueOrThrow({ where: { id: dado.id }, select: { active: true } });
+    revisar("y el equipo queda dado de baja", dadoTrasBaja.active === false);
+    const kardexDelDado = await prisma.stockMovement.count({ where: { organizationId: A.id, partId: dado.id } });
+    revisar("sin tocar el kardex: una unidad serializada no lleva existencia", kardexDelDado === 0);
+
+    const reporteFinal = await perdidasPorPersona(A.id);
+    const dePedro = reporteFinal.personas.find((x) => x.persona.name === "Pedro")!;
+    revisar("el dado entra al reporte de pérdidas de Pedro",
+      dePedro.herramientas.some((h) => h.code === "DAD-01" && h.costo === 20_000),
+      dePedro.herramientas);
   } finally {
     await prisma.organization.delete({ where: { id: A.id } });
     await prisma.organization.delete({ where: { id: B.id } });
