@@ -133,8 +133,15 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         </p>
       ) : null}
 
+      {/* min-w-0 en las dos columnas, como ya lo tienen planes e inventario.
+          Sin eso una columna de reja no baja de su contenido minimo: la tabla
+          de renglones mide 600 px, la columna se planta en 600, y la tarjeta
+          de datos de la derecha se sale de la pantalla. La tabla YA sabe
+          desplazarse —`table-wrap` trae overflow-x— pero nunca tiene la
+          oportunidad. Lo encontro la suite corriendo en Linux; en la Mac
+          cabia por poco y no se veia. */}
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <Card padded={false}>
             <div className="table-wrap">
               <table className="data">
@@ -232,7 +239,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           />
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           <Card>
             <p className="text-xs font-semibold text-slate-800">Datos</p>
             <dl className="mt-2 grid gap-1.5 text-xs">
