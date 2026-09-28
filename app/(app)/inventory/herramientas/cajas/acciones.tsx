@@ -227,6 +227,10 @@ export function RecibirCaja({
   const [ocupado, setOcupado] = useState(false);
 
   async function recibir() {
+    if (!regresaron.length) {
+      setError("No marcó ninguna pieza. Si de verdad no regresó nada, cierre sin recibir: la caja sigue a nombre de quien la trae.");
+      return;
+    }
     setOcupado(true);
     setError(null);
     const r = await fetch(`/api/herramientas/cajas/${grupo}`, {
@@ -245,8 +249,13 @@ export function RecibirCaja({
   }
 
   if (!abierto) {
+    // Se vuelve a marcar todo con las piezas de HOY, no con las de cuando se
+    // monto el componente: si la caja ya regreso a medias, `piezas` trae solo
+    // lo que sigue fuera y el estado viejo apuntaba a resguardos ya cerrados.
+    // Sin esto, al reabrir no venia nada marcado y «Recibir» no hacia nada ni
+    // decia por que.
     return (
-      <button type="button" onClick={() => setAbierto(true)}
+      <button type="button" onClick={() => { setRegresaron(piezas.map((p) => p.id)); setError(null); setAbierto(true); }}
         className="rounded-lg border border-slate-300 px-2 py-1 text-[0.6875rem] text-slate-700 hover:bg-slate-50">
         Recibir
       </button>
