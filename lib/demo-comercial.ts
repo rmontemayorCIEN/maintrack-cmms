@@ -19,6 +19,7 @@ import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { logAudit } from "./audit";
 import { sembrarCatalogosEstandar } from "./catalogos-estandar";
 import { alertaAbierta } from "./alertas";
+import { ESTADOS_ABIERTOS, filtroDeVencidas } from "./vencimiento";
 
 /**
  * La empresa demostrativa (Bloque 7).
@@ -760,9 +761,75 @@ export async function poblarDemo(orgId: string, ahora = new Date()) {
 
   await registrosPropiosDeLaDemo(c);
 
+  await fijarElAtraso(c);
+
   // Avisos: los que el propio sistema detecta con estos datos, no mensajes escritos a mano.
   await detectar(orgId, await configDe(orgId, ahora), ahora);
   return resumenDemo(orgId);
+}
+
+/**
+ * Deja SIEMPRE dos ordenes vencidas, y una de ellas SIEMPRE la caldera.
+ *
+ * El programador calcula el vencimiento de cada preventivo y lo recorre al
+ * siguiente dia habil. Cuantas caen en el pasado depende entonces del dia de
+ * la semana en que se arme la demo: unas veces una, otras tres. Delante de un
+ * prospecto eso es una planta distinta cada vez, y ninguna elegida.
+ *
+ * Dos es la lectura que se quiere, por la misma razon que VIGENCIAS reparte
+ * sus estados: hay atraso —o sea que el modulo sirve para algo— sin que se lea
+ * como una planta abandonada.
+ *
+ * Y la caldera no es un detalle: `demo-guia.ts` le dice a quien demuestra
+ * «abra las dos OT vencidas: una es la revision de la caldera, equipo
+ * critico». Elegirlas por fecha dejaba eso al azar —y un guion que manda abrir
+ * algo que no esta es peor que no tener guion—.
+ *
+ * Se mueven solo las ordenes DE PLAN. Las correctivas, la que nace de una
+ * solicitud y la que nace de una alerta traen su fecha calculada por el
+ * sistema —esa es justo la regla de dia habil que la demo quiere enseñar— y
+ * pisarla seria borrar lo que se va a demostrar.
+ */
+async function fijarElAtraso(c: Contexto) {
+  /** Dias de atraso. El primero es el de la caldera: la mas atrasada. */
+  const ATRASO = [6, 2];
+  const CRITICA = "CAL-203";
+
+  const dePlan = await prisma.workOrder.findMany({
+    where: { organizationId: c.orgId, planId: { not: null }, status: { in: [...ESTADOS_ABIERTOS] } },
+    select: { id: true, dueDate: true, asset: { select: { code: true } } },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+  });
+  if (dePlan.length < ATRASO.length + 1) {
+    throw new Error(`La demo quedo con ${dePlan.length} preventivos abiertos: no alcanzan para ${ATRASO.length} vencidos y algo por delante.`);
+  }
+  const caldera = dePlan.find((o) => o.asset?.code === CRITICA);
+  if (!caldera) {
+    throw new Error(`Ningun preventivo abierto de ${CRITICA}: el guion de la demostracion manda abrirlo y no estaria.`);
+  }
+
+  // La caldera primero; las demas por fecha, como ya venian.
+  const orden = [caldera, ...dePlan.filter((o) => o.id !== caldera.id)];
+  for (const [i, o] of orden.entries()) {
+    // Las demas quedan por delante, y NUNCA hoy: el limite de `filtroDeVencidas`
+    // es la medianoche de hoy en la zona de la empresa, asi que una orden que
+    // vence hoy cae de un lado o del otro segun la zona y el cambio de horario.
+    const vence = i < ATRASO.length ? hace(c, ATRASO[i]) : new Date(c.ahora.getTime() + (2 + i) * DIA);
+    if (o.dueDate?.getTime() !== vence.getTime()) {
+      await prisma.workOrder.update({ where: { id: o.id }, data: { dueDate: vence } });
+    }
+  }
+
+  // Se comprueba con el MISMO criterio que usa el inicio, no con uno parecido:
+  // si el dia de manana cambia la regla de vencimiento, esto tiene que gritar
+  // aqui y no quedarse callado hasta que alguien ensene la demo.
+  const org = await prisma.organization.findUniqueOrThrow({ where: { id: c.orgId }, select: { timezone: true } });
+  const vencidas = await prisma.workOrder.count({
+    where: { organizationId: c.orgId, ...filtroDeVencidas(org.timezone, c.ahora) },
+  });
+  if (vencidas !== ATRASO.length) {
+    throw new Error(`La demo quedo con ${vencidas} OT vencidas y se querian ${ATRASO.length}.`);
+  }
 }
 
 /**

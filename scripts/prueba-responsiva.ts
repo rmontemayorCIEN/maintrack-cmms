@@ -37,6 +37,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SignJWT } from "jose";
 import { levantarServidor } from "./servidor-de-prueba";
+// Cuantos formatos hay lo decide el catalogo, no esta prueba: con el numero
+// escrito aqui, quitar una plantilla rompia una prueba de OTRO modulo.
+import { PLANTILLAS } from "../lib/registros-plantillas";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -1591,7 +1594,7 @@ async function main() {
           };
         })()`);
         revisar("    el armador abre en los formatos ya hechos, con «en blanco» al final",
-          !armador.desborde && formatos.cuantos === 7 && formatos.contratos && formatos.blanco && formatos.porQue, formatos);
+          !armador.desborde && formatos.cuantos === PLANTILLAS.length && formatos.contratos && formatos.blanco && formatos.porQue, formatos);
         await captura("1440-admin-registros-armar");
 
         // En el telefono: es donde se captura una bitacora, caminando.
