@@ -101,6 +101,16 @@ else
       --replication-policy=automatic --data-file=-
   fi
   unset CADENA
+
+  # Quien lee el secreto NO es la cuenta que publica, sino aquella con la que
+  # CORRE el contenedor. Los secretos de produccion ya la traen desde que se
+  # creo el servicio; uno nuevo nace sin ella y el despliegue muere al crear
+  # la revision —despues de construir la imagen entera, que es lo caro—.
+  CORRE_COMO="$(gcloud projects describe "$PROYECTO" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
+  gcloud secrets add-iam-policy-binding "$SECRETO" --project "$PROYECTO" \
+    --member="serviceAccount:$CORRE_COMO" \
+    --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+  echo "      y la cuenta que corre el contenedor ya puede leerlo."
 fi
 
 echo ""
