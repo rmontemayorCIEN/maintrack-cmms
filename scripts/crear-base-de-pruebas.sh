@@ -63,8 +63,13 @@ else
   echo "1/4  Creando la instancia (tarda varios minutos)..."
   # Sin respaldos automaticos ni alta disponibilidad: son datos de prueba que
   # se pueden volver a sembrar. Pagar por protegerlos seria pagar de mas.
+  # --edition=ENTERPRISE no es opcional: las instancias nuevas nacen en
+  # ENTERPRISE_PLUS, que NO admite db-f1-micro y rechaza la creacion con un
+  # 400. Es ademas la edicion de maintrack-db, asi que la de pruebas se parece
+  # a la de produccion, que es de lo que se trata.
   gcloud sql instances create "$INSTANCIA" --project "$PROYECTO" \
-    --database-version=POSTGRES_16 --tier=db-f1-micro --region="$REGION" \
+    --database-version=POSTGRES_16 --edition=ENTERPRISE --tier=db-f1-micro \
+    --region="$REGION" \
     --storage-size=10 --storage-type=SSD --availability-type=ZONAL \
     --no-backup --quiet
 fi
