@@ -153,6 +153,18 @@ EXTRA=""
 if [ -n "${ETIQUETA:-}" ]; then
   EXTRA="--tag=$ETIQUETA"
   [ "${SIN_TRAFICO:-0}" = "1" ] && EXTRA="$EXTRA --no-traffic"
+else
+  # --to-latest NO es redundante, y costo caro descubrirlo.
+  #
+  # Una vista previa se publica con --no-traffic, y eso cambia el reparto del
+  # servicio de «siempre la ultima» a «esta revision y solo esta». A partir de
+  # ahi cada despliegue de produccion creaba su revision y el trafico se
+  # quedaba clavado en la anterior: la liberacion decia que todo bien y los
+  # clientes seguian con el codigo viejo.
+  #
+  # Peor todavia: la prueba de humo pegaba contra la direccion del servicio
+  # —que servia lo viejo— y pasaba. Verde por todos lados y nada publicado.
+  EXTRA="--to-latest"
 fi
 
 echo "Proyecto  : $(gcloud config get-value project 2>/dev/null)"
