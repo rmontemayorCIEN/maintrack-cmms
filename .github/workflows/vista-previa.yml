@@ -1,0 +1,115 @@
+# Una version de prueba por cada propuesta de cambio, con su propia liga.
+#
+# Es lo que hace posible el flujo que pidio Rafael: el equipo construye,
+# Calidad prueba ESTA liga contra los criterios de aceptacion, y solo despues
+# se libera. Sin esto, «probado» significaria «se ve bien en la maquina de
+# quien lo hizo».
+#
+# Dos cosas que no se tocan:
+#   - Sale SIN trafico. Una propuesta sin revisar no puede llevarse clientes.
+#   - Usa la base de PRUEBAS y su propia instancia de Cloud SQL. Nunca la de
+#     produccion: ahi viven los datos de Casa Montemayor, Acero Industrial y
+#     Minerales Metalicos.
+name: Version de prueba
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: vista-previa-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PROYECTO: maintrack-cmms-4821
+  SERVICIO: maintrack-cmms
+  REGION: us-central1
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Sin la instancia de pruebas configurada esto no corre: mas vale no tener
+    # vista previa que tener una apuntando a los datos de los clientes.
+    if: vars.SQL_PRUEBAS != ''
+
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write     # para dejar la liga en la propuesta
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_CUENTA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Poner el esquema en PostgreSQL
+        run: ./scripts/use-postgres.sh
+
+      - name: Migrar la base de PRUEBAS
+        run: |
+          set -euo pipefail
+          CONEXION=$(gcloud sql instances describe "${{ vars.SQL_PRUEBAS }}" \
+                     --project "$PROYECTO" --format='value(connectionName)')
+          curl -sSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --port 5432 "$CONEXION" &
+          for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && break; sleep 1; done
+          CADENA=$(gcloud secrets versions access latest --secret="${{ vars.SECRETO_DB_PRUEBAS }}" --project "$PROYECTO")
+          CLAVE=$(printf '%s' "$CADENA" | sed -n 's|^postgresql://maintrack:\(.*\)@localhost/maintrack?host=.*$|\1|p')
+          [ -z "$CLAVE" ] && { echo "No se pudo leer la cadena de la base de pruebas."; exit 1; }
+          DATABASE_URL="postgresql://maintrack:$CLAVE@127.0.0.1:5432/maintrack" npx prisma migrate deploy
+
+      # El comando NO se escribe aqui: deploy.sh es el unico que conoce la
+      # lista completa de secretos. Solo se le dicen las diferencias.
+      - name: Publicar la version de prueba
+        id: publicar
+        env:
+          ETIQUETA: pr-${{ github.event.pull_request.number }}
+          SIN_TRAFICO: "1"
+          SECRETO_DB: ${{ vars.SECRETO_DB_PRUEBAS }}
+          INSTANCIA_SQL: ${{ vars.SQL_PRUEBAS }}
+        run: |
+          set -euo pipefail
+          npm run deploy
+          URL=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                --format=json | jq -r --arg t "pr-${{ github.event.pull_request.number }}" \
+                '.status.traffic[] | select(.tag==$t) | .url')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Revisar que atienda
+        run: npx tsx scripts/humo.ts "${{ steps.publicar.outputs.url }}"
+
+      - name: Dejar la liga en la propuesta
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = "${{ steps.publicar.outputs.url }}";
+            const cuerpo = [
+              "### Version de prueba lista",
+              "",
+              `**${url}**`,
+              "",
+              "Sin trafico real y contra la base de PRUEBAS: lo que se capture aqui no toca",
+              "los datos de ningun cliente.",
+              "",
+              "Calidad prueba en esta liga. Se libera a produccion solo cuando Rafael",
+              "apruebe la fusion a `main`.",
+            ].join("\n");
+            const previos = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            // Se edita el comentario anterior en vez de apilar uno por empujon.
+            const mio = previos.data.find((c) => c.body.startsWith("### Version de prueba"));
+            if (mio) await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: mio.id, body: cuerpo });
+            else await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: cuerpo });

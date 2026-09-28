@@ -5,6 +5,19 @@
 #
 # Sube el contenido de esta carpeta, Cloud Build arma la imagen a partir del
 # Dockerfile y Cloud Run la pone en linea. No hace falta Docker ni GitHub.
+#
+# ── Vistas previas (las usa GitHub Actions; a mano casi nunca hacen falta)
+#
+#   ETIQUETA=pr-42 SIN_TRAFICO=1 SECRETO_DB=cmms-database-url-pruebas npm run deploy
+#
+# Publica una revision con su propia liga y SIN llevarse el trafico, contra la
+# base de PRUEBAS. Sirve para que Calidad pruebe un cambio antes de liberarlo.
+#
+# Estas opciones viven AQUI y no escritas en el workflow a proposito: este
+# archivo es el unico lugar que conoce la lista completa de secretos, el bucket
+# y la conexion a Cloud SQL. Un `gcloud run deploy` copiado a otro lado se
+# lleva todo eso por delante —ya paso, y los avisos al celular se apagaron sin
+# que nada fallara—.
 set -euo pipefail
 source "$(dirname "$0")/proyecto.sh"
 
@@ -12,7 +25,10 @@ cd "$(dirname "$0")/.."
 
 SERVICIO=maintrack-cmms
 REGION=us-central1
-INSTANCIA_SQL=maintrack-db
+# La instancia tambien se puede cambiar: una vista previa NO se conecta a la
+# base de los clientes. Sin esto, separar la base por secreto no serviria de
+# nada porque el contenedor seguiria montando la instancia de produccion.
+INSTANCIA_SQL="${INSTANCIA_SQL:-maintrack-db}"
 BUCKET_ARCHIVOS="$(gcloud config get-value project 2>/dev/null)-archivos"
 
 command -v gcloud >/dev/null || { echo "ERROR: gcloud no esta en el PATH."; exit 1; }
@@ -76,7 +92,10 @@ fi
 
 # La llave de Anthropic es opcional: mientras no exista el secreto, la app se
 # publica igual y las funciones de IA quedan visibles pero inactivas.
-SECRETOS="DATABASE_URL=cmms-database-url:latest,AUTH_SECRET=cmms-auth-secret:latest,CRON_SECRET=cmms-cron-secret:latest"
+# Por omision la base de produccion. Una vista previa pasa la suya, que es lo
+# unico que la separa de los datos de los clientes.
+SECRETO_DB="${SECRETO_DB:-cmms-database-url}"
+SECRETOS="DATABASE_URL=$SECRETO_DB:latest,AUTH_SECRET=cmms-auth-secret:latest,CRON_SECRET=cmms-cron-secret:latest"
 if gcloud secrets describe cmms-anthropic-key >/dev/null 2>&1; then
   SECRETOS="$SECRETOS,ANTHROPIC_API_KEY=cmms-anthropic-key:latest"
   IA="habilitada"
@@ -99,7 +118,17 @@ else
   AVISOS="no configurados (faltan las llaves VAPID)"
 fi
 
+# Una vista previa nace con su propia liga y sin trafico. Sin --no-traffic la
+# revision de una propuesta sin revisar se llevaria a los clientes de golpe.
+EXTRA=""
+if [ -n "${ETIQUETA:-}" ]; then
+  EXTRA="--tag=$ETIQUETA"
+  [ "${SIN_TRAFICO:-0}" = "1" ] && EXTRA="$EXTRA --no-traffic"
+fi
+
 echo "Proyecto  : $(gcloud config get-value project 2>/dev/null)"
+echo "Base      : $SECRETO_DB"
+[ -n "$EXTRA" ] && echo "Vista prev: $EXTRA"
 echo "Cloud SQL : $INSTANCIA"
 echo "Archivos  : gs://$BUCKET_ARCHIVOS"
 echo "IA        : $IA"
@@ -107,7 +136,15 @@ echo "Avisos    : $AVISOS"
 echo "Publicando $SERVICIO en $REGION..."
 echo ""
 
+# Para poder revisar que se va a ejecutar sin publicar nada. Lo usa la prueba
+# del propio script: una bandera mal armada no se descubre desplegando.
+if [ "${MOSTRAR_COMANDO:-0}" = "1" ]; then
+  echo "gcloud run deploy $SERVICIO --source . --region $REGION --add-cloudsql-instances=$INSTANCIA --set-secrets=$SECRETOS $EXTRA"
+  exit 0
+fi
+
 if ! gcloud run deploy "$SERVICIO" \
+  ${EXTRA:+$EXTRA} \
   --source . \
   --region "$REGION" \
   --platform managed \

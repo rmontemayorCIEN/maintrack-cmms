@@ -1,0 +1,47 @@
+# Al cerrar una propuesta, su version de prueba se borra.
+#
+# Sin esto cada propuesta deja una revision viva para siempre: se acumulan,
+# ensucian la lista de revisiones —donde hay que buscar a cual regresar cuando
+# algo falla— y siguen apuntando a la base de pruebas.
+name: Borrar la version de prueba
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+env:
+  PROYECTO: maintrack-cmms-4821
+  SERVICIO: maintrack-cmms
+  REGION: us-central1
+
+jobs:
+  borrar:
+    runs-on: ubuntu-latest
+    if: vars.SQL_PRUEBAS != ''
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_CUENTA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Quitar la etiqueta y su revision
+        run: |
+          set -euo pipefail
+          ETIQUETA="pr-${{ github.event.pull_request.number }}"
+          REV=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                --format=json | jq -r --arg t "$ETIQUETA" \
+                '.status.traffic[] | select(.tag==$t) | .revisionName')
+          if [ -z "$REV" ] || [ "$REV" = "null" ]; then
+            echo "No habia version de prueba para $ETIQUETA. Nada que borrar."
+            exit 0
+          fi
+          # Primero se suelta la etiqueta; una revision etiquetada no se borra.
+          gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+            --remove-tags="$ETIQUETA"
+          gcloud run revisions delete "$REV" --region "$REGION" --project "$PROYECTO" --quiet
+          echo "Borrada la version de prueba $ETIQUETA ($REV)."
