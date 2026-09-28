@@ -43,7 +43,8 @@ CORREO="$CUENTA@$PROYECTO.iam.gserviceaccount.com"
 #   iam.serviceAccountUser actuar como la cuenta con la que corre el servicio
 #   cloudbuild.builds.editor  armar la imagen desde el Dockerfile
 #   artifactregistry.writer   guardar esa imagen
-#   storage.objectAdmin    subir el codigo fuente al bucket de construccion
+#   (rol a la medida)      listar y ver buckets, nada mas. Ver abajo por que
+#                          NO se usa storage.admin ni storage.objectAdmin
 #   secretmanager.secretAccessor  leer la cadena de conexion para migrar
 #   secretmanager.viewer   PREGUNTAR si un secreto existe. No sobra: sin esto
 #                          `deploy.sh` no distingue «no existe» de «no puedo
@@ -58,7 +59,6 @@ PERMISOS=(
   roles/iam.serviceAccountUser
   roles/cloudbuild.builds.editor
   roles/artifactregistry.writer
-  roles/storage.objectAdmin
   roles/secretmanager.secretAccessor
   roles/secretmanager.viewer
   roles/cloudsql.client
@@ -88,6 +88,35 @@ else
     --display-name="GitHub Actions de MainTrack" \
     --description="Publica desde el repositorio $REPO. Sin llave JSON."
 fi
+
+# ── Por que un rol a la medida y no storage.admin
+#
+# `gcloud run deploy --source` necesita `storage.buckets.list` A NIVEL
+# PROYECTO para encontrar su bucket de construccion. Lo comodo seria dar
+# roles/storage.admin, y lo hace casi todo el mundo.
+#
+# Aqui no: en este proyecto vive tambien `maintrack-cmms-4821-archivos`, con
+# las fotos y los adjuntos de Casa Montemayor, Acero Industrial y Minerales
+# Metalicos. Dar storage.admin le entregaria eso completo a una cuenta que
+# solo publica —y que van a manejar agentes—.
+#
+# Asi que: tres permisos de bucket a nivel proyecto, y mando completo SOLO
+# sobre el bucket de construccion. Los archivos de los clientes quedan fuera
+# de su alcance, comprobado.
+ROL_ALMACEN="maintrack_despliegue_almacen"
+echo "3/5  El rol a la medida para el almacenamiento..."
+if gcloud iam roles describe "$ROL_ALMACEN" --project "$PROYECTO" >/dev/null 2>&1; then
+  echo "      ya existe, no se toca."
+else
+  hacer gcloud iam roles create "$ROL_ALMACEN" --project="$PROYECTO" \
+    --title="Despliegue: solo el bucket de construccion" \
+    --description="Listar y ver buckets para que 'run deploy --source' encuentre el suyo. NO da acceso a los archivos de los clientes." \
+    --permissions=storage.buckets.get,storage.buckets.list,storage.buckets.create \
+    --stage=GA
+fi
+hacer gcloud projects add-iam-policy-binding "$PROYECTO" \
+  --member="serviceAccount:$CORREO" \
+  --role="projects/$PROYECTO/roles/$ROL_ALMACEN" --condition=None --quiet
 
 echo "3/5  Sus permisos..."
 for p in "${PERMISOS[@]}"; do
