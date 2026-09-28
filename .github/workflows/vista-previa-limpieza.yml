@@ -40,8 +40,32 @@ jobs:
             echo "No habia version de prueba para $ETIQUETA. Nada que borrar."
             exit 0
           fi
-          # Primero se suelta la etiqueta; una revision etiquetada no se borra.
+          # Quitar la etiqueta es LO QUE IMPORTA: saca la version de prueba de
+          # circulacion y libera la liga. Una revision etiquetada tampoco se
+          # deja borrar, asi que va primero.
           gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
             --remove-tags="$ETIQUETA"
-          gcloud run revisions delete "$REV" --region "$REGION" --project "$PROYECTO" --quiet
-          echo "Borrada la version de prueba $ETIQUETA ($REV)."
+          echo "Etiqueta $ETIQUETA retirada: la liga de prueba ya no responde."
+
+          # Borrar la revision es aseo, no necesidad: sin trafico no atiende
+          # nada y no cuesta nada.
+          #
+          # Y Cloud Run se NIEGA a borrar la revision mas reciente. La vista
+          # previa casi siempre lo es —se publica justo antes de cerrar la
+          # propuesta—, asi que este paso fallaba SIEMPRE y pintaba de rojo una
+          # limpieza que en realidad habia hecho su trabajo. Nacio roto y se
+          # descubrio al tercer uso.
+          #
+          # Ahora solo eso se perdona. Cualquier otro error sigue siendo error.
+          SALIDA=$(gcloud run revisions delete "$REV" --region "$REGION" --project "$PROYECTO" --quiet 2>&1) && {
+            echo "Borrada la revision $REV."
+            exit 0
+          }
+          if printf '%s' "$SALIDA" | grep -qiE "latest created revision|cannot be directly deleted"; then
+            echo "La revision $REV es la mas reciente y Cloud Run no la borra."
+            echo "No es un problema: ya no tiene etiqueta ni trafico. El siguiente"
+            echo "despliegue la deja de ser, y Cloud Run recoge las viejas solo."
+            exit 0
+          fi
+          echo "$SALIDA"
+          exit 1
