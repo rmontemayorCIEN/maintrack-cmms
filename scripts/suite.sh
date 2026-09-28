@@ -17,9 +17,10 @@
 #      suyo y compiten por `.next`.
 #   3. Algo contra produccion en paralelo, que cambia el esquema debajo.
 #
-# Y al final separa las fallas ESPERADAS —las que dependen de la llave de IA o
-# del build— de las que de verdad hay que mirar. «10 fallas» no dice nada;
-# «0 inesperadas» si.
+# Y al final separa las fallas ESPERADAS —las que dependen de la llave de IA—
+# de las que de verdad hay que mirar. «10 fallas» no dice nada; «0 inesperadas»
+# si. La prueba de interfaz NO esta entre las esperadas: corre al final, con su
+# propio build, porque de otro modo no corria nunca.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -60,11 +61,11 @@ echo "  ok  no hay servidores de desarrollo corriendo"
 [ -f ".next/BUILD_ID" ] && HAY_BUILD=1 || HAY_BUILD=0
 [ "$HAY_IA" = "1" ] && echo "  ok  hay llave de IA: las pruebas *-real deberian pasar" \
                     || echo "  --  sin llave de IA: las pruebas *-real van a fallar, y esta bien"
-# El build de ahora puede no seguir ahi cuando le toque a responsiva: varias
-# pruebas borran `.next`. Por eso esto es informativo y la clasificacion real
-# se hace al momento de fallar.
-[ "$HAY_BUILD" = "1" ] && echo "  ok  hay build (ojo: algunas pruebas borran .next mientras corren)" \
-                       || echo "  --  sin build: prueba-responsiva va a fallar; correla aparte tras «npm run build»"
+# El build que hubiera ahora NO sirve para responsiva: trece pruebas levantan
+# `next dev` y eso pisa `.next`. Por eso responsiva va al final, despues de un
+# build hecho aqui mismo. Ver el bloque «La interfaz, al final» mas abajo.
+[ "$HAY_BUILD" = "1" ] && echo "  ok  hay build (se rehace al final: las pruebas con «next dev» lo pisan)" \
+                       || echo "  --  sin build todavia: se hace al final, para la prueba de interfaz"
 
 REGISTRO="${TMPDIR:-/tmp}/maintrack-suite-$(date +%H%M%S).log"
 echo ""
@@ -77,6 +78,9 @@ PASARON=0
 
 for f in scripts/prueba-*.ts; do
   NOMBRE=$(basename "$f" .ts)
+  # La interfaz va al final, con su build. Aqui no puede pasar: cualquiera de
+  # las que levantan `next dev` le deja `.next` sin BUILD_ID antes de su turno.
+  [ "$NOMBRE" = "prueba-responsiva" ] && continue
   printf "  %-42s " "$NOMBRE"
   {
     echo ""
@@ -93,8 +97,6 @@ for f in scripts/prueba-*.ts; do
   case "$NOMBRE" in
     *-real)
       if [ "$HAY_IA" = "0" ]; then echo "(sin llave de IA)"; ESPERADAS+=("$NOMBRE"); continue; fi ;;
-    prueba-responsiva)
-      if [ ! -f ".next/BUILD_ID" ]; then echo "(sin build)"; ESPERADAS+=("$NOMBRE"); continue; fi ;;
     prueba-rendimiento)
       # Conocida: no corre en esta maquina. Queda apuntada, no ignorada.
       echo "(conocida)"; ESPERADAS+=("$NOMBRE"); continue ;;
@@ -103,6 +105,41 @@ for f in scripts/prueba-*.ts; do
   echo "FALLA"
   INESPERADAS+=("$NOMBRE")
 done
+
+# ── La interfaz, al final.
+#
+# `prueba-responsiva` corre con `next start`, o sea que necesita un build de
+# produccion en `.next`. Trece de las pruebas de arriba levantan `next dev` y
+# se lo pisan, asi que dentro del bucle NUNCA podia pasar: caia siempre en
+# «esperadas» por falta de build y sus 92 revisiones de interfaz no se corrian.
+# El resumen decia «nada inesperado» con la interfaz entera sin probar, y asi
+# se escapo una regresion real: quitar una plantilla dejo el armador de
+# registros en 6 formatos donde la prueba esperaba 7, y nadie se entero.
+#
+# Por eso el build va aqui —el mismo que pide el cierre de CLAUDE.md— y
+# despues la prueba. Si el build truena, eso es una falla inesperada como
+# cualquier otra: no se sigue como si nada.
+echo ""
+printf "  %-42s " "npm run build"
+if npm run build >> "$REGISTRO" 2>&1; then
+  echo "ok"
+  printf "  %-42s " "prueba-responsiva"
+  if npx tsx scripts/prueba-responsiva.ts >> "$REGISTRO" 2>&1; then
+    echo "ok"
+    PASARON=$((PASARON + 1))
+  else
+    echo "FALLA"
+    INESPERADAS+=("prueba-responsiva")
+  fi
+else
+  echo "FALLA"
+  INESPERADAS+=("npm run build")
+  # Sin build no hay nada que probar, y callarlo seria justo el defecto que
+  # este bloque existe para cerrar.
+  printf "  %-42s " "prueba-responsiva"
+  echo "NO SE CORRIO (sin build)"
+  INESPERADAS+=("prueba-responsiva: no se corrio")
+fi
 
 echo ""
 echo "──────────────────────────────────────────────────────"
