@@ -22,7 +22,7 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   // compras» para auditar una compra veia la requisicion y la recepcion, pero
   // no con quien se cotizo ni que orden se emitio, que es justo lo que se
   // revisa cuando alguien pregunta por que se le compro a ese proveedor.
-  ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "PurchaseOrder", "Quote", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier", "EquivalenciaRefaccion", "Resguardo"] },
+  ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "PurchaseOrder", "Quote", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier", "EquivalenciaRefaccion", "Resguardo", "KitDeHerramientas"] },
   // Las vigencias van con activos y no en configuracion: una garantia o un
   // permiso de operacion son datos del equipo, y quien audita «que paso con
   // la caldera» los busca ahi.

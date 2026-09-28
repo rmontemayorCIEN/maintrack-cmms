@@ -16,8 +16,8 @@
 import { prisma } from "../lib/db";
 import { aplicarMovimiento } from "../lib/almacen";
 import {
-  avisarDeLoNoDevuelto, darDeBaja, devolver, loQueEstaFuera, panoramaDeHerramientas,
-  perdidasPorPersona, prestar, quienTraeQue,
+  avisarDeLoNoDevuelto, cajasFuera, darDeBaja, devolver, devolverKit, loQueEstaFuera,
+  herramientaQueHaceFalta, panoramaDeHerramientas, perdidasPorPersona, prestar, prestarKit, quienTraeQue,
 } from "../lib/herramientas";
 import { disponible, diasFuera, regresoPeor, seLeAtribuye } from "../lib/herramientas-tipos";
 
@@ -350,6 +350,150 @@ async function main() {
     revisar("el dado entra al reporte de pérdidas de Pedro",
       dePedro.herramientas.some((h) => h.code === "DAD-01" && h.costo === 20_000),
       dePedro.herramientas);
+
+    console.log("\n13. La caja de herramientas\n");
+    /*
+     * Un kit existe por UNA razón: ver qué falta cuando la caja vuelve
+     * incompleta. Prestar pieza por pieza ya se podía.
+     */
+    const llaves = await prisma.part.create({
+      data: { organizationId: A.id, code: "LLA-01", name: "Juego de llaves mixtas", naturaleza: "HERRAMIENTA", unitCost: 1_800, unit: "juego" },
+    });
+    await meter(llaves.id, almacen.id, 3, 1_800);
+    const martillo = await prisma.part.create({
+      data: { organizationId: A.id, code: "MAR-01", name: "Martillo de bola", naturaleza: "HERRAMIENTA", unitCost: 350, unit: "pza" },
+    });
+    await meter(martillo.id, almacen.id, 1, 350);
+    const torquimetro = await prisma.asset.create({
+      data: { organizationId: A.id, siteId: sitio.id, code: "TRQ-01", name: "Torquímetro 1/2", sePresta: true, purchaseCost: 12_000 },
+    });
+
+    const caja = await prisma.kitDeHerramientas.create({
+      data: {
+        organizationId: A.id, code: "CAJA-MEC", name: "Caja del mecánico",
+        piezas: {
+          create: [
+            { partId: llaves.id, cantidad: 1 },
+            { partId: martillo.id, cantidad: 1 },
+            { assetId: torquimetro.id, cantidad: 1 },
+          ],
+        },
+      },
+    });
+
+    const salida = await prestarKit({
+      organizationId: A.id, kitId: caja.id, personaId: pedro.id,
+      entregadoPorId: almacenista.id, warehouseId: almacen.id, estadoSalida: "BUENA",
+    });
+    revisar("la caja sale completa", salida.ok && salida.dato.prestadas === 3 && salida.dato.faltaron.length === 0,
+      salida.ok ? salida.dato : salida.motivo);
+    if (!salida.ok) throw new Error("sin caja no hay prueba");
+
+    // Mezcla lo generico con lo serializado: las tres piezas salen igual.
+    const fueraConCaja = await loQueEstaFuera(A.id);
+    revisar("las tres piezas quedan a nombre de quien la trae",
+      fueraConCaja.filter((r) => r.grupo === salida.dato.grupo).length === 3);
+    revisar("y el torquímetro serializado también",
+      fueraConCaja.some((r) => r.assetId === torquimetro.id && r.grupo === salida.dato.grupo));
+
+    const cajas1 = await cajasFuera(A.id);
+    revisar("aparece como caja fuera, con su gente y su cuenta",
+      cajas1.length === 1 && cajas1[0].total === 3 && cajas1[0].siguenFuera === 3 && cajas1[0].persona.name === "Pedro",
+      cajas1.map((c) => ({ kit: c.kit?.code, total: c.total, fuera: c.siguenFuera })));
+
+    console.log("\n14. La caja que regresa INCOMPLETA\n");
+    const deLaCaja = fueraConCaja.filter((r) => r.grupo === salida.dato.grupo);
+    const sinElMartillo = deLaCaja.filter((r) => r.partId !== martillo.id).map((r) => r.id);
+    const regreso = await devolverKit({
+      organizationId: A.id, grupo: salida.dato.grupo,
+      devueltos: sinElMartillo, recibidoPorId: almacenista.id, estadoRegreso: "USADA",
+    });
+    revisar("se devuelven dos de tres", regreso.ok && regreso.dato.devueltas === 2, regreso.ok ? regreso.dato : regreso.motivo);
+    revisar("y DICE qué falta, en vez de cerrarla en silencio",
+      regreso.ok && regreso.dato.siguenFuera.length === 1 && regreso.dato.siguenFuera[0].que.includes("MAR-01"),
+      regreso.ok ? regreso.dato.siguenFuera : undefined);
+
+    const cajas2 = await cajasFuera(A.id);
+    revisar("la caja sigue contando como fuera mientras le falte algo",
+      cajas2.length === 1 && cajas2[0].siguenFuera === 1 && cajas2[0].devueltas === 2,
+      cajas2.map((c) => ({ fuera: c.siguenFuera, devueltas: c.devueltas })));
+
+    // Lo que no volvio sigue a nombre de quien lo trae y se puede dar de baja.
+    const elMartillo = (await loQueEstaFuera(A.id)).find((r) => r.partId === martillo.id)!;
+    revisar("el martillo sigue a nombre de Pedro", elMartillo?.persona.name === "Pedro");
+    const bajaMartillo = await darDeBaja({ organizationId: A.id, resguardoId: elMartillo.id, motivo: "PERDIDA", userId: almacenista.id });
+    revisar("y se le da de baja como cualquier otra herramienta", bajaMartillo.ok && bajaMartillo.dato.costo === 350,
+      bajaMartillo.ok ? bajaMartillo.dato : bajaMartillo.motivo);
+    revisar("con eso la caja deja de estar fuera", (await cajasFuera(A.id)).length === 0);
+    const conMartillo = await perdidasPorPersona(A.id);
+    revisar("y el martillo entra al reporte de pérdidas de Pedro, sin lógica aparte",
+      conMartillo.personas.find((x) => x.persona.name === "Pedro")!.herramientas.some((h) => h.code === "MAR-01"));
+
+    console.log("\n15. Una caja que no puede salir completa\n");
+    // El torquimetro es unico y ya se presto suelto: la caja sale sin el.
+    await prestar({ organizationId: A.id, assetId: torquimetro.id, personaId: ana.id, entregadoPorId: almacenista.id });
+    const incompleta = await prestarKit({
+      organizationId: A.id, kitId: caja.id, personaId: pedro.id,
+      entregadoPorId: almacenista.id, warehouseId: almacen.id,
+    });
+    revisar("la caja SALE con lo que hay, en vez de negarse entera",
+      incompleta.ok && incompleta.dato.prestadas >= 1, incompleta.ok ? incompleta.dato.prestadas : incompleta.motivo);
+    revisar("y dice qué no pudo llevarse y por qué",
+      incompleta.ok && incompleta.dato.faltaron.some((f) => f.que.includes("TRQ-01") && f.motivo.includes("Ana")),
+      incompleta.ok ? incompleta.dato.faltaron : undefined);
+
+    revisar("una caja apagada no se presta",
+      !(await prestarKit({ organizationId: A.id, kitId: (await prisma.kitDeHerramientas.create({ data: { organizationId: A.id, code: "X", name: "Apagada", activo: false } })).id, personaId: pedro.id, entregadoPorId: almacenista.id })).ok);
+    revisar("una caja sin piezas tampoco",
+      !(await prestarKit({ organizationId: A.id, kitId: (await prisma.kitDeHerramientas.create({ data: { organizationId: A.id, code: "Y", name: "Vacía" } })).id, personaId: pedro.id, entregadoPorId: almacenista.id })).ok);
+    revisar("y la caja de otra empresa no se ve",
+      !(await prestarKit({ organizationId: B.id, kitId: caja.id, personaId: ajeno.id })).ok);
+
+    console.log("\n16. Qué herramienta hace falta para trabajar\n");
+    /*
+     * Lo que vuelve esto parte del CMMS y no un almacén paralelo: antes de
+     * mandar a alguien al preventivo, saber si el torquímetro está libre.
+     */
+    const planConHerramienta = await prisma.maintenancePlan.create({
+      data: { organizationId: A.id, name: "Apriete de bridas", intervalDays: 90, active: true },
+    });
+    const tarea = await prisma.planTask.create({
+      data: { planId: planConHerramienta.id, title: "Apretar a torque", position: 1 },
+    });
+    await prisma.planTaskTool.createMany({
+      data: [
+        { planTaskId: tarea.id, assetId: torquimetro.id, cantidad: 1 },
+        { planTaskId: tarea.id, partId: llaves.id, cantidad: 1 },
+      ],
+    });
+    const otConPlan = await prisma.workOrder.create({
+      data: { organizationId: A.id, number: "OT-HER-1", title: "Apriete", planId: planConHerramienta.id, status: "OPEN" },
+    });
+    const otSuelta = await prisma.workOrder.create({
+      data: { organizationId: A.id, number: "OT-HER-2", title: "Correctivo", status: "OPEN" },
+    });
+
+    // El torquimetro lo trae Ana desde el bloque anterior.
+    const hacenFalta = await herramientaQueHaceFalta(A.id, otConPlan.id);
+    revisar("dice qué herramienta pide el plan", hacenFalta.declarada && hacenFalta.piezas.length === 2,
+      hacenFalta.piezas.map((p) => p.que));
+    const elTorq = hacenFalta.piezas.find((p) => p.que.includes("TRQ-01"))!;
+    revisar("y avisa que el torquímetro no está, diciendo quién lo trae",
+      elTorq.disponible === false && elTorq.porque.includes("Ana"), elTorq);
+    const lasLlaves = hacenFalta.piezas.find((p) => p.que.includes("LLA-01"))!;
+    revisar("lo que sí hay, se dice que está", lasLlaves.disponible === true, lasLlaves);
+
+    revisar("una orden sin plan no inventa requisitos: dice que nadie los declaró",
+      (await herramientaQueHaceFalta(A.id, otSuelta.id)).declarada === false);
+    revisar("desde otra empresa no se ve nada",
+      (await herramientaQueHaceFalta(B.id, otConPlan.id)).declarada === false);
+
+    // Al devolverlo, vuelve a estar disponible.
+    const delTorq = (await loQueEstaFuera(A.id)).find((r) => r.assetId === torquimetro.id)!;
+    await devolver({ organizationId: A.id, resguardoId: delTorq.id, recibidoPorId: almacenista.id });
+    const yaHay = await herramientaQueHaceFalta(A.id, otConPlan.id);
+    revisar("al devolverlo, la orden ya puede hacerse",
+      yaHay.piezas.every((p) => p.disponible), yaHay.piezas.map((p) => ({ q: p.que, d: p.disponible, p: p.porque })));
   } finally {
     await prisma.organization.delete({ where: { id: A.id } });
     await prisma.organization.delete({ where: { id: B.id } });

@@ -742,3 +742,304 @@ export async function avisarDeLoNoDevuelto(organizationId: string, ahora = new D
   }
   return { avisados, piezas: atrasadas.length };
 }
+
+// ─────────────────────────────────────────── Kits
+
+/**
+ * Una caja de herramientas que sale y regresa completa.
+ *
+ * ── Por qué un kit no es un documento aparte
+ *
+ * Cada pieza sale como su propio resguardo —con su estado, su devolución y su
+ * posible baja— y comparten un `grupo`. Así una llave que se perdió entra al
+ * reporte de pérdidas igual que cualquier otra herramienta, sin lógica
+ * duplicada, y la caja se puede devolver incompleta sin que nada se atore.
+ *
+ * Un «préstamo de kit» como entidad propia habría obligado a reimplementar
+ * devolución, baja y valuación por segunda vez.
+ */
+export type PrestamoDeKit = {
+  organizationId: string;
+  kitId: string;
+  personaId: string;
+  entregadoPorId?: string | null;
+  estadoSalida?: string | null;
+  proposito?: string | null;
+  /** De qué almacén salen las piezas genéricas. Las serializadas no lo usan. */
+  warehouseId?: string | null;
+};
+
+export type ResultadoDeKit = {
+  grupo: string;
+  prestadas: number;
+  /** Lo que no se pudo prestar, con su motivo. La caja sale incompleta y se dice. */
+  faltaron: Array<{ que: string; motivo: string }>;
+};
+
+/**
+ * Presta una caja completa.
+ *
+ * Si una pieza no se puede prestar —está fuera, no hay disponible— **la caja
+ * sale de todos modos con lo demás** y se informa qué faltó. Lo contrario
+ * —negar la caja entera porque falta una llave— dejaría al técnico sin nada,
+ * que es peor que salir con trece de catorce sabiéndolo.
+ */
+export async function prestarKit(p: PrestamoDeKit): Promise<Resultado<ResultadoDeKit>> {
+  const kit = await prisma.kitDeHerramientas.findFirst({
+    where: { id: p.kitId, organizationId: p.organizationId },
+    include: {
+      piezas: {
+        include: {
+          part: { select: { id: true, code: true, name: true } },
+          asset: { select: { id: true, code: true, name: true } },
+        },
+      },
+    },
+  });
+  if (!kit) return falla("Esa caja no existe en esta empresa.", 404);
+  if (!kit.activo) return falla(`«${kit.name}» está apagada: ya no se presta.`);
+  if (!kit.piezas.length) return falla(`«${kit.name}» no tiene piezas todavía.`, 422);
+
+  const grupo = `kit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const faltaron: ResultadoDeKit["faltaron"] = [];
+  let prestadas = 0;
+
+  /*
+   * Se presta pieza por pieza reusando `prestar()`, no con inserciones
+   * directas: así cada una pasa por las mismas validaciones —disponibilidad,
+   * empresa, unidad ya prestada— y no hay un segundo camino que se olvide de
+   * revisar algo.
+   */
+  for (const pieza of kit.piezas) {
+    const r = await prestar({
+      organizationId: p.organizationId,
+      partId: pieza.partId,
+      assetId: pieza.assetId,
+      warehouseId: pieza.partId ? p.warehouseId : null,
+      personaId: p.personaId,
+      cantidad: pieza.cantidad,
+      entregadoPorId: p.entregadoPorId,
+      estadoSalida: p.estadoSalida,
+      proposito: p.proposito ?? `De la caja ${kit.code}`,
+    });
+
+    const nombre = pieza.part
+      ? `${pieza.part.code} — ${pieza.part.name}`
+      : `${pieza.asset?.code ?? "?"} — ${pieza.asset?.name ?? ""}`;
+
+    if (!r.ok) { faltaron.push({ que: nombre, motivo: r.motivo }); continue; }
+    await prisma.resguardo.update({ where: { id: r.dato.id }, data: { kitId: kit.id, grupo } });
+    prestadas++;
+  }
+
+  if (!prestadas) {
+    return falla(`No se pudo prestar nada de «${kit.name}»: ${faltaron.map((f) => f.motivo).join(" ")}`);
+  }
+
+  await logAudit({
+    organizationId: p.organizationId, userId: p.entregadoPorId ?? p.personaId,
+    action: "CREATE", entity: "Resguardo", entityId: grupo,
+    summary: `Salió la caja ${kit.code} con ${prestadas} de ${kit.piezas.length} piezas`,
+    changes: { kit: kit.code, prestadas, faltaron: faltaron.length },
+  });
+  return { ok: true, dato: { grupo, prestadas, faltaron } };
+}
+
+/**
+ * Devuelve una caja completa.
+ *
+ * Lo que de verdad importa aquí: **dice qué falta**. Una caja que regresa
+ * incompleta no se cierra en silencio; las piezas que no volvieron siguen
+ * abiertas a nombre de quien las trae, para que alguien vaya a buscarlas o las
+ * dé de baja.
+ */
+export async function devolverKit(p: {
+  organizationId: string;
+  grupo: string;
+  /** Los resguardos que SÍ regresaron. Los demás se quedan fuera, a su nombre. */
+  devueltos?: string[];
+  recibidoPorId?: string | null;
+  estadoRegreso?: string | null;
+}): Promise<Resultado<{ devueltas: number; siguenFuera: Array<{ id: string; que: string }> }>> {
+  const abiertos = await prisma.resguardo.findMany({
+    where: { organizationId: p.organizationId, grupo: p.grupo, devueltoEl: null },
+    include: {
+      part: { select: { code: true, name: true } },
+      asset: { select: { code: true, name: true } },
+    },
+  });
+  if (!abiertos.length) return falla("Esa caja ya se devolvió completa, o no existe.", 404);
+
+  // Sin lista explícita se entiende que regresó completa.
+  const regresaron = new Set(p.devueltos ?? abiertos.map((r) => r.id));
+  let devueltas = 0;
+
+  for (const r of abiertos) {
+    if (!regresaron.has(r.id)) continue;
+    const d = await devolver({
+      organizationId: p.organizationId,
+      resguardoId: r.id,
+      recibidoPorId: p.recibidoPorId,
+      estadoRegreso: p.estadoRegreso,
+    });
+    if (d.ok) devueltas++;
+  }
+
+  const siguenFuera = abiertos
+    .filter((r) => !regresaron.has(r.id))
+    .map((r) => ({
+      id: r.id,
+      que: r.part ? `${r.part.code} — ${r.part.name}` : `${r.asset?.code ?? "?"} — ${r.asset?.name ?? ""}`,
+    }));
+
+  await logAudit({
+    organizationId: p.organizationId, userId: p.recibidoPorId ?? undefined,
+    action: "UPDATE", entity: "Resguardo", entityId: p.grupo,
+    summary: siguenFuera.length
+      ? `Regresó una caja incompleta: ${devueltas} piezas, faltan ${siguenFuera.length}`
+      : `Regresó una caja completa: ${devueltas} piezas`,
+    changes: { devueltas, faltan: siguenFuera.map((x) => x.que) },
+  });
+  return { ok: true, dato: { devueltas, siguenFuera } };
+}
+
+/** Las cajas que están fuera, con lo que les falta. */
+export async function cajasFuera(organizationId: string, ahora = new Date()) {
+  const piezas = await prisma.resguardo.findMany({
+    where: { organizationId, grupo: { not: null } },
+    include: {
+      kit: { select: { id: true, code: true, name: true } },
+      persona: { select: { id: true, name: true } },
+      part: { select: { code: true, name: true } },
+      asset: { select: { code: true, name: true } },
+    },
+    orderBy: { entregadoEl: "asc" },
+  });
+
+  const porGrupo = new Map<string, typeof piezas>();
+  for (const r of piezas) {
+    const g = r.grupo!;
+    porGrupo.set(g, [...(porGrupo.get(g) ?? []), r]);
+  }
+
+  return [...porGrupo.entries()]
+    // Una caja cuyas piezas ya volvieron todas deja de estar fuera.
+    .filter(([, rs]) => rs.some((r) => !r.devueltoEl))
+    .map(([grupo, rs]) => {
+      const fuera = rs.filter((r) => !r.devueltoEl);
+      return {
+        grupo,
+        kit: rs[0].kit,
+        persona: rs[0].persona,
+        entregadoEl: rs[0].entregadoEl,
+        dias: diasFuera(rs[0].entregadoEl, ahora),
+        seTardo: diasFuera(rs[0].entregadoEl, ahora) >= DIAS_PARA_AVISAR,
+        total: rs.length,
+        siguenFuera: fuera.length,
+        /** Lo que ya regresó: si es parcial, la caja volvió incompleta. */
+        devueltas: rs.length - fuera.length,
+        piezas: fuera.map((r) => ({
+          id: r.id,
+          que: r.part ? `${r.part.code} — ${r.part.name}` : `${r.asset?.code ?? "?"} — ${r.asset?.name ?? ""}`,
+        })),
+      };
+    });
+}
+
+// ─────────────────────────────────────────── Lo que hace falta para trabajar
+
+/**
+ * Qué herramienta necesita una orden, y si está disponible HOY.
+ *
+ * Es lo que convierte el módulo en parte del CMMS y no en un almacén paralelo:
+ * antes de mandar a alguien a hacer el preventivo, saber si el torquímetro
+ * está libre o lo trae otro.
+ *
+ * Se resuelve desde el PLAN de la orden, que es donde se declara qué hace
+ * falta. Una orden sin plan no requiere nada —no porque no necesite
+ * herramienta, sino porque nadie lo declaró, y eso se dice en vez de suponer.
+ */
+export async function herramientaQueHaceFalta(
+  organizationId: string,
+  ordenId: string,
+): Promise<{
+  declarada: boolean;
+  piezas: Array<{
+    que: string;
+    cantidad: number;
+    disponible: boolean;
+    porque: string;
+  }>;
+}> {
+  const orden = await prisma.workOrder.findFirst({
+    where: { id: ordenId, organizationId },
+    select: { id: true, planId: true },
+  });
+  if (!orden?.planId) return { declarada: false, piezas: [] };
+
+  const requeridas = await prisma.planTaskTool.findMany({
+    where: { task: { planId: orden.planId } },
+    include: {
+      part: { select: { id: true, code: true, name: true } },
+      asset: { select: { id: true, code: true, name: true } },
+      kit: { select: { id: true, code: true, name: true, activo: true } },
+    },
+  });
+  if (!requeridas.length) return { declarada: false, piezas: [] };
+
+  const piezas = await Promise.all(
+    requeridas.map(async (r) => {
+      if (r.part) {
+        const stocks = await prisma.partStock.findMany({
+          where: { organizationId, partId: r.part.id },
+          select: { quantity: true, enResguardo: true },
+        });
+        const libres = stocks.reduce((a, s) => a + disponible(s.quantity, s.enResguardo), 0);
+        return {
+          que: `${r.part.code} — ${r.part.name}`,
+          cantidad: r.cantidad,
+          disponible: libres >= r.cantidad,
+          porque: libres >= r.cantidad
+            ? `Hay ${libres} libre${libres === 1 ? "" : "s"}.`
+            : libres === 0
+              ? "No hay ninguna libre: todo está prestado."
+              : `Solo hay ${libres} y hacen falta ${r.cantidad}.`,
+        };
+      }
+
+      if (r.asset) {
+        const fuera = await prisma.resguardo.findFirst({
+          where: { assetId: r.asset.id, devueltoEl: null },
+          select: { persona: { select: { name: true } } },
+        });
+        return {
+          que: `${r.asset.code} — ${r.asset.name}`,
+          cantidad: 1,
+          disponible: !fuera,
+          porque: fuera ? `La trae ${fuera.persona.name}.` : "Está en su lugar.",
+        };
+      }
+
+      if (r.kit) {
+        const abiertas = await prisma.resguardo.count({
+          where: { organizationId, kitId: r.kit.id, devueltoEl: null },
+        });
+        return {
+          que: `Caja ${r.kit.code} — ${r.kit.name}`,
+          cantidad: 1,
+          disponible: r.kit.activo && abiertas === 0,
+          porque: !r.kit.activo
+            ? "La caja está apagada."
+            : abiertas
+              ? `Tiene ${abiertas} pieza${abiertas === 1 ? "" : "s"} fuera.`
+              : "Está completa en su lugar.",
+        };
+      }
+
+      // Un requisito sin nada apuntado: se dice, no se esconde.
+      return { que: "—", cantidad: r.cantidad, disponible: false, porque: "Lo que pedía este requisito ya no existe." };
+    }),
+  );
+
+  return { declarada: true, piezas };
+}

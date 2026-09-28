@@ -299,6 +299,7 @@ model Organization {
   renglonesPropios   RenglonPropio[]
   normasAdoptadas    NormaAdoptada[]
   resguardos         Resguardo[]
+  kitsDeHerramientas KitDeHerramientas[]
   amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
@@ -820,6 +821,8 @@ model Asset {
   comentarios      Comentario[]
 
   resguardos        Resguardo[]
+  enKits         PiezaDeKit[]
+  enTareas       PlanTaskTool[]
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
@@ -1089,6 +1092,7 @@ model PlanTask {
   services    PlanTaskService[]
   calendarios PlanTaskAsset[]
 
+  tools            PlanTaskTool[]
   @@index([planId])
 }
 
@@ -1966,6 +1970,8 @@ model Part {
   equivalenciasB   EquivalenciaRefaccion[] @relation("EquivalenciaB")
 
   resguardos     Resguardo[]
+  enKits         PiezaDeKit[]
+  enTareas       PlanTaskTool[]
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -4343,6 +4349,19 @@ model Resguardo {
 
   /// Quien la tiene. Es el responsable, no necesariamente quien la pidio.
   personaId String
+
+  /// Cuando salio como parte de una CAJA, no suelta.
+  ///
+  /// `grupo` es el mismo para todas las piezas de una misma salida: es lo que
+  /// permite devolver la caja completa de un golpe y, sobre todo, ver QUE
+  /// FALTA cuando regresa incompleta —que es la unica razon de ser de un kit,
+  /// porque pieza por pieza ya se podia prestar—.
+  ///
+  /// `kitId` dice de que caja era. Se guarda aunque el kit cambie despues: lo
+  /// que salio ese dia no se reescribe porque alguien edite la caja el mes que
+  /// viene.
+  kitId  String?
+  grupo  String?
   cantidad  Float  @default(1)
 
   /// Quien la entrego. Nulo en un almacen de autoservicio: ahi la registra
@@ -4373,6 +4392,7 @@ model Resguardo {
   warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
   persona      User         @relation("ResguardoDe", fields: [personaId], references: [id])
+  kit          KitDeHerramientas? @relation(fields: [kitId], references: [id])
   entregadoPor User?        @relation("ResguardoEntrego", fields: [entregadoPorId], references: [id])
   recibidoPor  User?        @relation("ResguardoRecibio", fields: [recibidoPorId], references: [id])
 
@@ -4383,4 +4403,76 @@ model Resguardo {
   @@index([partId, devueltoEl])
   /// Si esta unidad esta fuera ahora: es la pregunta al prestar una serializada.
   @@index([assetId, devueltoEl])
+  /// Las piezas de una misma salida: para devolver la caja completa.
+  @@index([grupo])
+}
+
+/// Una caja de herramientas: un grupo que sale y regresa junto.
+///
+/// Existe por una sola razon: ver QUE FALTA cuando la caja vuelve incompleta.
+/// Prestar pieza por pieza ya se podia; lo que no se podia era saber que de
+/// las catorce llaves regresaron trece.
+model KitDeHerramientas {
+  id             String  @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  notas          String?
+  activo         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  piezas       PiezaDeKit[]
+  resguardos   Resguardo[]
+  enTareas     PlanTaskTool[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, activo])
+}
+
+/// Que trae la caja. Cada pieza es del almacen o una unidad serializada,
+/// exactamente igual que un resguardo suelto.
+model PiezaDeKit {
+  id       String @id @default(cuid())
+  kitId    String
+  partId   String?
+  assetId  String?
+  cantidad Float   @default(1)
+
+  kit   KitDeHerramientas @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  part  Part?             @relation(fields: [partId], references: [id], onDelete: Cascade)
+  asset Asset?            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([kitId])
+}
+
+/// La herramienta que HACE FALTA para una tarea del plan.
+///
+/// Sigue el molde de `PlanTaskLabor`, `PlanTaskPart` y `PlanTaskService`, pero
+/// es un modelo aparte y NO un `PlanTaskPart` con naturaleza HERRAMIENTA, y la
+/// razon es de dinero: `PlanTaskPart` significa «se consume esta cantidad» y
+/// alimenta el material necesario y el costo del plan. Una herramienta no se
+/// consume —se necesita tenerla— asi que meterla ahi inflaria el costo del
+/// preventivo con algo que nunca se gasto, y pediria al almacen que surtiera
+/// un torquimetro como si fuera grasa.
+///
+/// Puede apuntar a una herramienta del almacen, a una unidad serializada o a
+/// una caja completa: es lo que hay que tener en la mano, venga como venga.
+model PlanTaskTool {
+  id         String @id @default(cuid())
+  planTaskId String
+  partId     String?
+  assetId    String?
+  kitId      String?
+  cantidad   Float   @default(1)
+  nota       String?
+
+  task  PlanTask           @relation(fields: [planTaskId], references: [id], onDelete: Cascade)
+  part  Part?              @relation(fields: [partId], references: [id], onDelete: Cascade)
+  asset Asset?             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kit   KitDeHerramientas? @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@index([planTaskId])
 }
