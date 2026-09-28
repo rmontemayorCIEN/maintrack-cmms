@@ -33,6 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Seguro doble. La puerta de verdad es el environment de abajo, pero un
+    # environment que TODAVIA no existe GitHub lo crea al vuelo y SIN reglas:
+    # no detiene nada. Mientras la federacion de identidad no este puesta,
+    # esto ni siquiera arranca. El dia que se configure, la puerta que manda
+    # vuelve a ser la aprobacion.
+    if: vars.WIF_PROVIDER != ''
+
     # ESTA es la puerta. El environment «produccion» exige aprobacion manual
     # en GitHub: mientras nadie apruebe, el trabajo queda detenido aqui y no
     # toca ni la base ni el servicio. Es el unico punto donde un agente no
