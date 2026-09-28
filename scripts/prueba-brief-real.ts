@@ -13,6 +13,7 @@
  *     npx tsx scripts/prueba-brief-real.ts
  */
 import { prisma } from "../lib/db";
+import { borrarEmpresaDesechable, crearEmpresaDesechable } from "./empresa-desechable";
 import { guionDelDia } from "../lib/brief";
 import { cifrasInventadas, redactarBrief } from "../lib/ia/brief";
 import { iaConfigurada } from "../lib/ia/cliente";
@@ -33,18 +34,14 @@ async function main() {
     process.exit(1);
   }
 
-  const sello = `briefreal-${Date.now()}`;
   const creadas: string[] = [];
 
   try {
-    const org = await prisma.organization.create({
-      data: {
-        name: sello, slug: sello, plan: "ENTERPRISE", status: "ACTIVE",
-        timezone: ZONA, diasHabiles: "1,2,3,4,5", currency: "MXN",
-        // El complemento encendido: sin el, redactarBrief se cae al guion
-        // plano y esta prueba no probaria nada del modelo.
-        iaComplemento: true,
-      },
+    const { org, sello } = await crearEmpresaDesechable("briefreal-", {
+      timezone: ZONA, diasHabiles: "1,2,3,4,5", currency: "MXN",
+      // El complemento encendido: sin el, redactarBrief se cae al guion
+      // plano y esta prueba no probaria nada del modelo.
+      iaComplemento: true,
     });
     creadas.push(org.id);
     const site = await prisma.site.create({ data: { organizationId: org.id, code: "S1", name: "Planta" } });
@@ -135,8 +132,7 @@ async function main() {
     revisar("el consumo quedó registrado en AiUsage", usos > 0, `${usos} registro(s)`);
   } finally {
     for (const id of creadas) {
-      await prisma.workOrder.deleteMany({ where: { organizationId: id } }).catch(() => undefined);
-      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
+      if (!(await borrarEmpresaDesechable(id))) fallas++;
     }
   }
 

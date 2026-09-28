@@ -25,6 +25,7 @@ import { deflateSync } from "node:zlib";
 import { prisma } from "../lib/db";
 import { revisarFotosDelRondin, MAXIMO_FOTOS } from "../lib/ia/rondin";
 import { guardarArchivo } from "../lib/almacenamiento";
+import { borrarEmpresaDesechable, crearEmpresaDesechable } from "./empresa-desechable";
 
 let fallas = 0;
 function revisar(que: string, bien: boolean, detalle: unknown = "") {
@@ -77,13 +78,10 @@ async function main() {
     return;
   }
 
-  const sello = `rreal-${Date.now()}`;
   const creadas: string[] = [];
 
   try {
-    const org = await prisma.organization.create({
-      data: { name: sello, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey" },
-    });
+    const { org, sello } = await crearEmpresaDesechable("rreal-");
     creadas.push(org.id);
     const sitio = await prisma.site.create({ data: { organizationId: org.id, name: "Planta", code: "P1" } });
     const area = await prisma.location.create({ data: { organizationId: org.id, siteId: sitio.id, name: "Nave 1", code: "N1" } });
@@ -162,17 +160,7 @@ async function main() {
       [...r.hallazgos.map((h) => h.parada), ...r.noSirven.map((f) => f.parada)].every((n) => paradasValidas.includes(n)),
       [...r.hallazgos.map((h) => h.parada), ...r.noSirven.map((f) => f.parada)].join(","));
   } finally {
-    for (const id of creadas) {
-      await prisma.attachment.deleteMany({ where: { organizationId: id } });
-      await prisma.rondinHallazgo.deleteMany({ where: { organizationId: id } });
-      await prisma.rondinParada.deleteMany({ where: { organizationId: id } });
-      await prisma.rondin.deleteMany({ where: { organizationId: id } });
-      await prisma.asset.deleteMany({ where: { organizationId: id } });
-      await prisma.location.deleteMany({ where: { organizationId: id } });
-      await prisma.site.deleteMany({ where: { organizationId: id } });
-      await prisma.aiUsage.deleteMany({ where: { organizationId: id } });
-      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
-    }
+    for (const id of creadas) if (!(await borrarEmpresaDesechable(id))) fallas++;
   }
 
   console.log(`\n${fallas ? `${fallas} revisión(es) fallaron` : "Todo bien"}\n`);

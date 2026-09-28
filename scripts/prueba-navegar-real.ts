@@ -17,6 +17,7 @@
  *      se metio.
  */
 import { prisma } from "../lib/db";
+import { borrarEmpresaDesechable, crearEmpresaDesechable } from "./empresa-desechable";
 import { adivinarDestino } from "../lib/ia/navegar";
 import { DESTINOS, ATAJOS } from "../lib/navegacion-voz";
 
@@ -34,12 +35,9 @@ async function main() {
     return;
   }
 
-  const sello = `navr-${Date.now()}`;
   let orgId = "";
   try {
-    const org = await prisma.organization.create({
-      data: { name: sello, slug: sello, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey" },
-    });
+    const { org } = await crearEmpresaDesechable("navr-");
     orgId = org.id;
     const conIa = { id: org.id, plan: "ENTERPRISE", iaComplemento: true, iaExtra: 0 };
 
@@ -121,10 +119,7 @@ async function main() {
     console.log(`\n  ${gasto._count.id} llamadas · ${(gasto._sum.costoUsd ?? 0).toFixed(4)} USD`);
     console.log(`  por comando: ${((gasto._sum.costoUsd ?? 0) / Math.max(1, gasto._count.id)).toFixed(5)} USD\n`);
   } finally {
-    if (orgId) {
-      await prisma.aiUsage.deleteMany({ where: { organizationId: orgId } });
-      await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined);
-    }
+    if (orgId && !(await borrarEmpresaDesechable(orgId))) fallas++;
   }
 
   console.log(`${fallas ? `${fallas} revisión(es) fallaron` : "Todo bien"}\n`);
