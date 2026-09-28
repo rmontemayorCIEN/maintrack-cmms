@@ -126,6 +126,37 @@ jobs:
                 --project "$PROYECTO" --format='value(status.url)')
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
+      # ── Que lo publicado sea lo que ATIENDE
+      #
+      # Esto va ANTES del humo y no despues, porque el humo pega contra la
+      # direccion del servicio y no sabe que revision hay detras. La primera
+      # liberacion salio verde con los clientes en el codigo de cuatro horas
+      # antes: se publico una revision sana que nunca recibio trafico, y el
+      # humo la confirmo... probando la vieja.
+      #
+      # Una liberacion que no cambia lo que ve el cliente no es una
+      # liberacion, aunque todos los pasos digan que si.
+      - name: Comprobar que la revision nueva es la que atiende
+        run: |
+          set -euo pipefail
+          NUEVA=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                  --format='value(status.latestCreatedRevisionName)')
+          SIRVE=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                  --format='value(status.traffic[0].revisionName)')
+          echo "  Se publico: $NUEVA"
+          echo "  Atiende   : $SIRVE"
+          if [ "$NUEVA" != "$SIRVE" ]; then
+            echo ""
+            echo "ERROR: se publico «$NUEVA» pero quien atiende es «$SIRVE»."
+            echo ""
+            echo "       Los clientes seguirian con el codigo anterior y todo lo"
+            echo "       demas diria que la liberacion salio bien."
+            echo ""
+            echo "       Suele pasar cuando el trafico quedo clavado a una"
+            echo "       revision: revise que deploy.sh publique con --to-latest."
+            exit 1
+          fi
+
       - name: Prueba de humo
         # Sin navegador: solo peticiones. Lo que prueba es que ESTA revision
         # atienda con ESTOS secretos y ESTA base, no como se ve.
