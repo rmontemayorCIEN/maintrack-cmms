@@ -7,7 +7,7 @@
  * plantilla entrega el caso ya pensado —con las llaves a los datos de
  * MainTrack donde corresponden— y se ajusta antes de guardar.
  *
- * Las siete salen de lo que las plantas llevan hoy en Excel. Ninguna es
+ * Las seis salen de lo que las plantas llevan hoy en Excel. Ninguna es
  * mantenimiento: si lo fuera, seria un modulo, no una tabla del cliente.
  *
  * «Gestion de contratos» es la que mas cerca pasa de algo que ya existe, y por
@@ -19,7 +19,19 @@
  * la misma pregunta con dos fechas distintas: exactamente el defecto que ya
  * ocurrio en este proyecto entre `recurrencia.ts` y Reportes.
  *
- * ── Una que NO esta aqui, a proposito
+ * ── Dos que NO estan aqui, a proposito
+ *
+ * «Herramienta asignada» SI estuvo, y se retiro cuando se construyo Gestion de
+ * Herramientas. Una tabla propia solo habria guardado quien tiene que: no
+ * descuenta existencia, no sabe que una herramienta se presta y regresa, no
+ * avisa de lo no devuelto ni valua lo perdido por persona, y su «Herramienta»
+ * era texto libre —o sea, tres nombres distintos para el mismo calibrador—.
+ * Dejarla habria sido ofrecerle al cliente una version peor de algo que el
+ * sistema ya hace bien, y peor aun: dos lugares contestando quien trae que.
+ *
+ * Quitarla no toca a nadie. Una tabla ya creada guarda sus propios campos y
+ * `plantillaDe` solo se consulta al nacer, asi que una tabla vieja sigue
+ * funcionando igual; en produccion, ademas, ninguna nacio de plantilla.
  *
  * Los actos y condiciones inseguras (el requisito de la STPS) parecen la
  * plantilla obvia y no lo son: no es un registro, es un proceso corto
@@ -157,28 +169,6 @@ export const PLANTILLAS: Plantilla[] = [
       { etiqueta: "Quién tomó la muestra", tipo: "PERSONA" },
       { etiqueta: "Laboratorio", tipo: "PROVEEDOR" },
       { etiqueta: "Acción que se tomó", tipo: "TEXTO_LARGO" },
-    ],
-  }),
-  p({
-    clave: "herramienta",
-    nombre: "Herramienta asignada",
-    descripcion:
-      "Qué herramienta o instrumento tiene cada persona, desde cuándo y en qué estado se entregó. Se cierra cuando la devuelve.",
-    porQue:
-      "No es una refacción que se consume, así que no va al almacén: es un resguardo que se presta y se devuelve.",
-    icono: "herramienta",
-    campos: [
-      { etiqueta: "Persona", tipo: "PERSONA", requerido: true, enLista: true },
-      { etiqueta: "Herramienta", tipo: "TEXTO", requerido: true, enLista: true },
-      { etiqueta: "Número de serie o inventario", tipo: "TEXTO" },
-      { etiqueta: "Fecha de entrega", tipo: "FECHA", requerido: true, enLista: true },
-      { etiqueta: "Fecha de devolución", tipo: "FECHA", enLista: true },
-      {
-        etiqueta: "Estado al entregar", tipo: "LISTA", enLista: true,
-        opciones: ["Nueva", "Buena", "Usada", "Para reparar"],
-      },
-      { etiqueta: "Quién la entregó", tipo: "PERSONA" },
-      { etiqueta: "Nota", tipo: "TEXTO_LARGO" },
     ],
   }),
   p({
