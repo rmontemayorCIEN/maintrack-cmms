@@ -1,4 +1,4 @@
-import { COMPLEMENTO_IA, ORDEN_PLANES, PLANES, type ClavePlan } from "./planes";
+import { COMPLEMENTO_IA, COMPLEMENTO_NORMAS, COMPLEMENTO_REGISTROS, ORDEN_PLANES, PLANES, type ClavePlan } from "./planes";
 import { FUNCIONES_IA } from "./ia/funciones";
 
 /**
@@ -91,8 +91,12 @@ export const MODULOS: Array<{ nombre: string; texto: string }> = [
   { nombre: "Indicadores y reportes", texto: "Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro." },
   { nombre: "Avisos", texto: "En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega." },
   { nombre: "Conversaciones y compromisos", texto: "Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple." },
-  { nombre: "Cumplimiento normativo", texto: "Se contrata aparte. Las normas que su empresa debe cumplir, con el índice de qué plan, qué documento y qué registro responden a cada obligación, y el expediente listo para una inspección. La evidencia no se palomea: sale del trabajo que de verdad se hizo, con su fecha, su responsable y su foto. Le ayuda a organizar y conservar esa evidencia; no dictamina si cumple con la ley." },
-  { nombre: "Registros propios", texto: "Se contrata aparte. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo." },
+  // Estos dos no usan `precio()`: esta lista se evalua al cargar el modulo, y
+  // `precio()` lee MONEDA, que se declara mas abajo. Llamarla aqui tumbaba la
+  // comparacion entera con «Cannot access 'MONEDA' before initialization», y
+  // tsc no lo veia. El numero sigue viniendo de una sola constante.
+  { nombre: "Cumplimiento normativo", texto: `Se contrata aparte, por $${COMPLEMENTO_NORMAS.precioMensual.toLocaleString("es-MX")} al mes. Las normas que su empresa debe cumplir, con el índice de qué plan, qué documento y qué registro responden a cada obligación, y el expediente listo para una inspección. La evidencia no se palomea: sale del trabajo que de verdad se hizo, con su fecha, su responsable y su foto. Le ayuda a organizar y conservar esa evidencia; no dictamina si cumple con la ley.` },
+  { nombre: "Registros propios", texto: `Se contrata aparte, por $${COMPLEMENTO_REGISTROS.precioMensual.toLocaleString("es-MX")} al mes. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo.` },
   { nombre: "Integración con su ERP", texto: "API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas." },
 ];
 

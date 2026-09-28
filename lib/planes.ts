@@ -95,6 +95,79 @@ export const COMPLEMENTO_IA = {
   ],
 } as const;
 
+/**
+ * Los complementos que se contratan sobre un plan de pago.
+ *
+ * Los tres se cobran en la misma factura mensual, como lineas aparte. Van en
+ * UNA lista y no repartidos por el codigo porque el precio lo lee la cobranza,
+ * la comparacion comercial y la presentacion: tres lugares que no pueden
+ * contestar distinto cuando alguien cambie un numero.
+ *
+ * `contratado` recibe las banderas de la empresa. Agregar un complemento nuevo
+ * es agregar una entrada aqui, no tocar la cobranza.
+ */
+export type Complemento = {
+  clave: string;
+  nombre: string;
+  precioMensual: number;
+  contratado: (org: { iaComplemento?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean }) => boolean;
+};
+
+/**
+ * «Registros propios»: el cliente arma sus propias tablas.
+ *
+ * Mas barato que la IA a proposito: no cuesta nada entregarlo —no consume
+ * modelo— y su valor es que reemplaza hojas de Excel sueltas. Es un
+ * complemento de permanencia mas que de margen: quien mudo sus formatos aqui
+ * ya no se va facil.
+ */
+export const COMPLEMENTO_REGISTROS = {
+  clave: "REGISTROS_PROPIOS",
+  nombre: "Registros propios",
+  precioMensual: 690,
+  moneda: "MXN",
+  descripcion:
+    "Sus propias tablas, con las columnas que decida y amarradas a sus equipos, su gente y sus proveedores.",
+  incluye: [
+    "Hasta 12 tablas con 24 columnas cada una",
+    "Formatos ya hechos: contratos, combustible, EPP, análisis de agua, contratistas, energía",
+    "Columnas amarradas al catálogo: equipo, persona, proveedor, orden, centro de costo",
+    "Permiso de captura y de lectura por rol",
+    "La IA puede contestar sobre esas tablas",
+  ],
+} as const;
+
+/**
+ * «Cumplimiento normativo»: el catalogo de normas con su evidencia.
+ *
+ * El mas caro de los tres, y no por capricho. Es el unico que cuesta sostener
+ * —alguien tiene que revisar el catalogo cuando cambia una norma— y es el
+ * unico que atiende riesgo regulatorio, no productividad. Ningun CMMS del
+ * mercado mexicano lo trae amarrado a la operacion.
+ */
+export const COMPLEMENTO_NORMAS = {
+  clave: "CUMPLIMIENTO_NORMATIVO",
+  nombre: "Cumplimiento normativo",
+  precioMensual: 1490,
+  moneda: "MXN",
+  descripcion:
+    "El catálogo de normas aplicables a su giro, amarrado al trabajo que ya hace: la evidencia sale sola.",
+  incluye: [
+    "Catálogo de normas por giro, con sus obligaciones",
+    "Cada obligación amarrada a planes, equipos o registros",
+    "Estado de cumplimiento por norma, con su evidencia",
+    "Expediente listo para el auditor",
+    "Normas propias, para lo que el catálogo no cubra",
+  ],
+} as const;
+
+/** Los tres, en un solo lugar. Ver el comentario de `Complemento`. */
+export const COMPLEMENTOS: Complemento[] = [
+  { clave: COMPLEMENTO_IA.clave, nombre: COMPLEMENTO_IA.nombre, precioMensual: COMPLEMENTO_IA.precioMensual, contratado: (o) => Boolean(o.iaComplemento) },
+  { clave: COMPLEMENTO_REGISTROS.clave, nombre: COMPLEMENTO_REGISTROS.nombre, precioMensual: COMPLEMENTO_REGISTROS.precioMensual, contratado: (o) => Boolean(o.registrosPropios) },
+  { clave: COMPLEMENTO_NORMAS.clave, nombre: COMPLEMENTO_NORMAS.nombre, precioMensual: COMPLEMENTO_NORMAS.precioMensual, contratado: (o) => Boolean(o.cumplimientoNormas) },
+];
+
 export const PLANES: Record<ClavePlan, DefinicionPlan> = {
   PROFESSIONAL: {
     nombre: "Professional",
