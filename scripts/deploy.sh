@@ -153,18 +153,6 @@ EXTRA=""
 if [ -n "${ETIQUETA:-}" ]; then
   EXTRA="--tag=$ETIQUETA"
   [ "${SIN_TRAFICO:-0}" = "1" ] && EXTRA="$EXTRA --no-traffic"
-else
-  # --to-latest NO es redundante, y costo caro descubrirlo.
-  #
-  # Una vista previa se publica con --no-traffic, y eso cambia el reparto del
-  # servicio de «siempre la ultima» a «esta revision y solo esta». A partir de
-  # ahi cada despliegue de produccion creaba su revision y el trafico se
-  # quedaba clavado en la anterior: la liberacion decia que todo bien y los
-  # clientes seguian con el codigo viejo.
-  #
-  # Peor todavia: la prueba de humo pegaba contra la direccion del servicio
-  # —que servia lo viejo— y pasaba. Verde por todos lados y nada publicado.
-  EXTRA="--to-latest"
 fi
 
 echo "Proyecto  : $(gcloud config get-value project 2>/dev/null)"
@@ -204,6 +192,27 @@ if ! gcloud run deploy "$SERVICIO" \
   ID=$(gcloud builds list --limit=1 --format="value(id)" 2>/dev/null || true)
   [ -n "$ID" ] && gcloud builds log "$ID" 2>/dev/null | tail -40
   exit 1
+fi
+
+# ── Que el trafico siga al codigo nuevo
+#
+# No es redundante, y costo caro descubrirlo. Una vista previa se publica con
+# --no-traffic, y eso cambia el reparto del servicio de «siempre la ultima» a
+# «esta revision y solo esta». Desde ahi, cada despliegue de produccion creaba
+# su revision y el trafico se quedaba clavado en la anterior: la liberacion
+# decia que todo bien y los clientes seguian con el codigo viejo. Y el humo lo
+# confirmaba, porque pega contra la direccion del servicio.
+#
+# Se nombra la revision EXACTA en vez de usar --to-latest. «La ultima creada»
+# puede ser una vista previa —que apunta a la base de PRUEBAS— si una propuesta
+# se publico mientras tanto. Mandar a los clientes ahi seria peor que no
+# publicar.
+if [ -z "${ETIQUETA:-}" ]; then
+  NUEVA=$(gcloud run services describe "$SERVICIO" --region "$REGION" \
+          --format='value(status.latestCreatedRevisionName)')
+  gcloud run services update-traffic "$SERVICIO" --region "$REGION" \
+    --to-revisions="$NUEVA=100" --quiet >/dev/null
+  echo "Atendiendo: $NUEVA"
 fi
 
 echo ""
