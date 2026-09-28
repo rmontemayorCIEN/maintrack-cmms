@@ -2100,6 +2100,41 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { pregunta: "¿Sirve para descontarle a alguien?", respuesta: "Eso es una decisión suya y de recursos humanos, no del sistema. Lo que el sistema le da es el dato, con su respaldo: qué se perdió, cuándo, cuánto costó y quién lo traía." },
     ],
   },
+  "/inventory/herramientas/cajas": {
+    titulo: "Cajas de herramienta",
+    que: "Grupos de herramienta que salen y regresan juntos: la caja del mecánico, la del eléctrico. Se prestan de un golpe y, al volver, se marca pieza por pieza qué regresó.",
+    hacer: [
+      "Armar una caja con lo que trae: herramienta del almacén y unidades con número de serie",
+      "Prestarla completa a una persona",
+      "Recibirla marcando qué regresó y qué no",
+      "Apagar una caja que ya no se usa, sin borrar su historia",
+    ],
+    flujo: [
+      "Una caja existe por UNA razón: ver qué falta cuando vuelve incompleta. Prestar pieza por pieza ya se podía; lo que no se podía era saber que de las catorce llaves regresaron trece.",
+      "Por dentro no hay un «préstamo de caja»: cada pieza sale como su propio resguardo y comparten una misma salida. Por eso una llave que se perdió entra al reporte de pérdidas igual que cualquier otra herramienta, sin nada especial.",
+      "Si al salir falta una pieza —está prestada, no hay disponible—, la caja SALE con lo demás y se le dice cuál no pudo llevarse y por qué. Negarla entera dejaría al técnico sin nada, que es peor que salir con trece de catorce sabiéndolo.",
+      "Al recibirla se marca qué regresó. Lo que no vuelve sigue abierto a nombre de quien lo trae: se puede ir a buscar, o darse de baja desde Herramientas como cualquier pérdida.",
+      "Puede mezclar lo del almacén —que va por cantidad— con unidades que tienen número de serie, que son piezas únicas.",
+    ],
+    botones: [
+      { nombre: "Armar una caja", explica: "Le pone clave y nombre, y se eligen las piezas que trae. La clave es corta y estable: CAJA-MEC." },
+      { nombre: "Prestar", explica: "Saca la caja completa a nombre de una persona. Si algo no está, avisa cuál y sale con el resto." },
+      { nombre: "Recibir", explica: "Marca pieza por pieza qué regresó. Lo que no marque se queda fuera, a nombre de quien la trae." },
+    ],
+    campos: [
+      { nombre: "Regresó incompleta", explica: "Volvieron algunas piezas y otras no. La caja sigue contando como fuera mientras le falte algo." },
+      { nombre: "Días fuera", explica: "Desde que salió. Pasando quince, conviene ir a preguntar." },
+    ],
+    noPuedo: [
+      { sintoma: "No puedo armar una caja", porque: "Antes hace falta tener herramienta en el catálogo: se da de alta en Almacén marcándola como «Herramienta», o como un equipo con «se presta»." },
+      { sintoma: "La caja salió con menos piezas de las que trae", porque: "Alguna estaba prestada o no había disponible. El aviso dice cuál y por qué; el resto sí salió." },
+      { sintoma: "Recibí la caja pero sigue apareciendo fuera", porque: "Le falta alguna pieza por regresar. Búsquela, o dé de baja lo que no volvió desde Herramientas." },
+    ],
+    preguntas: [
+      { pregunta: "¿Para qué sirve una caja si puedo prestar pieza por pieza?", respuesta: "Para dos cosas: sacar catorce piezas con un clic en vez de catorce, y sobre todo para saber qué falta cuando vuelve. Sin caja, nadie lleva la cuenta de que el martillo no regresó." },
+      { pregunta: "¿Qué pasa con lo que no regresa?", respuesta: "Sigue abierto a nombre de quien lo trae, como si se lo hubiera llevado suelto. Se le da de baja desde Herramientas con su motivo, y si fue pérdida entra al reporte de lo que se pierde." },
+    ],
+  },
 };
 
 /**

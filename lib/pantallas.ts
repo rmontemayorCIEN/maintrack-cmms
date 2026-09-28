@@ -73,6 +73,7 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   // es quien las trae— y el reporte de perdidas, que nombra personas y les
   // pone una cifra al lado, solo quien ve costos.
   { ruta: "/inventory/herramientas", roles: ALMACEN },
+  { ruta: "/inventory/herramientas/cajas", roles: ALMACEN },
   { ruta: "/inventory/herramientas/perdidas", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/kardex", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/requisiciones", roles: ALMACEN },
@@ -331,6 +332,7 @@ export function pantallasDelMenu(): ItemMenu[] {
 const SUBPANTALLAS: ItemMenu[] = [
   { href: "/normas/nueva", etiqueta: "Agregar una norma propia", icono: "normas" },
   { href: "/inventory/herramientas/perdidas", etiqueta: "Qué se está perdiendo", icono: "herramientas" },
+  { href: "/inventory/herramientas/cajas", etiqueta: "Cajas de herramienta", icono: "herramientas" },
   // Del dia a dia, aunque no esten en el menu.
   { href: "/search", etiqueta: "Búsqueda", icono: "buscar" },
   { href: "/notificaciones", etiqueta: "Avisos", icono: "avisos" },

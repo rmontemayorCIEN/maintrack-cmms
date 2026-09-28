@@ -92,11 +92,16 @@ export default async function HerramientasPage() {
           <Card className="mb-4">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-900">Quién trae qué</h2>
-              {verCostos ? (
-                <Link href="/inventory/herramientas/perdidas" className="text-xs text-slate-500 underline hover:text-slate-700">
-                  Qué se está perdiendo
+              <span className="flex gap-3">
+                <Link href="/inventory/herramientas/cajas" className="text-xs text-slate-500 underline hover:text-slate-700">
+                  Cajas
                 </Link>
-              ) : null}
+                {verCostos ? (
+                  <Link href="/inventory/herramientas/perdidas" className="text-xs text-slate-500 underline hover:text-slate-700">
+                    Qué se está perdiendo
+                  </Link>
+                ) : null}
+              </span>
             </div>
 
             {porPersona.length === 0 ? (

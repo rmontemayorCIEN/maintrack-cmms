@@ -46,6 +46,7 @@ import { SeccionPlegable } from "./seccion";
 import { ConfirmarSeguridad } from "./confirmar-seguridad";
 import { estadoDeSeguridad } from "@/lib/seguridad-ot";
 import { naceAbierta } from "@/lib/secciones-orden";
+import { herramientaQueHaceFalta } from "@/lib/herramientas";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
 import { PasarRegistros } from "@/components/paso-registros";
@@ -364,6 +365,15 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
    */
   const faltantes = ["IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(wo.status) ? faltantesDeCierre(datosCierre) : [];
   const mostrarFaltantes = faltantes.length > 0 || wo.status === "COMPLETED";
+  /*
+   * Que herramienta pide el plan y si esta libre HOY.
+   *
+   * Va aqui y no en «Recursos planeados» porque no es lo mismo: aquello es lo
+   * que se preve GASTAR, y esto es lo que hay que TENER EN LA MANO. Mezclarlos
+   * haria creer que el torquimetro se consume.
+   */
+  const herramienta = await herramientaQueHaceFalta(user.organizationId, wo.id);
+
   const faltaEn = new Set(faltantes.map((f) => f.seccion));
 
   // El mismo contenido para el teléfono y la computadora: se arma una vez.
@@ -679,6 +689,35 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
           </section>
           <section id="materiales" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          {herramienta.declarada ? (
+            <Card>
+              <CardHeader
+                title="Herramienta que hace falta"
+                subtitle="Lo que el plan pide tener en la mano para este trabajo, y si está libre ahora."
+              />
+              <ul className="mt-2 space-y-1.5">
+                {herramienta.piezas.map((p, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                    <span className="font-medium text-slate-700">{p.que}</span>
+                    {p.cantidad !== 1 ? <span className="text-slate-500">×{formatNumber(p.cantidad, 2)}</span> : null}
+                    <Badge tone={p.disponible ? "success" : "warning"}>
+                      {p.disponible ? "Disponible" : "No está"}
+                    </Badge>
+                    {/* El porque importa mas que el estado: «la trae Ana» dice
+                        a quien ir a buscar, «no hay ninguna libre» no. */}
+                    <span className="text-slate-500">{p.porque}</span>
+                  </li>
+                ))}
+              </ul>
+              {herramienta.piezas.some((p) => !p.disponible) ? (
+                <p className="mt-2 text-[0.6875rem] text-amber-700">
+                  Falta herramienta para hacer este trabajo. Consígala antes de asignar la orden, o va a bajar
+                  alguien a piso a darse cuenta ahí.
+                </p>
+              ) : null}
+            </Card>
+          ) : null}
+
           {hayPlaneado ? (
             <Card>
               <CardHeader
