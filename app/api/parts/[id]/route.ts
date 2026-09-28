@@ -8,6 +8,8 @@ const schema = z.object({
   description: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
   unit: z.string().min(1).optional(),
+  /// REFACCION (se consume) o HERRAMIENTA (sale y regresa).
+  naturaleza: z.enum(["REFACCION", "HERRAMIENTA"]).optional(),
   unitCost: z.coerce.number().min(0).optional(),
   minQuantity: z.coerce.number().min(0).optional(),
   maxQuantity: z.coerce.number().min(0).optional(),

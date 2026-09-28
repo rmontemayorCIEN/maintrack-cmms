@@ -298,6 +298,7 @@ model Organization {
   tablasPropias      TablaPropia[]
   renglonesPropios   RenglonPropio[]
   normasAdoptadas    NormaAdoptada[]
+  resguardos         Resguardo[]
   amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
@@ -425,6 +426,9 @@ model User {
   tablasPropiasCreadas TablaPropia[]           @relation("TablaPropiaAutor")
   renglonesPropios     RenglonPropio[]         @relation("RenglonPropioAutor")
   normasACargo         NormaAdoptada[]         @relation("NormaResponsable")
+  resguardos           Resguardo[]             @relation("ResguardoDe")
+  resguardosEntregados Resguardo[]             @relation("ResguardoEntrego")
+  resguardosRecibidos  Resguardo[]             @relation("ResguardoRecibio")
   obligacionesACargo   ObligacionAdoptada[]    @relation("ObligacionResponsable")
   favoritos            PantallaFavorita[]
   links                ReferenceLink[]
@@ -1900,6 +1904,15 @@ model Part {
   description    String?
   category       String?
   unit           String   @default("pza")
+  /// REFACCION (se consume) o HERRAMIENTA (sale y regresa). De
+  /// `lib/herramientas-tipos.ts`.
+  ///
+  /// Es una naturaleza del MISMO catalogo y no un padron aparte: una
+  /// herramienta se compra igual que una refaccion —requisicion, autorizacion,
+  /// orden de compra, recepcion, proveedor, costo— y todo eso ya existe. Un
+  /// catalogo separado seria duplicar lo caro para no compartir lo barato, y
+  /// ademas dos padrones que se desincronizan.
+  naturaleza     String   @default("REFACCION")
   unitCost       Float    @default(0)
   /// Suma de la existencia en todos los almacenes.
   ///
@@ -1938,6 +1951,7 @@ model Part {
   equivalenciasA   EquivalenciaRefaccion[] @relation("EquivalenciaA")
   equivalenciasB   EquivalenciaRefaccion[] @relation("EquivalenciaB")
 
+  resguardos     Resguardo[]
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -2009,6 +2023,13 @@ model Warehouse {
   /// El que recibe la existencia al migrar y el destino por omision de una
   /// compra. Solo uno por organizacion.
   esGeneral      Boolean  @default(false)
+  /// Si la herramienta se toma sin pasar por el almacenista.
+  ///
+  /// Va por ALMACEN y no por empresa porque la misma planta suele tener los
+  /// dos: el general con ventanilla, y el carrito de dados junto al torno
+  /// donde nadie va a pedir permiso para tomar uno. El dato que se guarda es
+  /// el mismo en ambos casos; lo que cambia es quien lo teclea.
+  autoservicio   Boolean  @default(false)
   active         Boolean  @default(true)
   notas          String?
   createdAt      DateTime @default(now())
@@ -2027,6 +2048,7 @@ model Warehouse {
   ordenes       PurchaseOrder[]
   conteos       InventoryCount[]
 
+  resguardos     Resguardo[]
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -2038,6 +2060,17 @@ model PartStock {
   partId         String
   warehouseId    String
   quantity       Float    @default(0)
+  /// Cuanto de este articulo esta PRESTADO y todavia no vuelve.
+  ///
+  /// Prestar NO baja `quantity`, y esa es la decision que sostiene el modulo:
+  /// `quantity` es lo que la empresa POSEE, y prestar mueve posesion, no
+  /// valor. Si el prestamo tocara la existencia tendria que pasar por
+  /// `aplicarMovimiento()` —el unico punto que mueve stock— y entonces cada
+  /// devolucion entraria al kardex como si fuera una compra, ensuciando el
+  /// costo promedio.
+  ///
+  /// Lo disponible para prestar es `quantity - enResguardo`.
+  enResguardo    Float    @default(0)
   /// Nulo significa heredar el de la refaccion. El almacen general y el de
   /// linea rara vez tienen el mismo minimo.
   minQuantity    Float?
@@ -4267,4 +4300,62 @@ model TokenOAuth {
 
   @@index([familia])
   @@index([userId])
+}
+
+/// Una herramienta prestada: quien la tiene y desde cuando.
+///
+/// Esto es lo unico que de verdad faltaba. Lo demas —ficha, QR, ubicacion,
+/// calibracion que vence, plan preventivo, costo— ya existia: una herramienta
+/// cara e individual siempre pudo vivir como activo, y una generica como
+/// articulo del almacen. Lo que no habia era el ciclo de «sale y regresa».
+///
+/// Un renglon abierto (`devueltoEl` nulo) es algo que esta fuera. Al cerrarse
+/// NO se borra: el historial de quien tuvo que cosa es justamente de donde
+/// sale «a Pedro se le pierden los calibradores», que es el numero que hace
+/// que este modulo valga la pena.
+model Resguardo {
+  id             String @id @default(cuid())
+  organizationId String
+  partId         String
+  warehouseId    String
+
+  /// Quien la tiene. Es el responsable, no necesariamente quien la pidio.
+  personaId String
+  cantidad  Float  @default(1)
+
+  /// Quien la entrego. Nulo en un almacen de autoservicio: ahi la registra
+  /// quien la toma, y que no haya segunda firma es un dato, no un faltante.
+  entregadoPorId String?
+  entregadoEl    DateTime @default(now())
+  /// Estado con el que SALIO, de `lib/herramientas-tipos.ts`.
+  estadoSalida   String?
+  /// Para que sirve que salga: la orden, el trabajo, el area.
+  proposito      String?
+
+  devueltoEl      DateTime?
+  recibidoPorId   String?
+  /// Estado con el que VOLVIO. Comparado con el de salida es lo que detecta
+  /// el maltrato; sin el de salida no se puede afirmar nada.
+  estadoRegreso   String?
+
+  /// Si no volvio porque se perdio o se rompio. El movimiento de baja que
+  /// descuenta la existencia vive en el kardex, no aqui.
+  motivoBaja String?
+  nota       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  part         Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  persona      User         @relation("ResguardoDe", fields: [personaId], references: [id])
+  entregadoPor User?        @relation("ResguardoEntrego", fields: [entregadoPorId], references: [id])
+  recibidoPor  User?        @relation("ResguardoRecibio", fields: [recibidoPorId], references: [id])
+
+  /// Lo que esta fuera AHORA: es la consulta de todos los dias.
+  @@index([organizationId, devueltoEl])
+  /// Que trae cada quien.
+  @@index([personaId, devueltoEl])
+  @@index([partId, devueltoEl])
 }

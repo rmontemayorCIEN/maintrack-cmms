@@ -69,6 +69,11 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/inventory/analisis", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/proyeccion", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/indicadores", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
+  // Herramientas: lo VE quien trabaja con el almacen —incluido el tecnico, que
+  // es quien las trae— y el reporte de perdidas, que nombra personas y les
+  // pone una cifra al lado, solo quien ve costos.
+  { ruta: "/inventory/herramientas", roles: ALMACEN },
+  { ruta: "/inventory/herramientas/perdidas", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/inventory/kardex", roles: ["OWNER", "ADMIN", "SUPERVISOR", "COMPRAS"] },
   { ruta: "/requisiciones", roles: ALMACEN },
   // Compras completas (montos, cotizaciones, proveedores) no son del técnico:
@@ -242,6 +247,7 @@ const MENU: GrupoMenu[] = [
   {
     seccion: "Almacén y compras", clave: "almacen", items: [
       { href: "/inventory", etiqueta: "Almacén", icono: "almacen" },
+      { href: "/inventory/herramientas", etiqueta: "Herramientas", icono: "herramientas" },
       { href: "/requisiciones", etiqueta: "Requisiciones", icono: "requisiciones" },
       { href: "/compras", etiqueta: "Compras", icono: "compras" },
       { href: "/compras/planificador", etiqueta: "Qué hay que comprar", icono: "compras" },
@@ -324,6 +330,7 @@ export function pantallasDelMenu(): ItemMenu[] {
  */
 const SUBPANTALLAS: ItemMenu[] = [
   { href: "/normas/nueva", etiqueta: "Agregar una norma propia", icono: "normas" },
+  { href: "/inventory/herramientas/perdidas", etiqueta: "Qué se está perdiendo", icono: "herramientas" },
   // Del dia a dia, aunque no esten en el menu.
   { href: "/search", etiqueta: "Búsqueda", icono: "buscar" },
   { href: "/notificaciones", etiqueta: "Avisos", icono: "avisos" },

@@ -16,7 +16,7 @@ const ICONOS: Record<string, React.ComponentType<{ className?: string }>> = {
   predictivo: Activity, almacen: Boxes, requisiciones: ClipboardList, compras: ShoppingCart, proveedores: Truck,
   indicadores: LineChart, paros: Flame, reportes: BarChart3, consulta: MessageCircleQuestion, diagnostico: Sparkles,
   puesta: Rocket, catalogos: Library, importar: Upload, glosario: BookOpen, soporte: LifeBuoy, demo: Presentation, ajustes: Settings, clientes: Building2,
-  vigencias: ShieldCheck, registros: Table2, normas: ScrollText,
+  vigencias: ShieldCheck, registros: Table2, normas: ScrollText, herramientas: Wrench,
   // Iconos de las plantillas de registros propios (lib/registros-plantillas.ts).
   contrato: FileSignature, combustible: Fuel, agua: Droplets, proteccion: HardHat,
   herramienta: Wrench, contratista: HardHat, energia: Zap,

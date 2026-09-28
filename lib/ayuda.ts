@@ -2039,6 +2039,67 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Me dice que la clave ya existe", porque: "Ya tiene una norma con esa clave. Use otra o edite la que ya tiene." },
     ],
   },
+  "/inventory/herramientas": {
+    titulo: "Herramientas",
+    que: "Lo que sale del almacén y regresa: quién la tiene, desde cuándo, en qué estado salió y en qué estado volvió. Y cuando algo no vuelve, cuánto costó y a quién se le quedó.",
+    hacer: [
+      "Prestar una herramienta a alguien, con su propósito y su estado de salida",
+      "Recibirla de vuelta, anotando cómo regresó",
+      "Dar de baja lo que se perdió, se rompió o terminó su vida útil",
+      "Ver quién trae qué, y qué lleva demasiado tiempo fuera",
+      "Ver qué se está perdiendo y cuánto cuesta (solo quien ve costos)",
+    ],
+    flujo: [
+      "Una herramienta NO es una refacción, y por eso se comporta distinto: una refacción se consume —sale y no vuelve— y una herramienta sale y regresa. Se da de alta en el mismo catálogo del almacén, marcándola como «Herramienta» en vez de «Refacción».",
+      "Prestar NO descuenta la existencia. La herramienta sigue siendo de la empresa, así que «Tiene» no baja; lo que baja es lo libre. Suena raro la primera vez y es a propósito: si el préstamo descontara existencia tendría que pasar por el kardex, y entonces cada devolución entraría como si fuera una compra y ensuciaría el costo promedio de todo el almacén.",
+      "Dar de baja SÍ descuenta, y sí entra al kardex con su costo. Ese es el único momento en que la herramienta deja de existir, y de ahí sale el reporte de lo que se pierde.",
+      "El estado de salida no es un adorno: es lo único que después permite decir que algo regresó peor de como se fue. Sin él es la palabra de uno contra la del otro.",
+      "Cada almacén decide cómo entrega. «Con almacenista» exige registrar quién la entregó, así que quedan los dos en el registro. «Autoservicio» la registra quien se la lleva, sin segunda firma —es el carrito de dados junto al torno—. Se configura en Catálogos, en Almacenes.",
+      "El problema real del autoservicio no es la salida, que se registra sola porque la persona quiere la herramienta: es la devolución que nadie confirma. Por eso lo que lleva más de 15 días fuera le llega al responsable del almacén, y por eso conviene conciliar con un conteo físico de vez en cuando.",
+      "Lo que se perdió se cuenta por persona, pero SOLO lo que se le atribuye: perdida o dañada. El fin de vida útil y lo que dejó de usarse se informan aparte y no se le cargan a nadie. Meter ahí una herramienta que duró ocho años sería acusar a alguien del desgaste normal, y un reporte que acusa mal deja de usarse a la segunda vez.",
+    ],
+    botones: [
+      { nombre: "Prestar", explica: "Registra que alguien se lleva una herramienta. Pide para quién, de qué almacén, cuántas, cómo sale y para qué." },
+      { nombre: "Devolver", explica: "La herramienta volvió. Pregunta cómo regresó y lo compara con cómo salió." },
+      { nombre: "No volvió", explica: "Da de baja lo que se perdió o se rompió. Dice antes de guardar si va a contar como pérdida de esa persona o como desgaste." },
+      { nombre: "Qué se está perdiendo", explica: "El reporte por persona, con el costo real del almacén. Solo para quien ve costos." },
+    ],
+    campos: [
+      { nombre: "Tiene", explica: "Lo que la empresa posee. No baja al prestar: baja solo cuando algo se da de baja." },
+      { nombre: "Prestadas", explica: "Lo que está fuera ahora mismo. La suma de lo que trae la gente." },
+      { nombre: "Libres", explica: "Lo que se puede prestar hoy: lo que tiene menos lo prestado. Es el número que decide si alcanza." },
+      { nombre: "Se tardaron", explica: "Lo que lleva más de 15 días fuera. No significa que se haya perdido: significa que hay que ir a preguntar." },
+      { nombre: "Cómo sale / cómo regresó", explica: "Nueva, buena, usada o para reparar. Comparados, detectan el maltrato; por separado no dicen nada." },
+    ],
+    noPuedo: [
+      { sintoma: "No encuentro la herramienta al prestar", porque: "Solo se ofrecen las que tienen piezas libres. Si está toda prestada, no aparece: vea quién la trae en «Quién trae qué»." },
+      { sintoma: "Me dice que está dada de alta como refacción", porque: "Una refacción se consume y no se presta. Cámbiela a «Herramienta» en su ficha del almacén." },
+      { sintoma: "Me pide quién la entregó", porque: "Ese almacén entrega con almacenista. Si es un carrito de autoservicio, márquelo así en Catálogos → Almacenes." },
+      { sintoma: "Dice que alguien tomó la última mientras registraba", porque: "Dos personas pidieron la misma pieza al mismo tiempo y una ganó. Vuelva a intentar: es preferible eso a que dos se lleven la misma." },
+      { sintoma: "La existencia no bajó después de prestar", porque: "Es correcto y es el diseño: prestar mueve posesión, no valor. Lo que bajó es lo libre." },
+      { sintoma: "Una baja no aparece en el reporte de pérdidas", porque: "Se registró como fin de vida útil o como que ya no se usa, y eso no se le atribuye a nadie. Aparece arriba, como desgaste." },
+    ],
+    preguntas: [
+      { pregunta: "¿Por qué no baja la existencia al prestar?", respuesta: "Porque la herramienta sigue siendo suya. Si bajara, el préstamo tendría que pasar por el kardex y cada devolución entraría como una compra: el costo promedio de todo su almacén dejaría de ser confiable en una semana." },
+      { pregunta: "¿Cómo sé de dónde sale el costo de lo perdido?", respuesta: "Del costo promedio del almacén, el mismo que usa el kardex. No es una estimación: cada renglón corresponde a una baja registrada con su fecha y quién la autorizó, y se puede revisar en la bitácora." },
+      { pregunta: "¿Puedo llevar herramientas con número de serie, una por una?", respuesta: "Todavía no. Hoy se llevan por cantidad. Si una herramienta es cara y vale la pena individualizarla, por ahora conviene darla de alta como un activo, donde ya tiene expediente, QR y calibración." },
+      { pregunta: "¿Y las cajas de herramienta completas?", respuesta: "Todavía no se arman kits. Por ahora se prestan pieza por pieza." },
+      { pregunta: "¿Qué pasa si alguien se va de la empresa con herramienta?", respuesta: "Aparece en «Quién trae qué» mientras no se cierre. Ciérrelo con «No volvió» y el motivo que corresponda: así queda el costo y no se queda abierto para siempre." },
+    ],
+  },
+  "/inventory/herramientas/perdidas": {
+    titulo: "Qué se está perdiendo",
+    que: "La herramienta que se dio de baja por pérdida o daño, con su costo y quién la traía.",
+    hacer: ["Ver a quién se le pierde y cuánto cuesta", "Ver qué herramienta es la que más se pierde"],
+    flujo: [
+      "Cuenta solo lo que se le atribuye a quien la traía: perdida o dañada. El fin de vida útil y lo que dejó de usarse van aparte, arriba, y NO se le cargan a nadie.",
+      "El costo es el costo promedio del almacén, el mismo del kardex. Cada renglón es una baja registrada con fecha y responsable, así que el número se puede defender renglón por renglón — que es justo lo que hace falta cuando se va a hablar con alguien de esto.",
+      "Es un reporte que nombra personas y les pone una cifra al lado. Solo lo ve quien ve costos de almacén.",
+    ],
+    preguntas: [
+      { pregunta: "¿Sirve para descontarle a alguien?", respuesta: "Eso es una decisión suya y de recursos humanos, no del sistema. Lo que el sistema le da es el dato, con su respaldo: qué se perdió, cuándo, cuánto costó y quién lo traía." },
+    ],
+  },
 };
 
 /**

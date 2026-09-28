@@ -10,6 +10,8 @@ const schema = z.object({
   description: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
   unit: z.string().min(1),
+  /// REFACCION (se consume) o HERRAMIENTA (sale y regresa).
+  naturaleza: z.enum(["REFACCION", "HERRAMIENTA"]).optional(),
   unitCost: z.coerce.number().min(0).default(0),
   quantityOnHand: z.coerce.number().min(0).default(0),
   minQuantity: z.coerce.number().min(0).default(0),

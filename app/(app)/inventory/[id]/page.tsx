@@ -147,7 +147,7 @@ export default async function RefaccionPage({ params }: { params: Promise<{ id: 
                 refaccion={{
                   id: parte.id, code: parte.code, name: parte.name, description: parte.description, category: parte.category,
                   unit: parte.unit, unitCost: parte.unitCost, minQuantity: parte.minQuantity, maxQuantity: parte.maxQuantity,
-                  bin: parte.bin, supplierId: parte.supplierId,
+                  bin: parte.bin, supplierId: parte.supplierId, naturaleza: parte.naturaleza,
                 }}
               />
             ) : null}

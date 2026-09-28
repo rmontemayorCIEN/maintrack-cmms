@@ -30,6 +30,9 @@ export type ClaveCatalogo =
   | "external-services"
   | "cost-centers";
 
+/** Un si/no que llega del formulario como texto o como booleano. */
+const siNo = z.union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")]);
+
 const texto = (min = 1, max = 120) => z.string().trim().min(min).max(max);
 
 export type DefinicionCatalogo = {
@@ -210,25 +213,41 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y estable: ALM-GEN, ALM-L1" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "siteId", etiqueta: "Sitio", tipo: "select", opcionesDe: "sites", ayuda: "En que instalación esta fisicamente" },
+      {
+        nombre: "autoservicio", etiqueta: "Cómo se entrega la herramienta", tipo: "select",
+        opciones: [
+          { valor: "false", etiqueta: "Con almacenista" },
+          { valor: "true", etiqueta: "Autoservicio" },
+        ],
+        ayuda: "Con almacenista queda registrado quien entrega. En autoservicio la registra quien se la lleva, y entonces el aviso de lo no devuelto es lo que sostiene el control.",
+      },
       { nombre: "notas", etiqueta: "Notas", tipo: "textarea", ayuda: "Horario, quien tiene llave, restricciones de acceso" },
     ],
     crear: z.object({
       code: texto(1, 20),
       name: texto(2),
       siteId: z.string().optional().nullable(),
+      // Llega como texto del formulario y la columna es booleana.
+      //
+      // NO se usa `z.coerce.boolean()`: convierte la cadena "false" en true,
+      // porque cualquier texto no vacio lo es. Con eso, elegir «Con
+      // almacenista» habria guardado autoservicio —y el almacen dejaria de
+      // pedir la firma de quien entrega sin que nadie lo notara—.
+      autoservicio: siNo.optional(),
       notas: texto(0, 500).optional().nullable(),
     }),
     editar: z.object({
       code: texto(1, 20).optional(),
       name: texto(2).optional(),
       siteId: z.string().nullable().optional(),
+      autoservicio: siNo.optional(),
       notas: texto(0, 500).nullable().optional(),
     }),
     listar: (orgId) =>
       prisma.warehouse.findMany({
         where: { organizationId: orgId },
         select: {
-          id: true, code: true, name: true, siteId: true, notas: true, esGeneral: true,
+          id: true, code: true, name: true, siteId: true, notas: true, esGeneral: true, autoservicio: true,
           site: { select: { name: true } },
           _count: { select: { existencias: true } },
         },

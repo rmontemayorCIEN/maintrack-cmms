@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, X } from "lucide-react";
 import { Button, BotonEditar } from "@/components/ui";
 import { SelectCatalogo, type OpcionCatalogo } from "@/components/select-catalogo";
+import { NATURALEZAS, ORDEN_NATURALEZAS, type Naturaleza } from "@/lib/herramientas-tipos";
 
 /** Al migrar valores de texto libre el nombre queda igual al codigo; repetirlo
  *  ("pza — pza") no aporta nada. */
@@ -17,6 +18,7 @@ export type RefaccionEditable = {
   category: string | null; unit: string; unitCost: number;
   minQuantity: number; maxQuantity: number; bin: string | null;
   supplierId: string | null;
+  naturaleza?: string;
 };
 
 export function PartDialog({
@@ -60,6 +62,7 @@ export function PartDialog({
     name: refaccion?.name ?? "",
     description: refaccion?.description ?? "",
     category: refaccion?.category ?? "",
+    naturaleza: refaccion?.naturaleza ?? "REFACCION",
     unit: refaccion?.unit ?? unidades.find((u) => u.code === "pza")?.code ?? unidades[0]?.code ?? "",
     unitCost: String(refaccion?.unitCost ?? 0),
     quantityOnHand: "0",
@@ -165,6 +168,31 @@ export function PartDialog({
               { nombre: "name", etiqueta: "Nombre de la familia", requerido: true },
             ]}
           />
+
+          {/*
+            Refaccion o herramienta.
+
+            No es un catalogo aparte: se compran igual, se reciben igual y
+            comparten proveedor y costo. Lo que cambia es que una se consume y
+            la otra sale y regresa, y de eso depende que aparezca en
+            Herramientas y se pueda prestar.
+          */}
+          <div>
+            <label className="label" htmlFor="naturaleza">Qué es</label>
+            <select
+              id="naturaleza"
+              className="input"
+              value={form.naturaleza}
+              onChange={(e) => set("naturaleza", e.target.value)}
+            >
+              {ORDEN_NATURALEZAS.map((n) => (
+                <option key={n} value={n}>{NATURALEZAS[n].nombre}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[0.6875rem] text-slate-500">
+              {NATURALEZAS[(form.naturaleza as Naturaleza) in NATURALEZAS ? (form.naturaleza as Naturaleza) : "REFACCION"].descripcion}
+            </p>
+          </div>
 
           <SelectCatalogo
             catalogo="part-units"
