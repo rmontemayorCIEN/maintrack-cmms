@@ -90,13 +90,42 @@ fi
 # valor ya configurado en el servicio. Aditivo, lo que se configura una vez se
 # queda.
 
+# ¿Existe ese secreto? TRES respuestas, no dos.
+#
+# `gcloud secrets describe` falla igual cuando el secreto NO EXISTE y cuando no
+# se tiene permiso de preguntar. Tratar los dos casos igual casi apaga la IA y
+# los avisos al celular en produccion: la cuenta de GitHub tenia permiso de
+# LEER el valor pero no de preguntar si existia, asi que este script concluyo
+# «no esta» y habria publicado sin ellos, sin que nada fallara.
+#
+# Es el mismo desastre que traia el deploy.yml viejo, por otra puerta. Ante la
+# duda ya no se publica: se detiene y se dice por que.
+hay_secreto() {
+  local salida
+  if salida=$(gcloud secrets describe "$1" 2>&1); then return 0; fi
+  if printf '%s' "$salida" | grep -qiE "NOT_FOUND|was not found|does not exist"; then
+    return 1
+  fi
+  echo ""
+  echo "ERROR: no se pudo determinar si el secreto «$1» existe."
+  echo ""
+  echo "       Que no se pueda preguntar NO significa que no exista. Publicar"
+  echo "       asi dejaria el servicio sin ese secreto y sin avisar a nadie."
+  echo ""
+  echo "       Lo que contesto Google:"
+  printf '%s\n' "$salida" | head -3 | sed 's/^/         /'
+  echo ""
+  echo "       Si es la cuenta de GitHub, le falta roles/secretmanager.viewer."
+  exit 1
+}
+
 # La llave de Anthropic es opcional: mientras no exista el secreto, la app se
 # publica igual y las funciones de IA quedan visibles pero inactivas.
 # Por omision la base de produccion. Una vista previa pasa la suya, que es lo
 # unico que la separa de los datos de los clientes.
 SECRETO_DB="${SECRETO_DB:-cmms-database-url}"
 SECRETOS="DATABASE_URL=$SECRETO_DB:latest,AUTH_SECRET=cmms-auth-secret:latest,CRON_SECRET=cmms-cron-secret:latest"
-if gcloud secrets describe cmms-anthropic-key >/dev/null 2>&1; then
+if hay_secreto cmms-anthropic-key; then
   SECRETOS="$SECRETOS,ANTHROPIC_API_KEY=cmms-anthropic-key:latest"
   IA="habilitada"
 else
@@ -111,7 +140,7 @@ fi
 # en el siguiente despliegue. Paso: los avisos dejaron de funcionar sin que
 # nada fallara, y el sintoma aparecio en otra pantalla dos despliegues despues.
 # Todo lo que la aplicacion necesite se declara en este archivo, sin excepcion.
-if gcloud secrets describe vapid-private-key >/dev/null 2>&1; then
+if hay_secreto vapid-private-key; then
   SECRETOS="$SECRETOS,VAPID_PRIVATE_KEY=vapid-private-key:latest,VAPID_PUBLIC_KEY=vapid-public-key:latest"
   AVISOS="habilitados"
 else
