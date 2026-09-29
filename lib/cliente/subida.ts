@@ -9,7 +9,9 @@
 export type Destino =
   | { workOrderId: string } | { assetId: string }
   | { workRequestId: string } | { partId: string }
-  | { rondinParadaId: string };
+  | { rondinParadaId: string }
+  /// La publicacion oficial de una norma, su guia, el manual del proveedor.
+  | { normaId: string };
 
 /** Lo mismo que acepta el servidor (lib/almacenamiento.ts): aquí para avisar antes de intentar. */
 const TIPOS = [

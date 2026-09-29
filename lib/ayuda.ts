@@ -1977,6 +1977,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Dar de alta una norma propia: un requisito de su corporativo o de su cliente",
       "Decir con qué se cumple cada obligación, amarrándola a lo que ya existe",
       "Marcar lo que no le aplica, con su razón",
+      "Colgarle a la norma su publicación oficial, su guía o el manual del que depende: archivos y enlaces",
       "Sacar el expediente de una norma para una inspección",
     ],
     flujo: [
@@ -1984,6 +1985,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Por eso la evidencia no se inventa: sale del trabajo que de verdad se hizo. La orden se generó sola, se asignó, se cerró con foto y con fecha. Nadie palomeó una lista — y eso es lo que la hace valer en una inspección.",
       "Hay dos clases de norma y NO prometen lo mismo. Las del catálogo las mantenemos nosotros y le avisamos cuando cambian. Las que usted da de alta no las actualiza nadie: si el requisito cambia, hay que cambiarlo aquí. Va marcado en la lista.",
       "Una obligación sin nada amarrado NO se cuenta como incumplida ni como cumplida: dice «sin respaldo». El sistema no tiene con qué opinar, y contarla de cualquiera de los dos lados sería inventar.",
+      "Una obligación puede tener VARIOS respaldos a la vez —un rondín, un documento y un registro propio—, y entonces los tres tienen que estar al corriente para que se vea verde. Si algo es una alternativa que usted no usa, no lo amarre: el estado toma el peor de lo que encuentre.",
+      "Los documentos de la norma contestan «¿de dónde salió esto?». Lo que traiga la asistencia con IA queda marcado con un aviso: el modelo puede dar por vigente una versión derogada con la misma seguridad con que da la vigente, y quien decide si el documento sirve es usted. La publicación en el Diario Oficial es la única que manda.",
       "Cuando una obligación tiene varios respaldos, manda el peor. Si una de sus tres plantas trae el plan vencido, la obligación no está al corriente: lo contrario sería una máquina de presumir cumplimiento.",
       "No verá ningún porcentaje de cumplimiento. Un «87% cumplido» es una cifra que se ve seria, que nadie puede reproducir y que se acaba presumiendo en una junta. Lo que verá son conteos, que sí se pueden verificar uno por uno.",
       "Cada norma dice lo que pide y que aquí NO se lleva. Eso está a propósito: el peor servicio sería dejarle creer que con esto ya cumplió todo.",
