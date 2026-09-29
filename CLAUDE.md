@@ -146,8 +146,6 @@ Cuando algo de IA falle, el detalle esta en la tabla `AiUsage`, columna `error`.
 ```bash
 npm run dev                    # desarrollo (SQLite)
 npx tsc --noEmit               # tipos
-npm run actualizar             # desplegar a produccion (con migracion)
-npm run actualizar -- --sin-migrar
 ./scripts/nueva-migracion.sh   # crear migracion
 ./scripts/con-produccion.sh scripts/<x>.ts   # correr un script contra produccion
 ```
@@ -172,26 +170,81 @@ Y una leccion de un intento anterior: `~/Library/Caches` **no** es un lugar
 donde guardar nada que haga falta. macOS la purga cuando necesita espacio, y
 se llevo un `node_modules` completo sin avisar.
 
-### Publicar: `npm run actualizar` cuando hay migraciones
+### Publicar: siempre por GitHub, nunca desde la Mac
 
-**`npm run deploy` publica el codigo pero NO aplica migraciones.** Si el cambio
-trae una migracion pendiente y se usa `deploy`, el codigo nuevo sale a pedir
-columnas que la base todavia no tiene y la pantalla truena con un P2022. Ya
-paso: se publico la revision 00108 y el detalle de ordenes quedo caido.
+Desde el 28 de septiembre de 2026 produccion se publica **solo** desde GitHub
+(`rmontemayorCIEN/maintrack-cmms`). El camino es este y no tiene atajos:
 
-- **Con migraciones pendientes → `npm run actualizar`.** Corre las pruebas,
-  migra, publica y verifica, en ese orden.
-- **Sin migraciones → `npm run deploy`** basta.
+1. **Rama nueva desde `main`** para cada cambio. Nunca se trabaja ni se hace
+   commit directo en `main`, y no se mezclan dos temas en una rama.
+2. **Pruebas locales** (`npx tsc --noEmit` y las `scripts/prueba-*.ts` que
+   toquen lo cambiado), commit, `git push` y **pull request** contra `main`.
+3. GitHub corre las pruebas (`pruebas.yml`) y levanta una **version de prueba**
+   del PR (`vista-previa.yml`): etiqueta `pr-N`, sin trafico, contra la base de
+   PRUEBAS. Rafael revisa ahi, no en produccion.
+4. Rafael fusiona el PR. `produccion.yml` arranca y **se detiene esperando su
+   aprobacion** en el environment `produccion`.
+5. Al aprobar: anota la revision actual, migra, publica con `scripts/deploy.sh`,
+   comprueba que la revision nueva es la que atiende, corre el humo y, si algo
+   falla, regresa el trafico a la revision anterior.
 
-Para saber si hay pendientes: comparar `prisma/migrations` contra lo ultimo que
-se aplico. Ante la duda, `actualizar` sirve para los dos casos.
+**`npm run actualizar` y `npm run deploy` NO se corren desde la Mac.** Se saltan
+las pruebas en GitHub y la aprobacion de Rafael. Siguen existiendo porque el
+flujo de GitHub llama a `deploy.sh` por dentro; a mano, solo si Rafael lo pide
+expresamente para una emergencia con GitHub caido, y diciendole que se salta la
+puerta.
+
+Lo que se aprendio con el camino anterior sigue valiendo, y el flujo ya lo
+aplica solo: la migracion va **antes** de publicar (la revision 00108 salio
+pidiendo columnas que la base no tenia y dejo caido el detalle de ordenes), y
+las migraciones son aditivas para que la reversa funcione contra el esquema
+nuevo.
+
+### «Publica cambios» y «Libéralo»: las dos frases de Rafael
+
+Rafael publica con dos frases. Cada una tiene un alcance fijo y **ninguna
+incluye aprobar la liberación**: ese clic en GitHub es suyo y de nadie más.
+Aunque `gh` tenga su sesión y la API lo permita, un agente nunca aprueba un
+despliegue a `produccion`. Es el único punto del camino que un agente no pasa
+solo, y aprobarlo con su sesión lo convertiría en decorado.
+
+**«Publica cambios»** — hasta dejarle la versión de prueba:
+
+1. `git status`: qué cambió y en qué rama. Si hay cambios de **otro tema** en la
+   misma carpeta, no se meten al PR: se pregunta cuáles van.
+2. Si está en `main`, rama nueva con nombre descriptivo en español
+   (`la-cobranza-respeta-el-plan`). Nunca commit en `main`.
+3. `npx tsc --noEmit` y las `scripts/prueba-*.ts` de lo que se tocó. Si algo
+   falla, se corrige antes de subir.
+4. Commit con el estilo de la casa (una frase que dice qué pasa ahora, cuerpo
+   con el porqué), `git push -u origin <rama>` y `gh pr create` con el
+   resumen en español.
+5. Esperar las revisiones (`gh pr checks <n> --watch`). Si alguna sale en rojo:
+   leer el registro (`gh run view <id> --log-failed`), corregir, volver a
+   subir. Máximo dos intentos antes de explicarle a Rafael qué pasa.
+6. Entregarle: liga del PR, liga de la versión de prueba (la deja
+   `vista-previa.yml` como comentario en el PR), qué cambió en palabras de
+   usuario y qué revisar ahí. **Aquí se detiene.**
+
+**«Libéralo»** — de la fusión a confirmar lo que atiende:
+
+1. Comprobar que el PR sigue en verde y sin commits nuevos sin revisar.
+2. `gh pr merge <n> --merge --delete-branch`.
+3. Avisarle que «Liberar a produccion» espera su aprobación en GitHub
+   (*Actions → Review deployments → Approve*, también desde el celular).
+4. Cuando apruebe, seguir la corrida (`gh run watch <id>`) y confirmar con el
+   resultado: número de revisión nueva, que es la que atiende y que el humo
+   pasó. Si hubo reversa, decirlo con la causa.
+5. **Si la liberación publica sin haberle pedido aprobación**, la puerta no
+   está funcionando: se le dice de inmediato y no se libera nada más hasta
+   corregirla.
 
 ### El proyecto de Google Cloud va fijo, no el de la maquina
 
 En esta Mac conviven sistemas independientes —MainTrack y Avisos de
 Obligaciones, cada uno con su proyecto de GCP— y **no se mezclan**. La
 configuracion global de `gcloud` es de la maquina y cambia segun en cual se
-este trabajando: con ella apuntando a `avisos-obligaciones-4821`, `actualizar`
+este trabajando: con ella apuntando a `avisos-obligaciones-4821`, el antiguo `actualizar`
 fallo buscando `maintrack-db` ahi, y un `deploy` habria publicado MainTrack
 dentro del otro proyecto.
 

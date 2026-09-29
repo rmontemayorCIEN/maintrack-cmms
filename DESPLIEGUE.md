@@ -145,7 +145,7 @@ gcloud sql users create maintrack --instance=maintrack-db --password='LA-CONTRAS
 ## 5. Preparar el código para PostgreSQL
 
 ```bash
-cd "/Users/rafaelmontemayor/Documents/BILLS/GOOGLE CLOUD PROJECTS/CMMS-V1"
+cd ~/Proyectos/CMMS-V1
 ./scripts/use-postgres.sh
 ```
 
@@ -214,10 +214,14 @@ gcloud projects add-iam-policy-binding $PROYECTO \
 
 ---
 
-## 9. Publicar (tarda ~7 min la primera vez)
+## 9. Primera publicación (tarda ~7 min)
+
+Solo para instalar desde cero. Una vez en línea, todo cambio se publica por
+GitHub (ver «Publicar desde GitHub» y «Actualizar el sistema»), nunca repitiendo
+este paso.
 
 ```bash
-cd "/Users/rafaelmontemayor/Documents/BILLS/GOOGLE CLOUD PROJECTS/CMMS-V1"
+cd ~/Proyectos/CMMS-V1
 
 INSTANCIA=$(gcloud sql instances describe maintrack-db --format="value(connectionName)")
 
@@ -295,43 +299,40 @@ instancia. Para habilitarlo algún día: `--set-env-vars=ALLOW_PUBLIC_SIGNUP=tru
 
 ---
 
-## Opcional · Desplegar con `git push`
+## Publicar desde GitHub (así se publica hoy)
+
+GitHub entra a Google Cloud **sin llaves guardadas**: Google confía en los
+identificadores que firma GitHub, solo para el repositorio
+`rmontemayorCIEN/maintrack-cmms` (federación de identidad). No hay archivo JSON
+que robar ni que rotar. El antiguo `deploy.yml`, con una llave JSON y publicando
+en cada `push` sin aprobación, ya no existe.
+
+Se configura una sola vez:
 
 ```bash
-# Desde su carpeta personal, NUNCA dentro del proyecto: una clave dentro del
-# repositorio acaba publicada en GitHub.
-cd ~
-
-PROYECTO=$(gcloud config get-value project)
-
-gcloud iam service-accounts create github-deploy --display-name="Despliegue desde GitHub"
-CUENTA_GH="github-deploy@$PROYECTO.iam.gserviceaccount.com"
-
-for rol in roles/run.admin roles/cloudbuild.builds.editor \
-           roles/artifactregistry.admin roles/iam.serviceAccountUser roles/storage.admin; do
-  gcloud projects add-iam-policy-binding $PROYECTO \
-    --member="serviceAccount:$CUENTA_GH" --role="$rol" --quiet
-done
-
-gcloud iam service-accounts keys create ~/clave-github.json --iam-account=$CUENTA_GH
+cd ~/Proyectos/CMMS-V1
+./scripts/configurar-github.sh              # ensayo: dice qué haría
+./scripts/configurar-github.sh --aplicar    # lo hace
 ```
 
-En GitHub → *Settings → Secrets and variables → Actions*:
+Crea la cuenta `github-actions` con los permisos mínimos para publicar y migrar
+(sin acceso a los archivos de los clientes), el depósito de identidades
+federadas y la regla que amarra el permiso a ese repositorio. Al final imprime
+dos valores que van en GitHub → *Settings → Secrets and variables → Actions →*
+pestaña **Variables**: `WIF_PROVIDER` y `WIF_CUENTA`. No son secretos.
 
-| Secreto | Valor |
-|---|---|
-| `GCP_CREDENCIALES` | Contenido completo del archivo. Cópielo sin mostrarlo con `pbcopy < ~/clave-github.json` y pegue con ⌘V |
-| `GCP_PROYECTO` | El identificador del proyecto |
-| `CLOUDSQL_INSTANCIA` | `proyecto:us-central1:maintrack-db` |
+Después, en GitHub → *Settings → Environments*, el environment **`produccion`**
+con usted como aprobador (*Required reviewers*). Esa es la puerta: sin su
+aprobación la liberación no toca ni la base ni el servicio.
 
-Compruebe primero que pesa ~2 KB (`ls -l ~/clave-github.json`); si son 0 bytes, el comando
-falló y la cuenta de servicio no existe.
+Los flujos que quedan activos:
 
-Después: `rm ~/clave-github.json`. Nunca debe crearse dentro de la carpeta del proyecto.
-
-`.github/workflows/deploy.yml` incluye una revisión previa que detiene el
-despliegue si el esquema quedó en SQLite, si falta la migración inicial o si se
-versionó una base de datos por error.
+| Flujo | Cuándo corre | Qué hace |
+|---|---|---|
+| `pruebas.yml` | Cada PR y cada push a `main` | Revisa el código y corre las pruebas |
+| `vista-previa.yml` | Cada PR | Publica una versión de prueba `pr-N`, sin tráfico y contra la base de pruebas |
+| `vista-previa-limpieza.yml` | Al cerrar el PR | Borra esa versión de prueba |
+| `produccion.yml` | Al fusionar a `main` | Espera su aprobación, migra, publica, verifica y regresa solo si falla |
 
 ---
 
@@ -347,7 +348,7 @@ versionó una base de datos por error.
 | `Can't reach database server at localhost` | Falta `--add-cloudsql-instances`, o `$INSTANCIA` se perdió al cerrar la terminal. |
 | `password authentication failed` | La contraseña trae un símbolo que rompe la URL. Cámbiela y actualice `cmms-database-url`. |
 | `P3005 database schema is not empty` | Las tablas ya existían. No es error: siga. |
-| `does not have permission to act as service account` | Falta `roles/iam.serviceAccountUser` en la cuenta de GitHub. |
+| `does not have permission to act as service account` | Falta `roles/iam.serviceAccountUser` en la cuenta `github-actions`. Vuelva a correr `./scripts/configurar-github.sh --aplicar`. |
 | La construcción falla sin explicar | `gcloud builds list --limit=1` y luego `gcloud builds log ID`. |
 | Tarda ~4 s la primera visita | Arranque en frío. Es lo que lo hace gratis; suba a `--min-instances 1` si molesta. |
 
@@ -355,33 +356,27 @@ versionó una base de datos por error.
 
 ## Actualizar el sistema
 
-Un solo comando hace todo: revisa el código, migra la base si hace falta,
-publica y verifica.
+Todo cambio llega a producción por GitHub, en este orden:
 
-```bash
-npm run actualizar
-```
+1. **Una rama nueva desde `main`** para el cambio. Claude Code la crea, hace
+   commit, sube la rama y abre el pull request.
+2. **GitHub corre las pruebas y publica una versión de prueba** del PR. La liga
+   aparece en el PR; ahí se revisa, con la base de pruebas.
+3. **Usted fusiona el PR.** La liberación arranca y se detiene hasta que usted
+   la apruebe en GitHub (*Review deployments → Approve*).
+4. **Al aprobar,** anota la revisión que hoy atiende, migra la base, publica,
+   comprueba que la revisión nueva es la que atiende, corre la prueba de humo y,
+   si algo falla, regresa el tráfico a la revisión anterior.
 
-Si el cambio no toca la base de datos, se salta la migración:
+La migración va antes de publicar y las migraciones son aditivas: así el código
+nuevo nunca sale a pedir columnas que no existen, y la revisión anterior sigue
+funcionando si hay que regresar a ella.
 
-```bash
-npm run actualizar -- --sin-migrar
-```
-
-**La puerta de Cloud SQL se abre lo mínimo y se cierra sola.** Está puesta en
-una trampa de salida: se cierra aunque la migración falle, se pierda la red,
-se suspenda la computadora o alguien presione Ctrl-C. Antes era el último paso
-de una cadena de comandos, y un corte a la mitad dejaba la base expuesta a una
-IP de internet sin que nadie se enterara.
-
-El script se detiene antes de tocar nada si el código no compila o si detecta
-una migración generada con el esquema en SQLite —esos tipos PostgreSQL los
-rechaza, y ya nos costó una vez publicar código que consultaba tablas
-inexistentes—.
-
-Al terminar reporta el estado del sitio y confirma que Cloud SQL quedó sin
-redes autorizadas. Si por alguna razón no pudo cerrarla, lo dice con el comando
-exacto para hacerlo a mano.
+**`npm run actualizar` y `npm run deploy` no se corren desde la Mac.** Se saltan
+las pruebas de GitHub y su aprobación. Existen porque `produccion.yml` llama a
+`scripts/deploy.sh` por dentro; a mano, solo en una emergencia con GitHub caído
+y sabiendo que se salta la puerta. En ese caso `npm run actualizar` abre la
+puerta de Cloud SQL lo mínimo y la cierra sola aunque algo falle a la mitad.
 
 ### Cargar los catálogos estándar en una empresa
 
@@ -396,7 +391,7 @@ hace falta correr nada por terminal.
 |---|---|
 | Ver la URL | `gcloud run services describe maintrack-cmms --region us-central1 --format="value(status.url)"` |
 | Ver registros | `gcloud run services logs read maintrack-cmms --region us-central1 --limit 50` |
-| Publicar un cambio | Repetir el paso 9, o `git push` |
+| Publicar un cambio | Pull request y aprobación en GitHub (ver «Actualizar el sistema») |
 | Ver respaldos | `gcloud sql backups list --instance=maintrack-db` |
 | Volver a una versión | `gcloud run services update-traffic maintrack-cmms --region us-central1 --to-revisions=REVISION=100` |
 | Apagar todo | `gcloud projects delete PROYECTO` |
