@@ -1774,6 +1774,8 @@ model Attachment {
   partId         String?
   assetIntakeId  String?
   rondinParadaId String?
+  /// El documento de una norma: el PDF del DOF, la guia, el manual.
+  normaId        String?
   uploadedById   String?
   name           String
   /// Ruta dentro del almacen (no una URL): el enlace de descarga se firma al
@@ -1784,6 +1786,12 @@ model Attachment {
   kind           String   @default("DOCUMENT")
   size           Int      @default(0)
   note           String?
+  /// Lo localizo la asistencia con IA, no una persona.
+  ///
+  /// No es un dato interno: la pantalla lo dice, porque el modelo puede traer
+  /// una version derogada de una norma con la misma seguridad con que trae la
+  /// vigente. A quien lo usa le toca confirmar que sea la que manda.
+  origenIa       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1792,6 +1800,7 @@ model Attachment {
   workRequest  WorkRequest?  @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
   part         Part?         @relation(fields: [partId], references: [id], onDelete: Cascade)
   rondinParada RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: Cascade)
+  norma        NormaAdoptada? @relation(fields: [normaId], references: [id], onDelete: Cascade)
   assetIntake  AssetIntake?  @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
   uploadedBy   User?         @relation(fields: [uploadedById], references: [id])
 
@@ -1801,6 +1810,7 @@ model Attachment {
   @@index([workRequestId])
   @@index([partId])
   @@index([assetIntakeId])
+  @@index([normaId])
 }
 
 // ------------------------------------------------------------------ Solicitudes ---
@@ -2544,22 +2554,31 @@ model ReferenceLink {
   assetId        String?
   partId         String?
   planId         String?
+  normaId        String?
   createdById    String?
   title          String
   url            String
   note           String?
+  /// Lo localizo la asistencia con IA, no una persona.
+  ///
+  /// No es un dato interno: la pantalla lo dice, porque el modelo puede traer
+  /// una version derogada de una norma con la misma seguridad con que trae la
+  /// vigente. A quien lo usa le toca confirmar que sea la que manda.
+  origenIa       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Cascade)
   part         Part?            @relation(fields: [partId], references: [id], onDelete: Cascade)
   plan         MaintenancePlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  norma        NormaAdoptada?   @relation(fields: [normaId], references: [id], onDelete: Cascade)
   createdBy    User?            @relation(fields: [createdById], references: [id])
 
   @@index([organizationId])
   @@index([assetId])
   @@index([partId])
   @@index([planId])
+  @@index([normaId])
 }
 
 // -------------------------------------------- Especialidades y servicios
@@ -4165,6 +4184,8 @@ model NormaAdoptada {
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   responsable  User?                @relation("NormaResponsable", fields: [responsableId], references: [id])
   obligaciones ObligacionAdoptada[]
+  documentos   Attachment[]
+  ligas        ReferenceLink[]
 
   @@unique([organizationId, clave])
   @@index([organizationId, activa])

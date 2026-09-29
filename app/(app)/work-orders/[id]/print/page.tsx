@@ -5,6 +5,7 @@ import { MAINTENANCE_TYPE_LABELS, PRIORITY_LABELS, WO_STATUS_LABELS } from "@/li
 import { formatDate, formatDateTime, formatNumber, formatDia } from "@/lib/utils";
 import { normasDeLaOrden } from "@/lib/normas";
 import { PrintButton } from "./print-button";
+import { LogoImpreso } from "@/components/logo-impreso";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Orden de trabajo (impresion)" };
@@ -36,9 +37,12 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
       <PrintButton />
 
       <header className="mb-6 flex items-start justify-between border-b-2 border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold">ORDEN DE TRABAJO</h1>
-          <p className="mt-1 text-sm">{user.organization.name}</p>
+        <div className="flex items-start">
+          <LogoImpreso url={user.organization.logoUrl} nombre={user.organization.name} />
+          <div>
+            <h1 className="text-2xl font-bold">ORDEN DE TRABAJO</h1>
+            <p className="mt-1 text-sm">{user.organization.name}</p>
+          </div>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold tabular-nums">{wo.number}</p>

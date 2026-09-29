@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN" | "NORMA_DOCUMENTO";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -112,6 +112,15 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     descripcion:
       "Entrevista sobre la instalación y propone el inventario de activos completo, agrupado por sistema, listo para revisar y dar de alta.",
     operaciones: 3,
+    disponible: true,
+  },
+  NORMA_DOCUMENTO: {
+    nombre: "Lectura del documento de una norma",
+    descripcion:
+      "Lee el PDF que el cliente colgo de una norma —su publicacion oficial o su guia— y propone lo que exige, cada obligacion con la cita textual del renglon que la sustenta. No usa lo que el modelo recuerde de la norma: si no puede citar, no propone.",
+    // Un PDF de norma son decenas de miles de tokens de entrada, muy por
+    // encima de cualquier otra funcion. Cuesta como cuatro.
+    operaciones: 4,
     disponible: true,
   },
   FOTO_AREA: {

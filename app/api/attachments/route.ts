@@ -17,6 +17,7 @@ const destino = z.object({
   workRequestId: z.string().optional().nullable(),
   partId: z.string().optional().nullable(),
   rondinParadaId: z.string().optional().nullable(),
+  normaId: z.string().optional().nullable(),
 });
 
 const solicitud = destino.extend({
@@ -34,7 +35,11 @@ const solicitud = destino.extend({
  * ejecucion lo dejaria fuera de lo unico que puede aportar.
  */
 function permisoDe(d: z.infer<typeof destino>) {
-  return d.workRequestId ? "request:create" : "workorder:execute";
+  if (d.workRequestId) return "request:create";
+  // Colgar la publicacion oficial de una norma es parte de administrarla:
+  // mismo permiso que el resto de sus rutas, no el de ejecutar trabajo.
+  if (d.normaId) return "settings:write";
+  return "workorder:execute";
 }
 
 function contextoDe(d: z.infer<typeof destino>) {
@@ -43,6 +48,7 @@ function contextoDe(d: z.infer<typeof destino>) {
   if (d.workRequestId) return { carpeta: "solicitudes", clave: "workRequestId" as const, id: d.workRequestId };
   if (d.partId) return { carpeta: "refacciones", clave: "partId" as const, id: d.partId };
   if (d.rondinParadaId) return { carpeta: "rondines", clave: "rondinParadaId" as const, id: d.rondinParadaId };
+  if (d.normaId) return { carpeta: "normas", clave: "normaId" as const, id: d.normaId };
   return null;
 }
 
@@ -84,7 +90,7 @@ export async function POST(request: Request) {
     const tablas = {
       workOrderId: prisma.workOrder, assetId: prisma.asset,
       workRequestId: prisma.workRequest, partId: prisma.part,
-      rondinParadaId: prisma.rondinParada,
+      rondinParadaId: prisma.rondinParada, normaId: prisma.normaAdoptada,
     };
     const existe = await (tablas[ctx.clave] as { findFirst: Function }).findFirst({
       where: { id: ctx.id, organizationId: orgId },
@@ -103,6 +109,8 @@ export async function POST(request: Request) {
 const confirmacion = solicitud.extend({
   storagePath: z.string().min(1),
   note: z.string().max(300).optional().nullable(),
+  /// Lo trajo la asistencia con IA. Se guarda para que la pantalla lo advierta.
+  origenIa: z.boolean().optional(),
 });
 
 /**
@@ -159,9 +167,10 @@ export async function PUT(request: Request) {
         kind: clasificar(input.mimeType),
         size: tamanoReal,
         note: input.note ?? null,
+        origenIa: input.origenIa ?? false,
         [ctx.clave]: ctx.id,
       },
-      select: { id: true, name: true, kind: true, size: true, createdAt: true },
+      select: { id: true, name: true, kind: true, size: true, origenIa: true, createdAt: true },
     });
 
     await logAudit({

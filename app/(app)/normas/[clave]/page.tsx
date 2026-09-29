@@ -12,6 +12,9 @@ import {
 import { nombreDeTipo } from "@/lib/vigencias-tipos";
 import { Obligacion, type OpcionesPorPieza } from "./obligacion";
 import { Actualizar } from "./actualizar";
+import { DocumentosDeNorma } from "./documentos";
+import { iaDeLaOrganizacion } from "@/lib/planes";
+import { iaConfigurada } from "@/lib/ia/cliente";
 
 export async function generateMetadata({ params }: { params: Promise<{ clave: string }> }) {
   const { clave } = await params;
@@ -37,13 +40,23 @@ export default async function NormaPage({ params }: { params: Promise<{ clave: s
   const puedeConfigurar = can(user.role, "settings:write");
   const orgId = user.organizationId;
 
-  const [planes, vigencias, tablas, rondines, ordenes] = await Promise.all([
+  const [planes, vigencias, tablas, rondines, ordenes, adjuntos, ligas] = await Promise.all([
     prisma.maintenancePlan.findMany({ where: { organizationId: orgId }, select: { id: true, name: true, active: true }, orderBy: { name: "asc" } }),
     prisma.vigencia.findMany({ where: { organizationId: orgId }, select: { id: true, titulo: true, tipo: true }, orderBy: { titulo: "asc" } }),
     prisma.tablaPropia.findMany({ where: { organizationId: orgId, activa: true }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     // De los últimos: amarrar un rondín de hace dos años no le sirve a nadie.
     prisma.rondin.findMany({ where: { organizationId: orgId }, select: { id: true, numero: true, estado: true }, orderBy: { iniciadoEn: "desc" }, take: 50 }),
     prisma.workOrder.findMany({ where: { organizationId: orgId }, select: { id: true, number: true, title: true }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.attachment.findMany({
+      where: { organizationId: orgId, normaId: norma.id },
+      select: { id: true, name: true, kind: true, size: true, mimeType: true, note: true, origenIa: true, createdAt: true, uploadedBy: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.referenceLink.findMany({
+      where: { organizationId: orgId, normaId: norma.id },
+      select: { id: true, title: true, url: true, note: true, origenIa: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const opciones: OpcionesPorPieza = {
@@ -100,6 +113,17 @@ export default async function NormaPage({ params }: { params: Promise<{ clave: s
           <p className="mt-1 text-sm text-slate-600">{norma.fueraDeAlcance}</p>
         </Card>
       ) : null}
+
+      <DocumentosDeNorma
+        normaId={norma.id}
+        adjuntos={adjuntos.map((a) => ({
+          id: a.id, name: a.name, kind: a.kind, size: a.size, mimeType: a.mimeType,
+          createdAt: a.createdAt.toISOString(), subidoPor: a.uploadedBy?.name ?? null,
+        }))}
+        ligas={ligas}
+        editable={puedeConfigurar}
+        puedeIa={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("NORMA_DOCUMENTO")}
+      />
 
       <Card>
         <h2 className="text-sm font-semibold text-slate-900">Lo que exige, y con qué se cumple</h2>
