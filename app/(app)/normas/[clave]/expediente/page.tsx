@@ -7,6 +7,7 @@ import { ETIQUETA_ESTADO_OBLIGACION, LO_QUE_NO_PROMETE } from "@/lib/normas-tipo
 import { ETIQUETA_ESTADO, nombreDeTipo } from "@/lib/vigencias-tipos";
 import { formatDate } from "@/lib/utils";
 import { PrintButton } from "@/app/(app)/work-orders/[id]/print/print-button";
+import { LogoImpreso } from "@/components/logo-impreso";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,9 @@ export default async function ExpedientePage({
         <div className="mt-2"><PrintButton /></div>
       </div>
 
-      <header className="mb-6 border-b-2 border-slate-800 pb-4">
+      <header className="mb-6 flex items-start border-b-2 border-slate-800 pb-4">
+        <LogoImpreso url={user.organization.logoUrl} nombre={user.organization.name} />
+        <div>
         <h1 className="text-xl font-bold">EXPEDIENTE DE CUMPLIMIENTO</h1>
         <p className="mt-1 text-sm font-medium">{exp.norma.clave} — {exp.norma.titulo}</p>
         <p className="text-sm">{user.organization.name}</p>
@@ -62,6 +65,7 @@ export default async function ExpedientePage({
           Periodo del {formatDate(desde, zona)} al {formatDate(hasta, zona)}
           {user.organization.codigoFormatoOT ? ` · Formato ${user.organization.codigoFormatoOT}` : ""}
         </p>
+      </div>
       </header>
 
       <Seccion titulo={`Trabajo realizado (${exp.ordenes.length})`}>
