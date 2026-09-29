@@ -4,7 +4,7 @@
 
 > MainTrack es una plataforma de gestión y confiabilidad del mantenimiento que conecta activos, trabajo, inventario, condición y costos para anticipar fallas y mostrar dónde se está perdiendo capacidad productiva.
 
-**38 pantallas** en 8 grupos · **23 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
+**40 pantallas** en 9 grupos · **24 funciones de inteligencia artificial** · **7 roles** · API con 11 permisos y 29 eventos.
 
 Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capturado: tener la función y tenerla en marcha son cosas distintas.
 
@@ -21,8 +21,8 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 - **Indicadores y reportes:** Disponibilidad, cumplimiento, costos, MTBF y MTTR, backlog, y dónde para la planta: qué falla, por qué y cuánto cuesta cada paro.
 - **Avisos:** En la campana y en el celular, sin costo por mensaje. Quien pide una refacción se entera cuando se autoriza y cuando llega.
 - **Conversaciones y compromisos:** Se habla del registro, en el registro: cada orden, activo, solicitud, compra, plan, rondín, refacción y conjunto tiene su hilo, con menciones a la persona y avisos para quien pidió enterarse. Y lo que se acordó y no es una orden —cotizar, hablar con seguridad— queda anotado con responsable y fecha, y se cierra solo cuando se cumple.
-- **Cumplimiento normativo:** Se contrata aparte. Las normas que su empresa debe cumplir, con el índice de qué plan, qué documento y qué registro responden a cada obligación, y el expediente listo para una inspección. La evidencia no se palomea: sale del trabajo que de verdad se hizo, con su fecha, su responsable y su foto. Le ayuda a organizar y conservar esa evidencia; no dictamina si cumple con la ley.
-- **Registros propios:** Se contrata aparte. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo.
+- **Cumplimiento normativo:** Se contrata aparte, por $1,490 al mes. Las normas que su empresa debe cumplir, con el índice de qué plan, qué documento y qué registro responden a cada obligación, y el expediente listo para una inspección. La evidencia no se palomea: sale del trabajo que de verdad se hizo, con su fecha, su responsable y su foto. Le ayuda a organizar y conservar esa evidencia; no dictamina si cumple con la ley.
+- **Registros propios:** Se contrata aparte, por $690 al mes. Las tablas que cada empresa lleva en Excel porque ni su ERP ni el CMMS las tienen —la bitácora del diésel, la entrega de equipo de protección, el análisis del agua, el seguimiento de sus contratos—, armadas desde un formato ya hecho y amarradas a sus equipos, su personal y sus proveedores: la columna «equipo» es el equipo, así que ese registro aparece después en el expediente de ese equipo.
 - **Integración con su ERP:** API propia con permisos por llave, avisos firmados hacia sus sistemas y carga masiva del catálogo por archivo, con reversión. No hay conectores de fábrica: hay una puerta documentada y la abre su área de sistemas.
 
 ## Qué no es
@@ -117,6 +117,8 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Ver en qué equipos trabaja cada persona
   - Pedirle a la IA que revise cómo está trabajando el equipo
 
+### Sus registros
+
 **Registros propios** — Las tablas que su empresa arma para lo que lleva aparte porque ni su ERP ni MainTrack lo tienen: el diésel que se carga a cada equipo, el equipo de protección que se entrega a cada persona, el análisis del agua de la torre, la gestión administrativa de sus contratos. Lo que hoy vive en un Excel que solo una persona sabe abrir.
   - Capturar en las tablas que su empresa armó
   - Filtrar, agrupar, ordenar y exportar lo capturado
@@ -168,6 +170,13 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Ver la existencia de un almacén específico con el selector de arriba
   - Entrar al kardex, a los traspasos, a los conteos y a los indicadores
 
+**Herramientas** — Lo que sale del almacén y regresa: quién la tiene, desde cuándo, en qué estado salió y en qué estado volvió. Y cuando algo no vuelve, cuánto costó y a quién se le quedó.
+  - Prestar una herramienta a alguien, con su propósito y su estado de salida
+  - Recibirla de vuelta, anotando cómo regresó
+  - Dar de baja lo que se perdió, se rompió o terminó su vida útil
+  - Ver quién trae qué, y qué lleva demasiado tiempo fuera
+  - Ver qué se está perdiendo y cuánto cuesta (solo quien ve costos)
+
 **Requisiciones** — Lo que mantenimiento le pide al almacén, y el vale con el que se entrega.
   - Pedir material contra una orden de trabajo o un activo
   - Surtir completo o en partes, registrando a quién se entrega
@@ -212,6 +221,7 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
   - Dar de alta una norma propia: un requisito de su corporativo o de su cliente
   - Decir con qué se cumple cada obligación, amarrándola a lo que ya existe
   - Marcar lo que no le aplica, con su razón
+  - Colgarle a la norma su publicación oficial, su guía o el manual del que depende: archivos y enlaces
   - Sacar el expediente de una norma para una inspección
 
 **Dónde para la planta** — Qué áreas detuvieron la producción, cuánto costó y si va mejorando.
@@ -247,6 +257,12 @@ Este documento dice lo que el sistema TIENE, no lo que cada empresa ya trae capt
 **Catálogos** — Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, centros de costo, causas de falla, cuadrillas.
   - Dar de alta y editar cada catálogo
   - Borrar los que no estén en uso
+
+**Armar un registro** — Donde se define una tabla nueva: cómo se llama, para qué es, qué columnas tiene, quién captura y quién la ve.
+  - Arrancar de un formato ya hecho y ajustarlo
+  - Empezar en blanco cuando ninguno se parece
+  - Elegir el tipo de cada columna, incluidas las que apuntan a sus datos
+  - Decidir quién captura y quién ve, que son cosas distintas
 
 **Importar datos** — Cargar sitios, activos, usuarios, almacenes, medidores y lecturas, refacciones y existencias, planes, proveedores y catálogos desde Excel (.xlsx) o CSV, con vista previa y reversión.
   - Bajar la plantilla en Excel o en CSV, llenarla y subirla: las dos se leen con las mismas reglas
@@ -286,11 +302,11 @@ Nadie ve todo. El menú se arma según el rol, así que un solicitante entra a u
 
 | Rol | Pantallas |
 |---|---|
-| Propietario | 38 |
-| Administración | 38 |
-| Supervisión | 35 |
-| Técnico | 22 |
-| Compras | 11 |
+| Propietario | 40 |
+| Administración | 40 |
+| Supervisión | 36 |
+| Técnico | 23 |
+| Compras | 12 |
 | Solicitante | 7 |
 | Consulta | 24 |
 
@@ -311,6 +327,7 @@ Interpreta y redacta sobre los datos de la empresa. **No hace la aritmética**: 
 | Generador de planes | Redacta el plan completo de un activo: actividades, frecuencia, mano de obra por especialidad, refacciones y servicios externos. | 2 |
 | Refacciones sugeridas por equipo | Propone que refacciones conviene tener en almacén para un equipo, sobre todo cuando aun no hay consumo del cual deducirlo. | 1 |
 | Levantamiento de inventario | Entrevista sobre la instalación y propone el inventario de activos completo, agrupado por sistema, listo para revisar y dar de alta. | 3 |
+| Lectura del documento de una norma | Lee el PDF que el cliente colgo de una norma —su publicacion oficial o su guia— y propone lo que exige, cada obligacion con la cita textual del renglon que la sustenta. No usa lo que el modelo recuerde de la norma: si no puede citar, no propone. | 4 |
 | Reconocimiento por fotografia | De la foto de un cuarto de máquinas o un área identifica los equipos que se ven, para completar el levantamiento con lo que la entrevista no alcanzo. | 1 |
 | Lectura de placa | De la fotografia de la placa de un equipo extrae fabricante, modelo, serie y datos técnicos, y avisa si la foto no sirve. | 1 |
 | Revisión de configuración | Revisa como quedo armada la cuenta y senala lo que una lista de verificacion no puede ver: cobertura desbalanceada, datos que no se conectan, escalas que no cuadran. | 1 |

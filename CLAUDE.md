@@ -200,44 +200,53 @@ pidiendo columnas que la base no tenia y dejo caido el detalle de ordenes), y
 las migraciones son aditivas para que la reversa funcione contra el esquema
 nuevo.
 
-### «Publica cambios» y «Libéralo»: las dos frases de Rafael
+### «Publica cambios»: una frase, y un clic suyo
 
-Rafael publica con dos frases. Cada una tiene un alcance fijo y **ninguna
-incluye aprobar la liberación**: ese clic en GitHub es suyo y de nadie más.
-Aunque `gh` tenga su sesión y la API lo permita, un agente nunca aprueba un
-despliegue a `produccion`. Es el único punto del camino que un agente no pasa
-solo, y aprobarlo con su sesión lo convertiría en decorado.
+Rafael publica con **una sola frase**. Antes eran dos —«publica cambios» y
+«libéralo»— y el 29-sep-2026 pidió juntarlas: *«los 2 pasos, hazlo solo 1»*.
+Tenia razon: el proceso ya es mas largo que el anterior, y partirlo en dos
+avisos lo hacia sentir perdido sin ganar nada.
 
-**«Publica cambios»** — hasta dejarle la versión de prueba:
+**Lo que NO incluye sigue siendo lo mismo: aprobar la liberación.** Ese clic es
+suyo y de nadie más. Aunque `gh` tenga su sesión y la API lo permita, un agente
+nunca aprueba un despliegue a `produccion`. Es el único punto del camino que un
+agente no pasa solo, y aprobarlo con su sesión lo convertiría en decorado.
+
+**«Publica cambios»** — de los cambios sueltos hasta pedirle el clic:
 
 1. `git status`: qué cambió y en qué rama. Si hay cambios de **otro tema** en la
    misma carpeta, no se meten al PR: se pregunta cuáles van.
 2. Si está en `main`, rama nueva con nombre descriptivo en español
    (`la-cobranza-respeta-el-plan`). Nunca commit en `main`.
-3. `npx tsc --noEmit` y las `scripts/prueba-*.ts` de lo que se tocó. Si algo
-   falla, se corrige antes de subir.
+3. `npx tsc --noEmit` y las `scripts/prueba-*.ts` de lo que se tocó. Si el
+   cambio es grande o toca varios módulos, `./scripts/suite.sh` completa. Si
+   algo falla, se corrige **antes** de subir: 25 minutos de revisiones en
+   GitHub para descubrir lo que aquí se ve en dos no le sirven a nadie.
 4. Commit con el estilo de la casa (una frase que dice qué pasa ahora, cuerpo
-   con el porqué), `git push -u origin <rama>` y `gh pr create` con el
-   resumen en español.
+   con el porqué), `git push -u origin <rama>` y `gh pr create` con el resumen
+   en español.
 5. Esperar las revisiones (`gh pr checks <n> --watch`). Si alguna sale en rojo:
    leer el registro (`gh run view <id> --log-failed`), corregir, volver a
-   subir. Máximo dos intentos antes de explicarle a Rafael qué pasa.
-6. Entregarle: liga del PR, liga de la versión de prueba (la deja
-   `vista-previa.yml` como comentario en el PR), qué cambió en palabras de
-   usuario y qué revisar ahí. **Aquí se detiene.**
+   subir. Máximo dos intentos antes de explicarle qué pasa.
+6. **Si trae algo que él deberia ver antes** —una pantalla nueva, un cambio de
+   como se vende— entregarle la liga de la version de prueba y esperar. Si no,
+   seguir.
+7. `gh pr merge <n> --merge --delete-branch`.
+8. Avisarle **con el link de la corrida** que «Liberar a produccion» espera su
+   aprobación (*Review deployments → Approve and deploy*, también desde el
+   celular). El link durable es
+   `github.com/rmontemayorCIEN/maintrack-cmms/actions/workflows/produccion.yml`.
+9. Cuando apruebe, seguir la corrida (`gh run watch <id>`) y confirmar
+   **comprobando contra la nube, no contra el tablero**: número de revisión
+   nueva, que es la que atiende, y que el humo pasó. Si hubo reversa, decirlo
+   con la causa.
+10. **Si la liberación publica sin haberle pedido aprobación**, la puerta no
+    está funcionando: se le dice de inmediato y no se libera nada más hasta
+    corregirla.
 
-**«Libéralo»** — de la fusión a confirmar lo que atiende:
-
-1. Comprobar que el PR sigue en verde y sin commits nuevos sin revisar.
-2. `gh pr merge <n> --merge --delete-branch`.
-3. Avisarle que «Liberar a produccion» espera su aprobación en GitHub
-   (*Actions → Review deployments → Approve*, también desde el celular).
-4. Cuando apruebe, seguir la corrida (`gh run watch <id>`) y confirmar con el
-   resultado: número de revisión nueva, que es la que atiende y que el humo
-   pasó. Si hubo reversa, decirlo con la causa.
-5. **Si la liberación publica sin haberle pedido aprobación**, la puerta no
-   está funcionando: se le dice de inmediato y no se libera nada más hasta
-   corregirla.
+**Lo que Rafael tiene que hacer:** decir la frase, y dar un clic. Si algo más
+le toca —un `git push` que aquí esté bloqueado, por ejemplo— se le entrega el
+comando exacto y se le dice por qué no se pudo hacer solo.
 
 ### El proyecto de Google Cloud va fijo, no el de la maquina
 

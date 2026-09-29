@@ -16,7 +16,9 @@ import {
   BENEFICIOS_POR_ROL, COBRO, DESCRIPCION, DIFERENCIADORES, LEMA, MARCA, MODULOS, NO_ES, PREGUNTAS, PROBLEMAS, PRUEBA_DIAS, SEGURIDAD, SEVERIDADES, SOPORTE, SUBLEMA, TEXTO_PRUEBA,
   comparacion, precio, textoCelda,
 } from "../lib/comercial";
-import { COMPLEMENTO_IA, NOMBRE_RECURSO, ORDEN_PLANES, PLANES } from "../lib/planes";
+// Los tres complementos, iterados: agregar uno nuevo en planes.ts no obliga
+// a tocar este generador.
+import { COMPLEMENTO_IA, COMPLEMENTO_NORMAS, COMPLEMENTO_REGISTROS, NOMBRE_RECURSO, ORDEN_PLANES, PLANES } from "../lib/planes";
 import { DOCUMENTOS, ESTADO_DOCUMENTOS, PENDIENTES, VERSION_DOCUMENTOS } from "../lib/legal";
 import { HISTORIAS, ORDEN_RECOMENDADO, PASOS_RECORRIDO, PREGUNTAS_DEMO } from "../lib/demo-guia";
 import { armarPresentacion, type Bloque } from "../lib/demo-presentacion";
@@ -53,11 +55,13 @@ Incluye:
 ${p.incluye.map((x) => `- ${x}`).join("\n")}
 `;
 }).join("\n")}
-## Complemento ${COMPLEMENTO_IA.nombre} — ${precio(COMPLEMENTO_IA.precioMensual, COMPLEMENTO_IA.moneda)} al mes
+${[COMPLEMENTO_IA, COMPLEMENTO_REGISTROS, COMPLEMENTO_NORMAS].map((c) => `
+## Complemento ${c.nombre} — ${precio(c.precioMensual, c.moneda)} al mes
 
-${COMPLEMENTO_IA.descripcion}
+${c.descripcion}
 
-${COMPLEMENTO_IA.incluye.map((x) => `- ${x}`).join("\n")}
+${c.incluye.map((x) => `- ${x}`).join("\n")}
+`).join("")}
 
 ## Condiciones
 

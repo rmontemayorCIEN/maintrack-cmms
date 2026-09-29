@@ -61,6 +61,26 @@ Todas las funciones de inteligencia artificial, con 400 operaciones al mes sobre
 - Consulta en lenguaje natural sobre sus datos
 - 400 operaciones mensuales
 
+## Complemento Registros propios — $690 MXN al mes
+
+Sus propias tablas, con las columnas que decida y amarradas a sus equipos, su gente y sus proveedores.
+
+- Hasta 12 tablas con 24 columnas cada una
+- Formatos ya hechos: contratos, combustible, EPP, análisis de agua, contratistas, energía
+- Columnas amarradas al catálogo: equipo, persona, proveedor, orden, centro de costo
+- Permiso de captura y de lectura por rol
+- La IA puede contestar sobre esas tablas
+
+## Complemento Cumplimiento normativo — $1,490 MXN al mes
+
+El catálogo de normas aplicables a su giro, amarrado al trabajo que ya hace: la evidencia sale sola.
+
+- Catálogo de normas por giro, con sus obligaciones
+- Cada obligación amarrada a planes, equipos o registros
+- Estado de cumplimiento por norma, con su evidencia
+- Expediente listo para el auditor
+- Normas propias, para lo que el catálogo no cubra
+
 ## Condiciones
 
 - **Periodicidad:** Mensual. **Moneda:** Pesos mexicanos (MXN). Los impuestos aplicables se indican en la propuesta comercial.
@@ -94,12 +114,12 @@ Todas las funciones de inteligencia artificial, con 400 operaciones al mes sobre
 | Integración | Integración con su ERP | Bajo configuración · Por API; el alcance se acuerda en la implementación | Bajo configuración · Por API; el alcance se acuerda en la implementación |
 | Integración | Varias empresas cliente (para quien da servicio) | Bajo configuración · Se habilita a solicitud | Bajo configuración · Se habilita a solicitud |
 | Inteligencia artificial | Operaciones de IA al mes | 20 | 80 |
-| Inteligencia artificial | Funciones de IA | 11 de 23 | 18 de 23 |
+| Inteligencia artificial | Funciones de IA | 11 de 24 | 18 de 24 |
 | Inteligencia artificial | Dictar el cierre de la orden | Incluido · Con su propia bolsa: no gasta las operaciones del plan | Incluido · Con su propia bolsa: no gasta las operaciones del plan |
 | Inteligencia artificial | El parte del día, hablado | Incluido · Con su propia bolsa: no gasta las operaciones del plan | Incluido · Con su propia bolsa: no gasta las operaciones del plan |
 | Inteligencia artificial | Preguntarle hablando y que conteste | Bajo configuración · El parte del día sí se escucha; preguntar hablando es de Enterprise | Incluido · Para quien ve el panorama, con tope mensual por empresa |
 | Inteligencia artificial | Revisar las fotos del rondín | Complemento · Con IA Avanzada. El rondín y sus fotos funcionan sin él | Incluido · Propone hallazgos; usted acepta o descarta |
-| Inteligencia artificial | IA Avanzada | Complemento · Las 23 funciones y 400 operaciones más al mes, por $990 MXN al mes | Complemento · Las 23 funciones y 400 operaciones más al mes, por $990 MXN al mes |
+| Inteligencia artificial | IA Avanzada | Complemento · Las 24 funciones y 400 operaciones más al mes, por $990 MXN al mes | Complemento · Las 24 funciones y 400 operaciones más al mes, por $990 MXN al mes |
 | Servicio | Soporte dentro de MainTrack | Incluido · Tiempos estándar | Incluido · Tiempos prioritarios |
 | Servicio | Puesta en marcha guiada e importación | Incluido | Incluido |
 | Servicio | Acompañamiento de implementación y capacitación | Bajo configuración · Según la ruta de implementación acordada | Bajo configuración · Según la ruta de implementación acordada |
