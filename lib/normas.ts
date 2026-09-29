@@ -378,6 +378,60 @@ export function estadoDeObligacion(
   return amarres.map((a) => a.estado).sort((x, y) => PESO_ESTADO[x] - PESO_ESTADO[y])[0];
 }
 
+/**
+ * Firmar que un especialista reviso esta norma, o retirar la firma.
+ *
+ * Es lo que convierte el catalogo de una PROPUESTA en algo que el cliente
+ * puede presentar. Nosotros nunca revisamos ese contenido —lo redacto una IA—
+ * y no tendria caso que lo hicieramos: que obligaciones aplican y con que
+ * periodicidad depende de la instalacion, y eso solo lo sabe quien la conoce.
+ *
+ * El nombre es libre a proposito y no un usuario del sistema: el especialista
+ * en seguridad e higiene casi siempre es externo y no tiene cuenta. Lo que un
+ * inspector quiere ver es quien responde por el contenido.
+ *
+ * Con `nombre` vacio se RETIRA la firma. No es lo mismo que nunca haberla
+ * tenido, y por eso queda en la bitacora: una norma que se reviso y luego
+ * cambio el catalogo debajo hay que volver a revisarla, y eso tiene que poder
+ * decirse.
+ */
+export async function firmarRevisionDeNorma(p: {
+  organizationId: string;
+  normaId: string;
+  nombre: string | null;
+  cargo?: string | null;
+  userId?: string | null;
+}): Promise<Resultado<{ revisada: boolean }>> {
+  const norma = await prisma.normaAdoptada.findFirst({
+    where: { id: p.normaId, organizationId: p.organizationId },
+    select: { id: true, clave: true, revisadaPorNombre: true },
+  });
+  if (!norma) return { ok: false, motivos: ["Esa norma no está en su lista."] };
+
+  const nombre = p.nombre?.trim() || null;
+  const actualizada = await prisma.normaAdoptada.update({
+    where: { id: norma.id },
+    data: {
+      revisadaPorNombre: nombre,
+      revisadaPorCargo: nombre ? (p.cargo?.trim() || null) : null,
+      // La fecha la pone el sistema, no quien captura: una firma con fecha
+      // escrita a mano no prueba nada.
+      revisadaEl: nombre ? new Date() : null,
+    },
+    select: { revisadaPorNombre: true },
+  });
+
+  await logAudit({
+    organizationId: p.organizationId, userId: p.userId ?? undefined,
+    action: "UPDATE", entity: "NormaAdoptada", entityId: norma.id,
+    summary: nombre
+      ? `${norma.clave}: revisión firmada por ${nombre}`
+      : `${norma.clave}: se retiró la firma de revisión${norma.revisadaPorNombre ? ` de ${norma.revisadaPorNombre}` : ""}`,
+  });
+
+  return { ok: true, dato: { revisada: Boolean(actualizada.revisadaPorNombre) } };
+}
+
 // ─────────────────────────────────────────── Leer
 
 const INCLUIR_AMARRES = {
@@ -415,6 +469,10 @@ export type NormaLeida = {
   activa: boolean;
   responsable: string | null;
   nota: string | null;
+  /** Quien la reviso en la empresa del cliente. Ver `firmarRevisionDeNorma`. */
+  revisadaPorNombre: string | null;
+  revisadaPorCargo: string | null;
+  revisadaEl: Date | null;
   /** Cierto cuando el catálogo ya va en una versión más nueva que la adoptada. */
   cambioDesdeQueLaAdopto: boolean;
   obligaciones: ObligacionLeida[];
@@ -496,6 +554,8 @@ export async function listarNormas(orgId: string, ahora = new Date()): Promise<N
       id: n.id, clave: n.clave, titulo: n.titulo, emisor: n.emisor, resumen: n.resumen,
       fueraDeAlcance: n.fueraDeAlcance, origen: n.origen, versionAdoptada: n.versionAdoptada,
       activa: n.activa, responsable: n.responsable?.name ?? null, nota: n.nota,
+      revisadaPorNombre: n.revisadaPorNombre, revisadaPorCargo: n.revisadaPorCargo,
+      revisadaEl: n.revisadaEl,
       cambioDesdeQueLaAdopto: Boolean(delCatalogo && delCatalogo.version > n.versionAdoptada),
       obligaciones,
       resumenEstado: resumirObligaciones(obligaciones.map((o) => o.estado)),

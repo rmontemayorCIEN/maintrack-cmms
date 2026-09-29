@@ -4174,6 +4174,24 @@ model NormaAdoptada {
   /// la pantalla avisa que revise. Cero en las propias.
   versionAdoptada Int    @default(0)
 
+  /// Quien REVISO esta norma en la empresa del cliente, y cuando.
+  ///
+  /// Es la firma que importa, y por eso no es un usuario del sistema sino un
+  /// nombre libre: el especialista en seguridad e higiene suele ser externo y
+  /// no tiene cuenta. El inspector quiere ver quien responde por el contenido,
+  /// no que software lo propuso.
+  ///
+  /// El catalogo que traemos nosotros nace SIN revisar y se queda asi: lo
+  /// redacto una IA, no un especialista. Lo que aplica y como aplica depende
+  /// de la planta —tres calderas no es lo mismo que un compresor— y eso solo
+  /// lo puede decir quien la conoce. Mientras esto este vacio, la pantalla
+  /// dice que el contenido esta sin confirmar.
+  revisadaPorNombre String?
+  /// Puesto o cedula de quien reviso. «Responsable de Seguridad e Higiene»,
+  /// «Cedula 1234567». Va en el expediente impreso.
+  revisadaPorCargo  String?
+  revisadaEl        DateTime?
+
   activa       Boolean   @default(true)
   responsableId String?
   nota         String?
