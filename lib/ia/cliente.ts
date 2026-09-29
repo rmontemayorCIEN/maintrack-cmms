@@ -162,6 +162,18 @@ export async function analizarConIa<T extends z.ZodType>(params: {
    * que quien llame acota cuantas manda: no es lo mismo doce que doscientas.
    */
   imagenes?: Array<{ base64: string; tipo: "image/jpeg" | "image/png" | "image/webp"; etiqueta: string }>;
+  /**
+   * Un PDF a leer, en base64.
+   *
+   * El modelo lo lee entero —texto y diseño— sin que nadie extraiga el texto
+   * antes. Eso importa para lo unico que se usa hoy: sacar de una norma lo que
+   * exige, CITANDO el renglon. Con el texto plano extraido aparte se pierden
+   * los numerales y las tablas, que es justo donde vive la obligacion.
+   *
+   * Cuesta mucho mas que una imagen: un PDF de treinta paginas son decenas de
+   * miles de tokens de entrada. Quien lo use tiene que saberlo.
+   */
+  documento?: { base64: string; nombre: string };
 }): Promise<ResultadoIa<z.infer<T>>> {
   const modelo = params.modelo ?? MODELO_PREDETERMINADO;
   const client = obtenerCliente();
@@ -210,7 +222,21 @@ export async function analizarConIa<T extends z.ZodType>(params: {
       messages: [
         {
           role: "user",
-          content: params.imagenes?.length
+          content: params.documento
+            ? [
+                {
+                  type: "document" as const,
+                  source: { type: "base64" as const, media_type: "application/pdf" as const, data: params.documento.base64 },
+                  title: params.documento.nombre,
+                  // SIN `citations`: la API las rechaza cuando se pide salida
+                  // estructurada —«Citations cannot be enabled when output
+                  // format is set»— y aqui toda respuesta es estructurada. No
+                  // se pierde nada: el esquema de quien lo use le exige la
+                  // cita textual como campo, que ademas queda guardada.
+                },
+                { type: "text" as const, text: mensaje },
+              ]
+            : params.imagenes?.length
             ? [
                 // Cada foto anunciada por su etiqueta, y el encargo al final:
                 // asi el modelo ya vio todo cuando lee que tiene que hacer.

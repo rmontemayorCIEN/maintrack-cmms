@@ -1996,6 +1996,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     botones: [
       { nombre: "Seguir (en el catálogo)", explica: "Agrega esa norma a su lista, con todas sus obligaciones. No crea ningún plan ni documento: usted decide después con qué cumple cada una." },
       { nombre: "Agregar una norma propia", explica: "Para un requisito que no está en el catálogo. Usted define sus obligaciones y de qué tipo es cada una." },
+      { nombre: "Agregar enlace", explica: "Guarda la liga al sitio oficial de la norma junto a ella. Lo que traiga la asistencia con IA queda marcado con un aviso: a usted le toca confirmar que sea la versión vigente." },
+      { nombre: "Leer con IA", explica: "Lee el PDF que usted colgó y propone lo que esa norma exige, cada obligación con la cita textual del renglón que la sustenta. No usa lo que el modelo recuerde de la norma: si no puede citar, no propone. Nada se agrega solo — usted aprueba renglón por renglón." },
       { nombre: "Decir con qué se cumple", explica: "Amarra un plan, un documento, un registro propio, un rondín o una orden a esa obligación. Puede amarrar varios." },
       { nombre: "No nos aplica", explica: "Pide la razón, y la guarda con fecha. En una inspección preguntan por qué NO tiene algo, y tenerlo escrito es la respuesta." },
       { nombre: "Expediente", explica: "La evidencia del periodo, lista para imprimir: trabajo realizado, documentos, registros y lo que quedó sin respaldo." },

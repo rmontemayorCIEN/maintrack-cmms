@@ -13,6 +13,8 @@ import { nombreDeTipo } from "@/lib/vigencias-tipos";
 import { Obligacion, type OpcionesPorPieza } from "./obligacion";
 import { Actualizar } from "./actualizar";
 import { DocumentosDeNorma } from "./documentos";
+import { iaDeLaOrganizacion } from "@/lib/planes";
+import { iaConfigurada } from "@/lib/ia/cliente";
 
 export async function generateMetadata({ params }: { params: Promise<{ clave: string }> }) {
   const { clave } = await params;
@@ -120,6 +122,7 @@ export default async function NormaPage({ params }: { params: Promise<{ clave: s
         }))}
         ligas={ligas}
         editable={puedeConfigurar}
+        puedeIa={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("NORMA_DOCUMENTO")}
       />
 
       <Card>
