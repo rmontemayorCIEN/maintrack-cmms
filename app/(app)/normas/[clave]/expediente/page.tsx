@@ -65,6 +65,19 @@ export default async function ExpedientePage({
           Periodo del {formatDate(desde, zona)} al {formatDate(hasta, zona)}
           {user.organization.codigoFormatoOT ? ` · Formato ${user.organization.codigoFormatoOT}` : ""}
         </p>
+        {/* Quien reviso, en el papel. Es lo primero que pregunta un inspector:
+            no que software armo la lista, sino quien responde por ella. Y si
+            nadie la reviso, el papel lo dice —callarlo aqui seria dejar que se
+            presente como validada algo que no lo esta—. */}
+        {exp.norma.revisadaPorNombre ? (
+          <p className="mt-1 text-xs">
+            Revisada por <strong>{exp.norma.revisadaPorNombre}</strong>
+            {exp.norma.revisadaPorCargo ? ` — ${exp.norma.revisadaPorCargo}` : ""}
+            {exp.norma.revisadaEl ? `, el ${formatDate(exp.norma.revisadaEl, zona)}` : ""}
+          </p>
+        ) : (
+          <p className="mt-1 text-xs">Sin revisión de especialista registrada.</p>
+        )}
       </div>
       </header>
 

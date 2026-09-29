@@ -13,6 +13,7 @@ import { nombreDeTipo } from "@/lib/vigencias-tipos";
 import { Obligacion, type OpcionesPorPieza } from "./obligacion";
 import { Actualizar } from "./actualizar";
 import { DocumentosDeNorma } from "./documentos";
+import { FirmaDeRevision } from "./firma";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { iaConfigurada } from "@/lib/ia/cliente";
 
@@ -113,6 +114,15 @@ export default async function NormaPage({ params }: { params: Promise<{ clave: s
           <p className="mt-1 text-sm text-slate-600">{norma.fueraDeAlcance}</p>
         </Card>
       ) : null}
+
+      <FirmaDeRevision
+        normaId={norma.id}
+        nombre={norma.revisadaPorNombre}
+        cargo={norma.revisadaPorCargo}
+        fecha={norma.revisadaEl ? norma.revisadaEl.toISOString() : null}
+        editable={puedeConfigurar}
+        zona={user.organization.timezone}
+      />
 
       <DocumentosDeNorma
         normaId={norma.id}
