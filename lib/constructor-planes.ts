@@ -46,6 +46,15 @@ import { claveComparable } from "./normalizar";
 const SEMANAS_DE_RITMO = 8;
 /** Sin un plan nuevo en este plazo, la construccion esta detenida. */
 const DIAS_PARA_DETENIDO = 14;
+/**
+ * Cuanto se tienen que parecer dos planes del mismo grupo para avisar.
+ *
+ * Se mide sobre los titulos de las actividades, no sobre el nombre del plan:
+ * «Preventivo bomba» y «Mantto bombas CR» no se parecen en el nombre y pueden
+ * ser el mismo trabajo. Por debajo de la mitad son dos planes distintos de
+ * verdad —uno mensual y otro anual—, que es lo normal y no se molesta.
+ */
+const UMBRAL_GEMELOS = 50;
 
 export type EstadoPlan = "LISTO" | "EN_FORMA" | "ESQUELETO";
 
@@ -96,13 +105,31 @@ export type GrupoDeEquipos = {
   planes: { id: string; nombre: string; estado: EstadoPlan; avance: number }[];
   /** El peor estado de sus planes, o SIN_PLAN si no tiene ninguno. */
   estado: EstadoPlan | "SIN_PLAN";
+  /** Alguien corrigió el agrupado de alguno de sus equipos. */
+  aMano: boolean;
   /** Criticidad mas alta del grupo (A manda): con eso se ordena la lista. */
   criticidad: string;
+};
+
+/**
+ * Dos planes que cubren equipos del mismo grupo y se parecen entre si.
+ *
+ * No se fusionan solos ni se marca cual sobra: puede que de verdad sean dos
+ * —uno mensual y otro anual—. Lo que se dice es «mirelos», con el parecido
+ * medido sobre los titulos de sus actividades.
+ */
+export type PlanesGemelos = {
+  grupo: string;
+  grupoEtiqueta: string;
+  planes: { id: string; nombre: string; actividades: number; equipos: number }[];
+  /** 0 a 100: cuántos títulos de actividad comparten. */
+  parecido: number;
 };
 
 export type Constructor = {
   grupos: GrupoDeEquipos[];
   planes: PlanEnConstruccion[];
+  gemelos: PlanesGemelos[];
   /** Grupos de equipos iguales: el minimo de planes que se necesita. */
   sugeridos: number;
   /** La que rige: su decision, el sugerido si no hay, y nunca menos de lo construido. */
@@ -174,6 +201,15 @@ export function piezasDelPlan(p: {
   equiposAsignados: number;
   /** Equipos de los grupos del plan que no tienen ningun plan. */
   equiposDelGrupoSinPlan: number;
+  /**
+   * Si la empresa lleva herramientas en el sistema.
+   *
+   * Sin una sola herramienta, una caja o un activo que se preste, la pieza no
+   * aplica: no se le puede exigir a nadie que declare lo que su catalogo no
+   * tiene, y exigirlo dejaria a TODOS sus planes en una meta imposible. En
+   * cuanto da de alta la primera, empieza a contar.
+   */
+  hayHerramientas: boolean;
 }): PiezaPlan[] {
   const t = p.tareas;
   const conFrecuencia = (x: TareaParaRubrica) =>
@@ -203,7 +239,7 @@ export function piezasDelPlan(p: {
       `sin refacciones en ${reemplazosSinRefaccion} actividad(es) que reemplazan algo`),
     pieza("mediciones", 1, mediciones.length > 0, medicionesSinRango === 0,
       `sin unidad o rango en ${medicionesSinRango} medicion(es): sin rango no puede salir fuera de norma`),
-    pieza("herramientas", 1, pideHerramienta.length > 0, conHerramienta > 0,
+    pieza("herramientas", 1, p.hayHerramientas && pideHerramienta.length > 0, conHerramienta > 0,
       "sin herramientas declaradas en las actividades que cambian o miden algo"),
     pieza("procedimiento", 1, true, Boolean(p.procedure?.trim()) || p.enlaces > 0,
       "sin procedimiento ni documento de referencia"),
@@ -226,7 +262,7 @@ export function estadoDelPlan(piezas: PiezaPlan[]): { avance: number; estado: Es
 const PEOR: Record<EstadoPlan, number> = { ESQUELETO: 0, EN_FORMA: 1, LISTO: 2 };
 
 export async function constructorDePlanes(organizationId: string): Promise<Constructor> {
-  const [org, activos, planes] = await Promise.all([
+  const [org, activos, planes, excepciones, herramientasEnCatalogo] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: organizationId },
       // Sin relacion, igual que `operandoPorId` en la puesta en marcha: el
@@ -253,6 +289,7 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
         asignaciones: { where: { active: true }, select: { assetId: true } },
         tasks: {
           select: {
+            title: true,
             taskType: true, cadaCuanto: true, unit: true, minValue: true, maxValue: true,
             labor: { select: { id: true } },
             parts: { select: { id: true } },
@@ -262,13 +299,22 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
       },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.grupoDeEquipo.findMany({ where: { organizationId }, select: { assetId: true, clave: true } }),
+    Promise.all([
+      prisma.part.count({ where: { organizationId, naturaleza: "HERRAMIENTA", active: true } }),
+      prisma.kitDeHerramientas.count({ where: { organizationId, activo: true } }),
+      prisma.asset.count({ where: { organizationId, sePresta: true, active: true } }),
+    ]).then((n) => n.reduce((a, b) => a + b, 0) > 0),
   ]);
+  const aMano = new Map(excepciones.map((e) => [e.assetId, e.clave]));
 
   // ── Los grupos de equipos iguales.
   const grupos = new Map<string, GrupoDeEquipos>();
   const grupoDe = new Map<string, string>(); // assetId → clave de grupo
   for (const a of activos) {
-    const clave = claveDeGrupo(a);
+    // La corrección a mano manda sobre el cálculo: es justo lo que el cálculo
+    // no puede saber (ver `GrupoDeEquipo` en el esquema).
+    const clave = aMano.get(a.id) ?? claveDeGrupo(a);
     grupoDe.set(a.id, clave);
     const marca = [a.manufacturer, a.model].filter(Boolean).join(" ").trim();
     const g = grupos.get(clave) ?? {
@@ -280,8 +326,10 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
       sinPlan: 0,
       planes: [],
       estado: "SIN_PLAN" as GrupoDeEquipos["estado"],
+      aMano: false,
       criticidad: a.criticality,
     };
+    if (aMano.has(a.id)) g.aMano = true;
     const conPlan = a._count.planesAsignados > 0;
     g.equipos.push({ id: a.id, code: a.code, name: a.name, criticality: a.criticality, conPlan });
     if (!conPlan) g.sinPlan += 1;
@@ -304,6 +352,7 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
       enlaces: p._count.links,
       equiposAsignados: p.asignaciones.length,
       equiposDelGrupoSinPlan,
+      hayHerramientas: herramientasEnCatalogo,
     });
     const { avance, estado } = estadoDelPlan(piezas);
     return {
@@ -347,6 +396,32 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
   const ultimo = planes.reduce<Date | null>((m, p) => (!m || p.createdAt > m ? p.createdAt : m), null);
   const diasSinPlanNuevo = ultimo ? Math.floor((ahora - ultimo.getTime()) / 86_400_000) : null;
 
+  // ── Planes gemelos: dos que cubren el mismo grupo y se parecen.
+  const titulosDe = new Map(planes.map((p) => [p.id, new Set(p.tasks.map((t) => claveComparable(t.title)))]));
+  const gemelos: PlanesGemelos[] = [];
+  for (const g of lista) {
+    if (g.planes.length < 2) continue;
+    for (let i = 0; i < g.planes.length; i++) {
+      for (let j = i + 1; j < g.planes.length; j++) {
+        const a = titulosDe.get(g.planes[i].id) ?? new Set<string>();
+        const b = titulosDe.get(g.planes[j].id) ?? new Set<string>();
+        if (!a.size || !b.size) continue;
+        const comunes = [...a].filter((t) => b.has(t)).length;
+        const parecido = Math.round((comunes / new Set([...a, ...b]).size) * 100);
+        if (parecido < UMBRAL_GEMELOS) continue;
+        const pa = enConstruccion.find((p) => p.id === g.planes[i].id)!;
+        const pb = enConstruccion.find((p) => p.id === g.planes[j].id)!;
+        gemelos.push({
+          grupo: g.clave,
+          grupoEtiqueta: [g.categoria, g.marca].filter(Boolean).join(" · "),
+          planes: [pa, pb].map((p) => ({ id: p.id, nombre: p.nombre, actividades: p.actividades, equipos: p.equipos })),
+          parecido,
+        });
+      }
+    }
+  }
+  gemelos.sort((x, y) => y.parecido - x.parecido);
+
   const metaFijadaPor = org?.metaPlanesPorId
     ? (await prisma.user.findUnique({ where: { id: org.metaPlanesPorId }, select: { name: true } }))?.name ?? null
     : null;
@@ -361,6 +436,7 @@ export async function constructorDePlanes(organizationId: string): Promise<Const
   return {
     grupos: lista,
     planes: enConstruccion,
+    gemelos,
     sugeridos,
     meta,
     metaFijada,

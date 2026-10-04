@@ -112,6 +112,9 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
                 especialidades={catalogos.opcEspecialidades}
                 refacciones={catalogos.opcRefacciones}
                 servicios={catalogos.opcServicios}
+                herramientas={catalogos.opcHerramientas}
+                herramientasActivo={catalogos.opcHerramientasActivo}
+                cajas={catalogos.opcCajas}
                 moneda={moneda}
                 puedeCrearCatalogos={can(user.role, "settings:write")}
                 plan={planParaEditar(plan)}
@@ -193,11 +196,19 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
                     {t.taskType === "MEASUREMENT" ? `Medición en ${t.unit ?? "—"}${t.minValue !== null || t.maxValue !== null ? ` · entre ${t.minValue ?? "—"} y ${t.maxValue ?? "—"}` : ""}` : "Verificación"}
                     {t.cadaCuanto ? ` · cada ${t.cadaCuanto} ${(t.unidadFrecuencia ?? "DIAS").toLowerCase()}` : ""}
                   </p>
-                  {t.labor.length || t.parts.length || t.services.length ? (
+                  {t.labor.length || t.parts.length || t.services.length || t.tools.length ? (
                     <ul className="mt-2 grid gap-0.5 text-xs text-slate-600">
                       {t.labor.map((l) => <li key={l.id}>· {l.personas} × {l.specialty?.name ?? "Especialidad"} — {formatNumber(l.hours, 1)} h</li>)}
                       {t.parts.map((p) => <li key={p.id}>· {formatNumber(p.quantity, 2)} {p.part?.unit ?? ""} de {p.part?.code} · {p.part?.name}</li>)}
                       {t.services.map((s) => <li key={s.id}>· {s.service?.name ?? "Servicio"}{s.nota ? ` — ${s.nota}` : ""}</li>)}
+                      {/* Las herramientas no se consumen: se nombran aparte para que no se lean como material. */}
+                      {t.tools.map((h) => (
+                        <li key={h.id} className="text-slate-500">
+                          · Herramienta: {h.part?.name ?? h.asset?.name ?? h.kit?.name ?? "—"}
+                          {h.cantidad > 1 ? ` ×${formatNumber(h.cantidad, 0)}` : ""}
+                          {h.nota ? ` — ${h.nota}` : ""}
+                        </li>
+                      ))}
                     </ul>
                   ) : null}
                 </li>

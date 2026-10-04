@@ -53,6 +53,12 @@ export function planParaEditar(plan: PlanParaEditar) {
       services: t.services.map((s) => ({
         serviceId: s.serviceId, quantity: String(s.quantity), nota: s.nota ?? "",
       })),
+      tools: t.tools.map((h) => ({
+        fuente: (h.partId ? "ALMACEN" : h.assetId ? "ACTIVO" : "CAJA") as "ALMACEN" | "ACTIVO" | "CAJA",
+        id: h.partId ?? h.assetId ?? h.kitId ?? "",
+        cantidad: String(h.cantidad),
+        nota: h.nota ?? "",
+      })),
     })),
   };
 }

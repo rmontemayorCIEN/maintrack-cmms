@@ -14,6 +14,8 @@ import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { constructorDePlanes, fijarMetaDePlanes, piezasDelPlan, estadoDelPlan } from "../lib/constructor-planes";
+import { aplicarPlanDelGrupo, clonarPlan, corregirGrupo, claveAparte } from "../lib/constructor-acciones";
+import { altaDePlan } from "../lib/alta-de-plan";
 import { apagarServidor, colaDelLog, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
@@ -164,11 +166,13 @@ async function main() {
 
     const falta = async () => (await constructorDePlanes(A.id)).planes.find((p) => p.id === plan.id)!;
     const f1 = await falta();
+    // Las herramientas no salen aquí: esta empresa todavía no tiene ninguna en
+    // su catálogo, y eso hace que la pieza no aplique (se prueba más abajo).
     revisar("6. sin mano de obra, sin refacción, sin rango y sin procedimiento: se nombra cada hueco",
       f1.falta.some((x) => /mano de obra en 3/.test(x)) &&
       f1.falta.some((x) => /refacciones en 1/.test(x)) &&
       f1.falta.some((x) => /unidad o rango en 1/.test(x)) &&
-      f1.falta.some((x) => /herramientas/.test(x)) &&
+      f1.falta.every((x) => !/herramientas/.test(x)) &&
       f1.falta.some((x) => /procedimiento/.test(x)), f1.falta);
     revisar("   con actividades y equipos ya no es esqueleto", f1.estado === "EN_FORMA", { estado: f1.estado, avance: f1.avance });
 
@@ -197,6 +201,17 @@ async function main() {
     await prisma.planAsset.create({ data: { organizationId: A.id, planId: plan.id, assetId: ga30c.id } });
     const f5 = await falta();
     revisar("   al asignarlo vuelve a listo", f5.estado === "LISTO" && f5.equipos === 3, { estado: f5.estado, equipos: f5.equipos });
+
+    // Sin herramientas en el catálogo no se le exigen a nadie: pedir lo que la
+    // empresa no tiene sería una meta imposible para TODOS sus planes.
+    const sinCatalogo = piezasDelPlan({
+      tareas: [{ taskType: "REPLACE", cadaCuanto: 30, unit: null, minValue: null, maxValue: null, labor: [1], parts: [1], tools: [] }],
+      intervalDays: 30, intervalMeter: null, procedure: "x", enlaces: 0,
+      equiposAsignados: 1, equiposDelGrupoSinPlan: 0, hayHerramientas: false,
+    });
+    revisar("   sin herramientas en el catálogo, esa pieza no aplica y el plan llega a 100",
+      sinCatalogo.find((x) => x.clave === "herramientas")?.aplica === false && estadoDelPlan(sinCatalogo).avance === 100,
+      { avance: estadoDelPlan(sinCatalogo).avance });
 
     // Lo que no aplica no castiga: un plan de pura inspección visual.
     const inspeccion = await prisma.maintenancePlan.create({
@@ -248,13 +263,150 @@ async function main() {
       { ritmo: c7.ritmoSemanal, termino: c7.fechaTermino });
     revisar("   nada detenido cuando se acaba de crear un plan", c7.detenido === false && c7.diasSinPlanNuevo === 0);
 
-    // ─────────────────────────────── 15-17 Aislamiento y permisos
-    console.log("\n15-17. Aislamiento entre empresas y permisos");
+    // ─────────────────────────────── 15-17 Herramientas capturables
+    console.log("\n15-17. Herramientas de una actividad");
+    const caja = await prisma.kitDeHerramientas.create({ data: { organizationId: A.id, code: "CAJA-1", name: "Caja del mecánico" } });
+    const llave = await prisma.part.create({ data: { organizationId: A.id, code: "HTA-1", name: "Torquímetro", unit: "pza", naturaleza: "HERRAMIENTA" } });
+    const conHerramientas = await altaDePlan(A.id, dueno.id, {
+      name: `Con herramienta ${sello}`,
+      maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 90,
+      leadTimeDays: 3, toleranceDays: 2, priority: "MEDIUM", estimatedHours: 2,
+      requiresShutdown: false, active: true,
+      procedure: "Apretar al par indicado.",
+      assetIds: [ga75.id],
+      tasks: [{
+        title: "Reapretar tornillería", taskType: "REPLACE", required: true, cadaCuanto: 90, unidadFrecuencia: "DIAS",
+        labor: [{ specialtyId: especialidad.id, personas: 1, hours: 2 }],
+        parts: [{ partId: refaccion.id, quantity: 1 }],
+        services: [],
+        tools: [{ partId: llave.id, cantidad: 1, nota: "A 120 Nm" }, { kitId: caja.id, cantidad: 1 }],
+      }],
+    });
+    revisar("15. un plan se da de alta con las herramientas de su actividad", !("error" in conHerramientas),
+      "error" in conHerramientas ? conHerramientas.error : undefined);
+    const idConHta = "error" in conHerramientas ? "" : conHerramientas.plan.id;
+    const herramientasGuardadas = await prisma.planTaskTool.findMany({ where: { task: { planId: idConHta } } });
+    revisar("   quedan guardadas, una del almacén y una caja", herramientasGuardadas.length === 2 &&
+      herramientasGuardadas.some((h) => h.partId === llave.id && h.nota === "A 120 Nm") &&
+      herramientasGuardadas.some((h) => h.kitId === caja.id), herramientasGuardadas.length);
+    const pConHta = (await constructorDePlanes(A.id)).planes.find((x) => x.id === idConHta);
+    revisar("16. con herramientas y procedimiento, la rúbrica ya no las reclama",
+      pConHta?.falta.every((f) => !/herramienta|procedimiento/.test(f)) === true, pConHta?.falta);
+
+    await rechaza("17. una herramienta que cuelga de dos cosas a la vez se rechaza", async () => {
+      const r = await altaDePlan(A.id, dueno.id, {
+        name: `Herramienta ambigua ${sello}`,
+        maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 30,
+        leadTimeDays: 3, toleranceDays: 2, priority: "MEDIUM", estimatedHours: 1,
+        requiresShutdown: false, active: true,
+        tasks: [{
+          title: "x", taskType: "CHECK", required: true, labor: [], parts: [], services: [],
+          tools: [{ partId: llave.id, kitId: caja.id, cantidad: 1 }],
+        }],
+      });
+      if ("error" in r) throw new Error(r.error);
+      return r;
+    });
+    const deOtraEmpresa = await prisma.kitDeHerramientas.create({ data: { organizationId: B.id, code: "CAJA-B", name: "Caja de B" } });
+    await rechaza("   y una caja de otra empresa tampoco se puede colgar", async () => {
+      const r = await altaDePlan(A.id, dueno.id, {
+        name: `Herramienta ajena ${sello}`,
+        maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 30,
+        leadTimeDays: 3, toleranceDays: 2, priority: "MEDIUM", estimatedHours: 1,
+        requiresShutdown: false, active: true,
+        tasks: [{
+          title: "x", taskType: "CHECK", required: true, labor: [], parts: [], services: [],
+          tools: [{ kitId: deOtraEmpresa.id, cantidad: 1 }],
+        }],
+      });
+      if ("error" in r) throw new Error(r.error);
+      return r;
+    }, /herramienta|caja/i);
+
+    // ─────────────────────────────── 18-20 Acciones de un clic
+    console.log("\n18-20. Aplicar al grupo, copiar un plan y corregir el agrupado");
+    const claveGa30 = grupo("CR-1")!.clave;
+    const ga30d = await equipo("CR-5", compresores.id, { manufacturer: "Atlas Copco", model: "GA-30" });
+    const antesDeAplicar = (await constructorDePlanes(A.id)).grupos.find((g) => g.clave === claveGa30);
+    const aplicado = await aplicarPlanDelGrupo({ organizationId: A.id, userId: dueno.id, planId: plan.id, clave: claveGa30 });
+    const despuesDeAplicar = (await constructorDePlanes(A.id)).grupos.find((g) => g.clave === claveGa30);
+    revisar("18. el equipo que entró después toma el plan de su grupo de un clic",
+      antesDeAplicar?.sinPlan === 1 && aplicado.asignados === 1 && despuesDeAplicar?.sinPlan === 0 &&
+      aplicado.equipos.includes("CR-5"), { antes: antesDeAplicar?.sinPlan, despues: despuesDeAplicar?.sinPlan });
+    revisar("   y queda en la bitácora", (await prisma.auditLog.count({ where: { organizationId: A.id, action: "PLAN_APPLIED_TO_GROUP" } })) === 1);
+    await rechaza("   repetirlo no asigna dos veces: ya no hay a quién",
+      () => aplicarPlanDelGrupo({ organizationId: A.id, userId: dueno.id, planId: plan.id, clave: claveGa30 }), /ya tienen plan/i);
+
+    const claveGa75 = grupo("CR-3")!.clave;
+    const copia = await clonarPlan({
+      organizationId: A.id, userId: dueno.id, planId: idConHta,
+      nombre: `Preventivo GA-75 ${sello}`, equipos: [],
+    });
+    const original = await prisma.maintenancePlan.findUniqueOrThrow({
+      where: { id: idConHta },
+      include: { tasks: { include: { labor: true, parts: true, services: true, tools: true } }, asignaciones: true },
+    });
+    const copiado = await prisma.maintenancePlan.findUniqueOrThrow({
+      where: { id: copia.plan.id },
+      include: { tasks: { include: { labor: true, parts: true, services: true, tools: true } }, asignaciones: true },
+    });
+    revisar("19. la copia trae las actividades con sus cuatro recursos",
+      copiado.tasks.length === original.tasks.length &&
+      copiado.tasks[0].labor.length === original.tasks[0].labor.length &&
+      copiado.tasks[0].parts.length === original.tasks[0].parts.length &&
+      copiado.tasks[0].tools.length === original.tasks[0].tools.length &&
+      copiado.procedure === original.procedure,
+      { actividades: copiado.tasks.length, herramientas: copiado.tasks[0]?.tools.length });
+    revisar("   nace sin equipos si no se le dicen, y no toca al original",
+      copiado.asignaciones.length === 0 && original.asignaciones.length === 1 && copiado.id !== original.id);
+    const copiaConEquipos = await clonarPlan({
+      organizationId: A.id, userId: dueno.id, planId: idConHta,
+      nombre: `GA-75 con equipos ${sello}`, equipos: [ga75.id],
+    });
+    revisar("   o se aplica de una vez a los equipos que se le digan", copiaConEquipos.asignados === 1 &&
+      (await prisma.planAsset.count({ where: { planId: copiaConEquipos.plan.id, active: true } })) === 1);
+    void claveGa75;
+
+    // Corregir el agrupado: separar, unir y deshacer.
+    const trasSeparar = await corregirGrupo({ organizationId: A.id, userId: dueno.id, equipos: [ga30d.id], destino: claveAparte(ga30d.id) });
+    const grupoDe = (c: Awaited<ReturnType<typeof constructorDePlanes>>, code: string) =>
+      c.grupos.find((g) => g.equipos.some((e) => e.code === code));
+    revisar("20. separar un equipo lo deja en su propio grupo, y se nota que fue a mano",
+      grupoDe(trasSeparar, "CR-5")?.equipos.length === 1 && grupoDe(trasSeparar, "CR-5")?.aMano === true &&
+      grupoDe(trasSeparar, "CR-5")?.clave !== grupoDe(trasSeparar, "CR-1")?.clave,
+      { equipos: grupoDe(trasSeparar, "CR-5")?.equipos.length, aMano: grupoDe(trasSeparar, "CR-5")?.aMano });
+    revisar("   y el mínimo sugerido sube, porque ahora pide su propio plan", trasSeparar.sugeridos > c1.sugeridos,
+      { antes: c1.sugeridos, ahora: trasSeparar.sugeridos });
+
+    const trasUnir = await corregirGrupo({ organizationId: A.id, userId: dueno.id, equipos: [ga75.id], destino: claveGa30 });
+    revisar("   unir mete los equipos del otro grupo en este",
+      grupoDe(trasUnir, "CR-3")?.clave === claveGa30 && grupoDe(trasUnir, "CR-1")?.equipos.some((e) => e.code === "CR-3") === true,
+      { clave: grupoDe(trasUnir, "CR-3")?.clave });
+
+    const trasDeshacer = await corregirGrupo({ organizationId: A.id, userId: dueno.id, equipos: [ga75.id, ga30d.id], destino: null });
+    revisar("   deshacer devuelve el mando al cálculo", grupoDe(trasDeshacer, "CR-3")?.clave !== claveGa30 &&
+      grupoDe(trasDeshacer, "CR-5")?.clave === claveGa30 && grupoDe(trasDeshacer, "CR-5")?.aMano === false,
+      { ga75: grupoDe(trasDeshacer, "CR-3")?.clave, ga30d: grupoDe(trasDeshacer, "CR-5")?.clave });
+    revisar("   corregir el agrupado queda en la bitácora",
+      (await prisma.auditLog.count({ where: { organizationId: A.id, action: "ASSET_GROUP_CHANGED" } })) === 3);
+
+    // ─────────────────────────────── 21 Planes gemelos
+    console.log("\n21. Planes que parecen el mismo");
+    const gemelo = await clonarPlan({ organizationId: A.id, userId: dueno.id, planId: plan.id, nombre: `Mantto GA-30 ${sello}`, equipos: [ga30a.id] });
+    const conGemelos = await constructorDePlanes(A.id);
+    const par = conGemelos.gemelos.find((g) => g.planes.some((x) => x.id === gemelo.plan.id));
+    revisar("21. dos planes del mismo grupo con las mismas actividades se señalan", Boolean(par) && (par?.parecido ?? 0) >= 50 &&
+      par?.planes.some((x) => x.id === plan.id) === true, { gemelos: conGemelos.gemelos.length, parecido: par?.parecido });
+    revisar("   y no se fusionan solos: los dos planes siguen ahí",
+      (await prisma.maintenancePlan.count({ where: { organizationId: A.id, id: { in: [plan.id, gemelo.plan.id] }, active: true } })) === 2);
+
+    // ─────────────────────────────── 22-24 Aislamiento y permisos
+    console.log("\n22-24. Aislamiento entre empresas y permisos");
     await prisma.asset.create({ data: { organizationId: B.id, siteId: sitioB.id, code: "B-1", name: "De B", manufacturer: "Otra", model: "Z" } });
     await fijarMetaDePlanes({ organizationId: B.id, userId: duenoB.id, meta: 30 });
     const cA = await constructorDePlanes(A.id);
     const cB = await constructorDePlanes(B.id);
-    revisar("15. cada empresa ve solo lo suyo: grupos, planes y meta", cA.metaFijada === null && cB.metaFijada === 30 &&
+    revisar("22. cada empresa ve solo lo suyo: grupos, planes y meta", cA.metaFijada === null && cB.metaFijada === 30 &&
       cB.grupos.length === 1 && cB.planes.length === 0 &&
       cA.grupos.every((g) => g.equipos.every((e) => e.code !== "B-1")), { metaA: cA.metaFijada, metaB: cB.metaFijada, gruposB: cB.grupos.length });
 
@@ -280,7 +432,7 @@ async function main() {
     const cDuenoB = await sesion(duenoB);
 
     const lee = await pedir("GET", "/api/plans/constructor", cDueno);
-    revisar("16. el dueño lee su tablero por API", lee.status === 200 && (lee.json.sugeridos as number) === cA.sugeridos,
+    revisar("23. el dueño lee su tablero por API", lee.status === 200 && (lee.json.sugeridos as number) === cA.sugeridos,
       { status: lee.status, sugeridos: lee.json.sugeridos, log: lee.status >= 500 ? colaDelLog(PUERTO, 12, "constructor-planes") : undefined });
 
     const pone = await pedir("PUT", "/api/plans/constructor", cDueno, { meta: 9 });
@@ -289,12 +441,60 @@ async function main() {
       (await prisma.auditLog.count({ where: { organizationId: A.id, action: "PLAN_GOAL_CHANGED" } })) === 1, { status: pone.status });
 
     const tecIntenta = await pedir("PUT", "/api/plans/constructor", cTecnico, { meta: 1 });
-    revisar("17. un técnico no fija la meta (403), y la meta no cambió", tecIntenta.status === 403 &&
+    revisar("24. un técnico no fija la meta (403), y la meta no cambió", tecIntenta.status === 403 &&
       (await constructorDePlanes(A.id)).metaFijada === 9, { status: tecIntenta.status });
 
     const otraEmpresa = await pedir("GET", "/api/plans/constructor", cDuenoB);
     revisar("   el dueño de otra empresa recibe su propio tablero, no el de A",
       otraEmpresa.status === 200 && (otraEmpresa.json.metaFijada as number) === 30, { meta: otraEmpresa.json.metaFijada });
+
+    const tecAccion = await pedir("POST", "/api/plans/constructor/acciones", cTecnico, {
+      accion: "CORREGIR_GRUPO", equipos: [ga30a.id], destino: claveAparte(ga30a.id),
+    });
+    revisar("   tampoco corrige el agrupado (403) ni queda rastro", tecAccion.status === 403 &&
+      (await prisma.grupoDeEquipo.count({ where: { organizationId: A.id } })) === 0, { status: tecAccion.status });
+
+    const ajeno = await pedir("POST", "/api/plans/constructor/acciones", cDuenoB, { accion: "CLONAR", planId: plan.id });
+    revisar("   el dueño de otra empresa no puede copiar un plan que no es suyo", ajeno.status === 404 &&
+      (await prisma.maintenancePlan.count({ where: { organizationId: B.id } })) === 0, { status: ajeno.status });
+
+    const equipoAjeno = await pedir("POST", "/api/plans/constructor/acciones", cDueno, {
+      accion: "CORREGIR_GRUPO", equipos: [(await prisma.asset.findFirstOrThrow({ where: { organizationId: B.id } })).id], destino: "x",
+    });
+    revisar("   ni se puede mover de grupo un equipo de otra empresa", equipoAjeno.status === 404 &&
+      (await prisma.grupoDeEquipo.count({ where: { organizationId: A.id } })) === 0, { status: equipoAjeno.status });
+
+    // El camino completo por HTTP: crear un plan con herramientas y editarlo.
+    // El diálogo se probó a mano en el navegador; esto cuida el contrato.
+    const altaHttp = await pedir("POST", "/api/plans", cDueno, {
+      name: `Por HTTP ${sello}`, maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 60,
+      leadTimeDays: 3, priority: "MEDIUM", estimatedHours: 1, requiresShutdown: false, active: true,
+      assetIds: [ga30a.id],
+      tasks: [{
+        title: "Calibrar", taskType: "MEASURE", required: true, cadaCuanto: 60, unidadFrecuencia: "DIAS",
+        unit: "bar", minValue: 1, maxValue: 2,
+        labor: [], parts: [], services: [],
+        tools: [{ partId: llave.id, cantidad: 1, nota: "Con certificado" }],
+      }],
+    });
+    const planHttpId = ((altaHttp.json.plan ?? altaHttp.json) as { id?: string })?.id ?? "";
+    const htasHttp = await prisma.planTaskTool.findMany({ where: { task: { planId: planHttpId } }, select: { partId: true, nota: true } });
+    revisar("   crear un plan por HTTP guarda las herramientas de la actividad",
+      altaHttp.status === 201 && htasHttp.length === 1 && htasHttp[0].partId === llave.id && htasHttp[0].nota === "Con certificado",
+      { status: altaHttp.status, herramientas: htasHttp.length });
+
+    const edicion = await pedir("PATCH", `/api/plans/${planHttpId}`, cDueno, {
+      tasks: [{
+        title: "Calibrar", taskType: "MEASURE", required: true, cadaCuanto: 60, unidadFrecuencia: "DIAS",
+        unit: "bar", minValue: 1, maxValue: 2,
+        labor: [], parts: [], services: [],
+        tools: [{ kitId: caja.id, cantidad: 1, nota: null }],
+      }],
+    });
+    const trasEditar = await prisma.planTaskTool.findMany({ where: { task: { planId: planHttpId } }, select: { partId: true, kitId: true } });
+    revisar("   y editarlo las reemplaza, sin dejar la vieja colgada",
+      edicion.status === 200 && trasEditar.length === 1 && trasEditar[0].kitId === caja.id && trasEditar[0].partId === null,
+      { status: edicion.status, herramientas: trasEditar.length });
 
     const basura = await pedir("PUT", "/api/plans/constructor", cDueno, { meta: "muchos" });
     revisar("   una meta que no es número se rechaza sin tocar nada", basura.status >= 400 &&

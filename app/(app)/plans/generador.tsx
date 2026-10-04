@@ -30,6 +30,9 @@ export function GeneradorPlan({
   especialidades,
   refacciones,
   servicios,
+  herramientas,
+  herramientasActivo,
+  cajas,
   moneda,
   puedeCrearCatalogos,
   operacionesRestantes,
@@ -40,6 +43,9 @@ export function GeneradorPlan({
   especialidades: Opcion[];
   refacciones: Opcion[];
   servicios: Opcion[];
+  herramientas: Opcion[];
+  herramientasActivo: Opcion[];
+  cajas: Opcion[];
   moneda: string;
   puedeCrearCatalogos: boolean;
   operacionesRestantes: number;
@@ -87,6 +93,9 @@ export function GeneradorPlan({
         especialidades={especialidades}
         refacciones={refacciones}
         servicios={servicios}
+        herramientas={herramientas}
+        herramientasActivo={herramientasActivo}
+        cajas={cajas}
         moneda={moneda}
         puedeCrearCatalogos={puedeCrearCatalogos}
         aviso={aviso || null}

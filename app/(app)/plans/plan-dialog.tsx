@@ -17,7 +17,7 @@ import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-reac
 import { Button, BotonEditar } from "@/components/ui";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { RecursosTarea, type LineaMO, type LineaRef, type LineaSrv, type Opcion } from "./recursos-tarea";
+import { RecursosTarea, type LineaHta, type LineaMO, type LineaRef, type LineaSrv, type Opcion } from "./recursos-tarea";
 import { SelectorMultiple } from "@/components/selector-multiple";
 import { EquiposDelPlan } from "./equipos-del-plan";
 
@@ -31,6 +31,8 @@ export type Task = {
   labor: LineaMO[];
   parts: LineaRef[];
   services: LineaSrv[];
+  /** Lo que hay que tener en la mano. No se consume: no entra al costo. */
+  tools: LineaHta[];
   /**
    * Cada cuantos dias se hace ESTA actividad. Vacio = la del plan.
    *
@@ -73,7 +75,7 @@ export type PlanExistente = {
 };
 
 const vacia = (t: Partial<Task>): Task => ({
-  title: "", taskType: "CHECK", required: true, labor: [], parts: [], services: [], ...t,
+  title: "", taskType: "CHECK", required: true, labor: [], parts: [], services: [], tools: [], ...t,
 });
 
 const PRESETS: Record<string, { intervalDays: number; tasks: Task[] }> = {
@@ -113,6 +115,9 @@ export function PlanDialog({
   especialidades,
   refacciones,
   servicios,
+  herramientas,
+  herramientasActivo,
+  cajas,
   moneda,
   puedeCrearCatalogos,
   plan,
@@ -127,6 +132,9 @@ export function PlanDialog({
   especialidades: Opcion[];
   refacciones: Opcion[];
   servicios: Opcion[];
+  herramientas: Opcion[];
+  herramientasActivo: Opcion[];
+  cajas: Opcion[];
   moneda: string;
   puedeCrearCatalogos: boolean;
   /** Si viene, el dialogo edita ese plan en lugar de crear uno nuevo. */
@@ -257,7 +265,7 @@ export function PlanDialog({
     const preset = PRESETS[name];
     if (!preset) return;
     setForm((prev) => ({ ...prev, name, intervalDays: String(preset.intervalDays), triggerType: "CALENDAR" }));
-    setTasks(preset.tasks.map((t) => ({ ...t, labor: [], parts: [], services: [] })));
+    setTasks(preset.tasks.map((t) => ({ ...t, labor: [], parts: [], services: [], tools: [] })));
   }
 
   function abrir() {
@@ -317,6 +325,14 @@ export function PlanDialog({
             serviceId: s.serviceId,
             quantity: Number(s.quantity || 0),
             nota: s.nota || null,
+          })),
+          // La herramienta cuelga de UNA sola cosa, segun de dónde salga.
+          tools: t.tools.filter((h) => h.id).map((h) => ({
+            partId: h.fuente === "ALMACEN" ? h.id : null,
+            assetId: h.fuente === "ACTIVO" ? h.id : null,
+            kitId: h.fuente === "CAJA" ? h.id : null,
+            cantidad: Number(h.cantidad || 1),
+            nota: h.nota || null,
           })),
         })),
     };
@@ -815,14 +831,19 @@ export function PlanDialog({
                           labor={task.labor}
                           parts={task.parts}
                           services={task.services}
+                          tools={task.tools}
                           especialidades={catEsp}
                           refacciones={refacciones}
                           servicios={catSrv}
+                          herramientas={herramientas}
+                          herramientasActivo={herramientasActivo}
+                          cajas={cajas}
                           moneda={moneda}
                           puedeCrear={puedeCrearCatalogos}
                           onLabor={(v) => cambiarTarea(index, { labor: v })}
                           onParts={(v) => cambiarTarea(index, { parts: v })}
                           onServices={(v) => cambiarTarea(index, { services: v })}
+                          onTools={(v) => cambiarTarea(index, { tools: v })}
                           onEspecialidades={setCatEsp}
                           onServicios={setCatSrv}
                         />
