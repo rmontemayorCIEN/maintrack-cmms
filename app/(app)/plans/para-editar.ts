@@ -27,6 +27,7 @@ export function planParaEditar(plan: PlanParaEditar) {
     estimatedHours: plan.estimatedHours,
     assignedToId: plan.assignedToId,
     requiresShutdown: plan.requiresShutdown,
+    procedure: plan.procedure,
     safetyNotes: plan.safetyNotes,
     tasks: plan.tasks.map((t) => ({
       title: t.title,

@@ -67,6 +67,7 @@ export type PlanExistente = {
   estimatedHours: number;
   assignedToId: string | null;
   requiresShutdown: boolean;
+  procedure: string | null;
   safetyNotes: string | null;
   tasks: Task[];
 };
@@ -178,7 +179,7 @@ export function PlanDialog({
     estimatedHours: String(inicial?.estimatedHours ?? 2),
     assignedToId: plan?.assignedToId ?? "",
     requiresShutdown: inicial?.requiresShutdown ?? false,
-    procedure: "",
+    procedure: inicial?.procedure ?? "",
     safetyNotes: inicial?.safetyNotes ?? "",
   });
 
@@ -558,6 +559,15 @@ export function PlanDialog({
           <div className="md:col-span-2">
             <label className="label">Notas de seguridad</label>
             <input className="field" value={form.safetyNotes} onChange={(e) => set("safetyNotes", e.target.value)} placeholder="LOTO, permisos, EPP requerido…" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">Procedimiento</label>
+            <textarea
+              className="field min-h-[72px]"
+              value={form.procedure}
+              onChange={(e) => set("procedure", e.target.value)}
+              placeholder="Cómo se hace: asegurar el equipo, pasos, qué revisar al final. Se copia a cada orden que genere el plan."
+            />
           </div>
         </div>
 

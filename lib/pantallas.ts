@@ -62,6 +62,8 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/assets/levantamiento", roles: MANDO },
   { ruta: "/meters", roles: OPERACION },
   { ruta: "/plans", roles: OPERACION },
+  // El avance de la construccion es cosa de quien manda: trae la meta.
+  { ruta: "/plans/constructor", roles: MANDO },
   { ruta: "/conjuntos", roles: OPERACION },
 
   { ruta: "/inventory", roles: ALMACEN },
@@ -241,6 +243,7 @@ const MENU: GrupoMenu[] = [
       { href: "/escanear", etiqueta: "Escanear QR", icono: "escanear" },
       { href: "/meters", etiqueta: "Medidores", icono: "medidores" },
       { href: "/plans", etiqueta: "Planes preventivos", icono: "planes" },
+      { href: "/plans/constructor", etiqueta: "Constructor de planes", icono: "constructor" },
       { href: "/conjuntos", etiqueta: "Conjuntos", icono: "conjuntos", porInstalacion: true },
       { href: "/predictive", etiqueta: "Predictivo", icono: "predictivo" },
     ],

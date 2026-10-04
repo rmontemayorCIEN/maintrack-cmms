@@ -764,6 +764,62 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/plans/constructor": {
+    titulo: "Constructor de planes",
+    que: "Dónde va la construcción del programa preventivo: cuántos planes faltan, qué le falta a cada uno y a qué ritmo avanza.",
+    hacer: [
+      "Ver cuántos planes necesita como mínimo, calculado por grupos de equipos iguales",
+      "Fijar su propia meta de planes, o volver al mínimo sugerido",
+      "Ver qué planes ya están terminados y qué le falta exactamente a los demás",
+      "Ver el ritmo de construcción y la fecha en que terminaría a ese ritmo",
+      "Encontrar los grupos de equipos que todavía no tienen ningún plan",
+    ],
+    flujo: [
+      "Un grupo de equipos iguales es misma familia y mismo fabricante y modelo. Son candidatos, no un veredicto: si sus compresores Atlas llevan dos planes distintos, usted los parte; el sistema no asigna nada solo.",
+      "El mínimo sugerido es el número de grupos. Es una cuenta, no una opinión de la IA: se puede comprobar equipo por equipo.",
+      "La meta es suya. Si construye más planes que la meta, la meta sube sola. Si entran equipos nuevos y el mínimo sugerido pasa su meta, NO se le cambia su número: se le avisa, y usted decide.",
+      "«Plan terminado» es más exigente que «plan que generará órdenes», que es lo que revisa la puesta en marcha. Aquí se pide además mano de obra en cada actividad, refacciones en las que reemplazan algo, unidad y rango en las que miden, herramientas donde hacen falta, procedimiento o documento de referencia, y que ningún equipo igual se haya quedado sin plan.",
+      "Las piezas que no aplican no bajan el porcentaje: un plan de pura inspección visual no necesita refacciones ni herramientas, y no se le exigen.",
+      "El avance no se guarda, se calcula cada vez que abre la pantalla. Lo único que se guarda es la meta, con quién la puso y cuándo, y queda en la bitácora.",
+      "El ritmo se mide con los planes que de verdad se crearon en las últimas ocho semanas. La fecha de término es esa división, no una promesa.",
+    ],
+    campos: [
+      { nombre: "Listo", explica: "No le falta ninguna pieza que aplique. Ese plan ya se puede presupuestar y preparar: alguien sabe cuántas horas, de qué oficio, con qué refacciones y con qué herramienta." },
+      { nombre: "En forma", explica: "Genera órdenes, pero le falta algo para servir completo. Lo que falta está escrito renglón por renglón." },
+      { nombre: "Esqueleto", explica: "Existe el plan y poco más: sin actividades, o con menos de la mitad de las piezas. Es el que da la falsa sensación de que ya hay programa." },
+      { nombre: "Sin modelo", explica: "Esos equipos no tienen fabricante ni modelo capturados, así que no se puede saber si son un tipo o tres. Se agrupan por familia y se le advierte: capturar el modelo parte el grupo bien." },
+      { nombre: "Equipos iguales sin plan", explica: "Equipos del mismo grupo que no están en NINGÚN plan. No dice que le toquen a este plan: dice que están descubiertos." },
+      { nombre: "Ritmo", explica: "Planes nuevos por semana en las últimas ocho. En cero cuando no se ha creado ninguno en ese plazo." },
+    ],
+    botones: [
+      { nombre: "Cambiar la meta", explica: "Fija el número de planes que usted se propone. Queda registrado con su nombre y la fecha." },
+      { nombre: "Usar el sugerido", explica: "Borra su meta y vuelve al mínimo calculado por los grupos de equipos iguales." },
+    ],
+    noPuedo: [
+      { sintoma: "El mínimo sugerido me parece alto", porque: "Cada grupo de equipos iguales cuenta como un plan. Si varios grupos comparten el mismo plan en su realidad, la meta es suya: bájela y queda registrado por qué número va." },
+      { sintoma: "Dos grupos que son el mismo tipo de equipo aparecen separados", porque: "El fabricante o el modelo están escritos distinto en cada equipo. Se agrupan por esos dos campos normalizados; corrija la captura del activo y se juntan." },
+      { sintoma: "Un plan no llega a «Listo» y ya tiene todo", porque: "Revise el renglón de lo que falta: casi siempre es mano de obra en alguna actividad, el rango de una medición, o un equipo igual que sigue sin plan." },
+      { sintoma: "El porcentaje de aquí no es el de la puesta en marcha", porque: "No miden lo mismo. La puesta en marcha pregunta si el plan va a generar órdenes; aquí si el plan está terminado. Cada pregunta se calcula en un solo lugar, y son distintas a propósito." },
+    ],
+    preguntas: [
+      {
+        pregunta: "¿Por qué no crea los planes que faltan?",
+        respuesta:
+          "Porque un plan compromete trabajo con fechas, y qué equipos entran en cuál lo sabe quien conoce la planta. Esta pantalla mide y pone la meta; el plan lo redacta usted, con el generador si quiere ayuda.",
+      },
+      {
+        pregunta: "¿La meta sube sola?",
+        respuesta:
+          "Sube cuando usted construye más planes que su meta: no tendría sentido mostrar 12 de 10. Lo que NO hace es subirle la meta porque entraron equipos; eso se avisa y lo decide usted.",
+      },
+      {
+        pregunta: "¿Qué cuenta como herramienta en un plan?",
+        respuesta:
+          "Lo que hay que tener en la mano para hacer la actividad: una llave de torque, un multímetro, una caja completa. Se piden solo en las actividades que cambian algo o que miden algo; una inspección visual no las necesita.",
+      },
+    ],
+  },
+
   "/plans/cobertura": {
     titulo: "Equipos y sus planes",
     que: "Qué plan tiene cada equipo, y cuáles no tienen ninguno.",

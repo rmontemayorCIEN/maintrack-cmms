@@ -24,7 +24,7 @@ import { EnlacesPlan } from "./enlaces-plan";
 import { TablaPlanes, type FilaPlan } from "./tabla-planes";
 import { vistaGuardada } from "@/lib/vistas";
 import { coberturaPreventiva } from "@/lib/cobertura-planes";
-import { AlertTriangle, Network } from "lucide-react";
+import { AlertTriangle, Hammer, Network } from "lucide-react";
 import { catalogosDePlanes } from "@/lib/planes-datos";
 import { planParaEditar } from "./para-editar";
 
@@ -200,12 +200,18 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
         </div>
       ) : null}
 
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap gap-2">
         <Link
           href="/plans/cobertura"
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           <Network className="h-3.5 w-3.5" /> Equipos y sus planes
+        </Link>
+        <Link
+          href="/plans/constructor"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Hammer className="h-3.5 w-3.5" /> Constructor de planes
         </Link>
       </div>
 

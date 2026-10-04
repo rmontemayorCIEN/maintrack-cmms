@@ -116,7 +116,11 @@ async function main() {
   const avisosDe = (userId: string, tipo?: string) => prisma.notification.findMany({ where: { userId, ...(tipo ? { tipo } : {}) } });
 
   try {
-    const A = await nuevaOrg("a");
+    // A trabaja las 24 h, todos los días: registrarAviso toma la hora real, y
+    // fuera de la ventana un aviso MEDIA se difiere y la prueba dependería del
+    // reloj. La ventana en sí se prueba aparte (18-19) con una jornada fija.
+    const A = await nuevaOrg("a", { diasHabiles: "1,2,3,4,5,6,7" });
+    await prisma.configAvisos.create({ data: { organizationId: A.id, horaInicio: "00:00", horaFin: "24:00" } });
     const B = await nuevaOrg("b");
     const C = await nuevaOrg("c");
     const dueno = await persona(A.id, "OWNER", "Dueno");
