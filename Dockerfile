@@ -24,6 +24,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Cloud Build corre en la maquina por omision (e2-medium, 4 GB), y ahi Node se
+# auto-limita a ~2 GB de heap. La revision de tipos de Next ya raspa ese techo:
+# el 4-oct-2026 el build del PR #11 compilo bien y murio despues, en «Checking
+# validity of types», con «JavaScript heap out of memory». Dos builds del mismo
+# dia habian pasado, o sea que el pico vive justo en el limite.
+#
+# Esto es un TECHO, no una reserva: no aparta memoria, solo deja de matar al
+# proceso antes de tiempo. Se queda por debajo de los 4 GB de la maquina para
+# que no lo mate el kernel. Va SOLO en esta etapa; el runner es otra imagen y
+# no lo hereda, que es lo que importa porque el contenedor de Cloud Run tiene
+# su propia memoria, mucho mas chica.
+ENV NODE_OPTIONS=--max-old-space-size=3072
+
 RUN sed -i 's/^  provider = "sqlite"/  provider = "postgresql"/' prisma/schema.prisma \
  && npx prisma generate && npm run build
 
