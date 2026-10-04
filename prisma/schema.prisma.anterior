@@ -255,6 +255,15 @@ model Organization {
   /// cuenta funciona igual que cualquier otra. Se pone por linea de comandos:
   /// scripts/cuenta-interna.ts.
   cuentaInterna        Boolean   @default(false)
+  /// La meta de construccion de planes preventivos, si la empresa puso una.
+  ///
+  /// Nula significa «use el minimo sugerido», que sale de los grupos de
+  /// equipos iguales (lib/constructor-planes.ts). Lo que se guarda aqui es la
+  /// DECISION de la persona, nunca el avance: el avance se deriva, igual que
+  /// en la puesta en marcha, para que no existan dos porcentajes.
+  metaPlanes           Int?
+  metaPlanesPorId      String?
+  metaPlanesEl         DateTime?
   /// Mientras se restaura, la demo no atiende peticiones (lib/api.ts).
   demoRestaurandoDesde DateTime?
   demoRestauradaAt     DateTime?

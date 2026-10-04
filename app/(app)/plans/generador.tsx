@@ -92,6 +92,9 @@ export function GeneradorPlan({
         aviso={aviso || null}
         borrador={{
           ...borrador,
+          // El borrador de IA no trae procedimiento: lo escribe quien conoce
+          // el equipo. Vacío y visible es mejor que inventado.
+          procedure: "",
           assetId: activo?.id ?? assets[0]?.id ?? "",
           intervalDays: Number(borrador.intervalDays),
           estimatedHours: Number(borrador.estimatedHours),
