@@ -41,8 +41,8 @@ export default async function NotaDeCobro({ params }: { params: Promise<{ id: st
       <header className="mb-8 flex items-start justify-between border-b-2 border-slate-800 pb-4">
         <div>
           <h1 className="text-xl font-bold">NOTA DE COBRO</h1>
-          <p className="mt-1 text-sm">MainTrack CMMS</p>
-          <p className="text-xs text-slate-500">Servicio de gestion de mantenimiento</p>
+          <p className="mt-1 text-sm">MainTrack</p>
+          <p className="text-xs text-slate-500">Plataforma de gestión y confiabilidad del mantenimiento</p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold tabular-nums">{cargo.folio}</p>
@@ -130,7 +130,7 @@ export default async function NotaDeCobro({ params }: { params: Promise<{ id: st
       </section>
 
       <footer className="mt-6 border-t border-slate-300 pt-2 text-[0.625rem] text-slate-500">
-        Generado desde MainTrack CMMS · {formatDate(new Date())}
+        Generado desde MainTrack · {formatDate(new Date())}
       </footer>
     </div>
   );

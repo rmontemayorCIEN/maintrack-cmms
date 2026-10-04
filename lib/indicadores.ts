@@ -28,8 +28,9 @@ import {
   ZONA_POR_OMISION, type Periodo,
 } from "./periodos";
 import {
-  ESTADOS_ABIERTOS, ESTADOS_TERMINADOS, estadoDeVencimiento, diaDelCompromiso,
+  ESTADOS_ABIERTOS, ESTADOS_TERMINADOS, estadoDeVencimiento, diaDelCompromiso, filtroDeVencidas,
 } from "./vencimiento";
+import { MAINTENANCE_TYPE_LABELS } from "./constants";
 
 const HORA = 3_600_000;
 
@@ -38,18 +39,31 @@ export const TIPOS_PROGRAMADOS = ["PREVENTIVE", "INSPECTION"] as const;
 /** Apoyos a produccion: no son mantenimiento planeado ni falla. */
 export const TIPOS_FUERA_DE_MANTENIMIENTO = ["SUPPORT"] as const;
 
-export type ClaveIndicador =
-  | "paroTotal"
-  | "paroNoPlaneado"
-  | "paroPlaneado"
-  | "disponibilidad"
-  | "mttr"
-  | "mtbf"
-  | "cumplimientoPreventivo"
-  | "tiempoRespuesta"
-  | "trabajoPlanificado"
-  | "backlog"
-  | "costoMantenimiento";
+/**
+ * Los indicadores que el sistema calcula, en una lista que existe en
+ * EJECUCION y no solo en los tipos.
+ *
+ * Era una union de tipos, que se borra al compilar. El glosario necesita
+ * comprobar que sus claves apuntan a indicadores reales, y una comprobacion
+ * asi no se puede hacer contra algo que no existe en ejecucion: se quedaria
+ * en «compila», que es justo lo que no basta cuando lo que une dos listas es
+ * una cadena de texto.
+ */
+export const CLAVES_INDICADOR = [
+  "paroTotal",
+  "paroNoPlaneado",
+  "paroPlaneado",
+  "disponibilidad",
+  "mttr",
+  "mtbf",
+  "cumplimientoPreventivo",
+  "tiempoRespuesta",
+  "trabajoPlanificado",
+  "backlog",
+  "costoMantenimiento",
+] as const;
+
+export type ClaveIndicador = (typeof CLAVES_INDICADOR)[number];
 
 export type Renglon = {
   /** Id de la orden o del evento de paro. */
@@ -140,7 +154,7 @@ export async function eventosDeParoDelPeriodo(
   periodo: { desde: Date; hasta: Date },
 ) {
   return prisma.downtimeEvent.findMany({
-    where: { asset: { organizationId }, startedAt: dentroDe(periodo) },
+    where: { organizationId, startedAt: dentroDe(periodo) },
     select: {
       id: true, minutes: true, planned: true, startedAt: true, reason: true, workOrderId: true,
       asset: { select: { id: true, code: true, name: true } },
@@ -173,7 +187,32 @@ export async function calcularIndicadores(
     tasks: { select: { title: true, maintenanceType: true, failureCodeId: true, origenRequestId: true } },
   } as const;
 
-  const [creadas, terminadas, iniciadas, programadas, abiertas, eventos, activos, deFalla] = await Promise.all([
+  /**
+   * Sin `tasks`, para las consultas que no clasifican fallas.
+   *
+   * `clasificarFalla` mira las actividades de la orden, y por eso el select
+   * completo las trae. Pero el cumplimiento y el backlog no clasifican nada:
+   * arrastrar las actividades ahi era una segunda consulta y miles de
+   * renglones que nadie leia.
+   */
+  const seleccionLigera = {
+    id: true, number: true, title: true, status: true, maintenanceType: true, priority: true,
+    createdAt: true, dueDate: true, startedAt: true, completedAt: true,
+    actualHours: true, estimatedHours: true, totalCost: true,
+    asset: { select: { code: true } },
+  } as const;
+
+  /**
+   * Cuantos renglones de detalle se dibujan como maximo.
+   *
+   * El backlog no tiene periodo: son TODAS las ordenes abiertas de la empresa.
+   * Traerlas todas para armar una lista que nadie recorre entera costaba mas
+   * que todo lo demas junto. Los numeros del indicador siguen siendo exactos
+   * —salen de contar y sumar en la base—; lo acotado es la muestra.
+   */
+  const MAX_DETALLE = 500;
+
+  const [creadas, terminadas, iniciadas, programadas, abiertasMuestra, nAbiertas, sumasAbiertas, vencidasCandidatas, eventos, activos, deFalla] = await Promise.all([
     prisma.workOrder.findMany({ where: { organizationId, createdAt: dentroDe(periodo) }, select: seleccion }),
     prisma.workOrder.findMany({
       where: { organizationId, status: { in: [...ESTADOS_TERMINADOS] }, completedAt: dentroDe(periodo) },
@@ -188,9 +227,25 @@ export async function calcularIndicadores(
         organizationId, status: { not: "CANCELLED" },
         maintenanceType: { in: [...TIPOS_PROGRAMADOS] }, dueDate: holgura,
       },
-      select: seleccion,
+      select: seleccionLigera,
     }),
-    prisma.workOrder.findMany({ where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } }, select: seleccion }),
+    // El backlog, en cuatro consultas en vez de una sin tope: la muestra que
+    // se dibuja, el conteo, las sumas y las candidatas a vencidas.
+    prisma.workOrder.findMany({
+      where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } },
+      select: seleccionLigera, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: MAX_DETALLE,
+    }),
+    prisma.workOrder.count({ where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } } }),
+    prisma.workOrder.aggregate({
+      where: { organizationId, status: { in: [...ESTADOS_ABIERTOS] } },
+      _sum: { estimatedHours: true, totalCost: true },
+    }),
+    // Vencidas: el filtro de la base acota a las candidatas —unas pocas— y la
+    // etiqueta, que es la autoridad, descarta las que no lo son de verdad.
+    prisma.workOrder.findMany({
+      where: { organizationId, ...filtroDeVencidas(zona, ahora) },
+      select: seleccionLigera,
+    }),
     eventosDeParoDelPeriodo(organizationId, periodo),
     prisma.asset.findMany({
       where: { organizationId, active: true, status: { not: "RETIRED" } },
@@ -203,10 +258,12 @@ export async function calcularIndicadores(
   const ordenEsFalla = (o: Parameters<typeof falla>[0]) => falla(o).esFalla;
 
   type Orden = (typeof creadas)[number];
-  const renglonOrden = (o: Orden, aporte: number, fecha: Date | null, aFavor?: boolean, conRazon = false): Renglon => ({
+  /** Lo minimo que necesita un renglon de detalle: lo cumplen los dos selects. */
+  type OrdenDibujable = Omit<Orden, "tasks" | "failureCodeId" | "laborCost" | "partsCost" | "serviceCost" | "otherCost">;
+  const renglonOrden = (o: OrdenDibujable, aporte: number, fecha: Date | null, aFavor?: boolean, conRazon = false): Renglon => ({
     id: o.id, tipo: "ORDEN", folio: o.number, workOrderId: o.id, titulo: o.title,
     activo: o.asset?.code ?? null, fecha, aporte, aFavor,
-    ...(conRazon ? { razon: falla(o).razon } : {}),
+    ...(conRazon ? { razon: falla(o as Orden).razon } : {}),
   });
 
   const horasPeriodo = (periodo.hasta.getTime() - periodo.desde.getTime()) / HORA;
@@ -320,7 +377,7 @@ export async function calcularIndicadores(
     return dia >= primerDia && dia <= ultimoDia;
   });
   let sinFechaFin = 0;
-  const juzgables: Array<{ o: Orden; aFavor: boolean }> = [];
+  const juzgables: Array<{ o: OrdenDibujable; aFavor: boolean }> = [];
   for (const o of conCompromisoEnPeriodo) {
     const e = estadoDeVencimiento(o, { zona, ahora });
     if (e.clave === "CUMPLIDA_EN_FECHA") juzgables.push({ o, aFavor: true });
@@ -394,13 +451,13 @@ export async function calcularIndicadores(
   };
 
   // ── Backlog (foto de hoy) ───────────────────────────────────────────────
-  const vencidas = abiertas.filter((o) => estadoDeVencimiento(o, { zona, ahora }).clave === "VENCIDA");
+  const vencidas = vencidasCandidatas.filter((o) => estadoDeVencimiento(o, { zona, ahora }).clave === "VENCIDA");
   const backlog: Indicador = {
-    clave: "backlog", calculo: `${abiertas.length} orden(es) abiertas, ${vencidas.length} vencida(s)`,
+    clave: "backlog", calculo: `${nAbiertas} orden(es) abiertas, ${vencidas.length} vencida(s)`,
     nombre: "Backlog",
     definicion: "Órdenes abiertas hoy. No depende del periodo: es la carga pendiente en este momento.",
     formula: "número de órdenes en estado abierto",
-    unidad: "ordenes", valor: abiertas.length, sinValor: null,
+    unidad: "ordenes", valor: nAbiertas, sinValor: null,
     alcance: {
       estadosOT: ESTADOS_ABIERTOS.join(", "),
       tiposTrabajo: "Todos",
@@ -408,7 +465,7 @@ export async function calcularIndicadores(
       fechaQueCuenta: "Estado actual, sin periodo",
     },
     notas: vencidas.length ? [`${vencidas.length} vencida(s).`] : [],
-    detalle: abiertas.map((o) => renglonOrden(o, 1, o.dueDate)), denominador: null,
+    detalle: abiertasMuestra.map((o) => renglonOrden(o, 1, o.dueDate)), denominador: null,
   };
 
   // ── Costo ───────────────────────────────────────────────────────────────
@@ -429,7 +486,7 @@ export async function calcularIndicadores(
     notas: [],
     detalle: terminadas.map((o) => renglonOrden(o, o.totalCost, o.completedAt)), denominador: null,
   };
-  const enCurso = Math.round(abiertas.reduce((s, o) => s + o.totalCost, 0));
+  const enCurso = Math.round(sumasAbiertas._sum.totalCost ?? 0);
   if (enCurso > 0) costoMantenimiento.notas.push(`Además hay $${enCurso.toLocaleString("es-MX")} cargados a órdenes todavía abiertas, que no entran hasta terminarse.`);
 
   // ── Apoyos para pantallas e IA ──────────────────────────────────────────
@@ -454,9 +511,9 @@ export async function calcularIndicadores(
       ordenesCreadas: vivas.length,
       ordenesCanceladas: creadas.length - vivas.length,
       ordenesTerminadas: terminadas.length,
-      backlog: abiertas.length,
+      backlog: nAbiertas,
       backlogVencido: vencidas.length,
-      backlogHoras: r1(abiertas.reduce((s, o) => s + (o.estimatedHours || 0), 0)),
+      backlogHoras: r1(sumasAbiertas._sum.estimatedHours ?? 0),
       activosEnServicio: nActivos,
       activosParados: activos.filter((a) => a.status === "DOWN").length,
       activosCriticos: activos.filter((a) => a.criticality === "A").length,
@@ -580,4 +637,211 @@ export async function costoYParoPorActivo(organizationId: string, periodo: { des
     })
     .sort((x, y) => y.costo - x.costo || y.paroHoras - x.paroHoras)
     .slice(0, limite);
+}
+
+/**
+ * El costo de mantenimiento agrupado como lo pide contabilidad.
+ *
+ * ── Por que existe ──
+ *
+ * El sistema calculaba bien el costo por orden, por activo y por tipo, pero
+ * los tres son ejes de mantenimiento. El centro de costo es el unico que habla
+ * el idioma con el que la empresa lleva su gasto, y sin el este numero —que es
+ * correcto— no podia entrar a una junta de presupuesto sin que alguien lo
+ * tradujera a mano en un Excel.
+ *
+ * ── Lo que no se hace ──
+ *
+ * Las ordenes SIN centro de costo no se reparten entre los demas ni se
+ * esconden: salen juntas como «Sin centro de costo». Repartirlas con una regla
+ * inventada daria un numero preciso y falso, y esconderlas haria que la suma
+ * de la tabla no cuadre con el total de la empresa —que es justo lo primero
+ * que revisa quien lleva la contabilidad—.
+ *
+ * ── De donde sale el centro ──
+ *
+ * De la ORDEN, no del activo. La orden lo copio del equipo cuando se creo, asi
+ * que refleja a quien se le cargo el gasto ENTONCES. Leerlo del activo haria
+ * que cambiar un equipo de centro reescribiera la historia.
+ */
+export async function costoPorCentroDeCosto(
+  organizationId: string,
+  periodo: { desde: Date; hasta: Date },
+) {
+  const terminadas = await prisma.workOrder.findMany({
+    where: { organizationId, status: { in: [...ESTADOS_TERMINADOS] }, completedAt: dentroDe(periodo) },
+    select: {
+      centroDeCostoId: true, totalCost: true, laborCost: true, partsCost: true, serviceCost: true, otherCost: true,
+      maintenanceType: true,
+    },
+  });
+
+  type Fila = {
+    id: string | null; code: string; name: string;
+    ordenes: number; manoDeObra: number; refacciones: number; servicios: number; otros: number; total: number;
+    preventivo: number; correctivo: number;
+  };
+  const por = new Map<string, Fila>();
+  const clave = (id: string | null) => id ?? "SIN_CENTRO";
+  for (const o of terminadas) {
+    const k = clave(o.centroDeCostoId);
+    const f = por.get(k) ?? {
+      id: o.centroDeCostoId, code: "", name: "",
+      ordenes: 0, manoDeObra: 0, refacciones: 0, servicios: 0, otros: 0, total: 0,
+      preventivo: 0, correctivo: 0,
+    };
+    f.ordenes += 1;
+    f.manoDeObra += o.laborCost;
+    f.refacciones += o.partsCost;
+    f.servicios += o.serviceCost;
+    f.otros += o.otherCost;
+    f.total += o.totalCost;
+    // Dos columnas, no una clasificación completa: lo que una junta de
+    // presupuesto pregunta es cuánto se fue en planear y cuánto en apagar
+    // incendios. El desglose fino vive en el reporte por tipo.
+    if (o.maintenanceType === "PREVENTIVE" || o.maintenanceType === "INSPECTION" || o.maintenanceType === "PREDICTIVE") {
+      f.preventivo += o.totalCost;
+    } else if (o.maintenanceType === "CORRECTIVE") {
+      f.correctivo += o.totalCost;
+    }
+    por.set(k, f);
+  }
+
+  const ids = [...por.values()].map((f) => f.id).filter((x): x is string => Boolean(x));
+  const centros = ids.length
+    ? await prisma.centroDeCosto.findMany({ where: { id: { in: ids }, organizationId }, select: { id: true, code: true, name: true } })
+    : [];
+  const nombre = new Map(centros.map((c) => [c.id, c]));
+  const filas = [...por.values()].map((f) => {
+    const c = f.id ? nombre.get(f.id) : null;
+    return { ...f, code: c?.code ?? "—", name: c?.name ?? "Sin centro de costo" };
+  });
+  // De mayor a menor gasto; lo que no tiene centro va al final aunque pese,
+  // porque no es un centro: es un pendiente de captura.
+  filas.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.total - a.total);
+  return filas;
+}
+
+// ─────────────────────────────────────────── Mezcla de mantenimiento ───
+
+/**
+ * Por donde se puede cortar la mezcla. Cerrado a proposito.
+ *
+ * No es un constructor de reportes: son las cuatro preguntas que alguien hace
+ * de verdad —que tipo de trabajo hacemos, en que familia de equipo, en que
+ * area, y a cargo de quien—. Un selector generico de «esto contra aquello»
+ * suena flexible y termina sin usarse porque hay que armarlo cada vez.
+ */
+export const EJES_DE_MEZCLA = {
+  categoria: "Tipo de equipo",
+  area: "Área",
+  centro: "Centro de costo",
+  sitio: "Sitio",
+} as const;
+export type EjeDeMezcla = keyof typeof EJES_DE_MEZCLA;
+export const esEjeDeMezcla = (v: string): v is EjeDeMezcla => v in EJES_DE_MEZCLA;
+
+/** Lo que se puede confrontar: la misma mezcla medida de tres maneras. */
+export const UNIDADES_DE_MEZCLA = {
+  ordenes: "Órdenes",
+  horas: "Horas",
+  costo: "Costo",
+} as const;
+export type UnidadDeMezcla = keyof typeof UNIDADES_DE_MEZCLA;
+export const esUnidadDeMezcla = (v: string): v is UnidadDeMezcla => v in UNIDADES_DE_MEZCLA;
+
+export type CeldaDeMezcla = { ordenes: number; horas: number; costo: number };
+export type GrupoDeMezcla = {
+  id: string | null;
+  nombre: string;
+  total: CeldaDeMezcla;
+  /** Por tipo de mantenimiento, con las claves de MAINTENANCE_TYPE_LABELS. */
+  porTipo: Record<string, CeldaDeMezcla>;
+};
+
+/**
+ * Preventivo contra correctivo contra predictivo, cortado por donde se pida.
+ *
+ * ── Que NO cuenta, y por que ──
+ *
+ * Las ordenes de APOYO quedan fuera (`TIPOS_FUERA_DE_MANTENIMIENTO`). Prestar
+ * manos a produccion o mover un equipo consume horas y cuesta dinero, pero no
+ * es trabajo sobre la salud de una maquina: mezclarlo diria que las maquinas
+ * fallan mas de lo que fallan, que es justo el error que este reporte existe
+ * para no cometer.
+ *
+ * Tampoco se «interpreta» el tipo. Se usa el que la orden tiene, tal cual. Un
+ * preventivo bien ejecutado no se reclasifica como falla aunque haya
+ * encontrado algo: eso meteria un evento que nunca ocurrio.
+ *
+ * ── Lo que no tiene grupo ──
+ *
+ * Una orden sin equipo, sin categoria o sin centro sale en «Sin asignar», no
+ * se reparte ni se esconde: repartirla daria un numero preciso y falso, y
+ * esconderla haria que la suma no cuadre con el total del periodo.
+ */
+export async function mezclaDeMantenimiento(
+  organizationId: string,
+  periodo: { desde: Date; hasta: Date },
+  eje: EjeDeMezcla,
+) {
+  const ordenes = await prisma.workOrder.findMany({
+    where: {
+      organizationId,
+      status: { in: [...ESTADOS_TERMINADOS] },
+      completedAt: dentroDe(periodo),
+      maintenanceType: { notIn: [...TIPOS_FUERA_DE_MANTENIMIENTO] },
+    },
+    select: {
+      maintenanceType: true, actualHours: true, totalCost: true,
+      asset: { select: { category: { select: { id: true, name: true } } } },
+      location: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true } },
+      centroDeCosto: { select: { id: true, code: true, name: true } },
+    },
+  });
+
+  const vacia = (): CeldaDeMezcla => ({ ordenes: 0, horas: 0, costo: 0 });
+  const grupos = new Map<string, GrupoDeMezcla>();
+
+  for (const o of ordenes) {
+    const g = eje === "categoria" ? o.asset?.category
+      : eje === "area" ? o.location
+      : eje === "centro" ? o.centroDeCosto
+      : o.site;
+    const id = g?.id ?? null;
+    const nombre = !g
+      ? "Sin asignar"
+      : "code" in g && g.code
+        ? `${g.code} · ${g.name}`
+        : g.name;
+    const k = id ?? "SIN";
+    const fila = grupos.get(k) ?? { id, nombre, total: vacia(), porTipo: {} };
+    const celda = (fila.porTipo[o.maintenanceType] ??= vacia());
+    for (const c of [fila.total, celda]) {
+      c.ordenes += 1;
+      c.horas += o.actualHours;
+      c.costo += o.totalCost;
+    }
+    grupos.set(k, fila);
+  }
+
+  const filas = [...grupos.values()];
+  // De mayor a menor, y lo sin asignar al final: no es un grupo, es un
+  // pendiente de captura.
+  filas.sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.total.ordenes - a.total.ordenes);
+
+  // Los tipos que de verdad aparecen, en el orden del catálogo: una columna
+  // vacía por cada tipo que la empresa no usa es ruido.
+  const presentes = Object.keys(MAINTENANCE_TYPE_LABELS)
+    .filter((t) => !(TIPOS_FUERA_DE_MANTENIMIENTO as readonly string[]).includes(t))
+    .filter((t) => filas.some((f) => f.porTipo[t]));
+
+  const total = filas.reduce<CeldaDeMezcla>((a, f) => ({
+    ordenes: a.ordenes + f.total.ordenes,
+    horas: a.horas + f.total.horas,
+    costo: a.costo + f.total.costo,
+  }), vacia());
+
+  return { filas, tipos: presentes, total };
 }

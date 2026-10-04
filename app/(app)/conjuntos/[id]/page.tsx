@@ -1,4 +1,5 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { Compromisos } from "@/components/compromisos";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
@@ -151,6 +152,13 @@ export default async function ConjuntoPage({ params, searchParams }: Params) {
         }))}
         editable={can(user.role, "asset:write")}
       />
+
+      {/* Un sistema lo miran varias áreas a la vez, así que aquí es
+          donde se acuerda quién hace qué: «producción confirma la
+          ventana», «eléctrico revisa el arrancador». */}
+      <div className="mt-4">
+        <Compromisos entidad="Conjunto" entidadId={conjunto.id} yo={user.id} zona={user.organization.timezone} />
+      </div>
     </div>
   );
 }

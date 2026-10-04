@@ -23,7 +23,7 @@ model Organization {
   /// Tipo de instalacion, de lib/instalaciones.ts. Alimenta los ejemplos de
   /// captura y el contexto de todos los prompts de IA.
   tipoInstalacion       String?
-  plan                  String    @default("PROFESSIONAL") // FREE | STARTER | PROFESSIONAL | ENTERPRISE
+  plan                  String    @default("PROFESSIONAL") // PROFESSIONAL | ENTERPRISE (lib/planes.ts)
   status                String    @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELLED
   trialEndsAt           DateTime?
   seats                 Int       @default(10)
@@ -43,6 +43,8 @@ model Organization {
   rcSequence            Int       @default(0)
   reSequence            Int       @default(0)
   icSequence            Int       @default(0)
+  /// Folio de los rondines (RD-000001).
+  rdSequence            Int       @default(0)
   /// Si el proceso de compras corre DENTRO de MainTrack.
   ///
   /// Apagado por omision a proposito: la mayoria de las empresas ya compra en
@@ -197,6 +199,31 @@ model Organization {
   iaComplemento      Boolean   @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
   iaExtra            Int       @default(0)
+  /// Si la empresa contrato «Registros propios»: armar sus propias tablas de
+  /// captura amarradas a sus datos. Se cobra aparte, igual que el complemento
+  /// de IA, y por eso es una bandera y no una funcion del plan: se vende a
+  /// quien la necesita sin obligarlo a subir de plan.
+  registrosPropios   Boolean   @default(false)
+  /// Si la empresa contrato «Cumplimiento normativo»: el catalogo de normas,
+  /// el semaforo y el expediente de inspeccion. Se cobra aparte igual que los
+  /// registros propios, y por la misma razon: tiene comprador propio
+  /// —seguridad e higiene suele ser otra area con otro presupuesto—.
+  ///
+  /// El codigo de formato controlado de la orden impresa NO depende de esta
+  /// bandera: le sirve a cualquier cliente certificado aunque nunca contrate
+  /// el modulo.
+  cumplimientoNormas Boolean   @default(false)
+  /// Como identifica ESTA empresa el formato impreso de la orden de trabajo
+  /// dentro de su sistema de calidad: «FOR-MTTO-012» y su revision «3».
+  ///
+  /// No es la norma, y la distincion importa: el auditor de ISO no busca que
+  /// el papel diga «ISO 9001», busca que sea el formato registrado en el
+  /// sistema documental del cliente, con su codigo y su revision. Por eso
+  /// esto lo escribe el cliente y no sale de ningun catalogo nuestro.
+  ///
+  /// Vacio: el pie no lo muestra, y la orden se imprime como siempre.
+  codigoFormatoOT    String?
+  revisionFormatoOT  String?
   /// Direccion del aviso de privacidad de la empresa, si tiene uno propio.
   /// Se enlaza desde el formulario publico del QR. Vacio: se enlaza el aviso
   /// del sistema, que explica que se hace con los datos de quien reporta.
@@ -213,72 +240,116 @@ model Organization {
   /// COMERCIAL (prueba, activa, suspendida): una empresa puede estar pagando y
   /// todavía sin configurar.
   operandoPorId      String?
+
+  /// Bloque 7. Empresa demostrativa: sin cobranza, sin cambios de plan ni
+  /// credenciales, con su recorrido y su ayuda de demostracion, y
+  /// restaurable a su estado inicial (lib/demo-comercial.ts).
+  esDemo               Boolean   @default(false)
+  /// Cuenta de uso interno del operador: una empresa que se usa para
+  /// demostrar o probar pero que NO es la demostrativa restaurable.
+  ///
+  /// Existe porque `esDemo` no es solo una etiqueta: ofrece «Restaurar», que
+  /// borra todo y vuelve a sembrar la demo estandar. Una cuenta interna con
+  /// datos propios que valen no puede quedar expuesta a eso. Con esta bandera
+  /// solo sale de las cifras del negocio (servidor MCP) y de la cobranza; la
+  /// cuenta funciona igual que cualquier otra. Se pone por linea de comandos:
+  /// scripts/cuenta-interna.ts.
+  cuentaInterna        Boolean   @default(false)
+  /// Mientras se restaura, la demo no atiende peticiones (lib/api.ts).
+  demoRestaurandoDesde DateTime?
+  demoRestauradaAt     DateTime?
+  /// Documentos aceptados al contratar (lib/legal.ts), y quien los acepto.
+  terminosVersion      String?
+  terminosAceptadosAt  DateTime?
+  terminosAceptadosPor String?
+  /// Como nacio la cuenta: REGISTRO | OPERADOR | DEMO
+  origenAlta           String?
+  spSequence           Int       @default(0)
   /// Los modulos que la empresa dijo que NO usara, en JSON: {"almacen":false}.
   /// Un paso de la puesta en marcha que la empresa no va a usar se muestra
   /// como «no aplica» y no le baja el avance. Sin decidir = se espera.
-  modulosPuesta      String    @default("{}")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  modulosPuesta        String    @default("{}")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  users             User[]
-  sites             Site[]
-  locations         Location[]
-  assetCategories   AssetCategory[]
-  assets            Asset[]
-  meters            Meter[]
-  meterReadings     MeterReading[]
-  plans             MaintenancePlan[]
-  conjuntos         Conjunto[]
-  conjuntoAssets    ConjuntoAsset[]
-  workOrders        WorkOrder[]
-  workRequests      WorkRequest[]
-  parts             Part[]
-  partCategories    PartCategory[]
-  partUnits         PartUnit[]
-  aiUsage           AiUsage[]
-  aiReports         AiReport[]
-  assetIntakes      AssetIntake[]
-  specialties       Specialty[]
-  externalServices  ExternalService[]
-  stockMovements    StockMovement[]
-  suppliers         Supplier[]
-  teams             Team[]
-  sensors           Sensor[]
-  sensorReadings    SensorReading[]
-  alerts            PredictiveAlert[]
-  failureCodes      FailureCode[]
-  rootCauses        RootCause[]
-  notifications     Notification[]
-  pushSubscriptions PushSubscription[]
-  entregasAviso     EntregaAviso[]
-  historialAvisos   HistorialAviso[]
-  configAvisos      ConfigAvisos?
-  escalamientos     Escalamiento[]
-  credencialesApi   CredencialApi[]
-  webhooks          Webhook[]
-  auditLogs         AuditLog[]
-  attachments       Attachment[]
-  links             ReferenceLink[]
-  invites           Invitation[]
-  planRequests      PlanRequest[]
-  invoices          Invoice[]
-  warehouses        Warehouse[]
-  partStocks        PartStock[]
-  stockTransfers    StockTransfer[]
-  materialRequests  MaterialRequest[]
-  purchaseRequests  PurchaseRequest[]
-  goodsReceipts     GoodsReceipt[]
-  quotes            Quote[]
-  purchaseOrders    PurchaseOrder[]
-  inventoryCounts   InventoryCount[]
-  reportPoints      ReportPoint[]
-  festivos          DiaFestivo[]
-  equivalencias     EquivalenciaRefaccion[]
-  asignacionesPlan  PlanAsset[]
-  calendariosTarea  PlanTaskAsset[]
-  revisionesAgenda  RevisionAgenda[]
-  passwordResets    PasswordReset[]
-  importBatches     ImportBatch[]
+  users              User[]
+  sites              Site[]
+  locations          Location[]
+  assetCategories    AssetCategory[]
+  assets             Asset[]
+  meters             Meter[]
+  meterReadings      MeterReading[]
+  plans              MaintenancePlan[]
+  conjuntos          Conjunto[]
+  conjuntoAssets     ConjuntoAsset[]
+  workOrders         WorkOrder[]
+  workRequests       WorkRequest[]
+  parts              Part[]
+  partCategories     PartCategory[]
+  partUnits          PartUnit[]
+  aiUsage            AiUsage[]
+  aiReports          AiReport[]
+  assetIntakes       AssetIntake[]
+  specialties        Specialty[]
+  externalServices   ExternalService[]
+  vigencias          Vigencia[]
+  centrosDeCosto     CentroDeCosto[]
+  presupuestos       Presupuesto[]
+  tablasPropias      TablaPropia[]
+  renglonesPropios   RenglonPropio[]
+  normasAdoptadas    NormaAdoptada[]
+  resguardos         Resguardo[]
+  kitsDeHerramientas KitDeHerramientas[]
+  amarresCumplimiento AmarreDeCumplimiento[]
+  favoritos          PantallaFavorita[]
+  stockMovements     StockMovement[]
+  suppliers          Supplier[]
+  teams              Team[]
+  sensors            Sensor[]
+  sensorReadings     SensorReading[]
+  alerts             PredictiveAlert[]
+  failureCodes       FailureCode[]
+  rootCauses         RootCause[]
+  notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
+  entregasAviso      EntregaAviso[]
+  historialAvisos    HistorialAviso[]
+  configAvisos       ConfigAvisos?
+  escalamientos      Escalamiento[]
+  credencialesApi    CredencialApi[]
+  webhooks           Webhook[]
+  auditLogs          AuditLog[]
+  attachments        Attachment[]
+  links              ReferenceLink[]
+  invites            Invitation[]
+  planRequests       PlanRequest[]
+  invoices           Invoice[]
+  solicitudesSoporte SolicitudSoporte[]
+  warehouses         Warehouse[]
+  partStocks         PartStock[]
+  stockTransfers     StockTransfer[]
+  materialRequests   MaterialRequest[]
+  purchaseRequests   PurchaseRequest[]
+  goodsReceipts      GoodsReceipt[]
+  quotes             Quote[]
+  purchaseOrders     PurchaseOrder[]
+  inventoryCounts    InventoryCount[]
+  reportPoints       ReportPoint[]
+  rondines           Rondin[]
+  rondinParadas      RondinParada[]
+  rondinHallazgos    RondinHallazgo[]
+  festivos           DiaFestivo[]
+  equivalencias      EquivalenciaRefaccion[]
+  asignacionesPlan   PlanAsset[]
+  calendariosTarea   PlanTaskAsset[]
+  revisionesAgenda   RevisionAgenda[]
+  passwordResets     PasswordReset[]
+  importBatches      ImportBatch[]
+  downtimeEvents     DowntimeEvent[]
+  resumenInicio      ResumenInicio?
+  comentarios        Comentario[]
+  observadores       Observador[]
+  compromisos        Compromiso[]
 }
 
 model User {
@@ -316,6 +387,19 @@ model User {
   /// configurable. Va por usuario y no por organizacion porque el almacenista
   /// y el jefe de mantenimiento no miran lo mismo.
   vistasTabla       String    @default("{}")
+  /// Con que voz quiere oir el parte del dia (lib/voz.ts). Nula = la de
+  /// omision. Va por usuario y no por empresa porque es una preferencia de
+  /// oido, como la escala de letra: al director le puede gustar una y a su
+  /// jefe de mantenimiento otra.
+  vozBrief          String?
+  /// Que tan larga quiere la respuesta HABLADA: CONCISA o COMPLETA
+  /// (lib/respuestas-voz.ts). Nula = concisa, que es la de omision.
+  ///
+  /// Solo manda sobre lo que se DICE. Lo escrito sale completo siempre: el
+  /// contexto de mas si vale —«ojo, la mitad no tiene causa raiz»— y tirarlo
+  /// seria resolver un problema creando otro. Rafael lo midio en su telefono:
+  /// preguntar «cuantos activos tenemos» y oir cincuenta segundos de informe.
+  respuestaVoz      String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -338,19 +422,34 @@ model User {
   acknowledgedAlerts   PredictiveAlert[]
   completedTasks       WorkOrderTask[]
   attachments          Attachment[]
+  vigencias            Vigencia[]              @relation("VigenciaDeUsuario")
+  vigenciasCreadas     Vigencia[]              @relation("VigenciaAutor")
+  tablasPropiasCreadas TablaPropia[]           @relation("TablaPropiaAutor")
+  renglonesPropios     RenglonPropio[]         @relation("RenglonPropioAutor")
+  normasACargo         NormaAdoptada[]         @relation("NormaResponsable")
+  resguardos           Resguardo[]             @relation("ResguardoDe")
+  resguardosEntregados Resguardo[]             @relation("ResguardoEntrego")
+  resguardosRecibidos  Resguardo[]             @relation("ResguardoRecibio")
+  obligacionesACargo   ObligacionAdoptada[]    @relation("ObligacionResponsable")
+  favoritos            PantallaFavorita[]
   links                ReferenceLink[]
   planRequests         PlanRequest[]
+  solicitudesSoporte   SolicitudSoporte[]
   aiUsage              AiUsage[]
   assetIntakes         AssetIntake[]
   warehousesACargo     Warehouse[]
   stockTransfers       StockTransfer[]
   materialRequests     MaterialRequest[]
   purchaseRequests     PurchaseRequest[]       @relation("CompraSolicitante")
+  presupuestos         Presupuesto[]           @relation("PresupuestoCapturadoPor")
+  seguridadLeida       WorkOrder[]             @relation("SeguridadLeidaPor")
   purchaseAuthorized   PurchaseRequest[]       @relation("CompraAutorizador")
   goodsReceipts        GoodsReceipt[]
   quotesCapturadas     Quote[]
   purchaseOrders       PurchaseOrder[]
   inventoryCounts      InventoryCount[]
+  rondines             Rondin[]
+  rondinHallazgos      RondinHallazgo[]
   reportPoints         ReportPoint[]
   tareasLiberadas      WorkOrderTask[]         @relation("TareaLiberadaPor")
   /// Horas disponibles al dia de esta persona. Nulo usa la jornada de la
@@ -360,6 +459,13 @@ model User {
   equivalenciasCreadas EquivalenciaRefaccion[] @relation("EquivalenciaCreadaPor")
   asignacionesCreadas  PlanAsset[]             @relation("AsignacionCreadaPor")
   conjuntosACargo      Conjunto[]              @relation("ConjuntoResponsable")
+  comentarios          Comentario[]
+  menciones            ComentarioMencion[]
+  observa              Observador[]
+  compromisos          Compromiso[]            @relation("CompromisoResponsable")
+  compromisosCreados   Compromiso[]            @relation("CompromisoAutor")
+  codigosOAuth         CodigoOAuth[]
+  tokensOAuth          TokenOAuth[]
 
   @@index([organizationId])
 }
@@ -529,6 +635,7 @@ model Site {
   requests     WorkRequest[]
   warehouses   Warehouse[]
   reportPoints ReportPoint[]
+  rondines     Rondin[]
 
   conjuntos Conjunto[]
 
@@ -577,14 +684,16 @@ model Location {
   margenPorHora Float    @default(0)
   createdAt     DateTime @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  parent       Location?     @relation("LocationTree", fields: [parentId], references: [id])
-  children     Location[]    @relation("LocationTree")
-  assets       Asset[]
-  workOrders   WorkOrder[]
-  requests     WorkRequest[]
-  reportPoints ReportPoint[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent        Location?      @relation("LocationTree", fields: [parentId], references: [id])
+  children      Location[]     @relation("LocationTree")
+  assets        Asset[]
+  workOrders    WorkOrder[]
+  requests      WorkRequest[]
+  reportPoints  ReportPoint[]
+  rondines      Rondin[]
+  rondinParadas RondinParada[]
 
   @@index([organizationId])
   @@index([siteId])
@@ -614,8 +723,23 @@ model Asset {
   siteId            String
   locationId        String?
   categoryId        String?
+  /// A que centro de costo pertenece el equipo. La orden lo hereda de aqui.
+  centroDeCostoId   String?
   parentId          String?
   code              String
+  /// Si este activo SALE Y REGRESA con un responsable: un torquimetro, un
+  /// dado de fresadora, una camara termografica, un auto de cortesia.
+  ///
+  /// La herramienta cara e individual NO necesita un padron aparte: como
+  /// activo ya tiene expediente, QR, ubicacion, costo, calibracion que vence y
+  /// —lo que importa aqui— MEDIDOR con plan por uso. Un dado no se rectifica
+  /// cada seis meses: se rectifica cada 5 000 piezas, y ese motor ya existe.
+  ///
+  /// Lo generico por cantidad —diez pinzas— vive en el catalogo del almacen
+  /// como `Part` con naturaleza HERRAMIENTA. Son dos casos distintos a
+  /// proposito: serializar diez pinzas de 200 pesos es trabajo muerto que
+  /// nadie sostiene tres meses.
+  sePresta          Boolean   @default(false)
   name              String
   description       String?
   manufacturer      String?
@@ -674,6 +798,7 @@ model Asset {
   site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
   location         Location?         @relation(fields: [locationId], references: [id])
   category         AssetCategory?    @relation(fields: [categoryId], references: [id])
+  centroDeCosto    CentroDeCosto?    @relation(fields: [centroDeCostoId], references: [id])
   parent           Asset?            @relation("AssetTree", fields: [parentId], references: [id])
   children         Asset[]           @relation("AssetTree")
   meters           Meter[]
@@ -684,32 +809,48 @@ model Asset {
   alerts           PredictiveAlert[]
   downtimes        DowntimeEvent[]
   requisiciones    MaterialRequest[]
+  rondinParadas    RondinParada[]
+  rondinHallazgos  RondinHallazgo[]
   attachments      Attachment[]
+  vigencias        Vigencia[]
   links            ReferenceLink[]
   reportPoints     ReportPoint[]
   planesAsignados  PlanAsset[]
   calendariosTarea PlanTaskAsset[]
   conjuntos        ConjuntoAsset[]
+  comentarios      Comentario[]
 
+  resguardos        Resguardo[]
+  enKits         PiezaDeKit[]
+  enTareas       PlanTaskTool[]
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
 }
 
 model DowntimeEvent {
-  id          String    @id @default(cuid())
-  assetId     String
-  workOrderId String?
-  startedAt   DateTime
-  endedAt     DateTime?
-  minutes     Int       @default(0)
-  planned     Boolean   @default(false)
-  reason      String?
+  id String @id @default(cuid())
 
-  asset     Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id])
+  /// Era el unico modelo grande sin empresa: TODAS las consultas de paro
+  /// filtraban por `asset.organizationId`, asi que para pintar el indicador
+  /// de una empresa habia que recorrer los paros de todas y unirlos con
+  /// Activos. Se llena desde el activo (ver la migracion).
+  organizationId String
+  assetId        String
+  workOrderId    String?
+  startedAt      DateTime
+  endedAt        DateTime?
+  minutes        Int       @default(0)
+  planned        Boolean   @default(false)
+  reason         String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
 
   @@index([assetId])
+  @@index([organizationId, startedAt])
+  @@index([assetId, startedAt])
 }
 
 // ---------------------------------------------------------------- Medidores ---
@@ -799,12 +940,24 @@ model MeterReading {
   correccionEl     DateTime?
   correccionMotivo String?
 
+  /// De que orden de trabajo salio, si se capturo durante un trabajo.
+  ///
+  /// Sin esto no se podia saber si el horometro lo tomo el tecnico en ESA
+  /// orden o el operador en su ronda: la ficha de la orden no podia decir si
+  /// ya se habia registrado la lectura de ese trabajo. Nulo es lo normal —la
+  /// mayoria se capturan desde Medidores— y no se borra la lectura si la
+  /// orden desaparece: el dato del medidor vale por si mismo.
+  workOrderId String?
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   meter        Meter        @relation(fields: [meterId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
 
   @@index([meterId])
   @@index([organizationId])
+  @@index([meterId, readingAt])
+  @@index([workOrderId])
 }
 
 // --------------------------------------------------- Planes de mantenimiento ---
@@ -862,6 +1015,7 @@ model MaintenancePlan {
   links        ReferenceLink[]
   asignaciones PlanAsset[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@index([organizationId])
   @@index([assetId])
 }
@@ -938,6 +1092,7 @@ model PlanTask {
   services    PlanTaskService[]
   calendarios PlanTaskAsset[]
 
+  tools            PlanTaskTool[]
   @@index([planId])
 }
 
@@ -953,6 +1108,19 @@ model WorkOrder {
   status           String    @default("OPEN") // DRAFT|OPEN|ASSIGNED|IN_PROGRESS|ON_HOLD|COMPLETED|CLOSED|CANCELLED
   priority         String    @default("MEDIUM") // LOW|MEDIUM|HIGH|CRITICAL
   assetId          String?
+  /// A que centro de costo se carga ESTE trabajo.
+  ///
+  /// Se hereda del activo al crear la orden, y se puede cambiar: hay trabajos
+  /// que no los paga el dueño del equipo —una modificacion que pide
+  /// produccion, un montaje que carga a un proyecto—. Solo con el activo el
+  /// caso se pierde; solo con la orden hay que capturarlo cada vez y nadie lo
+  /// hace.
+  ///
+  /// Se copia, no se resuelve al vuelo: si el equipo cambia de centro el año
+  /// que viene, lo ya gastado se queda donde se gasto. Recalcular el historico
+  /// cambiaria los reportes del año pasado solos, y con eso el contador deja
+  /// de confiar en el sistema.
+  centroDeCostoId  String?
   siteId           String?
   locationId       String?
   planId           String?
@@ -985,6 +1153,21 @@ model WorkOrder {
   /// Requeria paro pero al final no hubo: se confirma expresamente al
   /// completar. Distingue «no hubo paro» de «no se capturo».
   sinParoConfirmado    Boolean  @default(false)
+
+  /// Quien confirmo haber leido el procedimiento y las indicaciones de
+  /// seguridad, y cuando. No detiene nada: es un registro, y obligar a
+  /// marcarlo para iniciar invita a marcarlo sin leer, que es peor que no
+  /// tenerlo.
+  seguridadLeidaPorId String?
+  seguridadLeidaEl    DateTime?
+  /// Huella del texto que se leyo.
+  ///
+  /// Si despues alguien edita el procedimiento o las notas de seguridad, lo
+  /// confirmado ya no corresponde a lo que ahora dice la orden: la pantalla
+  /// avisa que cambio y pide confirmar de nuevo. Sin esto, bastaria confirmar
+  /// un texto y cambiarlo luego para que el registro siguiera diciendo
+  /// «leido», y un registro que no aguanta esa pregunta no sirve para nada.
+  seguridadLeidaHuella String?
   /// En una falla, por que queda sin codigo o sin causa raiz («Sin determinar»).
   motivoSinDiagnostico String?
   /// Por que esta en espera. Se limpia al reanudar; la historia queda en auditoria.
@@ -1000,6 +1183,7 @@ model WorkOrder {
 
   organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset         Asset?             @relation(fields: [assetId], references: [id])
+  centroDeCosto CentroDeCosto?     @relation(fields: [centroDeCostoId], references: [id])
   site          Site?              @relation(fields: [siteId], references: [id])
   location      Location?          @relation(fields: [locationId], references: [id])
   plan          MaintenancePlan?   @relation(fields: [planId], references: [id])
@@ -1019,12 +1203,22 @@ model WorkOrder {
   downtimes     DowntimeEvent[]
   stockMoves    StockMovement[]
   requisiciones MaterialRequest[]
+  comentarios   Comentario[]
 
+  amarresCumplimiento AmarreDeCumplimiento[]
   @@unique([organizationId, number])
   @@index([organizationId])
   @@index([status])
   @@index([assetId])
   @@index([assignedToId])
+  @@index([organizationId, status, dueDate])
+  @@index([organizationId, completedAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, maintenanceType, dueDate])
+  meterReadings    MeterReading[]
+  seguridadLeidaPor User?           @relation("SeguridadLeidaPor", fields: [seguridadLeidaPorId], references: [id])
+
+  @@index([assetId, createdAt])
 }
 
 model WorkOrderTask {
@@ -1166,6 +1360,7 @@ model WorkOrderLabor {
 
   @@index([workOrderId])
   @@index([taskId])
+  @@index([userId, workedAt])
 }
 
 model WorkOrderPart {
@@ -1244,6 +1439,332 @@ model WorkOrderComment {
   @@index([workOrderId])
 }
 
+/// La conversacion, pegada al registro del que se habla.
+///
+/// ── Por que existe ──
+///
+/// Rafael: «se dan muchas interacciones por muchos canales y la mayoria es
+/// informacion valiosa que se dispersa». El tecnico pregunta por WhatsApp si
+/// la bomba lleva sello 6205 o 6206, alguien contesta, y en veinte minutos esa
+/// respuesta no la encuentra nadie —y al mes siguiente se vuelve a preguntar—.
+///
+/// Aqui la misma pregunta queda amarrada a la orden y al activo para siempre.
+/// Ese es todo el punto: no tener chat, sino que lo que se dice viva donde
+/// vive el trabajo del que se habla.
+///
+/// ── Por que una llave por tipo y no `entidad` + `entidadId` ──
+///
+/// Es el patron de `Attachment`, y por la misma razon: con llaves de verdad el
+/// comentario se borra con su registro. Un identificador suelto deja
+/// conversaciones huerfanas de ordenes que ya no existen, y nadie las va a ir
+/// a limpiar.
+/// Quien pidio enterarse de lo que pase con un registro.
+///
+/// «Avisame lo que pase con esta orden», sin ser el responsable ni el
+/// solicitante. Hoy eso se resuelve pidiendole a alguien «me avisas», que es
+/// justo el compromiso que se queda en el aire.
+///
+/// ── Por que `entidad` + `entidadId` y no llaves de verdad ──
+///
+/// Al reves que en `Comentario`. Aqui la forma la manda `emitirAviso`, que es
+/// donde se resuelve a quien se avisa y que trabaja con esas dos cadenas para
+/// CUALQUIER tipo de registro —orden, compra, medidor, sensor—. Con llaves por
+/// tipo habria que tocar el emisor cada vez que se quiera observar algo nuevo,
+/// y observar se vuelve util justamente cuando sirve para todo.
+///
+/// El precio es que un registro borrado deja su observador colgando. No hace
+/// daño —nunca vuelve a coincidir— y se limpia al soltar la organizacion.
+model Observador {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// Como la nombra `emitirAviso`: WorkOrder, WorkRequest, PurchaseRequest...
+  entidad        String
+  entidadId      String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entidad, entidadId])
+  @@index([organizationId, entidad, entidadId])
+}
+
+/// Lo que alguien se comprometio a hacer y no cabe en una orden de trabajo.
+///
+/// ── Por que no es una orden ──
+///
+/// «Cotiza el motor con tres proveedores», «habla con seguridad por el
+/// permiso», «manda el reporte al corporativo». No tienen activo, ni falla, ni
+/// refacciones, ni cierre tecnico: meterlos como orden ensuciaria los
+/// indicadores de mantenimiento con trabajo que no lo es.
+///
+/// ── Y por que NO es una segunda lista de pendientes ──
+///
+/// Una orden de trabajo YA es una tarea con responsable, fecha y avance. Esto
+/// es a proposito lo mas chico posible —un texto, un responsable, una fecha y
+/// tres estados— y nace SIEMPRE colgado de un registro. Un compromiso suelto
+/// se pierde igual que el mensaje que venia a sustituir.
+///
+/// ── Por que `entidad` + `entidadId` y no llaves por tipo ──
+///
+/// Al reves que `Comentario`, y a peticion de Rafael: «los compromisos puedes
+/// ponerlos en mas lugares porque es donde se da el momento». Con una llave
+/// por tipo, cada lugar nuevo seria una columna y una migracion; asi es un
+/// renglon en `lib/anclas.ts` y nada mas.
+///
+/// El precio es que no hay borrado en cascada. Se paga a proposito: un
+/// compromiso es un acuerdo entre personas, y si el registro donde nacio
+/// desaparece, lo que acordaron sigue existiendo. La pantalla dice que el
+/// registro ya no esta en vez de esconder el compromiso.
+model Compromiso {
+  id             String    @id @default(cuid())
+  organizationId String
+  texto          String
+  responsableId  String?
+  creadoPorId    String?
+  /// ABIERTO | HECHO | CANCELADO
+  estado         String    @default("ABIERTO")
+  paraCuando     DateTime?
+  cerradoEl      DateTime?
+  createdAt      DateTime  @default(now())
+
+  /// De donde salio. Como la nombra `emitirAviso`: WorkOrder, Asset,
+  /// PurchaseRequest... La lista de las que valen esta en `lib/anclas.ts`.
+  entidad   String
+  entidadId String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsable  User?        @relation("CompromisoResponsable", fields: [responsableId], references: [id])
+  creadoPor    User?        @relation("CompromisoAutor", fields: [creadoPorId], references: [id])
+
+  @@index([organizationId, entidad, entidadId])
+  @@index([organizationId, estado])
+  @@index([responsableId, estado])
+}
+
+/// Un documento con fecha de vencimiento, colgado de lo que cubre.
+///
+/// ── Por que es UNO y no siete ──
+///
+/// Garantia, poliza de seguro, fianza, contrato de servicio, calibracion,
+/// permiso de operacion, licencia y certificado son el mismo objeto: un papel
+/// con vigencia, colgado de algo, que tiene que avisar antes de vencerse y
+/// aparecer en el expediente de lo que cuelga. Siete modelos habrian sido la
+/// misma estructura siete veces, con siete pantallas que se desincronizan.
+/// Lo que cambia entre ellos es el nombre y a quien se le reclama, y eso es
+/// un campo.
+///
+/// ── De que cuelga ──
+///
+/// Exactamente UNA de assetId / partId / userId / serviceId, como en
+/// `Attachment`. No es un modelo generico con entidad+entidadId porque estas
+/// se consultan al abrir un equipo y al revisar que vence este mes: hacen
+/// falta las llaves de verdad y el indice.
+model Vigencia {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// Del catalogo de `lib/vigencias-tipos.ts`: GARANTIA, POLIZA_SEGURO,
+  /// FIANZA, CONTRATO_SERVICIO, CALIBRACION, PERMISO, LICENCIA, CERTIFICADO,
+  /// OTRO. Sin enum nativo: el esquema tiene que servir en SQLite y Postgres.
+  tipo           String
+  /// Como la llama la gente: «Garantia de fabrica», «Poliza GNP 44812».
+  titulo         String
+  /// Folio del documento: numero de poliza, de contrato, de certificado.
+  folio          String?
+  desde          DateTime?
+  /// Nulo cuando no caduca. Una vigencia sin `hasta` no avisa nunca, y esta
+  /// bien: un certificado de fabrica no se renueva.
+  hasta          DateTime?
+  /// Cuantos dias antes avisar. Nulo toma el del tipo: una poliza se renueva
+  /// con mas anticipacion que una calibracion.
+  avisarDias     Int?
+  /// Que cubre y que no. Es lo que alguien necesita leer cuando llega la
+  /// falla, y por eso no es la nota: es su propio campo.
+  cubre          String?
+  /// A quien se le reclama: el proveedor, la aseguradora, el laboratorio.
+  supplierId     String?
+
+  /// De que cuelga. Exactamente uno; lo cuida `lib/vigencias.ts`.
+  assetId   String?
+  partId    String?
+  userId    String?
+  serviceId String?
+
+  /// Apagada sin borrarla: una poliza que se cancelo antes de vencer sigue
+  /// siendo historia, y borrarla dejaria sin explicacion los avisos que ya
+  /// salieron.
+  activa      Boolean   @default(true)
+  canceladaEl DateTime?
+  nota        String?
+  creadoPorId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
+  asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  part         Part?            @relation(fields: [partId], references: [id], onDelete: Cascade)
+  user         User?            @relation("VigenciaDeUsuario", fields: [userId], references: [id], onDelete: Cascade)
+  service      ExternalService? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  creadoPor    User?            @relation("VigenciaAutor", fields: [creadoPorId], references: [id])
+
+  amarresCumplimiento AmarreDeCumplimiento[]
+  @@index([organizationId, tipo])
+  @@index([organizationId, hasta])
+  @@index([assetId])
+  @@index([supplierId])
+}
+
+/// El eje CONTABLE de la operacion, que es el que mantenimiento no tenia.
+///
+/// Un activo se agrupa por sitio, ubicacion y categoria: donde esta y que es.
+/// Ninguno de los tres es el idioma con el que la empresa lleva su
+/// contabilidad, y por eso el costo de mantenimiento —que el sistema calcula
+/// bien— no podia entrar a una junta de presupuesto sin que alguien lo
+/// tradujera a mano en un Excel.
+///
+/// No se inventa aqui: se importa del ERP del cliente, como los demas
+/// catalogos. Un catalogo de centros de costo cambia dos veces al año, asi que
+/// un archivo al año es la solucion correcta y no una limitacion.
+model CentroDeCosto {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// La clave tal como la usa su contabilidad. Es la llave para conciliar.
+  code           String
+  name           String
+  descripcion    String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets       Asset[]
+  workOrders   WorkOrder[]
+  presupuestos Presupuesto[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+/// Cuanto se puede gastar en un centro de costo, mes por mes.
+///
+/// Mensual y no anual: de los meses sale el trimestre y el año sumando, y al
+/// reves no —repartir un anual entre doce miente en cuanto hay un paro
+/// programado o una temporada alta—.
+///
+/// Un solo monto, sin desglosar en mano de obra, refacciones y servicios: el
+/// gasto real SI se muestra desglosado, asi que se ve en que se fue sin
+/// obligar a presupuestarlo por separado y a mantener cuatro cifras al dia.
+model Presupuesto {
+  id              String   @id @default(cuid())
+  organizationId  String
+  centroDeCostoId String
+  /// Separados y no una fecha: se consulta «todo 2026» sin recortar cadenas.
+  anio            Int
+  mes             Int
+  monto           Float    @default(0)
+  nota            String?
+  /// Quien lo dejo en este valor. El historial completo vive en la bitacora.
+  capturadoPorId  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  centroDeCosto CentroDeCosto @relation(fields: [centroDeCostoId], references: [id], onDelete: Cascade)
+  capturadoPor  User?         @relation("PresupuestoCapturadoPor", fields: [capturadoPorId], references: [id])
+
+  @@unique([centroDeCostoId, anio, mes])
+  @@index([organizationId, anio])
+}
+
+/// Las pantallas que alguien quiere a la mano, arriba de su menu.
+///
+/// ── Por que personales y no de la empresa ──
+///
+/// El menu llego a 33 pantallas, y cada quien usa una cuarta parte. Pero no la
+/// MISMA cuarta parte: el almacenista vive en existencias y requisiciones, y el
+/// director en indicadores y reportes. Un menu que el administrador configura
+/// para todos no resuelve ni la mitad del problema, porque no hay un acomodo
+/// que le sirva a los dos.
+///
+/// ── Por que en la base y no en el navegador ──
+///
+/// Un favorito tiene que seguir a la persona del telefono de piso a la
+/// computadora de la oficina. `localStorage` se queda en el aparato, y ahi
+/// dejaria de ser suyo para ser de esa maquina.
+///
+/// ── Lo que NO se guarda aqui ──
+///
+/// El nombre ni el grupo. La ruta apunta a `lib/pantallas.ts`, que sigue
+/// mandando en como se llaman las cosas: asi el soporte, la ayuda y los
+/// comandos de voz hablan del mismo sistema que la persona ve en pantalla.
+model PantallaFavorita {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// La ruta, tal como la registra `lib/pantallas.ts`.
+  ruta           String
+  /// En que orden las quiere. Se reacomoda al mover una.
+  posicion       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ruta])
+  @@index([userId, posicion])
+}
+
+model Comentario {
+  id             String    @id @default(cuid())
+  organizationId String
+  autorId        String?
+  texto          String
+  /// Un comentario borrado se marca, no se quita: una conversacion con huecos
+  /// no se entiende, y el hueco tapa justo lo que alguien quiso tapar.
+  eliminadoEl    DateTime?
+  editadoEl      DateTime?
+  createdAt      DateTime  @default(now())
+
+  workOrderId       String?
+  assetId           String?
+  workRequestId     String?
+  materialRequestId String?
+
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  autor           User?               @relation(fields: [autorId], references: [id])
+  workOrder       WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  asset           Asset?              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workRequest     WorkRequest?        @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
+  materialRequest MaterialRequest?    @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+  menciones       ComentarioMencion[]
+
+  @@index([organizationId])
+  @@index([workOrderId])
+  @@index([assetId])
+  @@index([workRequestId])
+  @@index([materialRequestId])
+}
+
+/// A quien se nombro en un comentario.
+///
+/// Se guarda en vez de sacarse del texto al momento de leerlo. Buscar «@Ana»
+/// dentro de la cadena funciona hasta que hay dos Anas, o alguien se llama
+/// «Ana Maria», o se cambia un nombre en Usuarios. Ademas hace falta para
+/// contestar «que menciones tengo» sin leer todos los comentarios del sistema.
+model ComentarioMencion {
+  id           String @id @default(cuid())
+  comentarioId String
+  userId       String
+
+  comentario Comentario @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([comentarioId, userId])
+  @@index([userId])
+}
+
 model Attachment {
   id             String   @id @default(cuid())
   organizationId String
@@ -1252,6 +1773,9 @@ model Attachment {
   workRequestId  String?
   partId         String?
   assetIntakeId  String?
+  rondinParadaId String?
+  /// El documento de una norma: el PDF del DOF, la guia, el manual.
+  normaId        String?
   uploadedById   String?
   name           String
   /// Ruta dentro del almacen (no una URL): el enlace de descarga se firma al
@@ -1262,15 +1786,23 @@ model Attachment {
   kind           String   @default("DOCUMENT")
   size           Int      @default(0)
   note           String?
+  /// Lo localizo la asistencia con IA, no una persona.
+  ///
+  /// No es un dato interno: la pantalla lo dice, porque el modelo puede traer
+  /// una version derogada de una norma con la misma seguridad con que trae la
+  /// vigente. A quien lo usa le toca confirmar que sea la que manda.
+  origenIa       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  workRequest  WorkRequest? @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
-  part         Part?        @relation(fields: [partId], references: [id], onDelete: Cascade)
-  assetIntake  AssetIntake? @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
-  uploadedBy   User?        @relation(fields: [uploadedById], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder?    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  asset        Asset?        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  workRequest  WorkRequest?  @relation(fields: [workRequestId], references: [id], onDelete: Cascade)
+  part         Part?         @relation(fields: [partId], references: [id], onDelete: Cascade)
+  rondinParada RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: Cascade)
+  norma        NormaAdoptada? @relation(fields: [normaId], references: [id], onDelete: Cascade)
+  assetIntake  AssetIntake?  @relation(fields: [assetIntakeId], references: [id], onDelete: Cascade)
+  uploadedBy   User?         @relation(fields: [uploadedById], references: [id])
 
   @@index([organizationId])
   @@index([workOrderId])
@@ -1278,6 +1810,7 @@ model Attachment {
   @@index([workRequestId])
   @@index([partId])
   @@index([assetIntakeId])
+  @@index([normaId])
 }
 
 // ------------------------------------------------------------------ Solicitudes ---
@@ -1340,19 +1873,23 @@ model WorkRequest {
   createdAt     DateTime  @default(now())
   reviewedAt    DateTime?
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  asset        Asset?          @relation(fields: [assetId], references: [id])
-  site         Site?           @relation(fields: [siteId], references: [id])
-  location     Location?       @relation(fields: [locationId], references: [id])
-  requestedBy  User?           @relation("RequestAuthor", fields: [requestedById], references: [id])
-  reportPoint  ReportPoint?    @relation(fields: [reportPointId], references: [id])
-  attachments  Attachment[]
-  reviewedBy   User?           @relation("RequestReviewer", fields: [reviewedById], references: [id])
-  workOrder    WorkOrder?      @relation(fields: [workOrderId], references: [id])
-  actividades  WorkOrderTask[] @relation("SolicitudAtendida")
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset           Asset?           @relation(fields: [assetId], references: [id])
+  site            Site?            @relation(fields: [siteId], references: [id])
+  location        Location?        @relation(fields: [locationId], references: [id])
+  requestedBy     User?            @relation("RequestAuthor", fields: [requestedById], references: [id])
+  reportPoint     ReportPoint?     @relation(fields: [reportPointId], references: [id])
+  rondinHallazgos RondinHallazgo[]
+  attachments     Attachment[]
+  reviewedBy      User?            @relation("RequestReviewer", fields: [reviewedById], references: [id])
+  workOrder       WorkOrder?       @relation(fields: [workOrderId], references: [id])
+  actividades     WorkOrderTask[]  @relation("SolicitudAtendida")
+  comentarios     Comentario[]
 
   @@unique([organizationId, number])
   @@index([organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, tipo])
 }
 
 // -------------------------------------------------------------------- Almacen ---
@@ -1377,6 +1914,7 @@ model Supplier {
   parts             Part[]
   services          ExternalService[]
   compras           PurchaseRequest[]
+  vigencias         Vigencia[]
   recepciones       GoodsReceipt[]
   cotizaciones      Quote[]
   ordenes           PurchaseOrder[]
@@ -1394,6 +1932,15 @@ model Part {
   description    String?
   category       String?
   unit           String   @default("pza")
+  /// REFACCION (se consume) o HERRAMIENTA (sale y regresa). De
+  /// `lib/herramientas-tipos.ts`.
+  ///
+  /// Es una naturaleza del MISMO catalogo y no un padron aparte: una
+  /// herramienta se compra igual que una refaccion —requisicion, autorizacion,
+  /// orden de compra, recepcion, proveedor, costo— y todo eso ya existe. Un
+  /// catalogo separado seria duplicar lo caro para no compartir lo barato, y
+  /// ademas dos padrones que se desincronizan.
+  naturaleza     String   @default("REFACCION")
   unitCost       Float    @default(0)
   /// Suma de la existencia en todos los almacenes.
   ///
@@ -1426,11 +1973,15 @@ model Part {
   planTaskParts    PlanTaskPart[]
   usedIn           WorkOrderPart[]
   attachments      Attachment[]
+  vigencias        Vigencia[]
   links            ReferenceLink[]
   tareasBloqueadas WorkOrderTask[]
   equivalenciasA   EquivalenciaRefaccion[] @relation("EquivalenciaA")
   equivalenciasB   EquivalenciaRefaccion[] @relation("EquivalenciaB")
 
+  resguardos     Resguardo[]
+  enKits         PiezaDeKit[]
+  enTareas       PlanTaskTool[]
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -1452,6 +2003,16 @@ model StockMovement {
   /// pasa por el material— y por eso no basta con el solicitante de la
   /// requisicion. Es texto libre porque el que recoge no siempre es usuario.
   entregadoA        String?
+  /// Por que entro o se ajusto, del catalogo de `lib/motivos-movimiento.ts`.
+  ///
+  /// Va aparte de `reference` porque con texto libre no se puede agrupar, y la
+  /// pregunta que hay que poder contestar es «cuanto material entro sin venir
+  /// de una compra, y por que». `reference` sigue guardando el detalle que
+  /// ningun catalogo captura —cual proyecto, cual obra—.
+  ///
+  /// Opcional porque los movimientos anteriores a esto no lo tienen, y porque
+  /// las salidas y los traspasos no lo piden: ya traen su documento.
+  motivo            String?
   /// IN | OUT | ADJUST | RETURN | TRANSFER_IN | TRANSFER_OUT
   ///
   /// RETURN es la devolucion de lo que el tecnico pidio y no uso. Se separa de
@@ -1476,6 +2037,8 @@ model StockMovement {
   @@index([organizationId])
   @@index([partId])
   @@index([warehouseId])
+  @@index([organizationId, createdAt])
+  @@index([partId, createdAt])
 }
 
 /// Un almacen fisico. La mayoria de las empresas tiene uno general y varios
@@ -1490,6 +2053,13 @@ model Warehouse {
   /// El que recibe la existencia al migrar y el destino por omision de una
   /// compra. Solo uno por organizacion.
   esGeneral      Boolean  @default(false)
+  /// Si la herramienta se toma sin pasar por el almacenista.
+  ///
+  /// Va por ALMACEN y no por empresa porque la misma planta suele tener los
+  /// dos: el general con ventanilla, y el carrito de dados junto al torno
+  /// donde nadie va a pedir permiso para tomar uno. El dato que se guarda es
+  /// el mismo en ambos casos; lo que cambia es quien lo teclea.
+  autoservicio   Boolean  @default(false)
   active         Boolean  @default(true)
   notas          String?
   createdAt      DateTime @default(now())
@@ -1508,6 +2078,7 @@ model Warehouse {
   ordenes       PurchaseOrder[]
   conteos       InventoryCount[]
 
+  resguardos     Resguardo[]
   @@unique([organizationId, code])
   @@index([organizationId])
 }
@@ -1519,6 +2090,17 @@ model PartStock {
   partId         String
   warehouseId    String
   quantity       Float    @default(0)
+  /// Cuanto de este articulo esta PRESTADO y todavia no vuelve.
+  ///
+  /// Prestar NO baja `quantity`, y esa es la decision que sostiene el modulo:
+  /// `quantity` es lo que la empresa POSEE, y prestar mueve posesion, no
+  /// valor. Si el prestamo tocara la existencia tendria que pasar por
+  /// `aplicarMovimiento()` —el unico punto que mueve stock— y entonces cada
+  /// devolucion entraria al kardex como si fuera una compra, ensuciando el
+  /// costo promedio.
+  ///
+  /// Lo disponible para prestar es `quantity - enResguardo`.
+  enResguardo    Float    @default(0)
   /// Nulo significa heredar el de la refaccion. El almacen general y el de
   /// linea rara vez tienen el mismo minimo.
   minQuantity    Float?
@@ -1625,6 +2207,11 @@ model GoodsReceipt {
   remision          String?
   ordenCompra       String?
   recibidoPorId     String?
+  /// Cuando no hay persona detras: el nombre de la integracion que la
+  /// registro. Una recepcion que mando el ERP sin esto se veria sin quien
+  /// la recibio, y eso es peor que decir de donde vino. Mismo criterio que
+  /// WorkRequest.reporterNombre.
+  recibidoPorNombre String?
   nota              String?
   createdAt         DateTime @default(now())
 
@@ -1838,12 +2425,13 @@ model ReportPoint {
   createdById    String?
   createdAt      DateTime @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  site         Site?         @relation(fields: [siteId], references: [id])
-  location     Location?     @relation(fields: [locationId], references: [id])
-  asset        Asset?        @relation(fields: [assetId], references: [id])
-  createdBy    User?         @relation(fields: [createdById], references: [id])
-  solicitudes  WorkRequest[]
+  rondinParadas RondinParada[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site          Site?          @relation(fields: [siteId], references: [id])
+  location      Location?      @relation(fields: [locationId], references: [id])
+  asset         Asset?         @relation(fields: [assetId], references: [id])
+  createdBy     User?          @relation(fields: [createdById], references: [id])
+  solicitudes   WorkRequest[]
 
   @@index([organizationId])
 }
@@ -1904,6 +2492,7 @@ model MaterialRequest {
   renglones    MaterialRequestLine[]
   movements    StockMovement[]
   compras      PurchaseRequest[]
+  comentarios  Comentario[]
 
   @@unique([organizationId, folio])
   @@index([organizationId])
@@ -1965,22 +2554,31 @@ model ReferenceLink {
   assetId        String?
   partId         String?
   planId         String?
+  normaId        String?
   createdById    String?
   title          String
   url            String
   note           String?
+  /// Lo localizo la asistencia con IA, no una persona.
+  ///
+  /// No es un dato interno: la pantalla lo dice, porque el modelo puede traer
+  /// una version derogada de una norma con la misma seguridad con que trae la
+  /// vigente. A quien lo usa le toca confirmar que sea la que manda.
+  origenIa       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset?           @relation(fields: [assetId], references: [id], onDelete: Cascade)
   part         Part?            @relation(fields: [partId], references: [id], onDelete: Cascade)
   plan         MaintenancePlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  norma        NormaAdoptada?   @relation(fields: [normaId], references: [id], onDelete: Cascade)
   createdBy    User?            @relation(fields: [createdById], references: [id])
 
   @@index([organizationId])
   @@index([assetId])
   @@index([partId])
   @@index([planId])
+  @@index([normaId])
 }
 
 // -------------------------------------------- Especialidades y servicios
@@ -2023,6 +2621,7 @@ model ExternalService {
   supplier     Supplier?          @relation(fields: [supplierId], references: [id])
   planServices PlanTaskService[]
   workOrders   WorkOrderService[]
+  vigencias    Vigencia[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -2145,6 +2744,7 @@ model SensorReading {
 
   @@index([sensorId])
   @@index([organizationId])
+  @@index([sensorId, readingAt])
 }
 
 model PredictiveAlert {
@@ -2415,6 +3015,81 @@ model PlanRequest {
   @@index([status])
 }
 
+// ------------------------------------------------ Comercial (Bloque 7)
+
+/// Quien pidio una demostracion o quiso contratar desde el sitio.
+///
+/// Es de la plataforma, no de una empresa cliente: no lleva organizationId de
+/// dueño y solo lo ve el operador. No es un CRM: registra lo minimo para dar
+/// seguimiento y saber por que se gana o se pierde.
+model Prospecto {
+  id              String    @id @default(cuid())
+  /// DEMO | CONTRATACION
+  tipo            String    @default("DEMO")
+  nombre          String
+  empresa         String
+  correo          String
+  telefono        String?
+  tipoInstalacion String?
+  /// "1-50" | "51-200" | "201-1000" | "1000+"
+  rangoActivos    String?
+  problema        String?
+  planInteres     String?
+  /// De donde llego: SITIO | CONTRATAR | la fuente que traiga la liga (?origen=)
+  origen          String    @default("SITIO")
+  /// NUEVA | CONTACTADA | DEMO_AGENDADA | DEMO_REALIZADA | PROPUESTA | GANADA | PERDIDA | DESCARTADA
+  estado          String    @default("NUEVA")
+  demoRealizadaAt DateTime?
+  resultado       String?
+  motivoPerdida   String?
+  notas           String?
+  /// Version del aviso de privacidad que acepto.
+  avisoPrivacidad String
+  /// Tipo + correo normalizado + dia: la misma persona dos veces el mismo dia es un duplicado.
+  huella          String    @unique
+  /// La empresa que se creo, si contrato.
+  organizationId  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([estado])
+  @@index([createdAt])
+}
+
+/// Una solicitud de ayuda al equipo de MainTrack, hecha desde el producto.
+///
+/// Es el unico canal de soporte (Bloque 7): no se publican correos ni
+/// telefonos. El folio es por empresa (spSequence).
+model SolicitudSoporte {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  folio              String
+  userId             String?
+  asunto             String
+  descripcion        String
+  /// CRITICA | ALTA | MEDIA | BAJA (lib/soporte.ts)
+  severidad          String    @default("MEDIA")
+  /// Pantalla desde donde se pidio.
+  pantalla           String?
+  /// Datos tecnicos que la persona acepto adjuntar (JSON): navegador, pantalla, hora.
+  datosTecnicos      String?
+  /// RECIBIDA | EN_REVISION | ESPERANDO_CLIENTE | RESUELTA | CERRADA
+  estado             String    @default("RECIBIDA")
+  respuesta          String?
+  primeraRespuestaAt DateTime?
+  respondidaPorId    String?
+  cerradaAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, folio])
+  @@index([organizationId])
+  @@index([estado])
+}
+
 // -------------------------------------------------------------------- Soporte ---
 
 /// Por que fallo, no que fallo. El codigo de falla describe el sintoma
@@ -2495,14 +3170,15 @@ model Notification {
   /// y canales. Es lo que se manda como identificador en los webhooks.
   eventoId       String?
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   entregas     EntregaAviso[]
   historial    HistorialAviso[]
 
   @@unique([userId, claveDedup])
   @@index([userId])
   @@index([organizationId, entidad, entidadId])
+  @@index([userId, atendidaEl, createdAt])
 }
 
 /// Cada vez que un aviso cambia de pendiente a atendido, o vuelve a abrirse.
@@ -2848,6 +3524,7 @@ model AuditLog {
 
   @@index([organizationId])
   @@index([entity, entityId])
+  @@index([organizationId, createdAt])
 }
 
 /// Dias que no se trabajan.
@@ -3103,4 +3780,738 @@ model ConjuntoAsset {
   @@unique([conjuntoId, assetId])
   @@index([organizationId])
   @@index([assetId])
+}
+
+/// Candado y ultima corrida de cada proceso programado.
+///
+/// Nacio de un hallazgo del Bloque 8: los cron no tenian candado, y dos
+/// corridas solapadas del programador —el reintento de Cloud Scheduler, o el
+/// boton manual mientras corre el cron— generaban DOS ordenes preventivas
+/// identicas para el mismo plan y equipo. La decision se tomaba contra una
+/// foto en memoria leida al inicio del barrido y se escribia mucho despues.
+///
+/// Sirve para dos cosas a la vez, y por eso vive en una sola tabla: tomar el
+/// candado (`corriendoDesde` + `expiraEl`, con escritura condicional) y saber
+/// cuando corrio por ultima vez, si termino bien y cuantas veces seguidas ha
+/// fallado. Sin esto, un proceso que deja de correr es indistinguible de uno
+/// que corre sin novedad: los dos callan.
+///
+/// No lleva relacion con Organization a proposito: es una tabla de la
+/// plataforma, no de un inquilino, y una empresa borrada no debe llevarse el
+/// historial de operacion por delante.
+model ProcesoProgramado {
+  /// "avisos", "diagnostico" o "scheduler:<organizationId>".
+  clave          String  @id
+  /// Presente solo en los procesos que corren por empresa.
+  organizationId String?
+
+  corriendoDesde DateTime?
+  /// Hasta cuando vale el candado. Un proceso muerto no bloquea para siempre.
+  expiraEl       DateTime?
+
+  ultimoInicio   DateTime?
+  ultimoFin      DateTime?
+  ultimoOk       Boolean?
+  ultimoResumen  String?
+  ultimoError    String?
+  fallasSeguidas Int       @default(0)
+  corridas       Int       @default(0)
+
+  @@index([ultimoFin])
+  @@index([organizationId])
+}
+
+/// Lo caro del inicio, ya calculado.
+///
+/// El inicio de dirección y el de administración tardaban segundos con un año
+/// de operación, y midiendo pieza por pieza resultó que el 98 % del costo eran
+/// solo dos: los indicadores del periodo y la revisión de calidad de datos.
+/// Las demás —vencidas, críticas, agotadas, compras por firmar— son conteos y
+/// cuestan milisegundos.
+///
+/// Esas dos, además, son las que NO se mueven: son ventanas de 30 y 90 días.
+/// Cerrar una orden mueve el cumplimiento menos de medio punto. Por eso se
+/// calculan cada cuarto de hora y no en cada carga, y por eso lo dinámico
+/// sigue consultándose en vivo: no hace falta congelarlo, ya es gratis.
+///
+/// Se guarda lo que el inicio DIBUJA —tres cifras y las reglas de captura
+/// incumplidas—, no el resultado completo, que trae miles de renglones de
+/// detalle que esa pantalla nunca muestra.
+model ResumenInicio {
+  organizationId String   @id
+  calculadoEl    DateTime
+  /// JSON: cumplimiento, disponibilidad, costo del periodo y reglas incumplidas.
+  datos          String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------------------ Rondin ---
+
+/// Un recorrido por la planta: el rondin del supervisor, con sus paradas.
+///
+/// Lo que hoy se pierde en el pasillo. Quien recorre ve cosas —un charco, una
+/// guarda floja, un ruido— y eso se queda en su cabeza o en una libreta que
+/// nadie vuelve a leer. Aqui queda con su foto, su lugar y su fecha.
+///
+/// El valor no esta en un recorrido: esta en el SIGUIENTE. Dos rondines del
+/// mismo punto separados por un mes contestan la pregunta que nadie puede
+/// contestar hoy: si aquella mancha crecio.
+model Rondin {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// RD-000001. Por empresa, como todos los folios del sistema.
+  numero         String
+  siteId         String?
+  /// El area que se declaro al empezar: «voy a recorrer la linea 2».
+  ///
+  /// No es adorno: es la segunda mejor forma de saber de que equipo se esta
+  /// hablando cuando no hay codigo QR. Acota el universo de cuatrocientos
+  /// equipos a doce, y con eso casi todo lo demas se resuelve solo.
+  locationId     String?
+  /// EN_CURSO | TERMINADO | CANCELADO. Sin enum nativo: el esquema es portable.
+  estado         String    @default("EN_CURSO")
+  iniciadoPorId  String?
+  iniciadoEn     DateTime  @default(now())
+  terminadoEn    DateTime?
+  /// Lo que se dijo del recorrido completo, no de una parada.
+  nota           String?
+  /// Cuando se revisaron las fotos con IA. Nulo: todavia no se han revisado.
+  ///
+  /// Se guarda para no volver a pagar el analisis cada vez que alguien abre
+  /// el recorrido, y para poder decir en pantalla si lo que se ve ya paso por
+  /// ahi o no.
+  analizadoEn    DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  site         Site?            @relation(fields: [siteId], references: [id])
+  location     Location?        @relation(fields: [locationId], references: [id])
+  iniciadoPor  User?            @relation(fields: [iniciadoPorId], references: [id])
+  paradas      RondinParada[]
+  hallazgos    RondinHallazgo[]
+
+  amarresCumplimiento AmarreDeCumplimiento[]
+  @@unique([organizationId, numero])
+  @@index([organizationId])
+  @@index([organizationId, estado])
+}
+
+/// Cada parada del recorrido: un lugar, lo que se vio y lo que se dijo.
+model RondinParada {
+  id             String @id @default(cuid())
+  organizationId String
+  rondinId       String
+  /// En que orden se hizo. La ruta del recorrido anterior ayuda a identificar
+  /// las paradas del siguiente cuando no hay codigo.
+  orden          Int    @default(0)
+
+  reportPointId String?
+  assetId       String?
+  locationId    String?
+
+  /// Como se supo de que equipo o punto se trata.
+  ///
+  /// QR | PLACA | DICHO | ELEGIDO | AREA | NINGUNO, de mas a menos confiable.
+  /// Se guarda para poder MEDIR despues cuanto se depende de que alguien
+  /// concilie a mano: si resulta que casi todo llega como ELEGIDO, es que
+  /// faltan codigos pegados, y eso es una conversacion con el cliente, no un
+  /// defecto del sistema.
+  comoSeIdentifico String @default("NINGUNO")
+
+  /// Lo que se dicto en la parada. De aqui sale casi todo el valor: la imagen
+  /// dice como se ve, la voz dice que le preocupa a quien lo vio.
+  observacion String?
+  createdAt   DateTime @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rondin       Rondin           @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  reportPoint  ReportPoint?     @relation(fields: [reportPointId], references: [id])
+  asset        Asset?           @relation(fields: [assetId], references: [id])
+  location     Location?        @relation(fields: [locationId], references: [id])
+  adjuntos     Attachment[]
+  hallazgos    RondinHallazgo[]
+
+  @@index([organizationId])
+  @@index([rondinId])
+  @@index([organizationId, assetId])
+}
+
+/// Lo que la IA vio en las fotos de un rondin, para que una persona decida.
+///
+/// ── Por que se guardan como propuesta y no como trabajo ──
+///
+/// El modo de fallar de esto es afirmar una fuga donde hay una mancha vieja.
+/// Si de ahi salieran ordenes solas, el sistema se llenaria de trabajo que no
+/// existe, la gente dejaria de creerle, y entonces tampoco atenderia lo que si
+/// es real. Por eso un hallazgo nace PROPUESTO y alguien lo acepta o lo
+/// descarta; aceptarlo levanta una solicitud, que es el camino que ya existe
+/// para lo que hay que atender.
+///
+/// ── Por que se guarda en que se baso ──
+///
+/// `baseVisual` es lo que el modelo dice que VE —«un charco oscuro bajo la
+/// brida»— separado de lo que concluye. Quien revisa puede mirar la foto y
+/// juzgar si eso esta ahi, que es la unica forma de que una persona pueda
+/// contradecir a la maquina con fundamento en vez de por corazonada.
+model RondinHallazgo {
+  id             String  @id @default(cuid())
+  organizationId String
+  rondinId       String
+  /// De que parada salio. Nulo si el modelo no pudo atribuirlo a ninguna.
+  rondinParadaId String?
+  /// El equipo, heredado de la parada. La IA NO lo decide.
+  assetId        String?
+
+  /// FUGA | SEGURIDAD | ORDEN | DETERIORO | OBSTRUCCION | OTRO
+  categoria  String  @default("OTRO")
+  titulo     String
+  detalle    String?
+  /// En que se basa, mirando la foto. Se separa de la conclusion a proposito.
+  baseVisual String?
+  /// SEGURO | PROBABLE | DUDOSO. Lo dudoso se enseña, pero se ve distinto.
+  certeza    String  @default("DUDOSO")
+
+  /// PROPUESTO | ACEPTADO | DESCARTADO
+  estado        String    @default("PROPUESTO")
+  /// La solicitud que se levanto al aceptarlo.
+  workRequestId String?
+  resueltoPorId String?
+  resueltoEn    DateTime?
+  createdAt     DateTime  @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rondin       Rondin        @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  parada       RondinParada? @relation(fields: [rondinParadaId], references: [id], onDelete: SetNull)
+  asset        Asset?        @relation(fields: [assetId], references: [id])
+  workRequest  WorkRequest?  @relation(fields: [workRequestId], references: [id])
+  resueltoPor  User?         @relation(fields: [resueltoPorId], references: [id])
+
+  @@index([organizationId])
+  @@index([rondinId])
+  @@index([organizationId, estado])
+}
+
+/// ─────────────────────────────────────── Registros propios
+///
+/// Lo que cada empresa lleva en Excel porque ni su ERP ni el CMMS lo tienen:
+/// la bitacora del diesel, la entrega de equipo de proteccion, el analisis del
+/// agua de la torre. No es mantenimiento —si lo fuera seria un modulo— pero se
+/// consulta junto al equipo y hoy vive en el archivo de una sola persona.
+///
+/// Las dos decisiones que sostienen esto, y por que:
+///
+/// 1. Los valores NO se guardan como JSON en el renglon, sino en columnas
+///    tipadas (`ValorPropio`). Un JSON se ve mas simple y convierte cualquier
+///    suma o filtro en un recorrido en memoria: con columnas tipadas la base
+///    ordena, filtra y suma como en cualquier otra tabla del sistema.
+///
+/// 2. La referencia a los datos de MainTrack es un `refId` de texto y NO ocho
+///    llaves foraneas. Con ocho FK habria integridad de base, pero tambien
+///    ocho columnas nulas por valor y una relacion inversa en ocho modelos, y
+///    la superficie no la paga el beneficio: los catalogos de este sistema no
+///    se borran, se desactivan (`Asset.active`). El costo real es que un id
+///    puede quedar huerfano si alguien borra de verdad, y por eso la pantalla
+///    NO muestra un guion en ese caso: dice «ya no existe». Un dato que
+///    desaparece sin decirlo es el defecto que mas caro ha salido aqui.
+model TablaPropia {
+  id             String  @id @default(cuid())
+  organizationId String
+  /// Para la direccion: /registros/bitacora-de-diesel. Unica por empresa.
+  clave          String
+  nombre         String
+  /// Para que es esta tabla, en una linea. OBLIGATORIA, y no es cortesia: es
+  /// lo que lee la ayuda y lo que lee la IA para poder contestar sobre ella.
+  /// Una tabla llamada «Control 2» sin descripcion es ilegible para el sistema
+  /// y para el companero que entra el año que viene.
+  descripcion    String
+  icono          String?
+  /// Permiso de `lib/rbac.ts` que se necesita para CAPTURAR aqui. Se elige de
+  /// los que ya existen: inventar un permiso por tabla habria obligado a
+  /// mantener una matriz de permisos que nadie revisa, y habria roto la
+  /// garantia de que VIEWER es de solo lectura por construccion.
+  permiso        String  @default("workorder:execute")
+  /// Roles que la VEN, separados por coma. Texto y no arreglo, porque el
+  /// esquema corre en SQLite y en PostgreSQL con el mismo archivo.
+  rolesVer       String  @default("OWNER,ADMIN,SUPERVISOR,TECHNICIAN,VIEWER")
+  /// De que plantilla de `lib/registros-plantillas.ts` nacio, si nacio de una.
+  plantilla      String?
+  /// Consecutivo de los renglones de ESTA tabla. Por tabla y no global: el
+  /// renglon 14 de la bitacora de diesel no tiene nada que ver con el 14 del
+  /// analisis de agua.
+  consecutivo    Int     @default(0)
+  /// Apagada sin borrarla: lo capturado sigue siendo historia de la planta.
+  activa         Boolean @default(true)
+  orden          Int     @default(0)
+  creadoPorId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creadoPor    User?           @relation("TablaPropiaAutor", fields: [creadoPorId], references: [id])
+  campos       CampoPropio[]
+  renglones    RenglonPropio[]
+
+  amarresCumplimiento AmarreDeCumplimiento[]
+  @@unique([organizationId, clave])
+  @@index([organizationId, activa])
+}
+
+/// Una columna de una tabla propia.
+model CampoPropio {
+  id      String @id @default(cuid())
+  tablaId String
+  /// La clave interna del campo. Se fija al crearlo y NO cambia al renombrar
+  /// la etiqueta: si saliera de la etiqueta cada vez, renombrar «Litros» a
+  /// «Litros cargados» dejaria huerfanos todos los valores ya capturados y la
+  /// columna se veria vacia sin un solo mensaje de error.
+  clave   String
+  /// Como se llama en pantalla. Esta si se puede cambiar.
+  etiqueta String
+  /// Del catalogo cerrado de `lib/registros-tipos.ts`: TEXTO, NUMERO, DINERO,
+  /// FECHA, SI_NO, LISTA, ACTIVO, REFACCION, PERSONA, UBICACION, SITIO,
+  /// PROVEEDOR, CENTRO_COSTO, ORDEN. Sin enum nativo, como todo el esquema.
+  tipo    String
+  /// Que significa esta columna. La lee la IA y la ayuda de la pantalla.
+  descripcion String?
+  requerido   Boolean @default(false)
+  /// Las opciones de un campo LISTA, una por renglon.
+  opciones    String?
+  /// Si aparece en la lista sin tener que abrir el renglon. Una tabla de
+  /// veinte campos con los veinte en la lista no se lee en un telefono.
+  enLista     Boolean @default(true)
+  orden       Int     @default(0)
+  /// Apagado sin borrarlo: borrar el campo se llevaria lo ya capturado en esa
+  /// columna, que es informacion de la empresa y no del esquema.
+  activo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tabla   TablaPropia   @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  valores ValorPropio[]
+
+  @@unique([tablaId, clave])
+  @@index([tablaId, activo])
+}
+
+/// Un renglon capturado en una tabla propia.
+model RenglonPropio {
+  id             String @id @default(cuid())
+  organizationId String
+  tablaId        String
+  /// Consecutivo dentro de la tabla, para poder referirse a el.
+  folio          Int
+  activo         Boolean  @default(true)
+  creadoPorId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tabla        TablaPropia   @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  creadoPor    User?         @relation("RenglonPropioAutor", fields: [creadoPorId], references: [id])
+  valores      ValorPropio[]
+
+  @@unique([tablaId, folio])
+  @@index([organizationId, tablaId, activo])
+}
+
+/// El valor de un campo en un renglon. Exactamente una columna con dato.
+model ValorPropio {
+  id        String @id @default(cuid())
+  renglonId String
+  campoId   String
+
+  texto    String?
+  numero   Float?
+  fecha    DateTime?
+  booleano Boolean?
+  /// El id del registro de MainTrack al que apunta un campo llave. Ver la nota
+  /// de `TablaPropia`: es texto a proposito, y quien lo pinta tiene que decir
+  /// «ya no existe» cuando no lo encuentra.
+  refId    String?
+
+  renglon RenglonPropio @relation(fields: [renglonId], references: [id], onDelete: Cascade)
+  campo   CampoPropio   @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([renglonId, campoId])
+  /// Para contestar «donde se uso este equipo»: el indice por campo y
+  /// referencia es lo que permite mirar los registros propios desde el
+  /// expediente del equipo sin recorrer toda la tabla.
+  @@index([campoId, refId])
+  @@index([campoId, numero])
+  @@index([campoId, fecha])
+}
+
+/// ─────────────────────────────────────── Cumplimiento normativo
+///
+/// Una norma que ESTA empresa decidio seguir.
+///
+/// Se COPIA del catalogo (`lib/normas-catalogo.ts`) al adoptarla, en vez de
+/// referenciarlo. Tres razones: el cliente puede marcar obligaciones como «no
+/// aplica» sin tocar el catalogo de todos; las normas propias del cliente
+/// necesitan exactamente la misma estructura y asi hay un solo camino; y
+/// guardar la version con que se adopto es lo que permite avisarle «esto
+/// cambio desde que usted lo adopto» sin leer el Diario Oficial.
+model NormaAdoptada {
+  id             String @id @default(cuid())
+  organizationId String
+  /// «NOM-002-STPS», o la que invente el cliente para un requisito propio.
+  clave          String
+  titulo         String
+  emisor         String?
+  resumen        String?
+  /// Lo que la norma pide y este modulo NO cubre. Se muestra en pantalla: es
+  /// lo que evita que el cliente crea que con esto ya cumplio todo.
+  fueraDeAlcance String?
+
+  /// CATALOGO (la mantenemos nosotros y avisa si cambia) o PROPIA (la escribio
+  /// el cliente y no la actualiza nadie). No es un dato interno: se muestra,
+  /// porque las dos NO ofrecen la misma promesa.
+  origen          String @default("CATALOGO")
+  /// Con que version del catalogo se adopto. Si el catalogo va mas adelante,
+  /// la pantalla avisa que revise. Cero en las propias.
+  versionAdoptada Int    @default(0)
+
+  /// Quien REVISO esta norma en la empresa del cliente, y cuando.
+  ///
+  /// Es la firma que importa, y por eso no es un usuario del sistema sino un
+  /// nombre libre: el especialista en seguridad e higiene suele ser externo y
+  /// no tiene cuenta. El inspector quiere ver quien responde por el contenido,
+  /// no que software lo propuso.
+  ///
+  /// El catalogo que traemos nosotros nace SIN revisar y se queda asi: lo
+  /// redacto una IA, no un especialista. Lo que aplica y como aplica depende
+  /// de la planta —tres calderas no es lo mismo que un compresor— y eso solo
+  /// lo puede decir quien la conoce. Mientras esto este vacio, la pantalla
+  /// dice que el contenido esta sin confirmar.
+  revisadaPorNombre String?
+  /// Puesto o cedula de quien reviso. «Responsable de Seguridad e Higiene»,
+  /// «Cedula 1234567». Va en el expediente impreso.
+  revisadaPorCargo  String?
+  revisadaEl        DateTime?
+
+  activa       Boolean   @default(true)
+  responsableId String?
+  nota         String?
+  adoptadaEl   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responsable  User?                @relation("NormaResponsable", fields: [responsableId], references: [id])
+  obligaciones ObligacionAdoptada[]
+  documentos   Attachment[]
+  ligas        ReferenceLink[]
+
+  @@unique([organizationId, clave])
+  @@index([organizationId, activa])
+}
+
+/// Cada cosa concreta que una norma exige.
+model ObligacionAdoptada {
+  id      String @id @default(cuid())
+  normaId String
+  clave   String
+  titulo  String
+  detalle String?
+  /// De `lib/normas-tipos.ts`: ACTIVIDAD, DOCUMENTO, DATO, RECORRIDO,
+  /// CAPACITACION. Decide con que pieza del sistema se cumple y como se mide.
+  tipo     String
+  /// Cada cuantos dias, cuando es periodica.
+  cadaDias Int?
+  evidencia String?
+  orden    Int     @default(0)
+
+  /// «No aplica» con su razon TAMBIEN es evidencia: en una inspeccion
+  /// preguntan por que no tiene algo, y «no tenemos recipientes a presion» es
+  /// una respuesta valida que conviene tener escrita y fechada.
+  aplica        Boolean @default(true)
+  razonNoAplica String?
+  responsableId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  norma       NormaAdoptada          @relation(fields: [normaId], references: [id], onDelete: Cascade)
+  responsable User?                  @relation("ObligacionResponsable", fields: [responsableId], references: [id])
+  amarres     AmarreDeCumplimiento[]
+
+  @@unique([normaId, clave])
+  @@index([normaId, aplica])
+}
+
+/// Con que pieza del sistema se cumple una obligacion.
+///
+/// Exactamente UNA por renglon, y puede haber varias por obligacion: «revisar
+/// extintores cada mes» puede ser tres planes si hay tres sitios.
+///
+/// Son llaves foraneas de verdad y no un id de texto —al reves que
+/// `ValorPropio`— porque aqui la pieza SI se puede borrar: un plan se elimina.
+/// Con la llave, el amarre se va con el, la obligacion vuelve a quedar «sin
+/// nada que lo respalde» y el semaforo lo dice. Con un id suelto, el sistema
+/// seguiria contando como cumplida una obligacion cuyo plan ya no existe, que
+/// es la peor de las mentiras posibles en este modulo.
+model AmarreDeCumplimiento {
+  id             String @id @default(cuid())
+  organizationId String
+  obligacionId   String
+
+  planId    String?
+  vigenciaId String?
+  tablaId   String?
+  rondinId  String?
+  ordenId   String?
+
+  nota      String?
+  createdAt DateTime @default(now())
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  obligacion   ObligacionAdoptada @relation(fields: [obligacionId], references: [id], onDelete: Cascade)
+  plan         MaintenancePlan?   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  vigencia     Vigencia?          @relation(fields: [vigenciaId], references: [id], onDelete: Cascade)
+  tabla        TablaPropia?       @relation(fields: [tablaId], references: [id], onDelete: Cascade)
+  rondin       Rondin?            @relation(fields: [rondinId], references: [id], onDelete: Cascade)
+  orden        WorkOrder?         @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+
+  @@index([obligacionId])
+  @@index([organizationId])
+  /// Para la impresion de la orden: que normas responde este plan.
+  @@index([planId])
+}
+
+// ------------------------------------------- Agentes de IA del operador (MCP)
+
+/// Una aplicacion que se registro sola para pedir acceso al servidor MCP
+/// (registro dinamico, RFC 7591). Hoy la unica que puede completar el flujo es
+/// Claude: las direcciones de regreso se aceptan solo de una lista cerrada
+/// (lib/mcp/oauth.ts), asi que registrarse no le da a nadie un lugar a donde
+/// mandar el codigo.
+///
+/// Es de la plataforma, no de una empresa cliente: no lleva organizationId.
+model ClienteOAuth {
+  id            String    @id @default(cuid())
+  /// Lo que viaja como client_id. Aleatorio, no el id interno.
+  clientId      String    @unique
+  nombre        String
+  /// JSON: ["https://claude.ai/api/mcp/auth_callback"]
+  redirectUris  String    @default("[]")
+  /// none | client_secret_post | client_secret_basic
+  metodoAuth    String    @default("none")
+  /// SHA-256 del secreto, si el cliente pidio uno. El secreto no se guarda.
+  huellaSecreto String?
+  ultimoUsoEl   DateTime?
+  createdAt     DateTime  @default(now())
+
+  codigos CodigoOAuth[]
+  tokens  TokenOAuth[]
+
+  @@index([createdAt])
+}
+
+/// El codigo de autorizacion: vive cinco minutos y sirve una sola vez.
+model CodigoOAuth {
+  id            String    @id @default(cuid())
+  /// SHA-256 del codigo. El codigo en claro solo existe en la redireccion.
+  huella        String    @unique
+  clienteId     String
+  userId        String
+  redirectUri   String
+  /// PKCE S256: el reto que manda el cliente al pedir el codigo.
+  codeChallenge String
+  /// El recurso para el que se pidio (RFC 8707): la URL de /api/mcp.
+  recurso       String
+  expiraEl      DateTime
+  usadoEl       DateTime?
+  createdAt     DateTime  @default(now())
+
+  cliente ClienteOAuth @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Tokens de acceso y de renovacion. Se guardan por su huella, nunca en claro.
+///
+/// `familia` junta el acceso original y todas sus renovaciones: si un token de
+/// renovacion ya usado vuelve a presentarse, alguien lo copio, y se revoca la
+/// familia entera. `autorizadoEl` es cuando el operador dio el permiso; se
+/// compara contra User.sessionsValidFrom, asi que «cerrar sesion en todos
+/// lados» tambien desconecta al agente.
+model TokenOAuth {
+  id           String    @id @default(cuid())
+  huella       String    @unique
+  /// ACCESO | RENOVACION
+  tipo         String
+  clienteId    String
+  userId       String
+  recurso      String
+  familia      String
+  autorizadoEl DateTime
+  expiraEl     DateTime
+  revocadoEl   DateTime?
+  /// Solo en renovacion: cuando se canjeo por un par nuevo.
+  usadoEl      DateTime?
+  ultimoUsoEl  DateTime?
+  createdAt    DateTime  @default(now())
+
+  cliente ClienteOAuth @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familia])
+  @@index([userId])
+}
+
+/// Una herramienta prestada: quien la tiene y desde cuando.
+///
+/// Esto es lo unico que de verdad faltaba. Lo demas —ficha, QR, ubicacion,
+/// calibracion que vence, plan preventivo, costo— ya existia: una herramienta
+/// cara e individual siempre pudo vivir como activo, y una generica como
+/// articulo del almacen. Lo que no habia era el ciclo de «sale y regresa».
+///
+/// Un renglon abierto (`devueltoEl` nulo) es algo que esta fuera. Al cerrarse
+/// NO se borra: el historial de quien tuvo que cosa es justamente de donde
+/// sale «a Pedro se le pierden los calibradores», que es el numero que hace
+/// que este modulo valga la pena.
+model Resguardo {
+  id             String @id @default(cuid())
+  organizationId String
+
+  /// De que cuelga: EXACTAMENTE uno de los dos, y lo cuida `lib/herramientas.ts`.
+  ///
+  /// `partId` es la herramienta generica del almacen, que se presta por
+  /// cantidad y necesita saber de que almacen salio. `assetId` es la unidad
+  /// serializada —el dado con su numero de serie—, que es unica: o esta fuera
+  /// o no lo esta, y no vive en un almacen.
+  partId         String?
+  warehouseId    String?
+  assetId        String?
+
+  /// Quien la tiene. Es el responsable, no necesariamente quien la pidio.
+  personaId String
+
+  /// Cuando salio como parte de una CAJA, no suelta.
+  ///
+  /// `grupo` es el mismo para todas las piezas de una misma salida: es lo que
+  /// permite devolver la caja completa de un golpe y, sobre todo, ver QUE
+  /// FALTA cuando regresa incompleta —que es la unica razon de ser de un kit,
+  /// porque pieza por pieza ya se podia prestar—.
+  ///
+  /// `kitId` dice de que caja era. Se guarda aunque el kit cambie despues: lo
+  /// que salio ese dia no se reescribe porque alguien edite la caja el mes que
+  /// viene.
+  kitId  String?
+  grupo  String?
+  cantidad  Float  @default(1)
+
+  /// Quien la entrego. Nulo en un almacen de autoservicio: ahi la registra
+  /// quien la toma, y que no haya segunda firma es un dato, no un faltante.
+  entregadoPorId String?
+  entregadoEl    DateTime @default(now())
+  /// Estado con el que SALIO, de `lib/herramientas-tipos.ts`.
+  estadoSalida   String?
+  /// Para que sirve que salga: la orden, el trabajo, el area.
+  proposito      String?
+
+  devueltoEl      DateTime?
+  recibidoPorId   String?
+  /// Estado con el que VOLVIO. Comparado con el de salida es lo que detecta
+  /// el maltrato; sin el de salida no se puede afirmar nada.
+  estadoRegreso   String?
+
+  /// Si no volvio porque se perdio o se rompio. El movimiento de baja que
+  /// descuenta la existencia vive en el kardex, no aqui.
+  motivoBaja String?
+  nota       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  part         Part?        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  asset        Asset?       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  persona      User         @relation("ResguardoDe", fields: [personaId], references: [id])
+  kit          KitDeHerramientas? @relation(fields: [kitId], references: [id])
+  entregadoPor User?        @relation("ResguardoEntrego", fields: [entregadoPorId], references: [id])
+  recibidoPor  User?        @relation("ResguardoRecibio", fields: [recibidoPorId], references: [id])
+
+  /// Lo que esta fuera AHORA: es la consulta de todos los dias.
+  @@index([organizationId, devueltoEl])
+  /// Que trae cada quien.
+  @@index([personaId, devueltoEl])
+  @@index([partId, devueltoEl])
+  /// Si esta unidad esta fuera ahora: es la pregunta al prestar una serializada.
+  @@index([assetId, devueltoEl])
+  /// Las piezas de una misma salida: para devolver la caja completa.
+  @@index([grupo])
+}
+
+/// Una caja de herramientas: un grupo que sale y regresa junto.
+///
+/// Existe por una sola razon: ver QUE FALTA cuando la caja vuelve incompleta.
+/// Prestar pieza por pieza ya se podia; lo que no se podia era saber que de
+/// las catorce llaves regresaron trece.
+model KitDeHerramientas {
+  id             String  @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  notas          String?
+  activo         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  piezas       PiezaDeKit[]
+  resguardos   Resguardo[]
+  enTareas     PlanTaskTool[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, activo])
+}
+
+/// Que trae la caja. Cada pieza es del almacen o una unidad serializada,
+/// exactamente igual que un resguardo suelto.
+model PiezaDeKit {
+  id       String @id @default(cuid())
+  kitId    String
+  partId   String?
+  assetId  String?
+  cantidad Float   @default(1)
+
+  kit   KitDeHerramientas @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  part  Part?             @relation(fields: [partId], references: [id], onDelete: Cascade)
+  asset Asset?            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([kitId])
+}
+
+/// La herramienta que HACE FALTA para una tarea del plan.
+///
+/// Sigue el molde de `PlanTaskLabor`, `PlanTaskPart` y `PlanTaskService`, pero
+/// es un modelo aparte y NO un `PlanTaskPart` con naturaleza HERRAMIENTA, y la
+/// razon es de dinero: `PlanTaskPart` significa «se consume esta cantidad» y
+/// alimenta el material necesario y el costo del plan. Una herramienta no se
+/// consume —se necesita tenerla— asi que meterla ahi inflaria el costo del
+/// preventivo con algo que nunca se gasto, y pediria al almacen que surtiera
+/// un torquimetro como si fuera grasa.
+///
+/// Puede apuntar a una herramienta del almacen, a una unidad serializada o a
+/// una caja completa: es lo que hay que tener en la mano, venga como venga.
+model PlanTaskTool {
+  id         String @id @default(cuid())
+  planTaskId String
+  partId     String?
+  assetId    String?
+  kitId      String?
+  cantidad   Float   @default(1)
+  nota       String?
+
+  task  PlanTask           @relation(fields: [planTaskId], references: [id], onDelete: Cascade)
+  part  Part?              @relation(fields: [partId], references: [id], onDelete: Cascade)
+  asset Asset?             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kit   KitDeHerramientas? @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@index([planTaskId])
 }

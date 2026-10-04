@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BotonDictado, unirDictado } from "@/components/boton-dictado";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Pause, Play, Sparkles } from "lucide-react";
 import { Dialogo } from "@/components/ui/dialogo";
@@ -28,6 +29,7 @@ export function WorkOrderActions({
   esOrdenDeFalla,
   puedeGestionarCatalogos = false,
   iaDisponible = false,
+  dictadoDisponible = false,
   rol,
   iniciada,
   conResponsable,
@@ -59,7 +61,7 @@ export function WorkOrderActions({
     actividadesEnBacklog: number;
     archivos: number;
     moneda: string;
-    faltantes: string[];
+    faltantes: Array<{ seccion: string; texto: string }>;
   };
   workOrderId: string;
   status: string;
@@ -94,6 +96,7 @@ export function WorkOrderActions({
   puedeGestionarCatalogos?: boolean;
   /** Si el plan de la empresa incluye el asistente de cierre. */
   iaDisponible?: boolean;
+  dictadoDisponible?: boolean;
 }) {
   const router = useRouter();
   function clavesDeFalla() {
@@ -423,7 +426,13 @@ export function WorkOrderActions({
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <p className="font-semibold">Antes de cerrar falta:</p>
               <ul className="mt-1 list-disc pl-4">
-                {cierre.faltantes.map((f) => <li key={f}>{f}</li>)}
+                {/* Cada faltante lleva a la tarjeta donde se arregla: antes decía
+                    qué faltaba y había que adivinar en cuál de nueve secciones. */}
+                {cierre.faltantes.map((f) => (
+                  <li key={f.texto}>
+                    <a href={`#${f.seccion}`} className="underline underline-offset-2 hover:no-underline">{f.texto}</a>
+                  </li>
+                ))}
               </ul>
               <p className="mt-1">Corrija los datos o devuelva la orden a proceso con el motivo.</p>
             </div>
@@ -618,8 +627,21 @@ export function WorkOrderActions({
               ) : null}
 
               <div>
-                <div className="mb-1 flex items-end justify-between gap-2">
+                <div className="mb-1 flex flex-col items-start gap-1.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
                   <label className="label mb-0">Solución aplicada o resumen del trabajo *</label>
+                  <div className="flex flex-wrap items-end gap-2">
+                  {/* Dictar va PRIMERO porque es lo primero que se hace:
+                      se cuenta lo que paso y despues se codifica. Y va
+                      antes que «Codificar con IA» tambien porque ese boton
+                      esta apagado hasta que haya texto, asi que el orden de
+                      la pantalla es el orden del trabajo. */}
+                  {dictadoDisponible ? (
+                    <BotonDictado
+                      onTexto={(t) =>
+                        setCloseForm((f) => ({ ...f, resolution: unirDictado(f.resolution, t) }))
+                      }
+                    />
+                  ) : null}
                   {iaDisponible ? (
                     <button
                       type="button"
@@ -630,12 +652,16 @@ export function WorkOrderActions({
                           ? "Escriba primero que hizo, aunque sea en pocas palabras"
                           : "La IA propone código de falla, causa raiz y refacciones"
                       }
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[0.6875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-40"
+                      /* `min-h-9` para que empareje con «Dictar» y, sobre todo,
+                         para que se pueda tocar con guante: los dos se usan en
+                         el mismo momento y desde el mismo teléfono. */
+                      className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[0.6875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-40"
                     >
                       {sugiriendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                       {sugiriendo ? "Analizando…" : "Codificar con IA"}
                     </button>
                   ) : null}
+                  </div>
                 </div>
                 <textarea
                   aria-label="Solución aplicada o resumen del trabajo"

@@ -23,6 +23,34 @@
         "3001"
       ],
       "port": 3001
+    },
+    {
+      "name": "maintrack-con-voz",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "GOOGLE_CLOUD_PROJECT=maintrack-cmms-4821",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3002"
+      ],
+      "port": 3002
+    },
+    {
+      "name": "maintrack-pantallas-ia",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ANTHROPIC_API_KEY=sk-ant-solover",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3003"
+      ],
+      "port": 3003
     }
   ]
 }

@@ -4,7 +4,7 @@ import { can } from "./rbac";
 import { esFalla, tipoDeActividad } from "./fallas";
 import { WO_STATUS_LABELS } from "./constants";
 import {
-  esTransicionPosible, faltantesDeCierre, motivoValido, permisoDeTransicion, pideMotivo,
+  esTransicionPosible, faltantesDeCierre, motivoValido, permisoDeTransicion, pideMotivo, textosDeFaltantes,
   type DatosDeCierre,
 } from "./reglas-ot";
 import { rollForwardPlan } from "./scheduler";
@@ -337,10 +337,11 @@ export async function transitionWorkOrder(params: {
       } : {}),
     }));
     if (faltan.length) {
+      const textos = textosDeFaltantes(faltan);
       throw new ErrorDeOrden(
-        `No se puede ${completando ? "completar" : "cerrar"} la orden todavía: ${faltan.join(" ")}`,
+        `No se puede ${completando ? "completar" : "cerrar"} la orden todavía: ${textos.join(" ")}`,
         422,
-        faltan,
+        textos,
       );
     }
   }
@@ -397,6 +398,34 @@ export async function transitionWorkOrder(params: {
    * La actividad se queda en la orden cancelada como historia de lo que se
    * penso hacer. Lo que se libera es la solicitud.
    */
+  /**
+   * El cambio se aplica solo si la orden sigue en el estado que se leyo.
+   *
+   * Dos clics seguidos, o dos personas a la vez, leian el mismo estado y las
+   * dos escribian: el paro se registraba dos veces y el plan avanzaba doble.
+   * Ahora gana una; la otra encuentra la orden ya movida y no repite nada.
+   */
+  const aplicado = await prisma.workOrder.updateMany({
+    where: { id: wo.id, organizationId: params.organizationId, status: wo.status },
+    data,
+  });
+  if (aplicado.count === 0) {
+    const ahora = await prisma.workOrder.findUnique({ where: { id: wo.id } });
+    if (ahora?.status === params.to) return ahora;
+    throw new ErrorDeOrden(
+      `La orden cambió de estado mientras tanto (ahora está ${etiqueta(ahora?.status ?? "").toLowerCase()}). Recargue la página.`,
+      409,
+    );
+  }
+  /**
+   * Las solicitudes se mueven DESPUES del candado, no antes.
+   *
+   * Estaban arriba, y quien perdia la carrera —dos personas, una cancelando y
+   * otra cerrando— ya habia soltado o reclamado las solicitudes cuando
+   * recibia el 409, sin revertir nada. Quedaba una orden cerrada con sus
+   * solicitudes sueltas, o una solicitud reclamada por una orden que nunca se
+   * reabrio. Aqui abajo solo corre quien gano.
+   */
   if (params.to === "CANCELLED") {
     await prisma.workRequest.updateMany({
       where: { workOrderId: wo.id, status: "CONVERTED" },
@@ -423,25 +452,7 @@ export async function transitionWorkOrder(params: {
     }
   }
 
-  /**
-   * El cambio se aplica solo si la orden sigue en el estado que se leyo.
-   *
-   * Dos clics seguidos, o dos personas a la vez, leian el mismo estado y las
-   * dos escribian: el paro se registraba dos veces y el plan avanzaba doble.
-   * Ahora gana una; la otra encuentra la orden ya movida y no repite nada.
-   */
-  const aplicado = await prisma.workOrder.updateMany({
-    where: { id: wo.id, organizationId: params.organizationId, status: wo.status },
-    data,
-  });
-  if (aplicado.count === 0) {
-    const ahora = await prisma.workOrder.findUnique({ where: { id: wo.id } });
-    if (ahora?.status === params.to) return ahora;
-    throw new ErrorDeOrden(
-      `La orden cambió de estado mientras tanto (ahora está ${etiqueta(ahora?.status ?? "").toLowerCase()}). Recargue la página.`,
-      409,
-    );
-  }
+
   const updated = (await prisma.workOrder.findUnique({ where: { id: wo.id } }))!;
 
   if (completando) {
@@ -501,6 +512,7 @@ export async function transitionWorkOrder(params: {
               (wo.maintenanceType === "PREVENTIVE" || wo.maintenanceType === "INSPECTION"),
           },
           create: {
+            organizationId: params.organizationId,
             assetId: wo.assetId,
             workOrderId: wo.id,
             startedAt: wo.startedAt ?? wo.createdAt,
@@ -681,6 +693,108 @@ export async function consumePart(params: {
     if (repetido) throw new ErrorDeOrden("Ese consumo ya se registró hace un momento. No se volvió a descontar del almacén.", 409);
     return consumirRefaccion(params);
   });
+}
+
+/**
+ * Quita una refaccion de la orden y la DEVUELVE al almacen.
+ *
+ * No es borrar un renglon. Cargar una refaccion saco existencia y la escribio
+ * en el kardex; quitarla sin regresarla dejaria el almacen creyendo que hay
+ * menos de lo que hay, y el kardex sin explicacion de a donde se fue. Por eso
+ * la salida se compensa con una devolucion —el tipo RETURN existe justo para
+ * esto— y no borrando el movimiento: el kardex no se edita, se corrige con
+ * otro movimiento.
+ *
+ * Regresa al MISMO almacen del que salio. Si la salida no se encuentra (un
+ * dato viejo), al almacen general, y se dice en la referencia.
+ */
+export async function quitarRefaccion(params: {
+  organizationId: string;
+  workOrderId: string;
+  lineaId: string;
+  userId: string;
+}) {
+  const linea = await prisma.workOrderPart.findFirst({
+    where: { id: params.lineaId, workOrderId: params.workOrderId, workOrder: { organizationId: params.organizationId } },
+    select: { id: true, partId: true, quantity: true, part: { select: { code: true, name: true, unit: true } } },
+  });
+  if (!linea) throw new ErrorDeOrden("Esa refacción no es de esta orden", 404);
+
+  asegurarEditable(await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: { status: true },
+  }));
+
+  // De donde salio: la ultima salida de esta refaccion en esta orden.
+  const salida = await prisma.stockMovement.findFirst({
+    where: { organizationId: params.organizationId, workOrderId: params.workOrderId, partId: linea.partId, movementType: "OUT" },
+    orderBy: { createdAt: "desc" },
+    select: { warehouseId: true },
+  });
+  const almacen = salida?.warehouseId ?? (await almacenPorOmision(params.organizationId))?.id;
+  if (!almacen) throw new ErrorDeAlmacen("La cuenta no tiene ningún almacén activo");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.workOrderPart.delete({ where: { id: linea.id } });
+    await aplicarMovimiento(
+      {
+        organizationId: params.organizationId,
+        partId: linea.partId,
+        warehouseId: almacen,
+        tipo: "RETURN",
+        cantidad: linea.quantity,
+        workOrderId: params.workOrderId,
+        userId: params.userId,
+        referencia: salida ? "Se quitó de la OT: devolución" : "Se quitó de la OT: devolución al almacén general",
+      },
+      tx,
+    );
+  });
+
+  await logAudit({
+    organizationId: params.organizationId, userId: params.userId,
+    entity: "WorkOrder", entityId: params.workOrderId, action: "UPDATED",
+    summary: `Se quitó ${linea.quantity} ${linea.part.unit} de ${linea.part.code} — ${linea.part.name} y se devolvió al almacén`,
+  });
+
+  return recalcWorkOrder(params.workOrderId);
+}
+
+/**
+ * Quita un registro de horas.
+ *
+ * Aqui si es borrar: las horas no movieron nada fuera de la orden. Lo unico
+ * que hay que rehacer es el costo, que `recalcWorkOrder` suma de cero.
+ */
+export async function quitarHoras(params: {
+  organizationId: string;
+  workOrderId: string;
+  lineaId: string;
+  userId: string;
+  /** Un tecnico solo puede quitar lo suyo; quien supervisa, cualquiera. */
+  soloPropias: boolean;
+}) {
+  const linea = await prisma.workOrderLabor.findFirst({
+    where: { id: params.lineaId, workOrderId: params.workOrderId, workOrder: { organizationId: params.organizationId } },
+    select: { id: true, hours: true, userId: true, user: { select: { name: true } } },
+  });
+  if (!linea) throw new ErrorDeOrden("Ese registro de horas no es de esta orden", 404);
+  if (params.soloPropias && linea.userId !== params.userId) {
+    throw new ErrorDeOrden("Solo puede quitar las horas que usted registró", 403);
+  }
+
+  asegurarEditable(await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: { status: true },
+  }));
+
+  await prisma.workOrderLabor.delete({ where: { id: linea.id } });
+  await logAudit({
+    organizationId: params.organizationId, userId: params.userId,
+    entity: "WorkOrder", entityId: params.workOrderId, action: "UPDATED",
+    summary: `Se quitaron ${linea.hours} h de ${linea.user.name}`,
+  });
+  return recalcWorkOrder(params.workOrderId);
 }
 
 async function consumirRefaccion(params: Parameters<typeof consumePart>[0]) {

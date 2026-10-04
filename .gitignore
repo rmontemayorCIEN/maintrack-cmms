@@ -28,3 +28,7 @@ tsconfig.tsbuildinfo
 
 # Archivos de bloqueo que deja Word mientras un documento esta abierto.
 ~$*
+
+# Borrador personal de Rafael: apuntes y prompts de trabajo, no del producto.
+# Cambiaba en cada sesion y ensuciaba el estado del repositorio.
+Cambios y prompts.docx

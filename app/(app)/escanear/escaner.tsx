@@ -22,7 +22,17 @@ declare global {
  *   esta empresa y que el rol pueda abrir el destino. Si no, se dice por qué y
  *   se puede volver a intentar o escribir el código.
  */
-export function Escaner() {
+export function Escaner({ onLeido }: {
+  /**
+   * Que hacer con el codigo leido, en vez de abrir a donde apunta.
+   *
+   * Lo usa el rondin: ahi el codigo no es para ir a ningun lado, es para decir
+   * en que parada se esta. Sin esto habria que copiar la camara, el detector
+   * nativo y el respaldo de jsQR —y la proxima pantalla que escanee seria una
+   * tercera copia—.
+   */
+  onLeido?: (codigo: string) => void;
+} = {}) {
   const router = useRouter();
   const video = useRef<HTMLVideoElement>(null);
   const flujo = useRef<MediaStream | null>(null);
@@ -49,6 +59,13 @@ export function Escaner() {
 
   /** Pregunta al servidor a dónde lleva el código y va ahí; si no sirve, lo dice. */
   async function abrir(valor: string) {
+    // Quien lo usa para otra cosa se queda con el código y aquí no se navega.
+    if (onLeido) {
+      apagar();
+      setEstado("inactiva");
+      onLeido(valor);
+      return;
+    }
     setEstado("validando");
     setError(null);
     try {

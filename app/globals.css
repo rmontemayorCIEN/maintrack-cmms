@@ -27,7 +27,19 @@
 
 html,
 body {
-  height: 100%;
+  /**
+   * `min-height` y no `height`.
+   *
+   * Con `height: 100%` el documento mide exactamente el alto de la ventana
+   * mientras el contenido desborda, y Safari de iPhone desincroniza los
+   * elementos fijos durante el scroll: la barra de accesos del pie se quedaba
+   * flotando a media pantalla con contenido debajo, en vez de pegada abajo.
+   *
+   * `min-height` cumple lo mismo que se buscaba —que el fondo llegue hasta
+   * abajo aunque la página sea corta— sin mentirle al navegador sobre cuánto
+   * mide el documento.
+   */
+  min-height: 100%;
 }
 
 html {

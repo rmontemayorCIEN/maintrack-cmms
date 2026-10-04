@@ -131,8 +131,12 @@ async function main() {
     await ot("W7", { maintenanceType: "CORRECTIVE", status: "CANCELLED", createdAt: hace(8), totalCost: 9999 });
     await ot("W8", { maintenanceType: "PREVENTIVE", status: "COMPLETED", createdAt: hace(100), completedAt: hace(100), actualHours: 1, totalCost: 300 });
 
-    const paro = (assetId: string, startedAt: Date, minutes: number, planned: boolean, workOrderId?: string) =>
-      prisma.downtimeEvent.create({ data: { assetId, startedAt, minutes, planned, workOrderId } });
+    // La empresa se saca del activo, no se fija: fijarla mandaba el paro de la
+    // empresa B a los indicadores de A, que es justo lo que esta prueba vigila.
+    const paro = async (assetId: string, startedAt: Date, minutes: number, planned: boolean, workOrderId?: string) => {
+      const duenio = await prisma.asset.findUniqueOrThrow({ where: { id: assetId }, select: { organizationId: true } });
+      return prisma.downtimeEvent.create({ data: { organizationId: duenio.organizationId, assetId, startedAt, minutes, planned, workOrderId } });
+    };
     await paro(a1.id, hace(9), 120, false, w1.id);
     await paro(a1.id, hace(2), 60, true, w4.id);
     await paro(a2.id, hace(100), 600, false);
@@ -169,12 +173,12 @@ async function main() {
     revisar("el detalle cuadra en los cuatro periodos", [30, 90, 180, 365].every((d) => Object.values(detalleCuadra(kPor[d])).every(Boolean)));
 
     console.log("\nLas mismas cifras en otros módulos");
-    const herr = (await ejecutarHerramienta(orgA.id, "indicadores", { dias: 30 })) as { indicadores: Array<{ indicador: string; valor: number | null }> };
+    const herr = (await ejecutarHerramienta(orgA.id, "indicadores", { dias: 30 }, { rol: "OWNER" })) as { indicadores: Array<{ indicador: string; valor: number | null }> };
     const deIa = (nombre: string) => herr.indicadores.find((x) => x.indicador === nombre)?.valor ?? null;
     revisar("la herramienta de IA da el mismo MTTR", deIa(i.mttr.nombre) === i.mttr.valor, deIa(i.mttr.nombre));
     revisar("la herramienta de IA da la misma disponibilidad", cerca(deIa(i.disponibilidad.nombre), i.disponibilidad.valor as number), deIa(i.disponibilidad.nombre));
     revisar("la herramienta de IA da el mismo costo", deIa(i.costoMantenimiento.nombre) === i.costoMantenimiento.valor);
-    const busqueda = (await ejecutarHerramienta(orgA.id, "buscar_ordenes", { dias: 30, soloVencidas: true })) as { total: number };
+    const busqueda = (await ejecutarHerramienta(orgA.id, "buscar_ordenes", { dias: 30, soloVencidas: true }, { rol: "OWNER" })) as { total: number };
     revisar("«vencidas» de la IA = vencidas del Panel", busqueda.total === k30.totales.backlogVencido, busqueda.total);
 
     // ─────────────────────────────────────────────── Aislamiento + OT ───
@@ -450,7 +454,7 @@ async function main() {
 
     // ───────────────────────────────────────── IA y zona horaria ───
     console.log("\nIA: ficha de activo y zona horaria");
-    const ficha = (await ejecutarHerramienta(orgA.id, "consultar_activo", { codigo: "A1" })) as { planes?: Array<{ plan: string }>; plans?: unknown };
+    const ficha = (await ejecutarHerramienta(orgA.id, "consultar_activo", { codigo: "A1" }, { rol: "OWNER" })) as { planes?: Array<{ plan: string }>; plans?: unknown };
     revisar("la ficha de activo de la IA lee las asignaciones, no el encabezado del plan",
       Boolean(ficha.planes?.some((p) => p.plan === "Servicio 500 h")) && ficha.plans === undefined, ficha.planes);
     const once = new Date("2026-09-17T04:30:00Z"); // 11:30 pm del 16 en Monterrey
@@ -469,6 +473,12 @@ async function main() {
       { organizationId: orgA.id, meterId: legado.id, value: 18420, readingAt: t(6) },
       { organizationId: orgA.id, meterId: legado.id, value: 20500, readingAt: t(2) },
     ] });
+    // Los renglones se insertan a mano porque simulan un dato heredado, pero
+    // el dictamen lo tiene que emitir el SISTEMA: es `recalcularMedidor` quien
+    // marca la cadena como inválida, y es esa marca la que lee la revisión de
+    // calidad. Sin esta línea la prueba estaría comprobando una conclusión que
+    // ella misma se inventó.
+    await recalcularMedidor(orgA.id, legado.id, ahora);
     const alertaVieja = await prisma.predictiveAlert.create({ data: { organizationId: orgA.id, assetId: a2.id, title: "Alerta vieja", message: "x", createdAt: t(5), projectedFailureAt: t(30) } });
     const fin = await prisma.workOrder.create({ data: { organizationId: orgA.id, number: "REV", title: "Al revés", assetId: a2.id, status: "COMPLETED", startedAt: t(1), completedAt: t(2) } });
 

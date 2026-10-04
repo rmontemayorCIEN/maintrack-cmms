@@ -10,11 +10,15 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { ORDEN_PLANES } from "@/lib/planes";
 import { ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/estado-operativo";
 import { MODOS_DE_INICIO, type ModoDeInicio } from "@/lib/modos-inicio";
+import { nombreSolicitado } from "@/lib/planes";
+import { PRUEBA_DIAS } from "@/lib/comercial";
 
 type Org = {
   id: string; name: string; slug: string; plan: string; status: string;
   industry: string | null; tipoInstalacion: string | null; trialEndsAt: string | null; createdAt: string;
   iaComplemento: boolean;
+  registrosPropios: boolean;
+  cumplimientoNormas: boolean;
   /// Consumo de IA del mes en curso: operaciones y costo real en dolares.
   ia: { operaciones: number; incluidas: number; costoUsd: number } | null;
   /// Avance de puesta en marcha: predice que cuentas se van a caer.
@@ -57,7 +61,7 @@ export function PanelClientes({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [form, setForm] = useState({
-    name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30",
+    name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: String(PRUEBA_DIAS),
     ownerName: "", ownerEmail: "", ownerPassword: "",
     // Sin opción marcada: hay que elegir cómo empieza, después de leer qué trae.
     modo: "" as ModoDeInicio | "",
@@ -81,7 +85,7 @@ export function PanelClientes({
     setOcupado(null);
     if (!res.ok) { setError(data.error ?? "No fue posible crear la empresa"); return; }
     setAviso(`Empresa "${data.organization.name}" creada. Ya puede entregar el acceso a su responsable.`);
-    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: "30", ownerName: "", ownerEmail: "", ownerPassword: "", modo: "" });
+    setForm({ name: "", industry: "", tipoInstalacion: "PLANTA", plan: "PROFESSIONAL", trialDays: String(PRUEBA_DIAS), ownerName: "", ownerEmail: "", ownerPassword: "", modo: "" });
     setCreando(false);
     router.refresh();
   }
@@ -99,7 +103,7 @@ export function PanelClientes({
     router.refresh();
   }
 
-  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "tipoInstalacion", valor: string | boolean) {
+  async function cambiar(org: Org, campo: "plan" | "status" | "iaComplemento" | "registrosPropios" | "cumplimientoNormas" | "tipoInstalacion", valor: string | boolean) {
     setOcupado(org.id);
     setError(null);
     const res = await fetch(`/api/admin/organizations/${org.id}`, {
@@ -125,7 +129,7 @@ export function PanelClientes({
     setOcupado(null);
     if (!res.ok) { setError(data.error ?? "No fue posible resolver la solicitud"); return; }
     setAviso(accion === "APLICAR"
-      ? `Plan de ${s.empresa} cambiado a ${s.planSolicitado}.`
+      ? `Plan de ${s.empresa} cambiado a ${nombreSolicitado(s.planSolicitado)}.`
       : `Solicitud de ${s.empresa} descartada.`);
     setTimeout(() => setAviso(null), 4000);
     router.refresh();
@@ -151,7 +155,7 @@ export function PanelClientes({
                   <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-800">
                     {s.empresa}
                     <span className="inline-flex items-center gap-1 text-xs font-normal text-slate-500">
-                      {s.planActual} <ArrowRight className="h-3 w-3" /> <strong className="text-slate-800">{s.planSolicitado}</strong>
+                      {nombreSolicitado(s.planActual)} <ArrowRight className="h-3 w-3" /> <strong className="text-slate-800">{nombreSolicitado(s.planSolicitado)}</strong>
                     </span>
                   </p>
                   <p className="text-[0.6875rem] text-slate-500">
@@ -298,7 +302,7 @@ export function PanelClientes({
                   <th>Plan</th>
                   <th title="Comercial: prueba, activa o suspendida. Lo maneja el operador.">Estado comercial</th>
                   <th title="Operativo: en configuración, lista para operar u operando. Sale de la puesta en marcha.">Puesta en marcha</th>
-                  <th>IA</th>
+                  <th title="Complementos que se cobran aparte: IA Avanzada y Registros propios.">Complementos</th>
                   <th className="text-right">Usuarios</th>
                   <th className="text-right">Activos</th>
                   <th className="text-right">OT</th>
@@ -387,6 +391,33 @@ export function PanelClientes({
                               : org.iaComplemento ? "activo" : "—"}
                           </span>
                         </label>
+                        {/* «Registros propios» se cobra aparte igual que la IA,
+                            y esta casilla es lo UNICO que lo hace alcanzable:
+                            sin ella el modulo existe y nadie puede entrar. */}
+                        <label className="mt-1 flex cursor-pointer items-center gap-1.5" title="Registros propios: tablas que arma el cliente">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
+                            checked={org.registrosPropios}
+                            disabled={ocupado === org.id}
+                            onChange={(e2) => cambiar(org, "registrosPropios", e2.target.checked)}
+                          />
+                          <span className="text-[0.6875rem] text-slate-500">
+                            {org.registrosPropios ? "registros" : "—"}
+                          </span>
+                        </label>
+                        <label className="mt-1 flex cursor-pointer items-center gap-1.5" title="Cumplimiento normativo: catálogo de normas y expediente">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
+                            checked={org.cumplimientoNormas}
+                            disabled={ocupado === org.id}
+                            onChange={(e2) => cambiar(org, "cumplimientoNormas", e2.target.checked)}
+                          />
+                          <span className="text-[0.6875rem] text-slate-500">
+                            {org.cumplimientoNormas ? "normas" : "—"}
+                          </span>
+                        </label>
                       </td>
                       <td className="text-right tabular-nums text-xs text-slate-600">{org._count.users}</td>
                       <td className="text-right tabular-nums text-xs text-slate-600">{org._count.assets}</td>
@@ -406,6 +437,27 @@ export function PanelClientes({
                                 {ocupado === org.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogIn className="h-3 w-3" />}
                                 Entrar
                               </button>
+                              {/*
+                                Una cuenta en prueba que ya compro necesita
+                                pasar a activa, y ese camino no existia: el
+                                unico boton alternaba entre suspender y
+                                reactivar, asi que desde «En prueba» lo que
+                                hacia era SUSPENDERLA. Quedaba la opcion de
+                                dejar vencer la prueba, que pone la cuenta en
+                                solo lectura y es justo lo contrario de lo que
+                                uno quiere al cobrarle a alguien.
+                              */}
+                              {org.status === "TRIAL" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => cambiar(org, "status", "ACTIVE")}
+                                  disabled={ocupado === org.id}
+                                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[0.6875rem] font-medium text-emerald-700 hover:bg-emerald-100"
+                                  title="Termina la prueba y deja la cuenta activa, sin fecha de vencimiento"
+                                >
+                                  Activar
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => cambiar(org, "status", org.status === "SUSPENDED" ? "ACTIVE" : "SUSPENDED")}

@@ -64,7 +64,7 @@ const crearColumnas = (zona: string): Columna<FilaCompra>[] => [
       </Badge>
     ),
   },
-  { id: "monto", etiqueta: "Monto estimado", alineaDerecha: true, texto: (c) => formatCurrency(c.montoEstimado, c.moneda) },
+  { id: "monto", etiqueta: "Monto estimado", alineaDerecha: true, texto: (c) => formatCurrency(c.montoEstimado, c.moneda), ordenPor: (c) => c.montoEstimado },
   { id: "almacen", etiqueta: "Entra a", agrupable: true, texto: (c) => c.almacen },
   { id: "solicitante", etiqueta: "Solicitó", agrupable: true, texto: (c) => guion(c.solicitante) },
   { id: "autorizo", etiqueta: "Autorizó", agrupable: true, texto: (c) => guion(quienAutorizo(c.autorizadaPor, c.autorizadaEl)) },
@@ -91,7 +91,7 @@ const crearColumnas = (zona: string): Columna<FilaCompra>[] => [
       return falta ? <span className="font-medium text-amber-700">{falta}</span> : <span className="text-slate-300">—</span>;
     },
   },
-  { id: "creada", etiqueta: "Pedida", texto: (c) => formatDate(new Date(c.createdAt), zona) },
+  { id: "creada", etiqueta: "Pedida", texto: (c) => formatDate(new Date(c.createdAt), zona), ordenPor: (c) => new Date(c.createdAt).getTime() },
   { id: "autorizadaEl", etiqueta: "Autorizada", texto: (c) => (c.autorizadaEl ? formatDate(new Date(c.autorizadaEl), zona) : "—") },
   { id: "rechazo", etiqueta: "Motivo de rechazo", texto: (c) => guion(c.motivoRechazo) },
 ];
@@ -110,6 +110,7 @@ export function TablaCompras({ compras, vistaInicial }: { compras: FilaCompra[];
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="compras"
+      paso={{ base: "/compras", etiqueta: (c) => c.folio }}
       sustantivo="requisiciones de compra"
       ejemploFiltro='Filtrar: "balero", "paro", "autorizada"…'
     />

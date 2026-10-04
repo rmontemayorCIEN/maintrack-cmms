@@ -59,11 +59,20 @@ export function MeterReadingForm({
   meterId,
   unit,
   current,
+  workOrderId,
 }: {
   meterId: string;
   unit: string;
   /** Nulo: el medidor no tiene lectura vigente. */
   current: number | null;
+  /**
+   * De que orden sale la lectura, cuando se captura desde una.
+   *
+   * Sin esto no se podia distinguir el horometro que tomo el tecnico durante
+   * el trabajo del que capturo el operador en su ronda, y la ficha de la
+   * orden no podia decir si ya se habia registrado el de ESE trabajo.
+   */
+  workOrderId?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -82,6 +91,7 @@ export function MeterReadingForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         meterId,
+        workOrderId,
         value: Number(value),
         tipo,
         readingAt: fecha ? new Date(fecha).toISOString() : undefined,

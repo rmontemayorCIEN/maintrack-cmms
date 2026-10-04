@@ -4,8 +4,11 @@ import { fail, ok, parseDate, sinCostos, withAuth, withVista } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
+import { avisarGarantiaEnOrden } from "@/lib/avisos/vigencias";
+import { advertenciaDeGarantia } from "@/lib/vigencias";
 import { OPEN_STATUSES } from "@/lib/constants";
 import { revisarProgramacion, validarDatosDeProgramacion } from "@/lib/programacion";
+import { enFila, hace } from "@/lib/repeticion";
 
 const createSchema = z.object({
   title: z.string().min(3),
@@ -78,12 +81,35 @@ export async function POST(request: Request) {
     }
     const dueDate = parseDate(input.dueDate);
     validarDatosDeProgramacion({ estimatedHours: input.estimatedHours, dueDate, scheduledStart: parseDate(input.scheduledStart) });
+    /**
+     * La garantia se revisa SIEMPRE, y aparte de la programacion.
+     *
+     * `revisarProgramacion` se sale de inmediato cuando no hay fecha de
+     * vencimiento (`if (!p.fecha) return vacio`), y una correctiva urgente se
+     * abre sin fecha justo cuando el equipo acaba de fallar. Metida ahi, la
+     * advertencia se habria perdido exactamente en el caso que importa.
+     */
+    const garantia = await advertenciaDeGarantia(orgId, input.assetId, input.maintenanceType);
     if (!input.aceptarAdvertencias) {
       const revision = await revisarProgramacion({
         organizationId: orgId, fecha: dueDate, responsableId: input.assignedToId || null, horas: input.estimatedHours,
       });
-      if (revision.advertencias.length) return fail(revision.advertencias.join(" "), 409, { programacion: revision });
+      const advertencias = [...(garantia ? [garantia.texto] : []), ...revision.advertencias];
+      if (advertencias.length) return fail(advertencias.join(" "), 409, { programacion: revision, garantia });
     }
+
+    // Un doble toque, un reintento del navegador o una segunda pestana no
+    // pueden levantar dos ordenes para el mismo trabajo. El `disabled` del
+    // boton no sobrevive a una red lenta; esto si (lib/repeticion.ts).
+    return enFila(`ot:${user.id}:${input.title.trim().toLowerCase()}:${input.assetId ?? ""}`, async () => {
+    const repetida = await prisma.workOrder.findFirst({
+      where: {
+        organizationId: orgId, createdById: user.id, title: input.title,
+        assetId: input.assetId || null, createdAt: { gte: hace() },
+      },
+      select: { number: true },
+    });
+    if (repetida) return fail(`Esa orden ya se creó hace un momento (${repetida.number}). No se creó otra.`, 409);
 
     const number = await nextWorkOrderNumber(orgId);
     const workOrder = await prisma.workOrder.create({
@@ -97,6 +123,15 @@ export async function POST(request: Request) {
         priority: input.priority,
         assetId: asset?.id ?? null,
         siteId: asset?.siteId ?? null,
+        /**
+         * El centro de costo se COPIA del equipo, no se resuelve al vuelo.
+         *
+         * Si el equipo cambia de centro el año que viene, lo ya gastado se
+         * queda donde se gastó. Resolverlo al leer haría que los reportes del
+         * año pasado cambiaran solos, y con eso el contador deja de confiar en
+         * el sistema.
+         */
+        centroDeCostoId: asset?.centroDeCostoId ?? null,
         locationId: input.locationId ?? asset?.locationId ?? null,
         assignedToId: input.assignedToId || null,
         teamId: input.teamId || null,
@@ -134,6 +169,14 @@ export async function POST(request: Request) {
     // Aviso al responsable y, si es crítica, a supervisión.
     await avisarNuevaOrden(orgId, workOrder.id);
 
+    /**
+     * Y si el equipo está en garantía, que lo sepa quien va a hacer el
+     * trabajo. La advertencia de arriba la vio quien la creó —y pudo
+     * aceptarla—; el aviso es para el que llega con la llave en la mano.
+     */
+    if (garantia) await avisarGarantiaEnOrden(orgId, workOrder.id, garantia);
+
     return ok({ workOrder }, 201);
+    });
   });
 }

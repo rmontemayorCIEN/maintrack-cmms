@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OPCIONES_DE_FAMILIA } from "./causas";
 import { prisma } from "./db";
 
 /**
@@ -26,7 +27,11 @@ export type ClaveCatalogo =
   | "part-categories"
   | "part-units"
   | "specialties"
-  | "external-services";
+  | "external-services"
+  | "cost-centers";
+
+/** Un si/no que llega del formulario como texto o como booleano. */
+const siNo = z.union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")]);
 
 const texto = (min = 1, max = 120) => z.string().trim().min(min).max(max);
 
@@ -208,25 +213,41 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "Corto y estable: ALM-GEN, ALM-L1" },
       { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true },
       { nombre: "siteId", etiqueta: "Sitio", tipo: "select", opcionesDe: "sites", ayuda: "En que instalación esta fisicamente" },
+      {
+        nombre: "autoservicio", etiqueta: "Cómo se entrega la herramienta", tipo: "select",
+        opciones: [
+          { valor: "false", etiqueta: "Con almacenista" },
+          { valor: "true", etiqueta: "Autoservicio" },
+        ],
+        ayuda: "Con almacenista queda registrado quien entrega. En autoservicio la registra quien se la lleva, y entonces el aviso de lo no devuelto es lo que sostiene el control.",
+      },
       { nombre: "notas", etiqueta: "Notas", tipo: "textarea", ayuda: "Horario, quien tiene llave, restricciones de acceso" },
     ],
     crear: z.object({
       code: texto(1, 20),
       name: texto(2),
       siteId: z.string().optional().nullable(),
+      // Llega como texto del formulario y la columna es booleana.
+      //
+      // NO se usa `z.coerce.boolean()`: convierte la cadena "false" en true,
+      // porque cualquier texto no vacio lo es. Con eso, elegir «Con
+      // almacenista» habria guardado autoservicio —y el almacen dejaria de
+      // pedir la firma de quien entrega sin que nadie lo notara—.
+      autoservicio: siNo.optional(),
       notas: texto(0, 500).optional().nullable(),
     }),
     editar: z.object({
       code: texto(1, 20).optional(),
       name: texto(2).optional(),
       siteId: z.string().nullable().optional(),
+      autoservicio: siNo.optional(),
       notas: texto(0, 500).nullable().optional(),
     }),
     listar: (orgId) =>
       prisma.warehouse.findMany({
         where: { organizationId: orgId },
         select: {
-          id: true, code: true, name: true, siteId: true, notas: true, esGeneral: true,
+          id: true, code: true, name: true, siteId: true, notas: true, esGeneral: true, autoservicio: true,
           site: { select: { name: true } },
           _count: { select: { existencias: true } },
         },
@@ -550,17 +571,11 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       { nombre: "code", etiqueta: "Código", tipo: "texto", requerido: true, ayuda: "ej. LUB-NO-EJECUTADA" },
       { nombre: "description", etiqueta: "Descripción", tipo: "texto", requerido: true },
       {
+        // La lista vive en `lib/causas.ts`, no aqui: con ella se captura Y se
+        // agrupa en Reportes y en Donde para la planta. Tenerla en dos lados
+        // era garantizar que un dia dijeran cosas distintas.
         nombre: "category", etiqueta: "Familia", tipo: "select",
-        opciones: [
-          { valor: "MANTENIMIENTO", etiqueta: "Práctica de mantenimiento" },
-          { valor: "INSTALACION", etiqueta: "Instalación o montaje" },
-          { valor: "OPERACION", etiqueta: "Operación" },
-          { valor: "DESGASTE", etiqueta: "Desgaste normal" },
-          { valor: "AMBIENTE", etiqueta: "Ambiente" },
-          { valor: "EXTERNO", etiqueta: "Causa externa" },
-          { valor: "DISENO", etiqueta: "Diseño o selección" },
-          { valor: "OTRO", etiqueta: "Otro" },
-        ],
+        opciones: OPCIONES_DE_FAMILIA,
       },
     ],
     crear: z.object({
@@ -592,6 +607,67 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
   },
 
   // --------------------------------------------------------- Especialidades
+  // ------------------------------------------------------- Centros de costo
+  "cost-centers": {
+    titulo: "Centros de costo",
+    singular: "centro de costo",
+    descripcion:
+      "El eje contable de la operación: la clave con la que su empresa lleva el gasto. Un equipo pertenece a un centro "
+      + "de costo y sus órdenes lo heredan, así que el costo de mantenimiento sale agrupado como lo pide contabilidad, "
+      + "sin traducirlo a mano. Tráigalos de su ERP tal como están allá: la clave es lo que permite conciliar.",
+    campos: [
+      { nombre: "code", etiqueta: "Clave", tipo: "texto", requerido: true, ayuda: "La misma que usa su contabilidad, ej. 5010-PROD" },
+      { nombre: "name", etiqueta: "Nombre", tipo: "texto", requerido: true, ayuda: "Producción, Envasado, Servicios auxiliares…" },
+      { nombre: "descripcion", etiqueta: "Qué cubre", tipo: "textarea", ayuda: "Qué gasto entra aquí y cuál no. Es lo que evita que cada quien lo interprete distinto" },
+    ],
+    crear: z.object({
+      code: texto(1, 30),
+      name: texto(2),
+      descripcion: texto(0, 600).optional().nullable(),
+    }),
+    editar: z.object({
+      code: texto(1, 30).optional(),
+      name: texto(2).optional(),
+      descripcion: texto(0, 600).optional().nullable(),
+      active: z.boolean().optional(),
+    }),
+    listar: (orgId) =>
+      prisma.centroDeCosto.findMany({
+        where: { organizationId: orgId },
+        select: {
+          id: true, code: true, name: true, descripcion: true, active: true,
+          _count: { select: { assets: true, workOrders: true } },
+        },
+        orderBy: { code: "asc" },
+      }) as Promise<Array<Record<string, unknown>>>,
+    insertar: (orgId, d) =>
+      prisma.centroDeCosto.create({ data: ({ ...d, organizationId: orgId } as never), select: { id: true } }),
+    actualizar: (orgId, id, d) =>
+      prisma.centroDeCosto.updateMany({ where: { id, organizationId: orgId }, data: d as never }),
+    /**
+     * Un centro con gasto encima NO se borra.
+     *
+     * Borrarlo dejaria huerfano el costo ya cargado —ordenes que apuntan a una
+     * clave que ya no existe— y los reportes del año pasado cambiarian solos.
+     * Si ya no se usa, se desactiva: deja de ofrecerse en los selects y lo
+     * historico sigue explicandose.
+     */
+    bloqueoDeBorrado: async (orgId, id) => {
+      const [equipos, ordenes] = await Promise.all([
+        prisma.asset.count({ where: { centroDeCostoId: id, organizationId: orgId } }),
+        prisma.workOrder.count({ where: { centroDeCostoId: id, organizationId: orgId } }),
+      ]);
+      if (equipos || ordenes) {
+        const partes = [
+          equipos ? plural(equipos, "equipo", "equipos") : null,
+          ordenes ? plural(ordenes, "orden de trabajo", "órdenes de trabajo") : null,
+        ].filter(Boolean).join(" y ");
+        return `Este centro de costo ya tiene ${partes} encima. Desactívelo en vez de borrarlo: así deja de ofrecerse y el gasto histórico sigue explicándose.`;
+      }
+      return null;
+    },
+    borrar: (orgId, id) => prisma.centroDeCosto.deleteMany({ where: { id, organizationId: orgId } }),
+  },
   specialties: {
     titulo: "Especialidades",
     singular: "especialidad",

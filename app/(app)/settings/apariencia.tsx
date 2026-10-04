@@ -74,8 +74,8 @@ export function PanelApariencia({
     const f = ev.target.files?.[0];
     ev.target.value = "";
     if (!f) return;
-    if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(f.type)) {
-      setError("Use PNG, JPG, WEBP o SVG."); return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) {
+      setError("Use PNG, JPG o WEBP."); return;
     }
     if (f.size > 300 * 1024) {
       setError(`El logotipo pesa ${Math.round(f.size / 1024)} KB y el maximo son 300 KB. Un PNG de 400 px de ancho suele pesar menos de 40.`);
@@ -212,7 +212,7 @@ export function PanelApariencia({
               <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
                 {subiendo ? <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> : null}
                 {logoUrl ? "Cambiar logotipo" : "Subir logotipo"}
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={subirLogo} />
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={subirLogo} />
               </label>
               {logoUrl ? (
                 <button

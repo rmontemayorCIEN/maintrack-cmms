@@ -8,7 +8,7 @@
  *
  *   npx tsx scripts/prueba-puesta-en-marcha.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
@@ -16,6 +16,7 @@ import { puestaEnMarcha, avancePuestaEnMarcha } from "../lib/puesta-en-marcha";
 import { catalogosPara, sembrarCatalogosEstandar } from "../lib/catalogos-estandar";
 import { hayDemo, iniciarEmpresa, quitarDemo, vistaPreviaQuitarDemo, MARCA_DEMO } from "../lib/demo";
 import { comenzarAOperar, declararModulo } from "../lib/puesta-en-marcha-acciones";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -55,9 +56,9 @@ const paso = async (orgId: string, clave: string) => (await puestaEnMarcha(orgId
 
 async function main() {
   let servidor: ChildProcess | null = null;
-  const base = process.env.BASE_URL ?? "http://127.0.0.1:3203";
+  const base = process.env.BASE_URL ?? "http://127.0.0.1:3208";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3203", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3208 });
   }
   const sello = `pem-${Date.now()}`;
   const orgs: string[] = [];
@@ -244,7 +245,7 @@ async function main() {
   } finally {
     for (const id of orgs) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3208);
     }
   }
 

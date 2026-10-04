@@ -6,6 +6,7 @@ import { OPEN_STATUSES } from "@/lib/constants";
 import { vistaGuardada } from "@/lib/vistas";
 import { TablaRequisiciones, type FilaRequisicion } from "./tabla-requisiciones";
 import { RequisicionDialog, type RefaccionOpcion } from "./requisicion-dialog";
+import { estaPorSurtir } from "@/lib/requisiciones-datos";
 
 export const metadata = { title: "Requisiciones de material" };
 export const dynamic = "force-dynamic";
@@ -81,7 +82,7 @@ export default async function RequisicionesPage() {
     cerradaEl: r.cerradaEl?.toISOString() ?? null,
   }));
 
-  const abiertas = filas.filter((f) => f.estado === "SOLICITADA" || f.estado === "PARCIAL");
+  const abiertas = filas.filter((f) => estaPorSurtir(f.estado));
   const conParo = abiertas.filter((f) => f.urgencia === "PARO");
 
   return (

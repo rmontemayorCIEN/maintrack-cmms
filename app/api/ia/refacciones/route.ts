@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { sugerirRefacciones } from "@/lib/ia/refacciones";
 import { logAudit } from "@/lib/audit";
 
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return ok({ refacciones: r.refacciones, nota: r.nota, activo: r.activo });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible generar la propuesta", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

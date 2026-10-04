@@ -1,0 +1,77 @@
+# Las pruebas de cada propuesta de cambio.
+#
+# Corre lo mismo que el cierre de CLAUDE.md, ni mas ni menos: tipos y
+# `suite.sh`, que adentro trae las 107 pruebas, el build y las 92 revisiones de
+# interfaz. Si aqui se corriera un subconjunto, esto seria un sello de calidad
+# que no revisa lo que mas se rompe: la pantalla de al lado.
+name: Pruebas
+
+on:
+  pull_request:
+    branches: [main]
+  # Tambien al fusionar, para que main quede con su propio veredicto y no solo
+  # con el de la rama que lo propuso.
+  push:
+    branches: [main]
+
+# Una propuesta que recibe otro empujon cancela la corrida anterior: no sirve
+# de nada gastar quince minutos revisando codigo que ya cambio.
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    # La suite completa levanta trece servidores de Next y un Chrome. Con el
+    # limite de seis minutos por omision no alcanzaria ni a la mitad.
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar
+        run: npm ci
+
+      # El desarrollo corre en SQLite y produccion en PostgreSQL con el MISMO
+      # schema.prisma. Aqui se prueba como en desarrollo: base local de archivo.
+      - name: Preparar la base de pruebas
+        run: |
+          cp .env.example .env
+          npm run db:push
+          npm run db:seed
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      # Sin paso de lint A PROPOSITO: este proyecto no tiene ESLint configurado
+      # —`npm run lint` abre el asistente de Next y en un servidor se colgaria
+      # esperando una respuesta que nadie va a dar—. Configurarlo es una tarea
+      # aparte, con su propio ruido sobre 250 commits de codigo ya escrito.
+      # Mientras tanto `tsc --noEmit` cubre lo que de verdad rompe aqui, y la
+      # suite cubre el resto.
+
+      # La prueba de interfaz maneja un Chrome sin ventana. En la Mac vive en
+      # /Applications; aqui se le dice donde esta el del servidor.
+      - name: La suite completa
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: ./scripts/suite.sh
+
+      # El detalle de una falla vive en el registro que deja la suite, no en la
+      # consola. Sin esto habria que adivinar que fallo.
+      - name: Guardar el registro si algo fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registro-de-la-suite
+          path: |
+            /tmp/maintrack-suite-*.log
+            /tmp/maintrack-capturas
+          if-no-files-found: ignore
+          retention-days: 7

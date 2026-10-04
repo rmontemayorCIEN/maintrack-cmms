@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { reconocerArea } from "@/lib/ia/foto-area";
 import { clasificar, construirRuta, guardarArchivo } from "@/lib/almacenamiento";
 
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       return ok({ lectura: r.lectura, fotoId });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible analizar la foto", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

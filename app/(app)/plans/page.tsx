@@ -25,6 +25,8 @@ import { TablaPlanes, type FilaPlan } from "./tabla-planes";
 import { vistaGuardada } from "@/lib/vistas";
 import { coberturaPreventiva } from "@/lib/cobertura-planes";
 import { AlertTriangle, Network } from "lucide-react";
+import { catalogosDePlanes } from "@/lib/planes-datos";
+import { planParaEditar } from "./para-editar";
 
 export const metadata = { title: "Planes preventivos" };
 export const dynamic = "force-dynamic";
@@ -42,126 +44,42 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
   // cuando hay compresores tipo A, B y C en la misma categoria.
   const cobertura = await coberturaPreventiva(user.organizationId);
 
-  const [plans, assets, meters, technicians, especialidades, refacciones, servicios] = await Promise.all([
-    prisma.maintenancePlan.findMany({
-      where: { organizationId: user.organizationId },
-      include: {
-        asset: { select: { code: true, name: true } },
-        meter: { select: { name: true, unit: true, currentValue: true } },
-        _count: { select: { workOrders: true, asignaciones: true } },
-        asignaciones: {
-          where: { active: true },
-          orderBy: { nextDueDate: "asc" },
-          select: {
-            nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true,
-            // Los equipos REALES del plan: el del encabezado es solo con el que nacio.
-            asset: { select: { code: true, name: true } },
-            meter: { select: { unit: true, currentValue: true, proyeccionSuspendida: true } },
-          },
-        },
-        tasks: incluirTareas,
-        links: {
-          orderBy: { createdAt: "desc" },
-          select: { id: true, title: true, url: true, note: true, createdAt: true },
+  const plans = await prisma.maintenancePlan.findMany({
+    where: { organizationId: user.organizationId },
+    include: {
+      asset: { select: { code: true, name: true } },
+      meter: { select: { name: true, unit: true, currentValue: true } },
+      _count: { select: { workOrders: true, asignaciones: true } },
+      asignaciones: {
+        where: { active: true },
+        orderBy: { nextDueDate: "asc" },
+        select: {
+          nextDueDate: true, lastCompletedAt: true, lastGeneratedAt: true,
+          // Los equipos REALES del plan: el del encabezado es solo con el que nacio.
+          asset: { select: { code: true, name: true } },
+          meter: { select: { unit: true, currentValue: true, proyeccionSuspendida: true } },
         },
       },
-      // El calendario vive en las asignaciones: la fecha que se muestra es la
-      // mas proxima de sus equipos, no la del plan, que quedo obsoleta.
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-    }),
-    prisma.asset.findMany({
-      where: { organizationId: user.organizationId, active: true },
-      select: { id: true, code: true, name: true },
-      orderBy: { code: "asc" },
-    }),
-    prisma.meter.findMany({
-      where: { organizationId: user.organizationId },
-      select: { id: true, name: true, unit: true, assetId: true, currentValue: true },
-    }),
-    prisma.user.findMany({
-      where: { organizationId: user.organizationId, active: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.specialty.findMany({
-      where: { organizationId: user.organizationId },
-      select: { id: true, code: true, name: true, hourlyRate: true },
-      orderBy: { code: "asc" },
-    }),
-    prisma.part.findMany({
-      where: { organizationId: user.organizationId, active: true },
-      select: { id: true, code: true, name: true, unit: true, unitCost: true },
-      orderBy: { code: "asc" },
-    }),
-    prisma.externalService.findMany({
-      where: { organizationId: user.organizationId, active: true },
-      select: { id: true, code: true, name: true, unit: true, unitCost: true },
-      orderBy: { code: "asc" },
-    }),
-  ]);
+      tasks: incluirTareas,
+      links: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, title: true, url: true, note: true, createdAt: true },
+      },
+    },
+    // El calendario vive en las asignaciones: la fecha que se muestra es la
+    // mas proxima de sus equipos, no la del plan, que quedo obsoleta.
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+  const { activos: assets, medidores: meters, tecnicos: technicians, opcEspecialidades, opcRefacciones, opcServicios } = await catalogosDePlanes(user.organizationId);
 
-  // Los catalogos que alimentan los recursos de cada actividad.
-  const opcEspecialidades = especialidades.map((e) => ({
-    id: e.id, etiqueta: `${e.code} — ${e.name}`, costo: e.hourlyRate, unidad: "h",
-  }));
-  const opcRefacciones = refacciones.map((r) => ({
-    id: r.id, etiqueta: `${r.code} — ${r.name}`, costo: r.unitCost, unidad: r.unit,
-  }));
   const usoIa = await consumoIa(user.organizationId);
   const entitlementIa = iaDeLaOrganizacion(user.organization);
   const puedeRedactarConIa =
     iaConfigurada() && editable && entitlementIa.funciones.includes("PLAN");
   const operacionesRestantes = Math.max(0, entitlementIa.operaciones - usoIa.operaciones);
 
-  const opcServicios = servicios.map((s) => ({
-    id: s.id, etiqueta: `${s.code} — ${s.name}`, costo: s.unitCost, unidad: s.unit,
-  }));
-
   /** Convierte un plan guardado al formato que espera el dialogo de edicion. */
-  function paraEditar(plan: (typeof plans)[number]) {
-    return {
-      id: plan.id,
-      name: plan.name,
-      description: plan.description,
-      equipos: plan.asignaciones.map((a) => a.asset.code),
-      maintenanceType: plan.maintenanceType,
-      triggerType: plan.triggerType,
-      intervalDays: plan.intervalDays,
-      intervalMeter: plan.intervalMeter,
-      meterId: plan.meterId,
-      leadTimeDays: plan.leadTimeDays,
-      priority: plan.priority,
-      estimatedHours: plan.estimatedHours,
-      assignedToId: plan.assignedToId,
-      requiresShutdown: plan.requiresShutdown,
-      safetyNotes: plan.safetyNotes,
-      tasks: plan.tasks.map((t) => ({
-        title: t.title,
-        taskType: t.taskType,
-        unit: t.unit ?? undefined,
-        minValue: t.minValue != null ? String(t.minValue) : undefined,
-        maxValue: t.maxValue != null ? String(t.maxValue) : undefined,
-        required: t.required,
-        /**
-         * La frecuencia, en las palabras en que se guardo.
-         *
-         * Vacio significa "la frecuencia del plan", que es el caso de siempre
-         * y por eso es lo que no hay que capturar. Un plan anterior al
-         * calendario por actividad no trae `cadaCuanto` y cae ahi solo.
-         */
-        cadaCuanto: t.cadaCuanto ? String(t.cadaCuanto) : undefined,
-        unidadFrecuencia: t.unidadFrecuencia ?? "DIAS",
-        confirmarDiaria: Boolean(t.diariaConfirmadaEl),
-        labor: t.labor.map((l) => ({
-          specialtyId: l.specialtyId, personas: String(l.personas), hours: String(l.hours),
-        })),
-        parts: t.parts.map((p) => ({ partId: p.partId, quantity: String(p.quantity) })),
-        services: t.services.map((s) => ({
-          serviceId: s.serviceId, quantity: String(s.quantity), nota: s.nota ?? "",
-        })),
-      })),
-    };
-  }
+  const paraEditar = (plan: (typeof plans)[number]) => planParaEditar(plan);
 
   const activeCount = plans.filter((p) => p.active).length;
   const meterPlans = plans.filter((p) => p.triggerType === "METER").length;

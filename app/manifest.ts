@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { MARCA, SUBLEMA } from "@/lib/comercial";
 
 /**
  * El manifiesto que convierte a MainTrack en una aplicacion instalable.
@@ -13,10 +14,9 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MainTrack CMMS",
-    short_name: "MainTrack",
-    description:
-      "Mantenimiento preventivo, correctivo y predictivo. Órdenes de trabajo, reportes de falla y refacciones desde el celular.",
+    name: MARCA,
+    short_name: MARCA,
+    description: SUBLEMA,
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

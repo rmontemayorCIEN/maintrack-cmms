@@ -12,6 +12,8 @@ export const ALCANCES = {
   "solicitudes:crear": "Crear solicitudes de trabajo",
   "lecturas:crear": "Registrar lecturas de medidores y condiciones de sensores",
   "inventario:leer": "Consultar existencias de refacciones",
+  "compras:leer": "Consultar requisiciones de compra y su avance",
+  "compras:escribir": "Registrar la orden de compra colocada y la recepción de mercancía",
   "estado:leer": "Consultar el estado general (conteos de pendientes)",
   "costos:leer": "Ver costos en activos, órdenes e inventario",
   "eventos:enviar": "Enviar eventos entrantes (webhook entrante)",

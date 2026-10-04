@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { generarInventario, prepararEntrevista } from "@/lib/ia/implementacion";
 import { logAudit } from "@/lib/audit";
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       return ok({ intakeId: intake.id, propuestos: intake._count.propuestas, nota: r.inventario.nota, fotos: fotosEnlazadas }, 201);
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible completar el levantamiento", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

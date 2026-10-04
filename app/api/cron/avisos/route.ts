@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { correrAvisos } from "@/lib/avisos/proceso";
+import { corridaDeCron } from "@/lib/cron";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -15,11 +15,5 @@ export const maxDuration = 300;
  * reintentos. Todo es idempotente, así que correrlo de más no duplica avisos.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const header = request.headers.get("authorization");
-  if (!secret || header !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-  const r = await correrAvisos();
-  return NextResponse.json({ ranAt: new Date().toISOString(), ...r });
+  return corridaDeCron(request, "avisos", async () => ({ ...(await correrAvisos()) }));
 }

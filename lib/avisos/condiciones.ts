@@ -23,6 +23,7 @@ import { prisma } from "../db";
 import { consumoDe } from "../planes";
 import { EVENTOS, type TipoEvento } from "./catalogo";
 import { configDe, type ConfigEmpresa } from "./config";
+import { estadoDeVigencia } from "../vigencias-tipos";
 import { resolverDestinatarios } from "./destinatarios";
 import { ultimosMovimientos } from "./movimiento";
 import { REGLAS_RECOMENDADAS, type ClaveRegla } from "./reglas";
@@ -260,11 +261,119 @@ const ordenCompraVencida: Evaluador = cadaUno(
   },
 );
 
+/**
+ * El compromiso: se cierra solo cuando se marca hecho o cancelado.
+ *
+ * Es lo que lo distingue de una mencion —que no tiene condicion que se pueda
+ * calcular— y lo que hace que la promesa deje de estar en el aire: el aviso no
+ * se va hasta que alguien lo resuelve, y cuando lo resuelve se va solo.
+ */
+const compromiso: Evaluador = cadaUno(
+  (c, x) => porId(prisma.compromiso.findMany({
+    where: { organizationId: c.organizationId, id: { in: x } },
+    select: { id: true, estado: true },
+  })),
+  (r) => {
+    if (!r) return resuelto("Ya no existe", "El compromiso se eliminó", "Eliminación");
+    if (r.estado === "HECHO") return resuelto("Hecho", "El compromiso se marcó como hecho", "Compromiso hecho");
+    if (r.estado === "CANCELADO") return resuelto("Cancelado", "El compromiso se canceló", "Cancelación");
+    return sigue("Abierto");
+  },
+);
+
+/**
+ * Una vigencia por vencer o vencida.
+ *
+ * ── Que cuenta como renovada ──
+ *
+ * NO solo que alguien mueva la fecha de esta, sino que exista OTRA vigencia
+ * activa, del mismo tipo y colgada de lo mismo, que cubra mas lejos. Asi se
+ * renueva de verdad: la poliza vieja se conserva como historia de la planta y
+ * se registra la nueva. Mirando solo el registro que disparo el aviso, el
+ * aviso de la poliza del ano pasado se quedaba pendiente para siempre aunque
+ * la nueva ya estuviera cargada.
+ *
+ * Va escrito a mano y no con `cadaUno` porque decidir necesita la consulta de
+ * renovaciones: con `cadaUno` seria una consulta por aviso, y en una planta
+ * con doscientos permisos eso son doscientas consultas cada vez que corre el
+ * proceso.
+ */
+const vigencia: Evaluador = async (c, avisos) => {
+  const registros = await porId(prisma.vigencia.findMany({
+    where: { organizationId: c.organizationId, id: { in: ids(avisos) } },
+    select: { id: true, tipo: true, hasta: true, activa: true, avisarDias: true, assetId: true, partId: true, userId: true, serviceId: true },
+  }));
+
+  /**
+   * Las candidatas a ser la renovacion, en UNA consulta: las activas de los
+   * mismos tipos, colgadas de las mismas cosas. El «cubre mas lejos» se
+   * decide despues, registro por registro.
+   */
+  const vivas = registros.size
+    ? await prisma.vigencia.findMany({
+        where: {
+          organizationId: c.organizationId, activa: true, hasta: { not: null },
+          tipo: { in: [...new Set([...registros.values()].map((r) => r.tipo))] },
+        },
+        select: { id: true, tipo: true, titulo: true, hasta: true, assetId: true, partId: true, userId: true, serviceId: true },
+      })
+    : [];
+
+  const mismaAncla = (a: { assetId: string | null; partId: string | null; userId: string | null; serviceId: string | null },
+                      b: { assetId: string | null; partId: string | null; userId: string | null; serviceId: string | null }) =>
+    (a.assetId && a.assetId === b.assetId) || (a.partId && a.partId === b.partId)
+    || (a.userId && a.userId === b.userId) || (a.serviceId && a.serviceId === b.serviceId);
+
+  return new Map(avisos.map((n) => {
+    const r = n.entidadId ? registros.get(n.entidadId) : undefined;
+    if (!r) return [n.id, resuelto("Ya no existe", "La vigencia se eliminó", "Eliminación")];
+    if (!r.activa) return [n.id, resuelto("Cancelada", "La vigencia se canceló", "Cancelación")];
+    if (!r.hasta) return [n.id, resuelto("Sin vencimiento", "Se le quitó la fecha de vencimiento", "Cambio de fecha")];
+
+    const nueva = vivas.find((v) =>
+      v.id !== r.id && v.tipo === r.tipo && v.hasta!.getTime() > r.hasta!.getTime() && mismaAncla(r, v));
+    if (nueva) {
+      return [n.id, resuelto("Renovada", `Se registró una vigencia que cubre más lejos: ${nueva.titulo}`, "Renovación")];
+    }
+
+    const estado = estadoDeVigencia(r, c.ahora);
+    if (estado === "VIGENTE") return [n.id, resuelto("Vigente", "Se movió la fecha y ya no está por vencerse", "Cambio de fecha")];
+    return [n.id, sigue(estado === "VENCIDA" ? "Vencida, sin renovar" : "Por vencer")];
+  }));
+};
+
 // ─────────────────────────────────────────── El registro de reglas
 
 type Clave = TipoEvento | `esc:${ClaveRegla}`;
 
 export const REGLAS_DE_AVISO: Partial<Record<Clave, ReglaDeAviso>> = {
+  VIGENCIA_POR_VENCER: {
+    condicion: "Vigencia por vencer, sin renovar",
+    nace: "Cuando le faltan al documento los días de anticipación de su tipo (una póliza avisa con más tiempo que una calibración).",
+    permanece: "Mientras no se renueve, no se cancele y no se mueva la fecha.",
+    actualiza: "Si se mueve la fecha de vencimiento.",
+    escala: "No escala por sí solo: al vencerse nace «Vigencia vencida», que es de prioridad alta.",
+    atiende: "Al registrarse otra vigencia del mismo tipo que cubra más lejos, al cancelarse, o al correrse la fecha.",
+    evaluar: vigencia,
+  },
+  VIGENCIA_VENCIDA: {
+    condicion: "Vigencia vencida, sin renovar",
+    nace: "El día que pasa su fecha de vencimiento sin renovación.",
+    permanece: "Mientras siga sin renovarse.",
+    actualiza: "No cambia: ya venció.",
+    escala: "No escala: la urgencia ya está en su prioridad.",
+    atiende: "Al registrarse otra vigencia del mismo tipo que cubra más lejos, o al cancelarse la vencida.",
+    evaluar: vigencia,
+  },
+  COMPROMISO_ASIGNADO: {
+    condicion: "Compromiso abierto a su nombre",
+    nace: "Cuando alguien le anota algo a su nombre en un registro.",
+    permanece: "Mientras siga abierto.",
+    actualiza: "No cambia: si cambia lo que hay que hacer, se anota otro.",
+    escala: "No escala: es un acuerdo entre dos personas, no una orden de trabajo.",
+    atiende: "Al marcarse hecho o cancelado, o si el compromiso se elimina.",
+    evaluar: compromiso,
+  },
   OT_ASIGNADA: {
     condicion: "OT asignada sin iniciar",
     nace: "Al asignarse la orden a una persona.", permanece: "Mientras esa persona siga a cargo y no la inicie.",

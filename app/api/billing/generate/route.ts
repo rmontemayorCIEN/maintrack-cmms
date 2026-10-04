@@ -25,8 +25,9 @@ export async function POST(request: Request) {
 
   // Se avisa al propietario de cada empresa que tiene un cargo nuevo.
   if (resultado.emitidos > 0) {
+    // Solo los recién emitidos: los pendientes de antes ya se avisaron.
     const cargos = await prisma.invoice.findMany({
-      where: { periodo, status: "PENDING" },
+      where: { periodo, status: "PENDING", folio: { in: resultado.detalle.map((d) => d.folio) } },
       select: { organizationId: true, folio: true, importe: true, moneda: true },
     });
     for (const c of cargos) {

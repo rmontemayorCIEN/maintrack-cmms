@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { COMPLEMENTO_IA, planDe } from "./planes";
+import { COMPLEMENTO_IA, COMPLEMENTOS, planDe } from "./planes";
 
 /**
  * Cobranza manual del servicio.
@@ -42,8 +42,10 @@ export type ResultadoEmision = {
 /**
  * Emite los cargos de un periodo.
  *
- * Se omiten: el plan Free (no cuesta), las cuentas canceladas, las que siguen
- * en prueba vigente, y las que ya tienen cargo de ese periodo. Es idempotente:
+ * Se omiten: la empresa demostrativa y las cuentas internas del operador
+ * (nunca generan cargos), las cuentas
+ * canceladas, las que siguen en prueba vigente, y las que ya tienen cargo de
+ * ese periodo. Es idempotente:
  * volver a ejecutarlo no duplica nada.
  */
 export async function emitirCargosDelPeriodo(
@@ -54,7 +56,8 @@ export async function emitirCargosDelPeriodo(
     where: opciones.organizationId ? { id: opciones.organizationId } : {},
     select: {
       id: true, name: true, plan: true, status: true, currency: true, trialEndsAt: true,
-      iaComplemento: true,
+      iaComplemento: true, registrosPropios: true, cumplimientoNormas: true,
+      esDemo: true, cuentaInterna: true,
       invoices: { where: { periodo }, select: { id: true } },
     },
   });
@@ -67,6 +70,14 @@ export async function emitirCargosDelPeriodo(
   for (const org of organizaciones) {
     if (org.invoices.length) {
       resultado.omitidos.push({ empresa: org.name, motivo: "Ya tiene cargo de este periodo" });
+      continue;
+    }
+    if (org.esDemo) {
+      resultado.omitidos.push({ empresa: org.name, motivo: "Empresa demostrativa: no genera cargos" });
+      continue;
+    }
+    if (org.cuentaInterna) {
+      resultado.omitidos.push({ empresa: org.name, motivo: "Cuenta interna del operador: no genera cargos" });
       continue;
     }
     if (org.status === "CANCELLED") {
@@ -84,13 +95,20 @@ export async function emitirCargosDelPeriodo(
       continue;
     }
 
-    // El complemento de IA es una linea adicional del mismo cargo mensual: el
-    // cliente recibe una sola nota, con el desglose a la vista.
+    // Los complementos contratados son lineas adicionales del mismo cargo
+    // mensual: el cliente recibe una sola nota, con el desglose a la vista.
+    //
+    // Cuales hay y cuanto cuestan lo decide `COMPLEMENTOS` en planes.ts, no
+    // este archivo: aqui solo se suman los que la empresa contrato. Uno nuevo
+    // se agrega alla y esto no se toca.
+    const contratados = COMPLEMENTOS.filter((c) => c.contratado(org));
+    const importe = contratados.reduce((t, c) => t + c.precioMensual, plan.precioMensual);
+    const concepto = contratados.length
+      ? `Servicio MainTrack · Plan ${plan.nombre} + ${contratados.map((c) => c.nombre).join(" + ")} · ${nombrePeriodo(periodo)}`
+      : `Servicio MainTrack · Plan ${plan.nombre} · ${nombrePeriodo(periodo)}`;
+    // Se conserva porque las facturas ya emitidas la traen y porque separa lo
+    // que se gasta en modelo de lo que no.
     const importeIa = org.iaComplemento ? COMPLEMENTO_IA.precioMensual : 0;
-    const importe = plan.precioMensual + importeIa;
-    const concepto = importeIa
-      ? `Servicio MainTrack CMMS · Plan ${plan.nombre} + ${COMPLEMENTO_IA.nombre} · ${nombrePeriodo(periodo)}`
-      : `Servicio MainTrack CMMS · Plan ${plan.nombre} · ${nombrePeriodo(periodo)}`;
 
     const folio = await siguienteFolio(org.id);
     await prisma.invoice.create({

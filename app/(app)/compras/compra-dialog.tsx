@@ -6,6 +6,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { URGENCIAS } from "@/lib/requisiciones-datos";
 import { SelectorBuscable } from "@/components/selector-buscable";
+import { formatCurrency } from "@/lib/utils";
 
 export type RefaccionCompra = { id: string; code: string; name: string; unit: string; costo: number };
 type Renglon = { partId: string; descripcion: string; cantidad: string; costo: string; materialRequestLineId?: string | null };
@@ -17,9 +18,10 @@ type Renglon = { partId: string; descripcion: string; cantidad: string; costo: s
  * material que el almacen no pudo surtir, no capturar todo de nuevo.
  */
 export function CompraDialog({
-  almacenes, refacciones, proveedores, materialRequestId, precargados, etiqueta,
+  almacenes, refacciones, proveedores, materialRequestId, precargados, etiqueta, moneda,
 }: {
   almacenes: { id: string; name: string }[];
+  moneda: string;
   refacciones: RefaccionCompra[];
   proveedores: { id: string; name: string }[];
   materialRequestId?: string;
@@ -208,7 +210,7 @@ export function CompraDialog({
                   + Agregar renglón
                 </button>
                 <span className="text-xs text-slate-500">
-                  Estimado: <span className="font-medium tabular-nums text-slate-800">{total.toFixed(2)}</span>
+                  Estimado: <span className="font-medium tabular-nums text-slate-800">{formatCurrency(total, moneda)}</span>
                 </span>
               </div>
             </div>

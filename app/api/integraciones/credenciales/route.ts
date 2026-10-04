@@ -38,5 +38,5 @@ export async function POST(request: Request) {
       if (e instanceof ErrorDeCredencial) return fail(e.message, e.codigo);
       throw e;
     }
-  });
+  }, { noEnDemo: true });
 }

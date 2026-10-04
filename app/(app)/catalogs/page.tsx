@@ -3,6 +3,7 @@ import { can } from "@/lib/rbac";
 import { CATALOGOS, type ClaveCatalogo } from "@/lib/catalogs";
 import { PageHeader } from "@/components/ui";
 import { GestorCatalogos } from "./gestor";
+import { instalacionDe } from "@/lib/instalaciones";
 
 export const metadata = { title: "Catálogos" };
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ export default async function CatalogsPage({
         datos={datos}
         activoInicial={activo}
         editable={editable}
+        instalacion={instalacionDe(user.organization.tipoInstalacion).sustantivo}
       />
     </>
   );

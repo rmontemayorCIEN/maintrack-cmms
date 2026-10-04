@@ -4,6 +4,7 @@ import { fail, ok, withAuth } from "@/lib/api";
 import { almacenPorOmision } from "@/lib/almacen";
 import { ErrorDeCompra, crearRequisicionDeCompra } from "@/lib/compras";
 import { logAudit } from "@/lib/audit";
+import { formatCurrency } from "@/lib/utils";
 
 const schema = z.object({
   warehouseId: z.string().optional().nullable(),
@@ -39,10 +40,11 @@ export async function POST(request: Request) {
 
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
-      select: { montoAutorizacion: true },
+      select: { montoAutorizacion: true, currency: true },
     });
 
     try {
+      const moneda = org?.currency ?? "MXN";
       const req = await crearRequisicionDeCompra({
         organizationId: orgId,
         userId: user.id,
@@ -58,8 +60,10 @@ export async function POST(request: Request) {
       await logAudit({
         organizationId: orgId, userId: user.id,
         entity: "PurchaseRequest", entityId: req.id, action: "CREATED",
-        summary: `Requisicion de compra ${req.folio}: ${input.renglones.length} renglones, $${req.montoEstimado.toFixed(2)}` +
-          (req.estado === "AUTORIZADA" ? " (autorizada automáticamente: bajo el umbral)" : ""),
+        summary: `Requisicion de compra ${req.folio}: ${input.renglones.length} renglones, ${formatCurrency(req.montoEstimado, moneda)}` +
+          (req.estado === "AUTORIZADA"
+            ? ` (autorizada automáticamente: bajo el umbral de ${formatCurrency(org?.montoAutorizacion ?? 0, moneda)})`
+            : ""),
       });
 
       return ok({ id: req.id, folio: req.folio, estado: req.estado }, 201);

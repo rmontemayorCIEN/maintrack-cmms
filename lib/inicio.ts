@@ -19,9 +19,15 @@
  * inicio que manda a «Sin permiso» es peor que no tenerlo.
  */
 import { prisma } from "./db";
+import { requisicionAbierta } from "./requisiciones-datos";
 import { formatDia, formatCurrency } from "./utils";
 import { accionesRapidasDe, puedeVerRuta, TITULO_INICIO, type AccionRapida, type Rol } from "./pantallas";
 import { OT_ACTIVAS, ordenesCompraEnEspera, refaccionesBajoMinimo, refaccionesCriticasAgotadas } from "./avisos/situaciones";
+import { filtroDeVencidas } from "./vencimiento";
+import { resumenDeInicio } from "./resumen-inicio";
+import { franjaDePlanta, type FranjaDePlanta } from "./planta";
+import { porAutorizar } from "./compras";
+import { alertaAbierta } from "./alertas";
 
 export type Tono = "normal" | "bien" | "atencion" | "critico";
 export type Cifra = { etiqueta: string; valor: string; tono: Tono; enlace?: string };
@@ -43,6 +49,21 @@ export type Inicio = {
   alDia: boolean;
   /** Dueño y administración, mientras la cuenta no esté lista: cuánto falta (el mismo número de /puesta-en-marcha). */
   puesta: { porcentaje: number; siguiente: string | null; estado: string } | null;
+  /**
+   * De cuándo son los indicadores y la calidad de datos que se muestran.
+   *
+   * Solo esas dos cifras vienen de un resumen guardado, que se recalcula cada
+   * cuarto de hora; lo demás del inicio se consulta en vivo. Se dice en
+   * pantalla porque una cifra sin fecha, cuando alguien acaba de cerrar
+   * órdenes y no se movió, se siente como un error del sistema.
+   */
+  calculadoEl: Date | null;
+  /**
+   * Como esta la planta por areas o por sistemas. Solo para quien ve equipos:
+   * a compras y a quien solo reporta no le sirve de nada saber que la nave
+   * tiene dos equipos degradados, y ocuparia el lugar de lo suyo.
+   */
+  franja: FranjaDePlanta | null;
 };
 
 type Usuario = { id: string; role: string; isSuperAdmin: boolean; organizationId: string; organization: { timezone: string | null; currency: string } };
@@ -50,7 +71,11 @@ type Usuario = { id: string; role: string; isSuperAdmin: boolean; organizationId
 const DIA = 86_400_000;
 const MAX = 6;
 const n = (x: number) => new Intl.NumberFormat("es-MX").format(x);
-const pct = (x: number | null) => (x === null ? "—" : `${Math.round(x)} %`);
+/**
+ * Porcentaje para el inicio. Cerca de 100 se muestra con un decimal y hacia
+ * abajo: 99.97 % redondeado a «100 %» dice que no hubo un solo paro, y sí hubo.
+ */
+const pct = (x: number | null) => (x === null ? "—" : x >= 99 && x < 100 ? `${(Math.floor(x * 10) / 10).toLocaleString("es-MX")} %` : `${Math.round(x)} %`);
 
 const selOt = {
   id: true, number: true, title: true, status: true, priority: true, dueDate: true, estimatedHours: true,
@@ -80,6 +105,17 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
   const zona = user.organization.timezone || "America/Mexico_City";
   const org = user.organizationId;
   const ctx = { user, rol, zona, org, ahora };
+
+  /**
+   * Se lanza ANTES de armar el inicio y se espera hasta el final: no depende
+   * de nada de lo que arma cada rol, asi que esperarla en serie seria regalar
+   * su tiempo. El `catch` va aqui mismo —no en el `await`— para que una falla
+   * no quede como rechazo sin atender mientras se arma lo demas.
+   */
+  const pendienteFranja = puedeVerRuta(rol, "/assets")
+    ? franjaDePlanta(org, ahora, zona).catch(() => null)
+    : Promise.resolve(null);
+
   const armado = await (ARMADORES[rol] ?? inicioConsulta)(ctx);
   const bloques = armado.bloques.filter((b) => b.total > 0)
     // Una liga a una pantalla que el rol no abre no se ofrece.
@@ -95,17 +131,30 @@ export async function inicioDe(user: Usuario, ahora = new Date()): Promise<Inici
       };
     }
   }
+  // La franja no puede tumbar el inicio: si falla, el inicio sale sin ella.
+  const franja = await pendienteFranja;
+
   return {
     rol, titulo: TITULO_INICIO[rol] ?? "Inicio", resumen: armado.resumen, bloques,
     acciones: accionesRapidasDe(rol),
     masDetalle: (armado.masDetalle ?? []).filter((d) => puedeVerRuta(rol, d.href)),
     tituloDetalle: armado.tituloDetalle ?? "Más detalle",
     alDia: bloques.length === 0, puesta,
+    calculadoEl: armado.calculadoEl ?? null,
+    franja,
   };
 }
 
 type Ctx = { user: Usuario; rol: Rol; zona: string; org: string; ahora: Date };
-type Armado = { resumen: Cifra[]; bloques: Bloque[]; masDetalle?: Inicio["masDetalle"]; tituloDetalle?: string };
+type Armado = {
+  resumen: Cifra[]; bloques: Bloque[]; masDetalle?: Inicio["masDetalle"]; tituloDetalle?: string;
+  /**
+   * De cuando son las cifras del resumen guardado. Solo en los inicios que lo
+   * usan: sin fecha, un numero que no se movio despues de cerrar cinco
+   * ordenes destruye la confianza mas rapido que la espera que se evito.
+   */
+  calculadoEl?: Date;
+};
 
 // ─────────────────────────────────────────── Piezas compartidas
 
@@ -119,8 +168,14 @@ async function ordenes(org: string, where: Record<string, unknown>, take = 50) {
 async function criticasYVencidas(c: Ctx) {
   const [criticas, vencidas, nVencidas, nCriticas] = await Promise.all([
     ordenes(c.org, { priority: "CRITICAL" }, MAX),
-    ordenes(c.org, { dueDate: { lt: c.ahora } }, MAX),
-    prisma.workOrder.count({ where: { organizationId: c.org, status: { in: OT_ACTIVAS }, dueDate: { lt: c.ahora } } }),
+    // El mismo criterio que la lista y que la etiqueta de cada orden: antes
+    // aqui se contaba `dueDate < ahora` al instante y alla se comparaba el DIA
+    // en la zona de la empresa, asi que el indicador y la pantalla a la que
+    // lleva podian no coincidir. Incluye los borradores, como los cuenta
+    // `estadoDeVencimiento`: un borrador con fecha pasada es trabajo vencido
+    // que nadie solto.
+    ordenes(c.org, filtroDeVencidas(c.zona, c.ahora), MAX),
+    prisma.workOrder.count({ where: { organizationId: c.org, ...filtroDeVencidas(c.zona, c.ahora) } }),
     prisma.workOrder.count({ where: { organizationId: c.org, status: { in: OT_ACTIVAS }, priority: "CRITICAL" } }),
   ]);
   return { criticas, vencidas, nVencidas, nCriticas };
@@ -128,7 +183,7 @@ async function criticasYVencidas(c: Ctx) {
 
 async function alertasAbiertas(c: Ctx) {
   const alertas = await prisma.predictiveAlert.findMany({
-    where: { organizationId: c.org, status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+    where: { organizationId: c.org, ...alertaAbierta() },
     select: { id: true, title: true, severity: true, status: true, asset: { select: { code: true, name: true } } },
     orderBy: [{ severity: "desc" }, { createdAt: "desc" }], take: 20,
   });
@@ -141,7 +196,7 @@ async function alertasAbiertas(c: Ctx) {
 
 async function comprasPorAutorizar(c: Ctx) {
   const compras = await prisma.purchaseRequest.findMany({
-    where: { organizationId: c.org, estado: "SOLICITADA", NOT: { solicitanteId: c.user.id } },
+    where: porAutorizar(c.org, c.user.id),
     select: { id: true, folio: true, urgencia: true, montoEstimado: true, createdAt: true, justificacion: true },
     orderBy: { createdAt: "asc" }, take: 30,
   });
@@ -169,17 +224,17 @@ async function avisosAbiertos(c: Ctx, tipos: string[]) {
 // ─────────────────────────────────────────── Propietario
 
 async function inicioPropietario(c: Ctx): Promise<Armado> {
-  const { calcularIndicadores, periodoDeLaEmpresa } = await import("./indicadores");
-  const periodo = await periodoDeLaEmpresa(c.org, 30, c.ahora);
-  const [kpi, cv, alertas, compras, agotadas, avisosAdmin] = await Promise.all([
-    calcularIndicadores(c.org, periodo, { ahora: c.ahora }),
+  const [{ datos: kpi, calculadoEl }, cv, alertas, compras, agotadas, avisosAdmin] = await Promise.all([
+    // Lo unico caro del inicio va por el resumen guardado (lib/resumen-inicio):
+    // son ventanas de 30 dias que no se mueven, y lo que SI se mueve —vencidas,
+    // criticas, agotadas, compras— se sigue consultando en vivo aqui abajo.
+    resumenDeInicio(c.org, c.ahora),
     criticasYVencidas(c),
     alertasAbiertas(c),
     comprasPorAutorizar(c),
     refaccionesCriticasAgotadas(c.org),
     avisosAbiertos(c, ["CONFIGURACION_INCOMPLETA", "INTEGRACION_CON_ERRORES", "LIMITE_PLAN_ALCANZADO", "PRUEBA_POR_TERMINAR", "PLAN_FALLO_GENERAR"]),
   ]);
-  const i = kpi.indicadores;
   const criticas: Renglon[] = [
     ...cv.criticas.map((o) => renglonOt(o, c.zona, c.ahora, { conResponsable: true })),
     ...alertas.filter((a) => a.tono === "critico"),
@@ -188,11 +243,12 @@ async function inicioPropietario(c: Ctx): Promise<Armado> {
   return {
     // Tendencias, mezcla, costo por equipo e indicadores secundarios viven en Indicadores y Reportes.
     masDetalle: [{ texto: "Indicadores y tendencias", href: "/indicadores" }, { texto: "Reportes", href: "/reports" }],
+    calculadoEl,
     resumen: [
       { etiqueta: "OT vencidas", valor: n(cv.nVencidas), tono: cv.nVencidas ? "critico" : "bien", enlace: "/work-orders?vencidas=1" },
-      { etiqueta: "Cumplimiento preventivo (30 días)", valor: pct(i.cumplimientoPreventivo.valor), tono: (i.cumplimientoPreventivo.valor ?? 100) < 80 ? "atencion" : "bien", enlace: "/indicadores" },
-      { etiqueta: "Disponibilidad (30 días)", valor: pct(i.disponibilidad.valor), tono: (i.disponibilidad.valor ?? 100) < 90 ? "atencion" : "bien", enlace: "/indicadores" },
-      { etiqueta: "Costo de mantenimiento (30 días)", valor: formatCurrency(kpi.costos.total, c.user.organization.currency), tono: "normal", enlace: "/reports" },
+      { etiqueta: "Cumplimiento preventivo (30 días)", valor: pct(kpi.cumplimiento), tono: (kpi.cumplimiento ?? 100) < 80 ? "atencion" : "bien", enlace: "/indicadores" },
+      { etiqueta: "Disponibilidad (30 días)", valor: pct(kpi.disponibilidad), tono: (kpi.disponibilidad ?? 100) < 90 ? "atencion" : "bien", enlace: "/indicadores" },
+      { etiqueta: "Costo de mantenimiento (30 días)", valor: formatCurrency(kpi.costoTotal, c.user.organization.currency), tono: "normal", enlace: "/reports" },
     ],
     bloques: [
       bloque("situacion-critica", "Situación crítica", criticas, { descripcion: "Órdenes críticas, alertas críticas y refacciones agotadas que detienen trabajo.", total: cv.nCriticas + alertas.filter((a) => a.tono === "critico").length + agotadas.filter((p) => p.detieneTrabajo).length }),
@@ -217,12 +273,13 @@ async function inicioAdministrador(c: Ctx): Promise<Armado> {
     avisosAbiertos(c, ["CONFIGURACION_INCOMPLETA", "INTEGRACION_CON_ERRORES", "LIMITE_PLAN_ALCANZADO", "PRUEBA_POR_TERMINAR"]),
     avisosAbiertos(c, ["PLAN_SIN_PROGRAMACION", "PLAN_FALLO_GENERAR", "ACTIVO_CRITICO_SIN_PLAN", "MEDIDOR_SIN_LECTURA"]),
     prisma.entregaAviso.count({ where: { organizationId: c.org, estado: "FALLIDA", createdAt: { gte: new Date(c.ahora.getTime() - 7 * DIA) } } }),
-    import("./calidad-datos").then((m) => m.revisarCalidad(c.org, c.ahora)).catch(() => []),
+    resumenDeInicio(c.org, c.ahora),
   ]);
-  const problemas = calidad.filter((r) => r.cantidad > 0).sort((a, b) => b.peso - a.peso);
+  const problemas = calidad.datos.problemas;
   const puesta = await import("./puesta-en-marcha").then((m) => m.puestaEnMarcha(c.org)).catch(() => null);
   return {
     tituloDetalle: "Administración",
+    calculadoEl: calidad.calculadoEl,
     masDetalle: [
       { texto: "Usuarios", href: "/settings?s=usuarios" }, { texto: "Configuración", href: "/settings?s=organizacion" },
       { texto: "Catálogos", href: "/catalogs" }, { texto: "Reglas de avisos", href: "/settings?s=avisos" },
@@ -264,6 +321,7 @@ async function inicioSupervisor(c: Ctx): Promise<Armado> {
   const manana = new Date(c.ahora.getTime() + DIA);
   const pasado = new Date(c.ahora.getTime() + 2 * DIA);
   const hace30 = new Date(c.ahora.getTime() - 30 * DIA);
+  const almacen = await porSurtirYRecibir(c);
   const [sinAsignar, cv, proximas, detenidas, revision, hoy, solicitudes, alertas, bloqueadas, tecnicos, carga, prevs] = await Promise.all([
     ordenes(c.org, { assignedToId: null }, 30),
     criticasYVencidas(c),
@@ -312,6 +370,8 @@ async function inicioSupervisor(c: Ctx): Promise<Armado> {
         fecha: `Recibida ${formatDia(s.createdAt, { zona: c.zona })}`, tono: s.riesgo === "ALTO" || s.priority === "CRITICAL" ? "critico" : "atencion",
         enlace: `/requests/${s.id}`, accion: { texto: "Clasificar", enlace: `/requests/${s.id}` },
       })), { verTodo: { texto: "Ver solicitudes", enlace: "/requests" } }),
+      bloque("por-surtir", "Material por surtir", almacen.surtir, { verTodo: { texto: "Ver requisiciones", enlace: "/requisiciones" } }),
+      bloque("por-recibir", "Compras por recibir", almacen.recibir, { verTodo: { texto: "Ver compras", enlace: "/compras" } }),
       bloque("bloqueos", "Refacciones que bloquean trabajo", bloqueadas.map<Renglon>((t) => ({
         id: t.id, folio: t.workOrder.number, titulo: t.title, detalle: t.bloqueadaPor ? `Falta ${t.bloqueadaPor.code} · ${t.bloqueadaPor.name} (hay ${t.bloqueadaPor.quantityOnHand} ${t.bloqueadaPor.unit})` : undefined,
         tono: "atencion", enlace: `/work-orders/${t.workOrder.id}`,
@@ -355,6 +415,69 @@ async function inicioTecnico(c: Ctx): Promise<Armado> {
       bloque("avisos", "Avisos de mi trabajo", avisos, { verTodo: { texto: "Ver avisos", enlace: "/notificaciones" } }),
     ],
   };
+}
+
+/**
+ * El trabajo del almacen: lo que hay que surtir y lo que hay que recibir.
+ *
+ * Esto faltaba. Quien atiende el almacen tenia su trabajo repartido en dos
+ * pantallas —las requisiciones de material por un lado, las compras por
+ * otro— y su Inicio no le decia ninguna de las dos, asi que cada mañana
+ * tenia que ir a preguntar a las dos si habia algo.
+ *
+ * No es una pantalla nueva a proposito: la lista de refacciones ya existe y
+ * duplicarla solo garantiza que los dos numeros se separen. Lo que hacia
+ * falta era que el dia se viera de un vistazo, con el boton que lleva
+ * directo a hacerlo.
+ *
+ * El criterio de «abierta» sale de `lib/requisiciones-datos.ts`, el mismo que
+ * usa la pantalla de requisiciones.
+ */
+async function porSurtirYRecibir(c: Ctx) {
+  const [requisiciones, compras] = await Promise.all([
+    prisma.materialRequest.findMany({
+      where: { organizationId: c.org, ...requisicionAbierta() },
+      select: {
+        id: true, folio: true, urgencia: true, estado: true, createdAt: true,
+        workOrder: { select: { number: true } },
+        solicitante: { select: { name: true } },
+      },
+      orderBy: [{ createdAt: "asc" }],
+      take: 50,
+    }),
+    // Lo que ya se compro y todavia no entra al almacen. Lo que aun no tiene
+    // orden de compra es trabajo del comprador, no del almacenista.
+    prisma.purchaseRequest.findMany({
+      where: { organizationId: c.org, estado: { in: ["EN_COMPRA", "RECIBIDA_PARCIAL"] } },
+      select: { id: true, folio: true, estado: true, ordenCompra: true, createdAt: true },
+      orderBy: [{ createdAt: "asc" }],
+      take: 50,
+    }),
+  ]);
+
+  const paro = requisiciones.filter((r) => r.urgencia === "PARO");
+  const surtir = requisiciones.map<Renglon>((r) => ({
+    id: r.id,
+    folio: r.folio,
+    titulo: r.workOrder?.number ? `Para la orden ${r.workOrder.number}` : "Material solicitado",
+    detalle: [r.solicitante?.name, r.estado === "PARCIAL" ? "surtida en parte" : null, r.urgencia === "PARO" ? "equipo parado" : null]
+      .filter(Boolean).join(" · ") || undefined,
+    tono: r.urgencia === "PARO" ? "critico" : "atencion",
+    enlace: `/requisiciones/${r.id}`,
+    accion: { texto: "Surtir", enlace: `/requisiciones/${r.id}` },
+  }));
+
+  const recibir = compras.map<Renglon>((x) => ({
+    id: x.id,
+    folio: x.folio,
+    titulo: x.ordenCompra ? `Orden de compra ${x.ordenCompra}` : "Compra colocada",
+    detalle: x.estado === "RECIBIDA_PARCIAL" ? "llegó una parte" : undefined,
+    tono: "normal",
+    enlace: `/compras/${x.id}`,
+    accion: { texto: "Recibir", enlace: `/compras/${x.id}` },
+  }));
+
+  return { surtir, recibir, paro: paro.length };
 }
 
 // ─────────────────────────────────────────── Compras

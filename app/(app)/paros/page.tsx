@@ -7,6 +7,9 @@ import {
   costoComparado, comoDecirlo, eventosDeParo, ventanas, esPeriodo, type ClavePeriodo,
 } from "@/lib/costo-de-parar";
 import { MapaDeParos } from "./mapa";
+import { PorQueFalla } from "@/components/por-que-falla";
+import { agruparPorFamiliaDeCausa, fallasCodificadas } from "@/lib/fallas";
+import { verCostos } from "@/lib/pantallas";
 
 export const metadata = { title: "Dónde para la planta" };
 export const dynamic = "force-dynamic";
@@ -46,13 +49,25 @@ export default async function ParosPage({
 
   const zona = await zonaDeLaEmpresa(user.organizationId);
   const v = ventanas(periodo, new Date(), zona);
-  const [datos, eventos] = await Promise.all([
+  /**
+   * El «por que falla» respeta la ventana que el director arrastro, igual que
+   * el costo de arriba.
+   *
+   * Si el mapa enseñara tres semanas de julio y esto el trimestre entero,
+   * serian dos periodos distintos en la misma pantalla y nadie lo notaria: el
+   * numero de abajo explicaria un pico que no es el que se esta mirando.
+   */
+  const rango = ventanaPropia ?? v.actual;
+
+  const [datos, eventos, fallas] = await Promise.all([
     costoComparado(user.organizationId, periodo, undefined, ventanaPropia),
     // El latido siempre muestra el periodo completo: la ventana es una
     // seleccion DENTRO de el, y encogerlo dejaria sin contexto lo que se
     // acaba de escoger.
     eventosDeParo(user.organizationId, v.actual),
+    fallasCodificadas(user.organizationId, rango.desde, rango.hasta),
   ]);
+  const porQueFalla = agruparPorFamiliaDeCausa(fallas);
 
   return (
     <>
@@ -80,6 +95,21 @@ export default async function ParosPage({
         puedeAcomodar={can(user.role, "settings:write")}
         moneda={user.organization.currency}
       />
+
+      {/*
+        Donde para la planta contesta «donde me duele». Esto contesta «por
+        que», que es la pregunta siguiente y la unica que se puede accionar:
+        un director que ve que la mitad de su paro es por operacion no llama
+        al jefe de mantenimiento, llama a produccion.
+      */}
+      <div className="mt-4">
+        <PorQueFalla
+          causas={porQueFalla}
+          moneda={user.organization.currency}
+          titulo="Por qué para"
+          conCostos={verCostos(user.role)}
+        />
+      </div>
     </>
   );
 }

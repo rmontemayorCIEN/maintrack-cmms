@@ -24,11 +24,56 @@ import { avisarCompraPorAutorizar } from "./avisos/detectores";
 // envio de avisos al paquete del navegador. Ya paso una vez.
 import { ESTADOS_COMPRA, type EstadoCompra } from "./estados-compra";
 
-export class ErrorDeCompra extends Error {}
+/** Regla de compras incumplida: es del usuario, no del sistema (ver ErrorDeAlmacen). */
+export class ErrorDeCompra extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 /** Si la requisicion necesita firma segun el monto de la organizacion. */
 export function requiereAutorizacion(montoEstimado: number, umbral: number) {
   return montoEstimado >= umbral;
+}
+
+/**
+ * Lo que cuesta hoy cada renglon, y como se llama esa cifra.
+ *
+ * Al elegir cotizacion, `montoEstimado` pasa a ser el cotizado (ver
+ * `elegirCotizacion`), pero el costo de cada renglon se queda como se pidio.
+ * La pantalla sumaba los estimados y el encabezado mostraba el cotizado: dos
+ * cifras distintas para la misma compra, a diez centimetros una de otra y sin
+ * decir por que. Se vio abriendo la pantalla; ninguna prueba de datos lo iba
+ * a notar, porque las dos cifras son correctas por separado.
+ *
+ * El total de una cotizacion solo suma lo que el proveedor SI surte, asi que
+ * un renglon que el no tiene queda fuera de la cifra: eso se marca con
+ * `fuera`, para que la pantalla lo muestre aparte en vez de cuadrarlo a la
+ * fuerza.
+ */
+export function costosVigentes(
+  renglones: Array<{ id: string; costoEstimado: number }>,
+  cotizaciones: Array<{
+    seleccionada: boolean;
+    renglones: Array<{ requestLineId: string | null; costoUnitario: number; disponible: boolean }>;
+  }>,
+) {
+  const elegida = cotizaciones.find((c) => c.seleccionada);
+  const porRenglon = new Map<string, { costo: number; fuera: boolean }>();
+
+  for (const r of renglones) {
+    if (!elegida) {
+      porRenglon.set(r.id, { costo: r.costoEstimado, fuera: false });
+      continue;
+    }
+    const cotizado = elegida.renglones.find((l) => l.requestLineId === r.id);
+    porRenglon.set(
+      r.id,
+      cotizado
+        ? { costo: cotizado.costoUnitario, fuera: !cotizado.disponible }
+        : { costo: r.costoEstimado, fuera: true },
+    );
+  }
+
+  return { base: elegida ? ("cotizado" as const) : ("estimado" as const), porRenglon };
 }
 
 /**
@@ -57,6 +102,18 @@ async function avisarACompras(params: {
     prioridad: req.urgencia === "PARO" ? "ALTA" : undefined,
     contexto: { warehouseId: req.warehouseId }, tag: req.folio, datos: { folio: req.folio, urgencia: req.urgencia },
   });
+}
+
+/**
+ * Lo que espera la firma de esta persona.
+ *
+ * El «no lo mio» no es un adorno: quien levanto la requisicion no la autoriza,
+ * y sin esa condicion el inicio —y el brief del dia— le dirian que tiene
+ * pendiente firmar lo que el mismo pidio. Vive aqui porque lo preguntan dos
+ * pantallas, y copiarlo seria garantizar que un dia dejen de coincidir.
+ */
+export function porAutorizar(organizationId: string, userId: string) {
+  return { organizationId, estado: "SOLICITADA", NOT: { solicitanteId: userId } };
 }
 
 /** Estados en los que una requisicion de compra sigue viva (cubre un faltante). */
@@ -178,15 +235,20 @@ export async function crearRequisicionDeCompra(params: {
       urgencia: params.urgencia,
       justificacion: params.justificacion || null,
       montoEstimado,
-      ...(sinFirma
-        ? {
-            estado: "AUTORIZADA",
-            autorizadaEl: new Date(),
-            justificacion:
-              `${params.justificacion ? `${params.justificacion} · ` : ""}` +
-              `Autorizada automáticamente: $${montoEstimado.toFixed(2)} está por debajo del umbral de $${umbral.toFixed(2)}`,
-          }
-        : {}),
+      /*
+       * Nace autorizada, y nada mas. La razon NO se pega a `justificacion`:
+       * ese campo es lo que escribio quien pidio, y el sistema le agregaba su
+       * propia nota con el monto de ese momento. Cuando despues se elegia una
+       * cotizacion, el monto cambiaba y la nota se quedaba citando el viejo:
+       * la pantalla mostraba las dos cifras juntas, contradiciendose. Ademas
+       * el inicio usa ese texto como titulo del renglon, asi que una compra
+       * sin justificacion propia se titulaba con la nota del sistema.
+       *
+       * Que se autorizo sola se deduce de tener fecha sin firmante, que es lo
+       * que lee `quienAutorizo()`; el monto y el umbral de ese momento quedan
+       * en la bitacora, que es el registro que sirve para auditar.
+       */
+      ...(sinFirma ? { estado: "AUTORIZADA", autorizadaEl: new Date() } : {}),
       renglones: {
         create: params.renglones.map((r) => ({
           partId: r.partId || null,
@@ -295,7 +357,13 @@ export async function enCompra(params: {
  */
 export async function recibir(params: {
   organizationId: string;
-  userId: string;
+  /**
+   * Quien recibio. Nulo cuando la recepcion la mando una integracion: ahi no
+   * hay persona, y entonces se llena `integracion`.
+   */
+  userId: string | null;
+  /** Nombre de la integracion, cuando no hay persona. Ver `quienFirmoLaRecepcion`. */
+  integracion?: string | null;
   purchaseRequestId?: string | null;
   warehouseId: string;
   supplierId?: string | null;
@@ -358,6 +426,7 @@ export async function recibir(params: {
   try {
     const recepcion = await registrarRecepcion(params, folio, utiles);
     await reconciliarRecepcion(params);
+    await avisarSiYaLlego(params);
     return recepcion;
   } catch (e) {
     /**
@@ -394,6 +463,57 @@ async function reconciliarRecepcion(params: Parameters<typeof recibir>[0]) {
   await reconciliar({ organizationId, tipos: ["REFACCION_BAJO_MINIMO", "REFACCION_CRITICA_AGOTADA"], origen: "FLUJO", actorId: params.userId, evento });
 }
 
+/**
+ * «Ya llego lo que pidio».
+ *
+ * Era el hueco del flujo de compras. A quien pedia una refaccion se le avisaba
+ * que su solicitud se habia autorizado —y nada mas—. Lo unico que de verdad
+ * estaba esperando, que el material llegara, tenia que ir a buscarlo a mano; y
+ * muchas veces hay una orden detenida por esa pieza, asi que el aviso tambien
+ * va al responsable de esa orden, que casi nunca es la misma persona.
+ *
+ * Solo cuando llega COMPLETA. Lo parcial ya tiene su propio aviso, ese a
+ * compras y almacen, que son quienes tienen que hacer algo con la diferencia.
+ *
+ * Va DESPUES de la transaccion y con su propio try: un fallo al avisar no
+ * puede deshacer una entrada de almacen que ya se asento.
+ */
+async function avisarSiYaLlego(params: Parameters<typeof recibir>[0]) {
+  if (!params.purchaseRequestId) return;
+  try {
+    const req = await prisma.purchaseRequest.findFirst({
+      where: { id: params.purchaseRequestId, organizationId: params.organizationId },
+      select: { id: true, folio: true, estado: true, solicitanteId: true, materialRequestId: true },
+    });
+    if (!req || req.estado !== "RECIBIDA") return;
+
+    // La orden que espera el material, si la compra nacio de una.
+    const orden = req.materialRequestId
+      ? await prisma.materialRequest.findFirst({
+        where: { id: req.materialRequestId, organizationId: params.organizationId },
+        select: { workOrder: { select: { id: true, number: true, assignedToId: true } } },
+      })
+      : null;
+    const ot = orden?.workOrder ?? null;
+
+    await emitirAviso({
+      organizationId: params.organizationId, tipo: "COMPRA_RECIBIDA", entidad: "PurchaseRequest", entidadId: req.id,
+      version: "RECIBIDA", prioridad: "MEDIA", kind: "SUCCESS",
+      titulo: `Ya llegó lo de la compra ${req.folio}`,
+      cuerpo: ot ? `Con esto se puede seguir la orden ${ot.number}.` : undefined,
+      enlace: `/compras/${req.id}`,
+      contexto: { solicitanteId: req.solicitanteId, responsableId: ot?.assignedToId ?? null },
+      tag: req.folio,
+      datos: { folio: req.folio, estado: "RECIBIDA", ordenDeTrabajo: ot?.number ?? null },
+    });
+  } catch (e) {
+    // Que no se pueda avisar no puede tumbar la recepcion: la mercancia ya
+    // entro y el kardex ya esta escrito. Queda en el registro para que no se
+    // vuelva mudo sin que nadie lo note.
+    console.error("[compras] no se pudo avisar que llego la compra:", e instanceof Error ? e.message : e);
+  }
+}
+
 async function registrarRecepcion(
   params: Parameters<typeof recibir>[0],
   folio: string,
@@ -411,6 +531,7 @@ async function registrarRecepcion(
         remision: params.remision || null,
         ordenCompra: params.ordenCompra || null,
         recibidoPorId: params.userId,
+        recibidoPorNombre: params.integracion || null,
         nota: params.nota || null,
       },
       select: { id: true, folio: true },

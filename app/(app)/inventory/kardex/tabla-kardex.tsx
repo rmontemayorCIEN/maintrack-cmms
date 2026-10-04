@@ -44,6 +44,7 @@ const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 const crearFijas = (zona: string): Columna<FilaKardex>[] => [
   {
     id: "fecha", etiqueta: "Fecha", texto: (m) => formatDateTime(new Date(m.fecha), zona),
+    ordenPor: (m) => new Date(m.fecha).getTime(),
     pinta: (m) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(new Date(m.fecha), zona)}</span>,
   },
   {
@@ -86,17 +87,24 @@ const crearColumnas = (zona: string): Columna<FilaKardex>[] => [
     pinta: (m) => <span className="font-medium text-slate-800">{formatNumber(m.saldoDespues, 2)}</span>,
   },
   { id: "unidad", etiqueta: "Unidad", agrupable: true, texto: (m) => m.unidad },
-  { id: "costo", etiqueta: "Costo unit.", alineaDerecha: true, texto: (m) => formatCurrency(m.costoUnitario, m.moneda) },
+  { id: "costo", etiqueta: "Costo unit.", alineaDerecha: true, texto: (m) => formatCurrency(m.costoUnitario, m.moneda), ordenPor: (m) => m.costoUnitario },
   {
     id: "importe", etiqueta: "Importe", alineaDerecha: true,
     texto: (m) => formatCurrency(m.cantidad * m.costoUnitario, m.moneda),
+    ordenPor: (m) => m.cantidad * m.costoUnitario,
   },
   {
+    // Sin documento cae al motivo, que responde la misma pregunta: de donde
+    // vino ese movimiento. Antes quedaba un guion, y esta columna es la que
+    // todos miran —«Referencia» no viene de fabrica—, asi que el motivo no se
+    // veia por ningun lado.
     id: "documento", etiqueta: "Documento",
-    texto: (m) => m.documento?.texto ?? "—",
+    texto: (m) => m.documento?.texto ?? m.referencia ?? "—",
     pinta: (m) => m.documento
       ? <Link href={m.documento.href} className="text-brand-600 hover:underline">{m.documento.texto}</Link>
-      : <span className="text-slate-300">—</span>,
+      : m.referencia
+        ? <span className="text-slate-600">{m.referencia}</span>
+        : <span className="text-slate-300">—</span>,
   },
   { id: "referencia", etiqueta: "Referencia", texto: (m) => guion(m.referencia) },
   { id: "entregadoA", etiqueta: "Recibió", agrupable: true, texto: (m) => guion(m.entregadoA) },

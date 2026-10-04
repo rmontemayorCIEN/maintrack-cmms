@@ -146,7 +146,7 @@ async function main() {
     });
     await prisma.downtimeEvent.create({
       data: {
-        assetId: activo.id, minutes: 120, planned: false,
+        organizationId: org.id, assetId: activo.id, minutes: 120, planned: false,
         startedAt: new Date(Date.now() - 86_400_000),
       },
     });

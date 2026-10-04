@@ -48,8 +48,8 @@ echo ""
 # El gasto de antes, para poder restar al final.
 ANTES=$(ANTHROPIC_API_KEY="$LLAVE" npx tsx -e '
 import { prisma } from "./lib/db";
-prisma.aiUsage.aggregate({ _sum: { costUsd: true } })
-  .then((r) => console.log(r._sum.costUsd ?? 0))
+prisma.aiUsage.aggregate({ _sum: { costoUsd: true } })
+  .then((r) => console.log(r._sum.costoUsd ?? 0))
   .finally(() => prisma.$disconnect());
 ' 2>/dev/null | tail -1)
 
@@ -64,7 +64,7 @@ fi
 FALLARON=0
 for s in $SCRIPTS; do
   printf "  %-34s " "$(basename "$s" .ts)"
-  if ANTHROPIC_API_KEY="$LLAVE" npx tsx "$s" > /tmp/ia-prueba.log 2>&1; then
+  if ANTHROPIC_API_KEY="$LLAVE" npx tsx "$s" "$@" > /tmp/ia-prueba.log 2>&1; then
     echo "OK"
   else
     echo "FALLA"
@@ -75,8 +75,8 @@ done
 
 DESPUES=$(ANTHROPIC_API_KEY="$LLAVE" npx tsx -e '
 import { prisma } from "./lib/db";
-prisma.aiUsage.aggregate({ _sum: { costUsd: true } })
-  .then((r) => console.log(r._sum.costUsd ?? 0))
+prisma.aiUsage.aggregate({ _sum: { costoUsd: true } })
+  .then((r) => console.log(r._sum.costoUsd ?? 0))
   .finally(() => prisma.$disconnect());
 ' 2>/dev/null | tail -1)
 

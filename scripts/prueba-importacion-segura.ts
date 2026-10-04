@@ -8,13 +8,14 @@
  *
  *   npx tsx scripts/prueba-importacion-segura.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { ErrorDeImportacion, ejecutarImportacion, validarImportacion } from "../lib/importacion-motor";
 import { diagnosticarReversion, revertirLote, ErrorDeLote } from "../lib/lotes";
 import * as N from "../lib/normalizar";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -58,7 +59,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3202";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3202", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3202 });
   }
 
   const sello = `imp-${Date.now()}`;
@@ -309,7 +310,7 @@ async function main() {
   } finally {
     for (const o of [org, otra]) await prisma.organization.delete({ where: { id: o.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3202);
     }
   }
 

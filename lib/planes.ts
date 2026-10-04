@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { FUNCIONES_IA, type ClaveFuncionIA } from "./ia/funciones";
+import { FUNCIONES_IA, type ClaveConBolsa, type ClaveFuncionIA } from "./ia/funciones";
 
 /**
  * Catalogo comercial: que incluye cada plan y hasta donde llega.
@@ -47,14 +47,23 @@ export type DefinicionPlan = {
     operaciones: number;
     funciones: ClaveFuncionIA[];
     /**
-     * Bolsa aparte para la ayuda con IA.
+     * Las bolsas que NO salen de las operaciones del plan.
      *
-     * No sale de las operaciones del plan a proposito: preguntar como se usa
-     * el sistema no debe competir con generar un plan de mantenimiento, y un
-     * usuario que se atora y no puede preguntar no compra el plan de arriba,
-     * se va. Por eso hasta los planes sin IA la traen.
+     * La ayuda va aparte porque preguntar como se usa el sistema no debe
+     * competir con generar un plan de mantenimiento: un usuario que se atora y
+     * no puede preguntar no compra el plan de arriba, se va. Por eso hasta los
+     * planes sin IA la traen.
+     *
+     * El parte del dia y el dictado del tecnico van aparte por lo mismo, y el
+     * dictado con mas razon todavia: es la funcion que hace que el sistema se
+     * llene de datos. Si dictar el cierre le quitara un diagnostico al jefe,
+     * el tecnico volveria a escribir con el pulgar —o a no escribir—, que es
+     * el problema que vino a resolver.
+     *
+     * El mapa lo exige el tipo: agregar una funcion a `CON_BOLSA_PROPIA` sin
+     * darle cupo aqui ya no compila.
      */
-    operacionesAyuda: number;
+    bolsas: Record<ClaveConBolsa, number>;
   };
 };
 
@@ -86,6 +95,79 @@ export const COMPLEMENTO_IA = {
   ],
 } as const;
 
+/**
+ * Los complementos que se contratan sobre un plan de pago.
+ *
+ * Los tres se cobran en la misma factura mensual, como lineas aparte. Van en
+ * UNA lista y no repartidos por el codigo porque el precio lo lee la cobranza,
+ * la comparacion comercial y la presentacion: tres lugares que no pueden
+ * contestar distinto cuando alguien cambie un numero.
+ *
+ * `contratado` recibe las banderas de la empresa. Agregar un complemento nuevo
+ * es agregar una entrada aqui, no tocar la cobranza.
+ */
+export type Complemento = {
+  clave: string;
+  nombre: string;
+  precioMensual: number;
+  contratado: (org: { iaComplemento?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean }) => boolean;
+};
+
+/**
+ * «Registros propios»: el cliente arma sus propias tablas.
+ *
+ * Mas barato que la IA a proposito: no cuesta nada entregarlo —no consume
+ * modelo— y su valor es que reemplaza hojas de Excel sueltas. Es un
+ * complemento de permanencia mas que de margen: quien mudo sus formatos aqui
+ * ya no se va facil.
+ */
+export const COMPLEMENTO_REGISTROS = {
+  clave: "REGISTROS_PROPIOS",
+  nombre: "Registros propios",
+  precioMensual: 690,
+  moneda: "MXN",
+  descripcion:
+    "Sus propias tablas, con las columnas que decida y amarradas a sus equipos, su gente y sus proveedores.",
+  incluye: [
+    "Hasta 12 tablas con 24 columnas cada una",
+    "Formatos ya hechos: contratos, combustible, EPP, análisis de agua, contratistas, energía",
+    "Columnas amarradas al catálogo: equipo, persona, proveedor, orden, centro de costo",
+    "Permiso de captura y de lectura por rol",
+    "La IA puede contestar sobre esas tablas",
+  ],
+} as const;
+
+/**
+ * «Cumplimiento normativo»: el catalogo de normas con su evidencia.
+ *
+ * El mas caro de los tres, y no por capricho. Es el unico que cuesta sostener
+ * —alguien tiene que revisar el catalogo cuando cambia una norma— y es el
+ * unico que atiende riesgo regulatorio, no productividad. Ningun CMMS del
+ * mercado mexicano lo trae amarrado a la operacion.
+ */
+export const COMPLEMENTO_NORMAS = {
+  clave: "CUMPLIMIENTO_NORMATIVO",
+  nombre: "Cumplimiento normativo",
+  precioMensual: 1490,
+  moneda: "MXN",
+  descripcion:
+    "El catálogo de normas aplicables a su giro, amarrado al trabajo que ya hace: la evidencia sale sola.",
+  incluye: [
+    "Catálogo de normas por giro, con sus obligaciones",
+    "Cada obligación amarrada a planes, equipos o registros",
+    "Estado de cumplimiento por norma, con su evidencia",
+    "Expediente listo para el auditor",
+    "Normas propias, para lo que el catálogo no cubra",
+  ],
+} as const;
+
+/** Los tres, en un solo lugar. Ver el comentario de `Complemento`. */
+export const COMPLEMENTOS: Complemento[] = [
+  { clave: COMPLEMENTO_IA.clave, nombre: COMPLEMENTO_IA.nombre, precioMensual: COMPLEMENTO_IA.precioMensual, contratado: (o) => Boolean(o.iaComplemento) },
+  { clave: COMPLEMENTO_REGISTROS.clave, nombre: COMPLEMENTO_REGISTROS.nombre, precioMensual: COMPLEMENTO_REGISTROS.precioMensual, contratado: (o) => Boolean(o.registrosPropios) },
+  { clave: COMPLEMENTO_NORMAS.clave, nombre: COMPLEMENTO_NORMAS.nombre, precioMensual: COMPLEMENTO_NORMAS.precioMensual, contratado: (o) => Boolean(o.cumplimientoNormas) },
+];
+
 export const PLANES: Record<ClavePlan, DefinicionPlan> = {
   PROFESSIONAL: {
     nombre: "Professional",
@@ -104,13 +186,17 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Avisos al celular, sin costo por mensaje",
       "Reportes, indicadores y exportación",
       "Bitácora de auditoría",
-      "API para integrar sistemas externos e IoT",
+      "API para integrar sistemas externos y sensores",
       "100 GB para fotos, videos y documentos",
       "Diagnóstico semanal con inteligencia artificial",
+      "El parte del día, para escucharlo camino a la planta",
+      "El técnico cierra la orden dictándola, con el teléfono y las manos ocupadas",
+      "Decir a dónde ir y que el sistema lo lleve, desde cualquier pantalla",
+      "El inicio y el almacén con su franja: se ve el estado antes de leerlo",
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
-    ia: { operaciones: 20, funciones: ["DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 60 },
+    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200, NAVEGAR: 1200 } },
   },
   ENTERPRISE: {
     nombre: "Enterprise",
@@ -122,10 +208,11 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Todo lo de Professional",
       "Activos, usuarios y sitios sin límite",
       "Monitoreo predictivo sin límite",
-      "Diagnóstico semanal y asistentes de IA",
-      "Soporte prioritario",
+      "Diagnóstico semanal y asistentes de IA (detalle en la comparación)",
+      "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
+      "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO"], operacionesAyuda: 200 },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR", "RONDIN"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000 } },
   },
 };
 
@@ -151,8 +238,12 @@ export function iaDeLaOrganizacion(org: { plan: string; iaComplemento: boolean; 
   }
   return {
     operaciones: base.operaciones + (org.iaComplemento ? COMPLEMENTO_IA.operaciones : 0) + (org.iaExtra ?? 0),
-    /** La bolsa de ayuda no la altera el complemento: ya viene generosa. */
-    operacionesAyuda: base.operacionesAyuda,
+    /**
+     * Las bolsas propias NO las altera el complemento, y es deliberado: ya
+     * vienen generosas, y el complemento se vende por lo caro y puntual
+     * —planes, levantamientos, procedimientos—, no por poder dictar mas.
+     */
+    bolsas: base.bolsas,
     funciones: [...funciones],
     /** Si el plan por si solo no da IA, el complemento es la unica via. */
     soloPorComplemento: base.operaciones === 0,
@@ -225,6 +316,15 @@ export async function verificarCupo(
    * «¿cabe uno más?» dejaba pasar la carga completa por encima del plan.
    */
   cantidad = 1,
+  /**
+   * Bytes que se van a agregar, solo para `storageGb`.
+   *
+   * Existe porque el cupo se revisaba ANTES de subir, con el tamano que
+   * declaraba el navegador: declarar un mega, obtener la URL firmada y subir
+   * cinco gigas rebasaba el plan despues del hecho. Con el peso real en la
+   * mano, la cuenta se hace de verdad.
+   */
+  bytesAdicionales = 0,
 ): Promise<{ permitido: true } | { permitido: false; mensaje: string }> {
   const definicion = planDe(plan);
   const limite = definicion.limites[recurso];
@@ -237,14 +337,16 @@ export async function verificarCupo(
     sensors: () => prisma.sensor.count({ where: { organizationId, active: true } }),
     storageGb: async () => {
       const r = await prisma.attachment.aggregate({ where: { organizationId }, _sum: { size: true } });
-      return Number(r._sum.size ?? 0) / 1_073_741_824;
+      return (Number(r._sum.size ?? 0) + bytesAdicionales) / 1_073_741_824;
     },
   };
 
   const actual = await contadores[recurso]();
   // El almacenamiento se mide en gigas, no en piezas: ahi basta con no haberse
   // pasado ya. Lo demas se cuenta con lo que se va a agregar.
-  const cabe = recurso === "storageGb" ? actual < limite : actual + cantidad <= limite;
+  // El almacenamiento ya trae sumado lo que se va a agregar, asi que aqui se
+  // compara con «cabe», no con «no se ha pasado».
+  const cabe = recurso === "storageGb" ? actual <= limite : actual + cantidad <= limite;
   if (cabe) return { permitido: true };
 
   if (cantidad > 1 && actual < limite) {

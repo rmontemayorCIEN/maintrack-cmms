@@ -53,7 +53,7 @@ async function main() {
 
   const paro = (assetId: string, horas: number, planned = false) =>
     prisma.downtimeEvent.create({
-      data: { assetId, startedAt: new Date(), minutes: Math.round(horas * 60), planned },
+      data: { organizationId: org.id, assetId, startedAt: new Date(), minutes: Math.round(horas * 60), planned },
     });
 
   try {

@@ -901,6 +901,7 @@ export async function sembrarDemo(opciones: OpcionesDemo) {
       if (plan.requiresShutdown) {
         await prisma.downtimeEvent.create({
           data: {
+            organizationId: org.id,
             assetId: plan.assetId!,
             workOrderId: wo.id,
             startedAt: started,
@@ -991,6 +992,7 @@ export async function sembrarDemo(opciones: OpcionesDemo) {
       if (downtime > 0) {
         await prisma.downtimeEvent.create({
           data: {
+            organizationId: org.id,
             assetId: asset.id,
             workOrderId: wo.id,
             startedAt: started,

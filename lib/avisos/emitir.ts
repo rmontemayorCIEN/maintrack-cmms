@@ -16,6 +16,7 @@ import { prisma } from "../db";
 import { logAudit, notify } from "../audit";
 import { EVENTOS, PESO_PRIORIDAD, type Grupo, type Prioridad, type TipoEvento } from "./catalogo";
 import { resolverDestinatarios, type Contexto } from "./destinatarios";
+import { observadoresDe } from "../observadores";
 import { idDeEvento } from "./entrega";
 import { leerJson } from "./config";
 import { consumirLimite } from "../integraciones/limites";
@@ -89,6 +90,31 @@ export async function emitirAviso(e: Evento): Promise<ResultadoEmision> {
       });
       if (res.estado === "OMITIDA") salida.omitidos++;
       else if (res.notificationId) salida.avisados.push(d.userId);
+    }
+
+    /**
+     * Los observadores, ADEMAS de quien tocaba.
+     *
+     * Aqui y no en la cadena de destinatarios porque esa funciona como
+     * respaldo —«el primer grupo con alguien recibe»— y un observador es
+     * copia: tiene que enterarse aunque el responsable ya se haya enterado.
+     *
+     * Va despues del reparto normal a proposito. Si esto fallara, el aviso al
+     * responsable ya salio: observar es comodidad, avisarle a quien tiene que
+     * actuar es la funcion.
+     */
+    for (const userId of await observadoresDe(e.organizationId, e.entidad, e.entidadId, salida.avisados)) {
+      const res = await notify({
+        organizationId: e.organizationId, userId, title: e.titulo, body: e.cuerpo, link: e.enlace,
+        tipo: e.tipo, prioridad, modulo: def.modulo, entidad: e.entidad, entidadId: e.entidadId,
+        // Nunca obligatorio ni pendiente: quien observa se apunto por su
+        // cuenta y no es el responsable de nada. Marcarselo como accion le
+        // llenaria la bandeja de pendientes que no le tocan.
+        requiereAccion: false, obligatorio: false,
+        porQue: "Usted pidió enterarse de lo que pase con este registro.",
+        claveDedup: `obs:${claveDedup}`, eventoId, tag: e.tag, kind: e.kind,
+      });
+      if (res.notificationId) salida.avisados.push(userId);
     }
 
     if (!r.destinatarios.length && def.destinatarios.length) {

@@ -8,10 +8,11 @@
  *
  *   npx tsx scripts/prueba-portal-publico.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { prisma } from "../lib/db";
 import { seguroParaHoja, textoDeFuera, telefonoDeFuera, imagenDeVerdad } from "../lib/texto-publico";
 import { toCsv } from "../lib/utils";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -39,7 +40,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3201";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3201", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3201 });
   }
 
   const sello = `qr-${Date.now()}`;
@@ -182,7 +183,7 @@ async function main() {
     await prisma.accessAttempt.deleteMany({ where: { email: { contains: "portal-origen:203.0.113.77" } } }).catch(() => undefined);
     await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3201);
     }
   }
 

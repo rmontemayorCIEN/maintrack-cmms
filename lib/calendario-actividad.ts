@@ -688,6 +688,15 @@ export type VisitaProyectada = {
   fecha: Date;
   /** Los titulos de lo que llevaria esa visita. */
   actividades: string[];
+  /**
+   * Los ids de esas actividades, en el mismo orden.
+   *
+   * Van aparte de los titulos porque sirven para otra cosa: el calendario
+   * pinta los titulos y la proyeccion de compras cruza los ids con sus
+   * refacciones. Dos planes pueden llamar igual a su actividad, asi que por
+   * titulo no se puede.
+   */
+  actividadIds: string[];
 };
 
 /**
@@ -724,6 +733,10 @@ export async function proyectarActividades(
       asset: { select: { code: true, name: true, categoryId: true } },
       planTask: {
         select: {
+          // El id, además del título: es lo que permite cruzar la visita con
+          // las refacciones que consume (`lib/consumo-proyectado.ts`). Con el
+          // título no se puede: dos planes pueden llamar igual a su actividad.
+          id: true,
           title: true, cadaCuanto: true, unidadFrecuencia: true, cadaCuantas: true,
           plan: {
             select: {
@@ -736,7 +749,7 @@ export async function proyectarActividades(
   });
 
   /** Una ocurrencia suelta antes de agruparse en visitas. */
-  type Toque = { fecha: Date; titulo: string };
+  type Toque = { fecha: Date; titulo: string; id: string };
   const porGrupo = new Map<string, { base: (typeof relojes)[number]; toques: Toque[] }>();
 
   for (const r of relojes) {
@@ -755,7 +768,7 @@ export async function proyectarActividades(
     let f = r.proximaEl as Date;
     let guarda = 0;
     while (f <= hasta && guarda < 400) {
-      grupo.toques.push({ fecha: f, titulo: r.planTask.title });
+      grupo.toques.push({ fecha: f, titulo: r.planTask.title, id: r.planTask.id });
       f = siguienteFecha(f, cada, unidad, regla, r.arranqueEl?.getDate());
       guarda += 1;
     }
@@ -770,8 +783,10 @@ export async function proyectarActividades(
       const corte = new Date(inicio);
       corte.setDate(corte.getDate() + regla.horizonteDias);
       const juntas: string[] = [];
+      const ids: string[] = [];
       while (i < toques.length && toques[i].fecha <= corte) {
         juntas.push(toques[i].titulo);
+        ids.push(toques[i].id);
         i += 1;
       }
       visitas.push({
@@ -785,6 +800,9 @@ export async function proyectarActividades(
         maintenanceType: base.planTask.plan.maintenanceType,
         fecha: inicio,
         actividades: [...new Set(juntas)],
+        // Por id, no por titulo: una actividad no se hace dos veces en la
+        // misma visita, pero dos actividades distintas pueden llamarse igual.
+        actividadIds: [...new Set(ids)],
       });
     }
   }

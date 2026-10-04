@@ -12,6 +12,7 @@ import { EnlacesPlan } from "./enlaces-plan";
 import { EquiposDelPlan } from "./equipos-del-plan";
 import { PlanDialog } from "./plan-dialog";
 import { PlanRowActions } from "./plan-actions";
+import Link from "next/link";
 
 type Enlace = { id: string; title: string; url: string; note: string | null; createdAt: string };
 
@@ -64,28 +65,15 @@ export function TablaPlanes({
       texto: (p) => `${p.name} ${p.description ?? ""}`,
       pinta: (p) => (
         <div className={`max-w-64 ${p.active ? "" : "opacity-50"}`}>
-          {/* El nombre abre la ficha: un control menos en el renglon. */}
-          {editable ? (
-            <PlanDialog
-              plan={p.paraEditar}
-              assets={assets} meters={meters} technicians={technicians}
-              especialidades={especialidades} refacciones={refacciones}
-              servicios={servicios} moneda={moneda}
-              puedeCrearCatalogos={puedeCrearCatalogos}
-              disparador={(abrir) => (
-                <button
-                  type="button"
-                  onClick={abrir}
-                  title={`Ver y editar ${p.name}`}
-                  className="block max-w-full truncate text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
-                >
-                  {p.name}
-                </button>
-              )}
-            />
-          ) : (
-            <p className="truncate font-medium text-slate-800">{p.name}</p>
-          )}
+          {/* El nombre abre el expediente del plan: equipos, actividades y
+              cómo le ha ido. Editar vive ahí dentro. */}
+          <Link
+            href={`/plans/${p.id}`}
+            title={`Abrir ${p.name}`}
+            className="block max-w-full truncate font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+          >
+            {p.name}
+          </Link>
           {p.description ? <p className="truncate text-xs text-slate-500">{p.description}</p> : null}
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <EnlacesPlan planId={p.id} nombre={p.name} editable={editable} enlaces={p.enlaces} />
@@ -196,6 +184,7 @@ export function TablaPlanes({
       vistaInicial={vistaInicial}
       busquedaInicial={busquedaInicial}
       clave="planes"
+      paso={{ base: "/plans", etiqueta: (p) => p.name }}
       sustantivo="planes"
       ejemploFiltro='Filtrar: "bomba", "mensual", "pausado"…'
       acciones={editable ? (p) => (

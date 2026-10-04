@@ -190,8 +190,14 @@ async function main() {
       renglones: [{ partId: rodamiento.id, descripcion: "ROD-1", cantidadSolicitada: 1, costoEstimado: 100 }],
     });
     const chicaD = await prisma.purchaseRequest.findUniqueOrThrow({ where: { id: chica.id } });
-    revisar("por debajo del umbral se autoriza sola y dice por qué",
-      chica.estado === "AUTORIZADA" && /debajo del umbral/.test(chicaD.justificacion ?? ""));
+    // El «por que» ya no se pega a la justificacion del usuario: el sistema le
+    // agregaba su nota con el monto de ese momento y, al elegir cotizacion, la
+    // nota se quedaba citando el monto viejo. Se deduce de tener fecha sin
+    // firmante, que es justo lo que revisa el renglon de abajo.
+    revisar("por debajo del umbral se autoriza sola, sin que nadie firme",
+      chica.estado === "AUTORIZADA" && chicaD.autorizadaPorId === null && chicaD.autorizadaEl !== null);
+    revisar("y no le mete al usuario una nota del sistema en su justificación",
+      !/debajo del umbral/.test(chicaD.justificacion ?? ""));
     // Nadie firmo, pero hay fecha de autorizacion: la pantalla lo dice en vez
     // de mostrar un guion que parece dato perdido.
     revisar("una compra autorizada sola se lee «Autorización automática», no «—»",

@@ -1,10 +1,59 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "./auth";
 import { can, type Permission } from "./rbac";
 import { puedeVerRuta, verCostos } from "./pantallas";
 import { estadoSuscripcion } from "./planes";
 import { diaLocal } from "./utils";
+
+/**
+ * Los errores que NO son para el usuario.
+ *
+ * Todo lo demas que llega al manejador central son nuestras clases de regla
+ * de negocio (`ErrorDeAlmacen`, `ErrorDeCompra`, `LecturaRechazada`...), cuyo
+ * mensaje esta escrito para la persona y tiene que llegarle tal cual. Lo que
+ * no puede salir es esto: un error de Prisma trae el nombre del modelo, los
+ * campos y hasta la invocacion —«Invalid prisma.user.update() invocation»— y
+ * un TypeError trae el detalle de una implementacion que al cliente no le
+ * dice nada y a un curioso le dice de mas.
+ */
+function esInterno(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError ||
+    error instanceof Prisma.PrismaClientUnknownRequestError ||
+    error instanceof Prisma.PrismaClientValidationError ||
+    error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientRustPanicError ||
+    error instanceof TypeError ||
+    error instanceof RangeError ||
+    error instanceof ReferenceError ||
+    error instanceof SyntaxError
+  );
+}
+
+/**
+ * Contesta una falla inesperada sin contar por dentro, y la deja en el
+ * registro CON contexto.
+ *
+ * El registro decia solo el mensaje: sin empresa, sin usuario y sin rastro,
+ * un 500 en los registros de Cloud Run era irreconstruible. Lo que se escribe
+ * aqui es lo unico que va a existir de ese error.
+ */
+export function fallaInesperada(error: unknown, quien: { userId?: string; orgId?: string } = {}) {
+  const mensaje = error instanceof Error ? error.message : String(error);
+  if (!esInterno(error)) {
+    console.error("[api]", { mensaje, ...quien });
+    return fail(mensaje, 500);
+  }
+  console.error("[api] falla interna", {
+    tipo: error instanceof Error ? error.name : typeof error,
+    mensaje,
+    ...quien,
+    rastro: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join(" | ") : undefined,
+  });
+  return fail("Ocurrió un error inesperado. Vuelva a intentarlo; si sigue pasando, repórtelo desde Soporte.", 500);
+}
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json(data, { status: init ?? 200 });
@@ -15,6 +64,14 @@ export function fail(message: string, status = 400, extra?: unknown) {
 }
 
 /** Envuelve un handler resolviendo sesion, tenant y permiso requerido. */
+export const NO_EN_DEMO = "Esto no está disponible en la empresa demostrativa.";
+export const EN_RESTAURACION = "La empresa demostrativa se está restaurando. Intente de nuevo en un minuto.";
+
+/** Un candado de restauración que quedó puesto más de 15 minutos se da por vencido (falla a medias). */
+export function demoEnRestauracion(org: { demoRestaurandoDesde?: Date | null }, ahora = Date.now()) {
+  return !!org.demoRestaurandoDesde && ahora - new Date(org.demoRestaurandoDesde).getTime() < 15 * 60_000;
+}
+
 export async function withAuth<T>(
   permission: Permission | null,
   handler: (ctx: {
@@ -29,11 +86,24 @@ export async function withAuth<T>(
    * vencida tiene que poder sacar su informacion. Sin esta distincion, dejar de
    * pagar equivaldria a perder el acceso a los propios datos.
    */
-  opciones?: { esLectura?: boolean },
+  opciones?: {
+    esLectura?: boolean;
+    /** Acciones que no se permiten en la empresa demostrativa (credenciales, webhooks). */
+    noEnDemo?: boolean;
+  },
 ) {
   const user = await getCurrentUser();
   if (!user) return fail("No autenticado", 401);
   if (permission && !can(user.role, permission)) return fail("Sin permisos suficientes", 403);
+
+  // La empresa demostrativa (Bloque 7): mientras se restaura no atiende a
+  // nadie, y lo que tocaría a la plataforma o al exterior —el plan, las
+  // credenciales, los avisos a otros sistemas— no se hace desde ahí.
+  const org = user.organization as { esDemo?: boolean; demoRestaurandoDesde?: Date | null };
+  if (org.esDemo) {
+    if (demoEnRestauracion(org)) return fail(EN_RESTAURACION, 503);
+    if (!user.isSuperAdmin && (permission === "billing:manage" || opciones?.noEnDemo)) return fail(NO_EN_DEMO, 403);
+  }
 
   // Un `permission` no nulo siempre corresponde a una operacion que modifica
   // datos; las lecturas pasan null. Por eso el control comercial cabe aqui, en
@@ -59,9 +129,7 @@ export async function withAuth<T>(
       const e = error as Error & { codigo: number; detalles?: unknown };
       return fail(e.message, e.codigo, e.detalles);
     }
-    const message = error instanceof Error ? error.message : "Error interno";
-    console.error("[api]", message);
-    return fail(message, 500);
+    return fallaInesperada(error, { userId: user.id, orgId: user.organizationId });
   }
 }
 
@@ -85,6 +153,10 @@ export async function withVista<T>(
 const CAMPOS_DE_COSTO = new Set([
   "laborCost", "partsCost", "serviceCost", "otherCost", "totalCost", "unitCost", "hourlyRate", "rate", "cost",
   "costoEstimado", "purchaseCost", "replacementCost", "costoUnitario",
+  // Los nombres en espanol los producen las herramientas de IA, que responden
+  // en prosa lo que la pantalla le oculta al mismo rol (hallazgo del Bloque 8).
+  "costo", "costos", "costoSumado", "costoTotal", "costoDeReemplazo", "proporcionDelReemplazo",
+  "costoDeParo", "valorInventario",
 ]);
 
 /**

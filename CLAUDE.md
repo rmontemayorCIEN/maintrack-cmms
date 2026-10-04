@@ -118,6 +118,18 @@ volver a activar su telefono a mano.
 **Permisos**: matriz en `lib/rbac.ts` — 7 roles. VIEWER no tiene ninguno, o sea
 que es de solo lectura por construccion, no por revisar cada pantalla.
 
+### El servidor MCP del operador
+
+`/api/mcp` deja que un agente de IA en claude.ai consulte cifras agregadas del
+negocio, con OAuth y solo para el operador de la plataforma. Guia completa en
+`Docs/mcp-operador.md`. Dos reglas:
+
+- **Las herramientas (`lib/mcp/herramientas.ts`) usan `lectura`, nunca
+  `prisma`.** `lectura` truena ante cualquier escritura; importar `prisma` ahi
+  es saltarse la garantia de solo lectura, y `scripts/prueba-mcp.ts` lo detiene.
+- **Solo agregados.** Una herramienta nueva no devuelve descripciones, equipos
+  ni personas de los clientes: conteos, fechas y sumas por empresa.
+
 ### Las funciones de IA
 
 Registradas en `lib/ia/funciones.ts`. Todas entran por `analizarConIa()` o
@@ -134,8 +146,6 @@ Cuando algo de IA falle, el detalle esta en la tabla `AiUsage`, columna `error`.
 ```bash
 npm run dev                    # desarrollo (SQLite)
 npx tsc --noEmit               # tipos
-npm run actualizar             # desplegar a produccion (con migracion)
-npm run actualizar -- --sin-migrar
 ./scripts/nueva-migracion.sh   # crear migracion
 ./scripts/con-produccion.sh scripts/<x>.ts   # correr un script contra produccion
 ```
@@ -160,26 +170,90 @@ Y una leccion de un intento anterior: `~/Library/Caches` **no** es un lugar
 donde guardar nada que haga falta. macOS la purga cuando necesita espacio, y
 se llevo un `node_modules` completo sin avisar.
 
-### Publicar: `npm run actualizar` cuando hay migraciones
+### Publicar: siempre por GitHub, nunca desde la Mac
 
-**`npm run deploy` publica el codigo pero NO aplica migraciones.** Si el cambio
-trae una migracion pendiente y se usa `deploy`, el codigo nuevo sale a pedir
-columnas que la base todavia no tiene y la pantalla truena con un P2022. Ya
-paso: se publico la revision 00108 y el detalle de ordenes quedo caido.
+Desde el 28 de septiembre de 2026 produccion se publica **solo** desde GitHub
+(`rmontemayorCIEN/maintrack-cmms`). El camino es este y no tiene atajos:
 
-- **Con migraciones pendientes → `npm run actualizar`.** Corre las pruebas,
-  migra, publica y verifica, en ese orden.
-- **Sin migraciones → `npm run deploy`** basta.
+1. **Rama nueva desde `main`** para cada cambio. Nunca se trabaja ni se hace
+   commit directo en `main`, y no se mezclan dos temas en una rama.
+2. **Pruebas locales** (`npx tsc --noEmit` y las `scripts/prueba-*.ts` que
+   toquen lo cambiado), commit, `git push` y **pull request** contra `main`.
+3. GitHub corre las pruebas (`pruebas.yml`) y levanta una **version de prueba**
+   del PR (`vista-previa.yml`): etiqueta `pr-N`, sin trafico, contra la base de
+   PRUEBAS. Rafael revisa ahi, no en produccion.
+4. Rafael fusiona el PR. `produccion.yml` arranca y **se detiene esperando su
+   aprobacion** en el environment `produccion`.
+5. Al aprobar: anota la revision actual, migra, publica con `scripts/deploy.sh`,
+   comprueba que la revision nueva es la que atiende, corre el humo y, si algo
+   falla, regresa el trafico a la revision anterior.
 
-Para saber si hay pendientes: comparar `prisma/migrations` contra lo ultimo que
-se aplico. Ante la duda, `actualizar` sirve para los dos casos.
+**`npm run actualizar` y `npm run deploy` NO se corren desde la Mac.** Se saltan
+las pruebas en GitHub y la aprobacion de Rafael. Siguen existiendo porque el
+flujo de GitHub llama a `deploy.sh` por dentro; a mano, solo si Rafael lo pide
+expresamente para una emergencia con GitHub caido, y diciendole que se salta la
+puerta.
+
+Lo que se aprendio con el camino anterior sigue valiendo, y el flujo ya lo
+aplica solo: la migracion va **antes** de publicar (la revision 00108 salio
+pidiendo columnas que la base no tenia y dejo caido el detalle de ordenes), y
+las migraciones son aditivas para que la reversa funcione contra el esquema
+nuevo.
+
+### «Publica cambios»: una frase, y un clic suyo
+
+Rafael publica con **una sola frase**. Antes eran dos —«publica cambios» y
+«libéralo»— y el 29-sep-2026 pidió juntarlas: *«los 2 pasos, hazlo solo 1»*.
+Tenia razon: el proceso ya es mas largo que el anterior, y partirlo en dos
+avisos lo hacia sentir perdido sin ganar nada.
+
+**Lo que NO incluye sigue siendo lo mismo: aprobar la liberación.** Ese clic es
+suyo y de nadie más. Aunque `gh` tenga su sesión y la API lo permita, un agente
+nunca aprueba un despliegue a `produccion`. Es el único punto del camino que un
+agente no pasa solo, y aprobarlo con su sesión lo convertiría en decorado.
+
+**«Publica cambios»** — de los cambios sueltos hasta pedirle el clic:
+
+1. `git status`: qué cambió y en qué rama. Si hay cambios de **otro tema** en la
+   misma carpeta, no se meten al PR: se pregunta cuáles van.
+2. Si está en `main`, rama nueva con nombre descriptivo en español
+   (`la-cobranza-respeta-el-plan`). Nunca commit en `main`.
+3. `npx tsc --noEmit` y las `scripts/prueba-*.ts` de lo que se tocó. Si el
+   cambio es grande o toca varios módulos, `./scripts/suite.sh` completa. Si
+   algo falla, se corrige **antes** de subir: 25 minutos de revisiones en
+   GitHub para descubrir lo que aquí se ve en dos no le sirven a nadie.
+4. Commit con el estilo de la casa (una frase que dice qué pasa ahora, cuerpo
+   con el porqué), `git push -u origin <rama>` y `gh pr create` con el resumen
+   en español.
+5. Esperar las revisiones (`gh pr checks <n> --watch`). Si alguna sale en rojo:
+   leer el registro (`gh run view <id> --log-failed`), corregir, volver a
+   subir. Máximo dos intentos antes de explicarle qué pasa.
+6. **Si trae algo que él deberia ver antes** —una pantalla nueva, un cambio de
+   como se vende— entregarle la liga de la version de prueba y esperar. Si no,
+   seguir.
+7. `gh pr merge <n> --merge --delete-branch`.
+8. Avisarle **con el link de la corrida** que «Liberar a produccion» espera su
+   aprobación (*Review deployments → Approve and deploy*, también desde el
+   celular). El link durable es
+   `github.com/rmontemayorCIEN/maintrack-cmms/actions/workflows/produccion.yml`.
+9. Cuando apruebe, seguir la corrida (`gh run watch <id>`) y confirmar
+   **comprobando contra la nube, no contra el tablero**: número de revisión
+   nueva, que es la que atiende, y que el humo pasó. Si hubo reversa, decirlo
+   con la causa.
+10. **Si la liberación publica sin haberle pedido aprobación**, la puerta no
+    está funcionando: se le dice de inmediato y no se libera nada más hasta
+    corregirla.
+
+**Lo que Rafael tiene que hacer:** decir la frase, y dar un clic. Si algo más
+le toca —un `git push` que aquí esté bloqueado, por ejemplo— se le entrega el
+comando exacto y se le dice por qué no se pudo hacer solo.
 
 ### El proyecto de Google Cloud va fijo, no el de la maquina
 
 En esta Mac conviven sistemas independientes —MainTrack y Avisos de
 Obligaciones, cada uno con su proyecto de GCP— y **no se mezclan**. La
 configuracion global de `gcloud` es de la maquina y cambia segun en cual se
-este trabajando: con ella apuntando a `avisos-obligaciones-4821`, `actualizar`
+este trabajando: con ella apuntando a `avisos-obligaciones-4821`, el antiguo `actualizar`
 fallo buscando `maintrack-db` ahi, y un `deploy` habria publicado MainTrack
 dentro del otro proyecto.
 
@@ -260,7 +334,9 @@ prueba de "se ve bien".
 **Que hacer, siempre, sin excepcion:**
 
 1. `npx tsc --noEmit` — compila.
-2. **TODAS** las pruebas, no las del cambio: `for f in scripts/prueba-*.ts; do npx tsx "$f"; done`
+2. **TODAS** las pruebas, no las del cambio: `./scripts/suite.sh` — que ademas
+   hace el build y corre la prueba de interfaz. Correr a mano las del cambio no
+   es haber corrido la suite.
 3. Si toco interfaz, abrirla en el navegador. Guardar bien no es mostrar bien.
 4. Preguntarse **quien mas lee lo que toque**, y probar eso tambien:
    `grep -rn "loQueCambie" app/ lib/`
@@ -376,13 +452,23 @@ aplica al codigo Y a las pruebas.
 ### El cierre, siempre
 
 ```
-npx tsc --noEmit                                    # compila
-for f in scripts/prueba-*.ts; do npx tsx "$f"; done # TODAS, no solo las del cambio
-npm run build                                       # con el servidor detenido
+npx tsc --noEmit        # compila
+./scripts/suite.sh      # TODAS las pruebas, el build y la interfaz
 ```
 
-Las cinco `*-real` fallan sin `ANTHROPIC_API_KEY`: son de funciones de IA y se
-corren con `./scripts/con-produccion.sh`, que trae la llave de Secret Manager.
+`suite.sh` revisa primero que el entorno no las vaya a arruinar —el esquema en
+SQLite, ningun servidor de desarrollo compitiendo por `.next`— y al final
+separa las fallas ESPERADAS de las que hay que mirar. «10 fallas» no dice
+nada; «0 inesperadas» si.
+
+La prueba de interfaz va **al final, con su propio build**, y no por gusto: usa
+`next start`, y las trece pruebas que levantan `next dev` le pisan `.next`.
+Cuando corria dentro del bucle caia siempre en «esperadas» y sus 92 revisiones
+no se corrian NUNCA, con el resumen diciendo que no habia nada inesperado. Por
+ahi se escapo una regresion de verdad.
+
+Las `*-real` fallan sin `ANTHROPIC_API_KEY`: son de funciones de IA y se corren
+con `./scripts/con-produccion.sh`, que trae la llave de Secret Manager.
 
 Y la ficha de ayuda de la pantalla que se toco. Es regla, no cortesia.
 

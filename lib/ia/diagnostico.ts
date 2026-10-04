@@ -133,7 +133,7 @@ export async function ultimoDiagnostico(organizationId: string) {
   const despues = { gt: fila.createdAt };
   const [ordenes, paros, lecturas, sensores, anteriores] = await Promise.all([
     prisma.workOrder.count({ where: { organizationId, updatedAt: despues } }),
-    prisma.downtimeEvent.count({ where: { asset: { organizationId }, startedAt: despues } }),
+    prisma.downtimeEvent.count({ where: { organizationId, startedAt: despues } }),
     // Una lectura corregida o anulada despues tambien cambia lo que hoy se ve.
     prisma.meterReading.count({ where: { organizationId, OR: [{ readingAt: despues }, { correccionEl: despues }] } }),
     prisma.sensorReading.count({ where: { organizationId, readingAt: despues } }),

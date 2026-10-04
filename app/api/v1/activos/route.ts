@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { conCredencial, pagina, paginacion } from "@/lib/integraciones/api";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const filas = await prisma.asset.findMany({
       where: {
         organizationId: quien.organizationId,
-        ...(q ? { OR: [{ code: { contains: q } }, { name: { contains: q } }, { serialNumber: { contains: q } }] } : {}),
+        ...(q ? { OR: [{ code: contiene(q) }, { name: contiene(q) }, { serialNumber: contiene(q) }] } : {}),
         ...(sitio ? { site: { code: sitio } } : {}),
         ...(estado ? { status: estado } : {}),
       },

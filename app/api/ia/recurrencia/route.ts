@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fail, ok, withAuth } from "@/lib/api";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { puedeVerRuta } from "@/lib/pantallas";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { analizarRecurrencia } from "@/lib/ia/recurrencia";
 
 export const maxDuration = 180;
@@ -14,6 +15,9 @@ export async function POST(request: Request) {
   return withAuth(null, async ({ user, orgId }) => {
     if (!iaConfigurada()) {
       return fail("El análisis de recurrencia no esta configurado en este servidor.", 503);
+    }
+    if (!puedeVerRuta(user.role, "/indicadores", { esSuperAdmin: user.isSuperAdmin, esDemo: user.organization.esDemo })) {
+      return fail("Esta función no es de su rol.", 403);
     }
     const input = schema.parse(await request.json());
 
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
       return ok({ analisis: r.analisis });
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      return fail(error instanceof Error ? error.message : "No fue posible analizar", 502);
+      return fail(motivoLegible(error), 502);
     }
   });
 }

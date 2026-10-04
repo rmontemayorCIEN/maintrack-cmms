@@ -7,6 +7,7 @@
  * esperando fecha.
  */
 import { prisma } from "./db";
+import { contiene } from "./busqueda-texto";
 
 /** Lunes es 1 y domingo es 7, como en la norma ISO y como habla la gente. */
 export const diaSemanaIso = (d: Date) => ((d.getDay() + 6) % 7) + 1;
@@ -273,7 +274,7 @@ export async function reprogramar(params: {
       where: {
         organizationId: params.organizationId,
         active: true,
-        name: { contains: params.responsableNombre },
+        name: contiene(params.responsableNombre),
       },
       select: { id: true },
     });

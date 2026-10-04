@@ -1,0 +1,502 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { MAXIMO_SEGUNDOS_DICTADO } from "@/lib/dictado";
+import { crearDetectorDeSilencio, SILENCIO_COMANDO_MS } from "@/lib/deteccion-voz";
+import { porQueNoSePudo } from "@/lib/dictado";
+
+/**
+ * Grabar con el microfono: la mecanica, sin la pantalla.
+ *
+ * La escribio primero el boton de dictado del cierre de orden. Al llegar la
+ * navegacion por voz habria sido la segunda copia de lo mismo —permiso del
+ * microfono, corte automatico, soltar el aparato al salir— y esas copias son
+ * las que se desincronizan: se arregla una y la otra se queda con el defecto.
+ *
+ * Lo que aqui se decidio una vez, y vale para los dos:
+ *
+ *   El microfono se pide en el PRIMER toque, no al aparecer el boton. Pedirlo
+ *   antes enciende el indicador de grabacion del telefono sin que nadie haya
+ *   tocado nada, y eso asusta con razon.
+ *
+ *   Se CONSERVA mientras dure la conversacion y se suelta al terminarla o
+ *   tras un rato sin usarlo. Las dos formas extremas estuvieron puestas y las
+ *   dos fallaron:
+ *
+ *     Conservandolo mientras la pantalla viviera, el indicador del iPhone se
+ *     quedaba encendido para siempre; uno lo tocaba y el sistema ofrecia
+ *     «¿dejar de grabar audio?», como si la aplicacion escuchara de fondo.
+ *
+ *     Soltandolo despues de CADA grabacion —que es lo que se probo despues,
+ *     dando por hecho que en HTTPS el permiso quedaba concedido— Safari de
+ *     iPhone vuelve a preguntar «¿quiere acceder al microfono?» en cada
+ *     frase. Eso es peor: no se puede conversar dando permiso cada vez.
+ *
+ *   El punto medio es el correcto: se conserva entre una frase y la
+ *   siguiente, y se suelta cuando la persona cierra o cuando pasa un rato sin
+ *   hablar. El indicador se apaga y nadie da permiso dos veces.
+ *
+ *   Se graba y se manda al servidor en vez de usar el reconocimiento del
+ *   navegador porque Safari de iPhone no lo tiene, y medio piso trae iPhone.
+ *   `MediaRecorder` si esta en los dos y el servidor detecta el formato.
+ */
+
+export type EstadoGrabacion = "quieto" | "grabando" | "trabajando";
+
+
+
+/** Cada cuanto se mide el nivel del microfono. */
+const MUESTRA_MS = 100;
+
+/**
+ * Cuanto se conserva el microfono sin usarlo antes de soltarlo.
+ *
+ * Suficiente para encadenar frases sin que vuelvan a pedir permiso, y corto
+ * para que el indicador del telefono no se quede encendido si alguien se
+ * distrajo o se fue.
+ */
+const SOLTAR_TRAS_MS = 25_000;
+
+export function usarGrabadora({
+  alTerminar,
+  alDesistir,
+  silencioMs = SILENCIO_COMANDO_MS,
+  esperaMaximaMs,
+  cortarSolo = true,
+  avisarAlEscuchar = false,
+}: {
+  alTerminar: (audio: Blob) => Promise<void>;
+  /**
+   * Se abrio el microfono y no hablo nadie.
+   *
+   * No es un error ni hay nada que mandar: es el caso de quien toca el boton y
+   * se distrae, o deja la conversacion abierta y se va. Quien lo use decide
+   * que hacer —cerrar la conversacion, normalmente—.
+   */
+  alDesistir?: () => void;
+  /**
+   * Cuanto silencio se espera antes de cortar solo.
+   *
+   * Distinto segun lo que se haga: un comando es corto y urgente, un cierre de
+   * orden se dicta a pausas. Ver `lib/deteccion-voz.ts`.
+   */
+  silencioMs?: number;
+  /**
+   * Cuanto se espera a que alguien EMPIECE antes de cerrar sin mandar nada.
+   *
+   * Sin esto —lo de omision— se comporta como siempre: se queda escuchando
+   * hasta el tope. Lo pone quien reabre el microfono solo, porque ahi el
+   * descuido se repite. Ver `ESPERA_MAXIMA_MS`.
+   */
+  esperaMaximaMs?: number;
+  /** En falso, solo corta quien toque el boton. */
+  cortarSolo?: boolean;
+  /**
+   * Un tono corto en el instante EXACTO en que empieza a oir.
+   *
+   * Sustituye al saludo hablado, que duraba dos segundos y medio y se decia
+   * en cada apertura. Rafael: «lo dice cada vez que le doy click». Pero
+   * quitarlo sin poner nada dejaba un problema peor escondido: el saludo
+   * terminaba y el microfono todavia tardaba un segundo en abrir, asi que
+   * quien arrancaba a hablar al acabar la frase perdia sus primeras palabras.
+   *
+   * El tono no tiene ese hueco —suena cuando la grabacion YA empezo—, es
+   * instantaneo y no cuesta: lo genera el propio navegador.
+   */
+  avisarAlEscuchar?: boolean;
+}) {
+  const [estado, setEstado] = useState<EstadoGrabacion>("quieto");
+  const [segundos, setSegundos] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  /**
+   * Si este navegador puede grabar.
+   *
+   * Se resuelve DESPUES de montar: en el servidor no hay `navigator` y leerlo
+   * ahi revienta el render. Arranca en `null` —todavia no se sabe— para que
+   * quien lo use no dibuje un boton que despues desaparece.
+   */
+  const [puedeGrabar, setPuedeGrabar] = useState<boolean | null>(null);
+
+  const grabadora = useRef<MediaRecorder | null>(null);
+  const microfono = useRef<MediaStream | null>(null);
+  const trozos = useRef<Blob[]>([]);
+  const corte = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloj = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Lo que escucha el nivel del microfono para saber cuando se dejo de hablar. */
+  const escucha = useRef<{ ctx: AudioContext; medidor: ReturnType<typeof setInterval> } | null>(null);
+  /** Para soltar el aparato si se deja de usar. */
+  const ocioso = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Para no tocar el estado de algo que ya se fue de la pantalla. */
+  const vivo = useRef(true);
+  /**
+   * El seguro contra arrancar dos veces la misma grabacion.
+   *
+   * ── Que paso ──
+   *
+   * Cada comando de voz mandaba DOS grabaciones al servidor, con un segundo
+   * de diferencia. Quedo registrado en produccion: pares de renglones donde
+   * el primero cobra $0.00027 y el segundo $0.00000 —audio vacio—, los dos
+   * marcados «no se entendio nada», y entre ellos el bueno. Para quien lo usa
+   * eso se veia como «me dice que no me entendio y a los diez segundos me
+   * contesta bien»: la grabacion fantasma vuelve enseguida con el error, y la
+   * de verdad llega despues con la respuesta.
+   *
+   * ── Por que ──
+   *
+   * `alternar` es asincrona: entre que empieza y que pone el estado en
+   * «grabando» hay un `await getUserMedia`, que la primera vez tarda lo que
+   * tarde la persona en dar permiso. Durante ese hueco el estado sigue en
+   * «quieto», asi que quien mire el estado —el efecto de manos libres— cree
+   * que no hay nada corriendo y vuelve a llamar. La comprobacion de adentro
+   * tampoco salva: lee el estado de su propia cerradura, que es el de antes.
+   *
+   * Un ref se escribe y se lee AL MOMENTO, sin esperar a que React vuelva a
+   * dibujar. Es lo unico que sirve para esto.
+   */
+  const enMarcha = useRef(false);
+  /**
+   * El audio del navegador, UNO para toda la conversacion.
+   *
+   * Se abria uno por grabacion y se cerraba al terminar. Eso funciona en la
+   * primera —nace dentro del toque— y en ninguna de las siguientes: en manos
+   * libres el microfono se vuelve a abrir solo, fuera de cualquier gesto, y
+   * iOS deja ese contexto suspendido para siempre. Suspendido no da error:
+   * mide, y lo que mide es silencio, asi que el corte automatico nunca
+   * llegaba y el microfono se quedaba abierto hasta el tope de un minuto.
+   *
+   * Conservandolo, el permiso del primer toque vale para toda la
+   * conversacion. Se cierra cuando se suelta el microfono.
+   */
+  const audio = useRef<AudioContext | null>(null);
+  /** Lo que conecta el flujo al analizador; hay que desconectarlo o se apilan. */
+  const fuente = useRef<MediaStreamAudioSourceNode | null>(null);
+  /** Esta grabacion se tira: nadie hablo y no hay nada que transcribir. */
+  const aLaBasura = useRef(false);
+
+  useEffect(() => {
+    vivo.current = true;
+    setPuedeGrabar(
+      typeof window !== "undefined" &&
+        typeof window.MediaRecorder !== "undefined" &&
+        Boolean(navigator.mediaDevices?.getUserMedia),
+    );
+    return () => {
+      vivo.current = false;
+      if (corte.current) clearTimeout(corte.current);
+      if (reloj.current) clearInterval(reloj.current);
+      try {
+        if (grabadora.current?.state === "recording") grabadora.current.stop();
+      } catch { /* ya se habia detenido */ }
+      cerrarEscucha();
+      soltarMicrofono();
+    };
+  }, []);
+
+  /**
+   * Suelta lo que mide el nivel.
+   *
+   * El contexto de audio se cierra SIEMPRE, aunque la grabacion haya acabado
+   * por el camino que sea: dejarlo abierto mantiene el microfono tomado y el
+   * punto rojo del telefono encendido despues de terminar.
+   */
+  /**
+   * Suelta el microfono. Apaga el indicador del telefono.
+   *
+   * Se llama al terminar CADA grabacion, no solo al salir de la pantalla.
+   */
+  function soltarMicrofono() {
+    if (ocioso.current) { clearTimeout(ocioso.current); ocioso.current = null; }
+    microfono.current?.getTracks().forEach((t) => t.stop());
+    microfono.current = null;
+    cerrarEscucha();
+    // Aqui SI se cierra el contexto: se acabo la conversacion.
+    const ctx = audio.current;
+    audio.current = null;
+    if (ctx && ctx.state !== "closed") void ctx.close().catch(() => undefined);
+  }
+
+  /** Vuelve a contar el rato de gracia antes de soltarlo. */
+  function aplazarElSuelte() {
+    if (ocioso.current) clearTimeout(ocioso.current);
+    ocioso.current = setTimeout(soltarMicrofono, SOLTAR_TRAS_MS);
+  }
+
+  /**
+   * Suelta el analizador, NO el contexto.
+   *
+   * Cerrar el contexto aqui era lo que dejaba sin corte automatico a la
+   * segunda frase en adelante: el siguiente nacia fuera del gesto y se
+   * quedaba suspendido. El contexto se cierra al soltar el microfono, que es
+   * cuando de verdad se termino la conversacion.
+   */
+  function cerrarEscucha() {
+    try { fuente.current?.disconnect(); } catch { /* ya estaba suelto */ }
+    fuente.current = null;
+    if (!escucha.current) return;
+    clearInterval(escucha.current.medidor);
+    escucha.current = null;
+  }
+
+  /**
+   * Escucha el nivel y corta cuando la persona termino de hablar.
+   *
+   * Si el navegador no tiene audio, simplemente no se corta solo y queda el
+   * boton: es una comodidad, no un requisito.
+   */
+  /**
+   * Abre el audio del navegador DENTRO del toque, aunque todavia no haya nada
+   * que medir.
+   *
+   * El contexto nace suspendido y solo se deja reanudar dentro del gesto de
+   * la persona. Crearlo despues de `await getUserMedia` ya es tarde: ese await
+   * rompe la cadena del gesto, el contexto se queda suspendido, el analizador
+   * devuelve ceros, el detector no oye voz nunca y el microfono se queda
+   * escuchando para siempre —sin un solo error, porque medir mide; lo que
+   * mide es silencio—.
+   *
+   * El chat de voz ya lo habia aprendido y lo hace igual. Esto no, y se
+   * comportaba distinto sin que se viera la causa.
+   */
+  function abrirAudio(): AudioContext | null {
+    try {
+      const ya = audio.current;
+      if (ya && ya.state !== "closed") {
+        void ya.resume().catch(() => undefined);
+        return ya;
+      }
+      const Contexto = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Contexto) return null;
+      const ctx = new Contexto();
+      void ctx.resume().catch(() => undefined);
+      audio.current = ctx;
+      return ctx;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * El tono de «ya lo escucho».
+   *
+   * Sale del mismo contexto que mide el nivel, que nacio dentro del toque y
+   * por eso si puede sonar en iOS. Corto y con entrada y salida suaves: un
+   * pitido seco, oido en el coche, es insoportable.
+   */
+  function avisar(ctx: AudioContext | null) {
+    if (!avisarAlEscuchar || !ctx || ctx.state === "closed") return;
+    try {
+      void ctx.resume().catch(() => undefined);
+      const osc = ctx.createOscillator();
+      const vol = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      const t = ctx.currentTime;
+      vol.gain.setValueAtTime(0, t);
+      vol.gain.linearRampToValueAtTime(0.15, t + 0.02);
+      vol.gain.linearRampToValueAtTime(0, t + 0.16);
+      osc.connect(vol).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.18);
+    } catch {
+      // Sin audio del navegador simplemente no hay tono. No es un fallo.
+    }
+  }
+
+  function escucharParaCortar(flujo: MediaStream, ctx: AudioContext | null) {
+    if (!cortarSolo || !ctx) return;
+    try {
+      void ctx.resume().catch(() => undefined);
+      const entrada = ctx.createMediaStreamSource(flujo);
+      fuente.current = entrada;
+      const analizador = ctx.createAnalyser();
+      analizador.fftSize = 512;
+      entrada.connect(analizador);
+      const datos = new Float32Array(analizador.fftSize);
+      const detector = crearDetectorDeSilencio({ silencioMs, muestraMs: MUESTRA_MS, esperaMaximaMs });
+
+      const medidor = setInterval(() => {
+        // Si el contexto no llegó a arrancar, el análisis no sirve y hay que
+        // decirlo en vez de dejar el micrófono abierto hasta el tope: quien
+        // use el botón tendrá que cerrarlo a mano, que es molesto pero
+        // honesto. Sin esto, un contexto suspendido se veía como «escuchando»
+        // indefinidamente.
+        if (ctx.state !== "running") return;
+        analizador.getFloatTimeDomainData(datos);
+        // Valor eficaz: el volumen de verdad, no el pico. Un golpe seco no
+        // cuenta como voz y una voz sostenida no se pierde entre picos.
+        let suma = 0;
+        for (const v of datos) suma += v * v;
+        const decision = detector.alNivel(Math.sqrt(suma / datos.length));
+        if (decision === "cortar") detener();
+        else if (decision === "abandonar") desistir();
+      }, MUESTRA_MS);
+
+      escucha.current = { ctx, medidor };
+    } catch {
+      // Sin medicion se sigue pudiendo grabar; solo hay que tocar el botón.
+    }
+  }
+
+  /**
+   * Cerrar sin mandar nada porque no hablo nadie.
+   *
+   * Lo que se grabo se tira ANTES de detener, en un ref: `onstop` corre
+   * despues y es quien decide si sube o no. Subirlo seria pagar por
+   * transcribir un cuarto vacio.
+   */
+  function desistir() {
+    aLaBasura.current = true;
+    detener();
+    alDesistir?.();
+  }
+
+  function detener() {
+    enMarcha.current = false;
+    cerrarEscucha();
+    if (corte.current) { clearTimeout(corte.current); corte.current = null; }
+    if (reloj.current) { clearInterval(reloj.current); reloj.current = null; }
+    const rec = grabadora.current;
+    grabadora.current = null;
+    if (rec && rec.state === "recording") {
+      if (vivo.current) setEstado("trabajando");
+      rec.stop();
+    } else if (vivo.current) {
+      setEstado("quieto");
+    }
+  }
+
+  async function alternar() {
+    // El seguro va ANTES que nada y se lee de un ref, no del estado: entre
+    // que esto arranca y que el estado dice «grabando» hay un await, y en ese
+    // hueco una segunda llamada abria una segunda grabadora sobre el mismo
+    // microfono. Ver el comentario de `enMarcha`.
+    if (enMarcha.current) return;
+    if (estado === "trabajando") return;
+    if (estado === "grabando") { detener(); return; }
+    enMarcha.current = true;
+
+    setError(null);
+    // Antes que nada, y antes de cualquier espera: el audio solo se abre
+    // dentro del gesto.
+    const ctxAudio = abrirAudio();
+    try {
+      /**
+       * Primero se le pregunta al navegador si esta aplicacion PUEDE grabar.
+       *
+       * No es una comprobacion de mas: la aplicacion se estuvo prohibiendo a
+       * si misma el microfono durante meses con una cabecera
+       * `Permissions-Policy: microphone=()`, y el unico sintoma era un «no se
+       * pudo usar el microfono» idéntico al de un permiso denegado. La gente
+       * lo fue a buscar a los ajustes del sistema operativo.
+       *
+       * Preguntando aqui, ese caso se distingue del resto y se dice lo que es.
+       */
+      const politica = (document as unknown as { featurePolicy?: { allowsFeature: (f: string) => boolean } }).featurePolicy;
+      if (politica && !politica.allowsFeature("microphone")) {
+        enMarcha.current = false;
+        setError("Esta instalación tiene el micrófono bloqueado por su configuración de seguridad. No es su equipo: hay que corregirlo del lado del servidor.");
+        setEstado("quieto");
+        return;
+      }
+
+      if (!microfono.current || !microfono.current.active) {
+        microfono.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      const rec = new MediaRecorder(microfono.current);
+      grabadora.current = rec;
+      trozos.current = [];
+
+      rec.ondataavailable = (e) => { if (e.data.size) trozos.current.push(e.data); };
+      rec.onstop = async () => {
+        const audio = new Blob(trozos.current, { type: rec.mimeType });
+        trozos.current = [];
+        if (aLaBasura.current) {
+          aLaBasura.current = false;
+          // No hablo nadie, asi que no hay frase siguiente que proteger. Se
+          // suelta ya y el indicador del telefono se apaga en el momento, no
+          // veinticinco segundos despues.
+          soltarMicrofono();
+          if (vivo.current) setEstado("quieto");
+          return;
+        }
+        if (!audio.size) { aplazarElSuelte(); if (vivo.current) setEstado("quieto"); return; }
+        try {
+          await alTerminar(audio);
+        } finally {
+          /**
+           * La cuenta atras empieza AQUI, no al dejar de hablar.
+           *
+           * Estaba arriba, antes de atender lo dicho, y ese era el defecto:
+           * contestar una pregunta de los datos —consultarlos, sintetizar la
+           * voz y leerla— tarda de sobra mas de veinticinco segundos. El
+           * micrófono se soltaba A MEDIA RESPUESTA y, al volver a escuchar,
+           * Safari pedia permiso otra vez encima de la respuesta recien
+           * dada. Rafael lo vio y lo describio exacto: «responde, pero
+           * inmediatamente al terminar sale la pantalla del permiso».
+           *
+           * El rato de gracia es para cuando NO esta pasando nada. Mientras
+           * el sistema trabaja o habla, no esta ocioso.
+           */
+          aplazarElSuelte();
+          if (vivo.current) setEstado("quieto");
+        }
+      };
+
+      // Mientras se graba no corre la cuenta atras: nadie suelta el aparato
+      // en mitad de una frase.
+      if (ocioso.current) { clearTimeout(ocioso.current); ocioso.current = null; }
+      rec.start();
+      // El tono va DESPUES de arrancar la grabacion: avisa de algo que ya es
+      // cierto. Antes seria la misma mentira que el saludo.
+      avisar(ctxAudio);
+      escucharParaCortar(microfono.current, ctxAudio);
+      setSegundos(0);
+      setEstado("grabando");
+      // Ya hay grabadora viva: de aqui en adelante quien quiera detenerla usa
+      // `detener`, y el seguro deja de hacer falta.
+      enMarcha.current = false;
+      reloj.current = setInterval(() => setSegundos((s) => s + 1), 1000);
+      // Red de seguridad: el telefono en la bolsa no sube media hora de ruido.
+      corte.current = setTimeout(detener, MAXIMO_SEGUNDOS_DICTADO * 1000);
+    } catch (e) {
+      enMarcha.current = false;
+      setError(porQueNoSePudo(e));
+      setEstado("quieto");
+    }
+  }
+
+  return {
+    estado,
+    segundos,
+    restantes: MAXIMO_SEGUNDOS_DICTADO - segundos,
+    error,
+    setError,
+    puedeGrabar,
+    alternar,
+    detener,
+    /** Soltar el microfono ya: lo llama quien cierra la conversacion. */
+    soltar: soltarMicrofono,
+    /**
+     * Tomar el permiso de audio DENTRO del toque, aunque el microfono se abra
+     * despues.
+     *
+     * Lo usa quien saluda antes de escuchar: entre el toque y la apertura del
+     * microfono pasa el saludo entero, y para entonces iOS ya no deja
+     * arrancar un contexto nuevo.
+     */
+    prepararAudio: () => { abrirAudio(); },
+    /**
+     * El audio del navegador que esta grabadora tiene abierto.
+     *
+     * Lo necesita quien quiera hacer sonar algo generado —el latido de
+     * «sigo aqui»— sin abrir un contexto propio: en iOS solo sirve el que
+     * nacio dentro del toque, y este es ese. Devuelve `null` cuando todavia
+     * no hay ninguno o ya se cerro.
+     */
+    audioDelNavegador: () => (audio.current && audio.current.state !== "closed" ? audio.current : null),
+    /** Si esta corta sola o hay que tocar el boton. Para decirlo en pantalla. */
+    cortaSolo: cortarSolo,
+    /** Para que quien lo use no toque el estado despues de desmontarse. */
+    sigueVivo: () => vivo.current,
+  };
+}

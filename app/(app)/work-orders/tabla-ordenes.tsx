@@ -97,11 +97,11 @@ const crearColumnas = (zona: string): Columna<FilaOrden>[] => [
     id: "horas", etiqueta: "Horas real / est.", alineaDerecha: true,
     texto: (w) => `${formatNumber(w.actualHours, 1)} / ${formatNumber(w.estimatedHours, 1)}`,
   },
-  { id: "costoMo", etiqueta: "Mano de obra", alineaDerecha: true, texto: (w) => formatCurrency(w.laborCost, w.moneda) },
-  { id: "costoRef", etiqueta: "Refacciones", alineaDerecha: true, texto: (w) => formatCurrency(w.partsCost, w.moneda) },
-  { id: "costoServ", etiqueta: "Servicios externos", alineaDerecha: true, texto: (w) => formatCurrency(w.serviceCost, w.moneda) },
-  { id: "costoOtros", etiqueta: "Otros costos", alineaDerecha: true, texto: (w) => formatCurrency(w.otherCost, w.moneda) },
-  { id: "costo", etiqueta: "Costo total", alineaDerecha: true, texto: (w) => formatCurrency(w.totalCost, w.moneda) },
+  { id: "costoMo", etiqueta: "Mano de obra", alineaDerecha: true, texto: (w) => formatCurrency(w.laborCost, w.moneda), ordenPor: (w) => w.laborCost },
+  { id: "costoRef", etiqueta: "Refacciones", alineaDerecha: true, texto: (w) => formatCurrency(w.partsCost, w.moneda), ordenPor: (w) => w.partsCost },
+  { id: "costoServ", etiqueta: "Servicios externos", alineaDerecha: true, texto: (w) => formatCurrency(w.serviceCost, w.moneda), ordenPor: (w) => w.serviceCost },
+  { id: "costoOtros", etiqueta: "Otros costos", alineaDerecha: true, texto: (w) => formatCurrency(w.otherCost, w.moneda), ordenPor: (w) => w.otherCost },
+  { id: "costo", etiqueta: "Costo total", alineaDerecha: true, texto: (w) => formatCurrency(w.totalCost, w.moneda), ordenPor: (w) => w.totalCost },
   { id: "creada", etiqueta: "Creada", texto: (w) => fecha(w.createdAt, zona) },
   { id: "iniciada", etiqueta: "Iniciada", texto: (w) => fecha(w.startedAt, zona) },
   { id: "compromiso", etiqueta: "Fecha compromiso", texto: (w) => (w.dueDate ? formatDia(w.dueDate, { zona }) : "—") },
@@ -115,21 +115,24 @@ const DE_FABRICA = ["tipo", "prioridad", "estado", "responsable", "vencimiento",
 
 const COLUMNAS_DE_COSTO = new Set(["costoMo", "costoRef", "costoServ", "costoOtros", "costo"]);
 
-export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true }: {
+export function TablaOrdenes({ ordenes, vistaInicial, conCostos = true, total}: {
   ordenes: FilaOrden[]; vistaInicial: Vista;
   /** Sin costos (técnico): las columnas de dinero ni se ofrecen (lib/pantallas.ts verCostos). */
   conCostos?: boolean;
+  total?: number;
 }) {
   const zona = useZona();
   const columnas = useMemo(() => crearColumnas(zona).filter((c) => conCostos || !COLUMNAS_DE_COSTO.has(c.id)), [zona, conCostos]);
   return (
     <TablaConfigurable
+      total={total}
       filas={ordenes}
       fijas={FIJAS}
       columnas={columnas}
       deFabrica={conCostos ? DE_FABRICA : DE_FABRICA.filter((c) => !COLUMNAS_DE_COSTO.has(c))}
       vistaInicial={vistaInicial}
       clave="ordenes"
+      paso={{ base: "/work-orders", etiqueta: (o) => `${o.number} · ${o.title}` }}
       sustantivo="ordenes"
       ejemploFiltro='Filtrar: "bomba", "correctivo", "vencida"…'
     />

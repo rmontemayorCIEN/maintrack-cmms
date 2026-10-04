@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { pedir } from "@/lib/cliente/pedir";
 import { SelectActividad, type ActividadCargable } from "@/components/select-actividad";
+import { SelectorBuscable } from "@/components/selector-buscable";
 
 export function PartsPanel({
   actividades,
@@ -26,7 +27,13 @@ export function PartsPanel({
   editable: boolean;
 }) {
   const router = useRouter();
-  const [partId, setPartId] = useState(catalog[0]?.id ?? "");
+  /*
+   * Arranca VACIO. Antes venia preseleccionada la primera del catalogo, asi
+   * que un toque en «Cargar a la OT» sacaba del almacen la que estuviera
+   * hasta arriba —y eso mueve inventario y escribe kardex—. Ahora hay que
+   * elegir a proposito.
+   */
+  const [partId, setPartId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [taskId, setTaskId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,6 +41,7 @@ export function PartsPanel({
 
   async function add() {
     if (loading) return; // un doble toque no saca dos veces del almacén
+    if (!partId) { setError("Elija la refacción que se cargó."); return; }
     setLoading(true);
     setError(null);
     const r = await pedir(`/api/work-orders/${workOrderId}/parts`, {
@@ -43,6 +51,23 @@ export function PartsPanel({
     setLoading(false);
     if (!r.ok) { setError(r.error); return; }
     setQuantity("1");
+    setPartId("");
+    router.refresh();
+  }
+
+  /**
+   * Quitar una refaccion NO es borrar un renglon: la cantidad regresa al
+   * almacen con una devolucion, y por eso se dice en la pregunta. Quien la
+   * quita tiene que saber que la pieza vuelve a estar disponible.
+   */
+  async function quitar(lineaId: string, nombre: string, cantidad: number, unidad: string) {
+    if (loading) return;
+    if (!confirm(`¿Quitar ${formatNumber(cantidad, 2)} ${unidad} de ${nombre} de esta orden?\n\nSe devuelve al almacén y el costo de la orden se recalcula.`)) return;
+    setLoading(true);
+    setError(null);
+    const r = await pedir(`/api/work-orders/${workOrderId}/parts?linea=${lineaId}`, { method: "DELETE" });
+    setLoading(false);
+    if (!r.ok) { setError(r.error); return; }
     router.refresh();
   }
 
@@ -60,11 +85,24 @@ export function PartsPanel({
                 <p className="truncate text-xs font-medium text-slate-700">{item.name}</p>
                 <p className="text-[0.6875rem] text-slate-400">{item.code}</p>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-medium tabular-nums text-slate-700">
-                  {formatNumber(item.quantity, 2)} {item.unit}
-                </p>
-                {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p> : null}
+              <div className="flex items-center gap-1">
+                <div className="text-right">
+                  <p className="text-xs font-medium tabular-nums text-slate-700">
+                    {formatNumber(item.quantity, 2)} {item.unit}
+                  </p>
+                  {currency ? <p className="text-[0.6875rem] tabular-nums text-slate-400">{formatCurrency(item.cost, currency)}</p> : null}
+                </div>
+                {editable ? (
+                  <button
+                    type="button"
+                    onClick={() => quitar(item.id, item.name, item.quantity, item.unit)}
+                    disabled={loading}
+                    title="Quitar y devolver al almacén"
+                    className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </div>
             </li>
           ))}
@@ -76,13 +114,24 @@ export function PartsPanel({
           <p className="text-[0.6875rem] text-slate-400">No hay refacciones con existencia en el almacén.</p>
         ) : (
           <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5">
-            <select className="field" aria-label="Refacción" value={partId} onChange={(e) => setPartId(e.target.value)}>
-              {catalog.map((part) => (
-                <option key={part.id} value={part.id}>
-                  {part.code} — {part.name} ({formatNumber(part.quantityOnHand, 0)} {part.unit})
-                </option>
-              ))}
-            </select>
+            {/*
+              Buscador y no un desplegable: el almacen de una planta tiene
+              cientos de refacciones y el tecnico esta buscando UNA, en el
+              piso y con el telefono. Recorrer la lista no es una opcion. Se
+              busca por clave o por cualquier palabra del nombre, sin acentos
+              —«refrigerante» encuentra «Refrigerante glicol»— igual que en
+              compras y en el calendario.
+            */}
+            <SelectorBuscable
+              valor={partId}
+              onCambio={setPartId}
+              vacio="Elija una refacción"
+              marcador="Busque por clave o nombre"
+              opciones={catalog.map((part) => ({
+                id: part.id,
+                etiqueta: `${part.code} — ${part.name} (${formatNumber(part.quantityOnHand, 0)} ${part.unit})`,
+              }))}
+            />
             <div className="flex gap-2">
               <input
                 type="number" inputMode="decimal"
@@ -93,7 +142,7 @@ export function PartsPanel({
                 onChange={(e) => setQuantity(e.target.value)}
                 aria-label="Cantidad"
               />
-              <Button size="sm" onClick={add} disabled={loading} className="flex-1">
+              <Button size="sm" onClick={add} disabled={loading || !partId} className="flex-1">
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Cargar a la OT
               </Button>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { centroDeCostoDelActivo } from "@/lib/centro-de-costo";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
@@ -6,6 +7,8 @@ import { nextWorkOrderNumber } from "@/lib/numbering";
 import { logAudit } from "@/lib/audit";
 import { validarNormalizacion } from "@/lib/predictive";
 import { reconciliar } from "@/lib/avisos/condiciones";
+import { jornada } from "@/lib/agenda";
+import { siguienteHabil } from "@/lib/scheduler";
 
 const schema = z.object({
   action: z.enum(["ACKNOWLEDGE", "DISMISS", "RESOLVE", "CREATE_WORK_ORDER", "VALIDATE_NORMALIZATION"]),
@@ -26,6 +29,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (input.action === "CREATE_WORK_ORDER") {
       if (alert.workOrderId) return fail("La alerta ya tiene una OT asociada", 409);
       const number = await nextWorkOrderNumber(orgId);
+      const cruce = alert.fechaCruceCritico && alert.fechaCruceCritico > new Date()
+        ? alert.fechaCruceCritico
+        : new Date(Date.now() + 7 * 86_400_000);
+      const j = await jornada(orgId, new Date(), new Date(cruce.getTime() + 20 * 86_400_000));
+      const venceEl = siguienteHabil(cruce, j) ?? cruce;
       const workOrder = await prisma.workOrder.create({
         data: {
           organizationId: orgId,
@@ -36,14 +44,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           status: "OPEN",
           priority: alert.severity === "CRITICAL" ? "CRITICAL" : "HIGH",
           assetId: alert.assetId,
+          // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+          centroDeCostoId: await centroDeCostoDelActivo(orgId, alert.asset.id),
           siteId: alert.asset.siteId,
           locationId: alert.asset.locationId,
           // El cruce critico solo si todavia es futuro: una fecha pasada crearia
           // una orden que nace vencida por una proyeccion que ya no aplica.
-          dueDate:
-            alert.fechaCruceCritico && alert.fechaCruceCritico > new Date()
-              ? alert.fechaCruceCritico
-              : new Date(Date.now() + 7 * 86_400_000),
+          //
+          // Y se recorre al siguiente dia habil, igual que hace el programador
+          // de preventivos. Sin esto la orden podia nacer con vencimiento en
+          // sabado: nadie la iba a hacer ese dia, el lunes ya salia en rojo, y
+          // ademas el propio sistema bloqueaba su asignacion —«el sabado 10 de
+          // oct no es dia laborable»— por una fecha que habia puesto el.
+          dueDate: venceEl,
           estimatedHours: 3,
           createdById: user.id,
         },

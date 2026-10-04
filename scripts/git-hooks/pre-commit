@@ -22,8 +22,30 @@ archivos=$(git diff --cached --name-only --diff-filter=ACM)
 patron='sk-ant-[a-zA-Z0-9_-]{20,}|AIza[0-9A-Za-z_-]{30,}|BEGIN [A-Z ]*PRIVATE KEY|postgres(ql)?://[^:@ "]+:[^$@ "\\()*|]{6,}@|VAPID_PRIVATE_KEY[ ]*[:=][ ]*.{0,2}[A-Za-z0-9_-]{40,}'
 
 
-encontrados=$(echo "$archivos" | tr '\n' '\0' | xargs -0 grep -lIE "$patron" 2>/dev/null \
-  | grep -v -e '^\.env\.example$' -e '^DESPLIEGUE\.md$')
+# Lo que SI puede parecer un secreto sin serlo: marcadores de documentacion.
+#
+# Antes esto se resolvia excluyendo archivos ENTEROS —.env.example y
+# DESPLIEGUE.md—, y ahi estaba el hueco: DESPLIEGUE.md es precisamente donde
+# alguien pegaria la contrasena real al documentar un despliegue, y el guardian
+# tenia ese archivo en su punto ciego. La auditoria del 28-sep lo encontro.
+#
+# Ahora no se excluye ningun archivo: se excluyen los RENGLONES cuyo valor es
+# un marcador. Un valor de verdad en esos mismos archivos se detiene.
+# Nada de \$VARIABLE aqui: la primera version marcaba como inofensivo
+# cualquier renglon con una variable de shell, y una contrasena REAL seguida de
+# «@$IP_DB» se colaba entera. El patron de arriba ya descarta las variables en
+# la parte de la contrasena; el renglon no necesita mas indulto.
+marcadores='LA-CONTRASE|REPLACE_WITH|USUARIO:CLAVE|:CLAVE@|<[A-Za-z_-]+>|XXXX|EJEMPLO|TU-CLAVE|SU-CLAVE'
+
+encontrados=""
+for a in $archivos; do
+  # -I salta binarios; el renglon se descarta si su valor es un marcador.
+  if grep -IE "$patron" "$a" 2>/dev/null | grep -qvE "$marcadores"; then
+    encontrados="$encontrados$a
+"
+  fi
+done
+encontrados=$(printf '%s' "$encontrados" | grep -v '^$' || true)
 
 if [ -n "$encontrados" ]; then
   echo ""

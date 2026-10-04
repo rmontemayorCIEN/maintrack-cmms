@@ -14,10 +14,11 @@
  *
  * No debe correr al mismo tiempo que `npm run build` (comparten .next).
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -53,7 +54,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3198";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3198", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3198 });
   }
 
   const sello = `aisl-${Date.now()}`;
@@ -234,7 +235,8 @@ async function main() {
     const rPortal = await pedir("GET", `/reportar/${puntoA.token}`, null);
     revisar("la pantalla del QR abre sin sesión (así debe ser)", rPortal.status === 200, rPortal.status);
     revisar("y no muestra costos, personal ni el historial del equipo",
-      !/costo|Costo|OT-A1|Dueña A|historial/i.test(rPortal.texto) || rPortal.texto.length === 0);
+      // Solo lo que se ve: el <head> y los datos de Next llevan la descripción pública del producto («…condición y costos…»).
+      !/costo|Costo|OT-A1|Dueña A|historial/i.test(rPortal.texto.replace(/<head>[\s\S]*?<\/head>/, "").replace(/<script[\s\S]*?<\/script>/g, "")) || rPortal.texto.length === 0);
     const rPortalApi = await pedir("POST", "/api/publico", null, { accion: "RECUPERAR", folio: "SOL-A1", celular: "0000000000" });
     revisar("con el folio de A pero sin su celular, el portal no entrega la solicitud", rPortalApi.status === 404, rPortalApi.status);
 
@@ -271,7 +273,7 @@ async function main() {
       await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
     }
     if (servidor?.pid) {
-      try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ }
+      await apagarServidor(servidor, 3198);
     }
   }
 

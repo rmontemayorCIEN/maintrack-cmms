@@ -17,10 +17,26 @@ import { medianocheEnZona } from "./periodos";
 export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: string[] }> = {
   ACCESO: { titulo: "Acceso y usuarios", entidades: ["User"] },
   ORDENES: { titulo: "Órdenes de trabajo", entidades: ["WorkOrder", "WorkOrderTask", "WorkRequest"] },
-  ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "Meter", "MeterReading", "Sensor", "PlanRequest", "Conjunto"] },
-  ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier"] },
-  CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink"] },
+  ACTIVOS: { titulo: "Activos y planes", entidades: ["Asset", "MaintenancePlan", "PlanAsset", "PlanTask", "Meter", "MeterReading", "Sensor", "PredictiveAlert", "PlanRequest", "Conjunto", "AssetIntake"] },
+  // La orden de compra y la cotizacion faltaban: quien filtraba «Almacen y
+  // compras» para auditar una compra veia la requisicion y la recepcion, pero
+  // no con quien se cotizo ni que orden se emitio, que es justo lo que se
+  // revisa cuando alguien pregunta por que se le compro a ese proveedor.
+  ALMACEN: { titulo: "Almacén y compras", entidades: ["Part", "MaterialRequest", "PurchaseRequest", "PurchaseOrder", "Quote", "GoodsReceipt", "StockTransfer", "InventoryCount", "Supplier", "EquivalenciaRefaccion", "Resguardo", "KitDeHerramientas"] },
+  // Las vigencias van con activos y no en configuracion: una garantia o un
+  // permiso de operacion son datos del equipo, y quien audita «que paso con
+  // la caldera» los busca ahi.
+  VIGENCIAS: { titulo: "Garantías y vigencias", entidades: ["Vigencia"] },
+  REGISTROS: { titulo: "Registros propios", entidades: ["TablaPropia", "CampoPropio", "RenglonPropio"] },
+  NORMAS: { titulo: "Cumplimiento normativo", entidades: ["NormaAdoptada", "ObligacionAdoptada"] },
+  AVISOS: { titulo: "Avisos", entidades: ["ConfigAvisos", "Notification", "EntregaAviso"] },
+  INTEGRACION: { titulo: "Integración con otros sistemas", entidades: ["CredencialApi", "Webhook"] },
+  INTELIGENCIA: { titulo: "Inteligencia artificial", entidades: ["AiReport"] },
+  CONFIGURACION: { titulo: "Configuración", entidades: ["Organization", "Catalog", "Catalogo", "ReportPoint", "Attachment", "ReferenceLink", "DiaFestivo", "Invoice"] },
   IMPORTACION: { titulo: "Importaciones y puesta en marcha", entidades: ["Importacion", "ImportBatch"] },
+  // Lo que consultan los agentes de IA del operador por el servidor MCP
+  // (lib/mcp). Cada llamada deja su renglon con herramienta y parametros.
+  AGENTES: { titulo: "Agentes de IA (MCP)", entidades: ["AgenteMcp"] },
 };
 
 /** Acciones que vale la pena poder aislar de un vistazo. */
@@ -29,6 +45,7 @@ export const ACCIONES_SENSIBLES = [
   "USER_CREATED", "USER_ROLE_CHANGED", "USER_DEACTIVATED", "USER_UPDATED",
   "PASSWORD_CHANGED", "PASSWORD_RESET", "PASSWORD_RESET_ISSUED", "PASSWORD_RESET_USED",
   "EXPORTED", "FILE_ACCESSED", "CLIENT_UPDATED",
+  "MCP_ACCESS", "MCP_RECHAZADO", "MCP_AUTORIZADO",
 ];
 
 export type FiltroBitacora = {

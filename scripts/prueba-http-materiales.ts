@@ -11,11 +11,12 @@
  *
  * No debe correr al mismo tiempo que `npm run build` (comparten .next).
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
 import { prisma } from "../lib/db";
 import { aplicarMovimiento } from "../lib/almacen";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
 function revisar(afirmacion: string, ok: boolean, detalle?: unknown) {
@@ -47,7 +48,7 @@ async function main() {
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3196";
   if (!process.env.BASE_URL) {
-    servidor = spawn("npx", ["next", "dev", "-p", "3196", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+    servidor = levantarServidor({ puerto: 3196 });
   }
 
   const sello = `prueba-http-mat-${Date.now()}`;
@@ -163,7 +164,7 @@ async function main() {
     revisar("otra empresa no puede pedir contra esta orden", r.status === 404, r);
   } finally {
     for (const id of [org.id, orgB.id]) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya termino */ } }
+    await apagarServidor(servidor, 3196);
   }
 
   console.log(fallos ? `\n${fallos} revisión(es) fallaron` : "\nTodo bien");

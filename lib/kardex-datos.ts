@@ -18,6 +18,7 @@ export type OrigenDeMovimiento = {
     folio: string;
     purchaseRequest?: { id: string; folio: string } | null;
     recibidoPor?: { name: string | null } | null;
+    recibidoPorNombre?: string | null;
   } | null;
   entregadoA?: string | null;
 };
@@ -55,7 +56,12 @@ export function documentoDeMovimiento(m: OrigenDeMovimiento): DocumentoDeMovimie
  * siempre es usuario del sistema—. En una entrada de compra es quien firmo la
  * recepcion. Son la misma pregunta desde los dos lados del mostrador, y por eso
  * comparten columna.
+ *
+ * Cuando la recepcion la mando una integracion no hay persona, y entonces se
+ * dice el nombre de la integracion. Dejarlo vacio habria hecho parecer que a
+ * esa entrada le falta un dato, cuando en realidad se sabe perfectamente de
+ * donde vino.
  */
 export function quienRecibio(m: OrigenDeMovimiento): string | null {
-  return m.entregadoA ?? m.goodsReceipt?.recibidoPor?.name ?? null;
+  return m.entregadoA ?? m.goodsReceipt?.recibidoPor?.name ?? m.goodsReceipt?.recibidoPorNombre ?? null;
 }

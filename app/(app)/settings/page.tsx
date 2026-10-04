@@ -1,8 +1,12 @@
 import Link from "next/link";
-import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, UserCog, Users, ClipboardList } from "lucide-react";
+import { PanelAtajos } from "./atajos";
+import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
+import { favoritosDe, gruposParaAnclar } from "@/lib/favoritos";
+import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
+import { menuDe, puedeVerRuta } from "@/lib/pantallas";
 import { consumoDe, PLANES, type ClavePlan } from "@/lib/planes";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { PanelSuscripcion } from "@/components/panel-suscripcion";
@@ -11,6 +15,9 @@ import { consumoIa } from "@/lib/ia/consumo";
 import { COMPLEMENTO_IA, iaDeLaOrganizacion, planDe } from "@/lib/planes";
 import { instalacionDe } from "@/lib/instalaciones";
 import { PanelApariencia } from "./apariencia";
+import { PanelVoz } from "./voz";
+import { VOCES, VOZ_POR_OMISION } from "@/lib/voz";
+import { LARGOS_DE_RESPUESTA, LARGO_POR_OMISION } from "@/lib/respuestas-voz";
 import type { ClaveAcento, ClaveDensidad, ClaveEscala } from "@/lib/apariencia";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
 import { FichasPlanes } from "./planes";
@@ -39,12 +46,13 @@ import { ZONA_POR_OMISION } from "@/lib/periodos";
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "atajos", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
   cuenta: "Sus datos de acceso al sistema.",
   apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
+  atajos: "Las pantallas que usa a diario, hasta arriba de su menú. Es suyo: no cambia el de nadie más.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
@@ -80,7 +88,8 @@ export default async function SettingsPage({
    */
   const MANDO = can(user.role, "workorder:write");
   const PERMITIDAS: Record<Seccion, boolean> = {
-    cuenta: true, apariencia: true, avisos: true, seguridad: true,
+    // Personales, de todos: cada quien decide los suyos.
+    cuenta: true, apariencia: true, atajos: true, avisos: true, seguridad: true,
     organizacion: can(user.role, "settings:write"),
     jornada: MANDO, ordenes: MANDO,
     suscripcion: can(user.role, "settings:write"),
@@ -96,6 +105,7 @@ export default async function SettingsPage({
   const todas: Pestana[] = [
     { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
     { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
+    { clave: "atajos", titulo: "Lo que más uso", icono: <Star className="h-4 w-4" /> },
     { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
@@ -187,10 +197,30 @@ export default async function SettingsPage({
     usuarioId: params.usuario, modulo: params.modulo, accion: params.accion,
   });
 
+  /** Lo que esta persona puede ver, en un solo lugar: se pasa igual a todo. */
+  const accesoDe = (u: typeof user, o: typeof org) => ({
+    esSuperAdmin: u.isSuperAdmin,
+    esDemo: o.esDemo,
+    registrosPropios: o.registrosPropios,
+    cumplimientoNormas: o.cumplimientoNormas,
+  });
+
   return (
     <>
       <PageHeader title="Configuracion" description={DESCRIPCIONES[activa]} />
       <Pestanas activa={activa} pestanas={pestanas} />
+
+      {activa === "atajos" ? (
+        <PanelAtajos
+          nombreDelMapa={nombreDelMapa(terminoConjunto(org))}
+          /* Los grupos traen tambien las tablas propias, con SU nombre: es como
+             las busca quien las usa. Y las mismas banderas van a las dos
+             llamadas —antes iban solo al menu, y entonces un acceso ya elegido
+             no aparecia marcado—. */
+          grupos={await gruposParaAnclar(user.organizationId, user.role, accesoDe(user, org))}
+          iniciales={(await favoritosDe(user.organizationId, user.id, user.role, accesoDe(user, org))).map((i) => i.href)}
+        />
+      ) : null}
 
       {activa === "apariencia" ? (
         <PanelApariencia
@@ -200,6 +230,19 @@ export default async function SettingsPage({
           logoUrl={org.logoUrl}
           puedeEditarMarca={can(user.role, "settings:write")}
         />
+      ) : null}
+
+      {/* La voz solo le sirve a quien oye el parte, que es quien ve el
+          panorama de la empresa: el mismo criterio que protege esa ruta. */}
+      {activa === "apariencia" && puedeVerRuta(user.role, "/indicadores") ? (
+        <div className="mt-4">
+          <PanelVoz
+            voces={VOCES}
+            elegida={user.vozBrief ?? VOZ_POR_OMISION}
+            largos={LARGOS_DE_RESPUESTA}
+            largoElegido={user.respuestaVoz ?? LARGO_POR_OMISION}
+          />
+        </div>
       ) : null}
 
       {activa === "jornada" && jornadaDatos ? (
@@ -222,6 +265,8 @@ export default async function SettingsPage({
           diasHabiles={org.otDiasHabiles}
           generacion={org.otGeneracion}
           evidenciaCriticas={org.otEvidenciaCriticas}
+          codigoFormato={org.codigoFormatoOT}
+          revisionFormato={org.revisionFormatoOT}
           jornadaDias={org.diasHabiles}
           editable={can(user.role, "settings:write")}
         />

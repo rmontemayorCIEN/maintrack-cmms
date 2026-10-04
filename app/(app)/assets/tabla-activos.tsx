@@ -77,7 +77,7 @@ const crearColumnas = (zona: string): Columna<FilaActivo>[] => [
   },
   { id: "costoReemplazo", etiqueta: "Costo de reemplazo", alineaDerecha: true, texto: (a) => (a.replacementCost ? formatCurrency(a.replacementCost) : "—") },
   { id: "costoCompra", etiqueta: "Costo de compra", alineaDerecha: true, texto: (a) => (a.purchaseCost ? formatCurrency(a.purchaseCost) : "—") },
-  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => formatDia(a.commissionedAt, { zona }) },
+  { id: "puestaEnMarcha", etiqueta: "Puesta en marcha", texto: (a) => formatDia(a.commissionedAt, { zona }), ordenPor: (a) => (a.commissionedAt ? new Date(a.commissionedAt).getTime() : 0) },
   { id: "vidaUtil", etiqueta: "Vida útil (años)", alineaDerecha: true, texto: (a) => (a.expectedLifeYears ? `${a.expectedLifeYears}` : "—") },
 ];
 
@@ -121,6 +121,7 @@ export function TablaActivos({
         deFabrica={DE_FABRICA}
         vistaInicial={vistaInicial}
         clave="activos"
+        paso={{ base: "/assets", etiqueta: (a) => `${a.code} · ${a.name}` }}
         sustantivo="activos"
         ejemploFiltro='Filtrar: "bomba", "alberca", "critico"…'
         acciones={puedeEditar ? (a) => (

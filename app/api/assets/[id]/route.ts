@@ -9,6 +9,7 @@ const schema = z.object({
   description: z.string().nullable().optional(),
   locationId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
+  centroDeCostoId: z.string().nullable().optional(),
   manufacturer: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   serialNumber: z.string().nullable().optional(),

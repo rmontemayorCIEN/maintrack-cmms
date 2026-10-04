@@ -1,19 +1,11 @@
-import Link from "next/link";
 import { motivoSinOtActiva } from "@/lib/reglas-ot";
-import { Paperclip } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
-import { Avatar, Badge, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
-import {
-  PRIORITY_COLORS,
-  PRIORITY_LABELS,
-  REQUEST_STATUS_COLORS,
-  REQUEST_STATUS_LABELS,
-} from "@/lib/constants";
-import { formatDateTime } from "@/lib/utils";
+import { EmptyState, PageHeader, Stat } from "@/components/ui";
 import { RequestDialog } from "./request-dialog";
-import { ReviewActions } from "./review-actions";
+import { TablaSolicitudes, type FilaSolicitud } from "./tabla-solicitudes";
+import { vistaGuardada } from "@/lib/vistas";
 import { puedeVerRuta, veTodasLasSolicitudes } from "@/lib/pantallas";
 
 export const metadata = { title: "Solicitudes de servicio" };
@@ -53,6 +45,24 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     }),
   ]);
 
+  const filas: FilaSolicitud[] = requests.map((r) => {
+    const sinOt = motivoSinOtActiva(r.status, r.workOrder);
+    return {
+      id: r.id, numero: r.number, titulo: r.title,
+      descripcion: r.description, notaDeRevision: r.reviewNotes,
+      adjuntos: r._count.attachments,
+      activo: r.asset ? `${r.asset.code} · ${r.asset.name}` : null,
+      prioridad: r.priority, estado: r.status,
+      solicitante: r.requestedBy?.name ?? null,
+      colorSolicitante: r.requestedBy?.color ?? null,
+      creada: r.createdAt.toISOString(),
+      otId: r.workOrder?.id ?? null, otNumero: r.workOrder?.number ?? null,
+      sinOtCorto: sinOt?.corto ?? null,
+      sinOtLargo: sinOt ? `${sinOt.largo} Aparece en la calidad de captura para revisarla.` : null,
+      assetId: r.assetId, tipo: r.tipo, tipoSugerido: r.iaTipo,
+    };
+  });
+
   const pending = requests.filter((r) => r.status === "PENDING");
   const converted = requests.filter((r) => r.status === "CONVERTED").length;
 
@@ -85,134 +95,13 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         />
       ) : (
         <>
-        {/* Teléfono: una tarjeta por reporte, con lo que importa arriba. */}
-        <ul className="grid gap-2 md:hidden">
-          {requests.map((r) => {
-            const sinOt = motivoSinOtActiva(r.status, r.workOrder);
-            return (
-              <li key={r.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                <Link href={`/requests/${r.id}`} className="block">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-semibold text-brand-700">{r.number}</span>
-                    <Badge className={REQUEST_STATUS_COLORS[r.status]}>{REQUEST_STATUS_LABELS[r.status]}</Badge>
-                  </div>
-                  <p className="mt-1 text-sm font-medium text-slate-900">{r.title}</p>
-                  {r.reviewNotes ? <p className="mt-1 rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-900">Respuesta de quien revisa: {r.reviewNotes}</p> : null}
-                  <p className="mt-1 text-xs text-slate-500">
-                    {r.asset ? `${r.asset.code} · ${r.asset.name} · ` : ""}{formatDateTime(r.createdAt)}
-                    {r._count.attachments ? ` · ${r._count.attachments} foto(s)` : ""}
-                  </p>
-                </Link>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                  <Badge className={PRIORITY_COLORS[r.priority]}>{PRIORITY_LABELS[r.priority]}</Badge>
-                  {r.workOrder ? (
-                    veOrdenes
-                      ? <Link href={`/work-orders/${r.workOrder.id}`} className="font-medium text-brand-700">Orden {r.workOrder.number}</Link>
-                      : <span className="text-slate-600">Se atiende con la orden {r.workOrder.number}</span>
-                  ) : sinOt ? <span className="text-amber-700">{sinOt.corto}</span> : null}
-                  {soloMias ? null : r.requestedBy ? <span className="text-slate-500">· {r.requestedBy.name}</span> : null}
-                </div>
-                {canReview && r.status === "PENDING" ? (
-                  <div className="mt-2 border-t border-slate-100 pt-2">
-                    <ReviewActions requestId={r.id} technicians={technicians} assets={assets} assetActual={r.assetId} tipoActual={r.tipo} tipoSugerido={r.iaTipo} />
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-        <Card padded={false} className="hidden md:block">
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Folio</th>
-                  <th>Reporte</th>
-                  <th>Activo</th>
-                  <th>Prioridad</th>
-                  <th>Estado</th>
-                  <th>Solicitante</th>
-                  <th>Fecha</th>
-                  <th>OT</th>
-                  {canReview ? <th /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((request) => (
-                  <tr key={request.id}>
-                    <td>
-                      <Link href={`/requests/${request.id}`} className="font-medium text-brand-600 hover:underline">
-                        {request.number}
-                      </Link>
-                    </td>
-                    <td className="max-w-72">
-                      <Link href={`/requests/${request.id}`} className="block truncate font-medium text-slate-800 hover:text-brand-600">
-                        {request.title}
-                      </Link>
-                      {request.description ? (
-                        <p className="truncate text-xs text-slate-500">{request.description}</p>
-                      ) : null}
-                      {request.reviewNotes ? (
-                        <p className="mt-0.5 truncate text-xs italic text-slate-400">
-                          Nota: {request.reviewNotes}
-                        </p>
-                      ) : null}
-                      {request._count.attachments ? (
-                        <p className="mt-0.5 flex items-center gap-1 text-[0.6875rem] text-slate-500">
-                          <Paperclip className="h-3 w-3" />
-                          {request._count.attachments}{" "}
-                          {request._count.attachments === 1 ? "archivo" : "archivos"}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="text-xs text-slate-600">
-                      {request.asset ? `${request.asset.code} · ${request.asset.name}` : "—"}
-                    </td>
-                    <td><Badge className={PRIORITY_COLORS[request.priority]}>{PRIORITY_LABELS[request.priority]}</Badge></td>
-                    <td>
-                      <Badge className={REQUEST_STATUS_COLORS[request.status]}>
-                        {REQUEST_STATUS_LABELS[request.status]}
-                      </Badge>
-                    </td>
-                    <td>
-                      {request.requestedBy ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar name={request.requestedBy.name} color={request.requestedBy.color} />
-                          <span className="text-xs text-slate-600">{request.requestedBy.name}</span>
-                        </div>
-                      ) : "—"}
-                    </td>
-                    <td className="text-xs text-slate-500">{formatDateTime(request.createdAt)}</td>
-                    <td className="text-xs">
-                      {request.workOrder ? (
-                        veOrdenes ? (
-                          <Link href={`/work-orders/${request.workOrder.id}`} className="text-brand-600 hover:underline">
-                            {request.workOrder.number}
-                          </Link>
-                        ) : <span className="text-slate-600">{request.workOrder.number}</span>
-                      ) : null}
-                      {(() => {
-                        const sinOt = motivoSinOtActiva(request.status, request.workOrder);
-                        return sinOt ? (
-                          <span className="block text-amber-700" title={`${sinOt.largo} Aparece en la calidad de captura para revisarla.`}>
-                            {sinOt.corto}
-                          </span>
-                        ) : request.workOrder ? null : "—";
-                      })()}
-                    </td>
-                    {canReview ? (
-                      <td className="text-right">
-                        {request.status === "PENDING" ? (
-                          <ReviewActions requestId={request.id} technicians={technicians} assets={assets} assetActual={request.assetId} tipoActual={request.tipo} tipoSugerido={request.iaTipo} />
-                        ) : null}
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <TablaSolicitudes
+          solicitudes={filas}
+          vistaInicial={vistaGuardada(user.vistasTabla, todas ? "solicitudes" : "mis-reportes")}
+          veOrdenes={veOrdenes}
+          conSolicitante={todas}
+          revision={canReview ? { technicians, assets } : null}
+        />
         </>
       )}
     </>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { MAINTENANCE_TYPE_COLORS, MAINTENANCE_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, WO_STATUS_COLORS, WO_STATUS_LABELS } from "@/lib/constants";
-import { AlertTriangle, MapPin, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Check, MapPin, ShieldAlert } from "lucide-react";
 
 /**
  * Lo primero que ve quien ejecuta la orden desde el teléfono: qué, dónde,
@@ -51,17 +51,58 @@ export function FichaDeEjecucion(p: {
 }
 
 /**
- * El índice de la orden en el teléfono: la secuencia del trabajo, a un toque
- * cada paso. Se desliza de lado dentro de sí mismo; la página no.
+ * En qué va cada sección. Solo tres, y cada una significa algo:
+ *
+ *  - `falta`  — esta sección DETIENE el cierre. Sale de `faltantesDeCierre`.
+ *  - `hecho`  — ya está lista; no hace falta entrar.
+ *  - `neutro` — ni completa ni pendiente, porque no tiene noción de completa:
+ *               la bitácora o las lecturas no «se terminan».
+ *
+ * No hay un cuarto color a propósito. Ocho secciones con ocho tonos dejan de
+ * distinguir a la semana, y compiten con los colores que en MainTrack ya
+ * significan algo: el ámbar de «requiere paro», el rojo de vencida, la
+ * criticidad del equipo. El color se gasta donde contesta la única pregunta
+ * que alguien se hace frente a esta pantalla: qué me falta para cerrar.
  */
-export function IndiceDeSecciones({ secciones }: { secciones: Array<{ id: string; texto: string }> }) {
+export type EstadoDeSeccion = "falta" | "hecho" | "neutro";
+
+export type SeccionDelIndice = { id: string; texto: string; estado: EstadoDeSeccion };
+
+const CHIP: Record<EstadoDeSeccion, string> = {
+  falta: "border-amber-300 bg-amber-50 text-amber-900",
+  hecho: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  neutro: "border-slate-200 bg-white text-slate-700",
+};
+
+/**
+ * El índice de la orden: la secuencia del trabajo, a un toque cada paso. Se
+ * desliza de lado dentro de sí mismo; la página no.
+ *
+ * Va ARRIBA en los dos tamaños, no al costado en escritorio. Se probó al
+ * costado y competía con Resumen, Costos y Resultado, que viven en esa misma
+ * columna; además se lee después del contenido en vez de antes. Arriba hay una
+ * sola forma de recorrer la orden, igual en la laptop que en el teléfono: dos
+ * modelos distintos para la misma pantalla confunden a quien usa los dos.
+ *
+ * Además de llevar, ahora MARCA: de un vistazo se ve qué sección detiene el
+ * cierre sin recorrer las nueve tarjetas. El número de paso se queda porque es
+ * la secuencia real del trabajo, y el ícono se acompaña de texto para quien no
+ * distingue los colores.
+ */
+export function IndiceDeSecciones({ secciones }: { secciones: SeccionDelIndice[] }) {
   return (
-    <nav aria-label="Secciones de la orden" className="sticky top-14 z-10 -mx-3 border-b border-slate-200 bg-slate-50/95 px-3 py-2 sm:-mx-4 sm:px-4 lg:hidden">
+    <nav aria-label="Secciones de la orden" className="sticky top-14 z-10 -mx-3 border-b border-slate-200 bg-slate-50/95 px-3 py-2 sm:-mx-4 sm:px-4 lg:top-16">
       <ol className="flex gap-1.5 overflow-x-auto pb-0.5">
         {secciones.map((s, i) => (
           <li key={s.id} className="shrink-0">
-            <a href={`#${s.id}`} className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700">
-              <span className="mr-1 text-slate-400">{i + 1}.</span>{s.texto}
+            <a
+              href={`#${s.id}`}
+              className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium ${CHIP[s.estado]}`}
+            >
+              <span className={`mr-1 ${s.estado === "neutro" ? "text-slate-400" : "opacity-70"}`}>{i + 1}.</span>
+              {s.texto}
+              {s.estado === "falta" ? <AlertTriangle className="ml-1 h-3.5 w-3.5" aria-label="falta algo aquí" /> : null}
+              {s.estado === "hecho" ? <Check className="ml-1 h-3.5 w-3.5" aria-label="listo" /> : null}
             </a>
           </li>
         ))}

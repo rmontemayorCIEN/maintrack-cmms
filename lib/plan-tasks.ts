@@ -362,3 +362,56 @@ export async function filtroDeActividadesDeLaOrden(
   if (!condiciones.length) return null;
   return condiciones.length === 1 ? condiciones[0] : { OR: condiciones };
 }
+
+/**
+ * Agrega refacciones a actividades concretas de un plan, sin tocar lo demas.
+ *
+ * `reemplazarTareas` rehace el plan entero y recalcula la cadencia: sirve para
+ * editar, no para completar. Aqui solo se le cuelga material a las actividades
+ * que se eligieron, y por eso lo puede usar lo que propone la IA sin riesgo de
+ * mover frecuencias que nadie pidio cambiar.
+ *
+ * Se agrega, no se pisa: si la actividad ya tenia esa refaccion, se deja la
+ * cantidad que estaba. Quien la capturo sabia algo que la propuesta no.
+ */
+export async function agregarRefaccionesAActividades(
+  organizationId: string,
+  planId: string,
+  lineas: Array<{ taskId: string; refacciones: Array<{ partId: string; cantidad: number }> }>,
+): Promise<{ actividades: number; refacciones: number }> {
+  if (!lineas.length) return { actividades: 0, refacciones: 0 };
+
+  // Que las actividades sean de ESTE plan y de ESTA empresa: un id ajeno no
+  // puede colgarle material al plan de otro cliente.
+  const validas = new Set(
+    (await prisma.planTask.findMany({
+      where: { planId, id: { in: lineas.map((l) => l.taskId) }, plan: { organizationId } },
+      select: { id: true },
+    })).map((t) => t.id),
+  );
+  const partesValidas = new Set(
+    (await prisma.part.findMany({
+      where: { organizationId, active: true, id: { in: lineas.flatMap((l) => l.refacciones.map((r) => r.partId)) } },
+      select: { id: true },
+    })).map((p) => p.id),
+  );
+
+  let actividades = 0;
+  let refacciones = 0;
+  for (const l of lineas) {
+    if (!validas.has(l.taskId)) continue;
+    const utiles = l.refacciones.filter((r) => partesValidas.has(r.partId) && r.cantidad > 0);
+    if (!utiles.length) continue;
+    const ya = new Set(
+      (await prisma.planTaskPart.findMany({ where: { planTaskId: l.taskId }, select: { partId: true } })).map((x) => x.partId),
+    );
+    const nuevas = utiles.filter((r) => !ya.has(r.partId));
+    if (!nuevas.length) continue;
+    await prisma.planTaskPart.createMany({
+      data: nuevas.map((r) => ({ planTaskId: l.taskId, partId: r.partId, quantity: r.cantidad })),
+    });
+    actividades += 1;
+    refacciones += nuevas.length;
+  }
+  return { actividades, refacciones };
+}

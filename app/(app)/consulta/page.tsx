@@ -5,6 +5,7 @@ import { iaDeLaOrganizacion } from "@/lib/planes";
 import { consumoIa } from "@/lib/ia/consumo";
 import { EJEMPLOS } from "@/lib/ia/consulta";
 import { PanelConsulta } from "./panel";
+import { tieneChatDeVoz } from "@/lib/voz";
 
 export const metadata = { title: "Consulta" };
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function ConsultaPage() {
         disponible={iaConfigurada() && entitlement.funciones.includes("BUSQUEDA")}
         restantes={Math.max(0, entitlement.operaciones - uso.operaciones)}
         ejemplos={EJEMPLOS}
+        conVoz={tieneChatDeVoz(user.organization.plan)}
       />
     </>
   );

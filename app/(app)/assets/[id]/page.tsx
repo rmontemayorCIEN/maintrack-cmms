@@ -1,4 +1,8 @@
 import { zonaDeLaEmpresa } from "@/lib/indicadores";
+import { Compromisos } from "@/components/compromisos";
+import { Comentarios } from "@/components/comentarios";
+import { Vigencias } from "@/components/vigencias";
+import { RegistrosReferidos } from "@/components/registros-referidos";
 import { estadoDeVencimiento } from "@/lib/vencimiento";
 import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
@@ -37,6 +41,7 @@ import { can } from "@/lib/rbac";
 import { AssetDialog } from "../asset-dialog";
 import { Adjuntos } from "@/components/adjuntos";
 import { Enlaces } from "@/components/enlaces";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +109,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
   const recurrenciaDisponible =
     iaConfigurada() && (user.isSuperAdmin || iaDeLaOrganizacion(user.organization).funciones.includes("RECURRENCIA"));
 
-  const [sitios, ubicaciones, categorias] = await Promise.all([
+  const [sitios, ubicaciones, categorias, centrosDeCosto] = await Promise.all([
     prisma.site.findMany({
       where: { organizationId: user.organizationId },
       select: { id: true, name: true, code: true },
@@ -117,6 +122,11 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
     }),
     prisma.assetCategory.findMany({
       where: { organizationId: user.organizationId },
+      select: { id: true, name: true, code: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: user.organizationId, active: true },
       select: { id: true, name: true, code: true },
       orderBy: { code: "asc" },
     }),
@@ -194,9 +204,12 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         title={`${asset.code} — ${asset.name}`}
         breadcrumb={
-          <Link href="/assets" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/assets" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Activos
           </Link>
+            <PasarRegistros base="/assets" id={id} />
+          </span>
         }
         description={asset.description ?? undefined}
         actions={
@@ -206,6 +219,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 sites={sitios}
                 locations={ubicaciones}
                 categories={categorias}
+                centrosDeCosto={centrosDeCosto}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
                 activo={{
                   id: asset.id,
@@ -215,6 +229,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   siteId: asset.siteId,
                   locationId: asset.locationId,
                   categoryId: asset.categoryId,
+                  centroDeCostoId: asset.centroDeCostoId,
                   manufacturer: asset.manufacturer,
                   model: asset.model,
                   serialNumber: asset.serialNumber,
@@ -584,6 +599,41 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </Card>
+
+      {/* Los papeles del equipo que se vencen. Va ANTES de la conversación
+          porque es dato del equipo, no charla sobre él: quien abre el
+          expediente porque el equipo falló tiene que ver aquí si todavía está
+          cubierto, sin bajar hasta el final. */}
+      <div className="mt-4">
+        <Vigencias
+          ancla="assetId" anclaId={asset.id} zona={user.organization.timezone}
+          puedeEscribir={can(user.role, "vigencia:write")}
+          tiposSugeridos={["GARANTIA", "POLIZA_SEGURO", "CALIBRACION", "PERMISO", "CONTRATO_SERVICIO", "CERTIFICADO", "OTRO"]}
+        />
+      </div>
+
+      {/* Lo que la empresa lleva de este equipo en sus propias tablas: el
+          diésel que se le carga, sus análisis de agua, sus contratos. Aparece
+          solo/si hay algo, y solo si contrató el módulo. */}
+      <div className="mt-4">
+        <RegistrosReferidos
+          orgId={user.organizationId} llave="asset" refId={asset.id}
+          rol={user.role} esSuperAdmin={user.isSuperAdmin}
+          contratado={user.organization.registrosPropios}
+          zona={user.organization.timezone}
+        />
+      </div>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="asset" anclaId={asset.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación del equipo" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="Asset" entidadId={asset.id} yo={user.id} zona={user.organization.timezone} />
+      </div>
     </>
   );
 }

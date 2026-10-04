@@ -1,4 +1,6 @@
 import { MAINTENANCE_TYPE_LABELS } from "@/lib/constants";
+import { Compromisos } from "@/components/compromisos";
+import { Comentarios } from "@/components/comentarios";
 import { cubiertoPorCompras } from "@/lib/compras";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,6 +14,7 @@ import { tipoDeActividad } from "@/lib/fallas";
 import { formatDateTime, formatNumber } from "@/lib/utils";
 import { AccionesRequisicion, type RenglonVale } from "./acciones";
 import { CompraDialog } from "../../compras/compra-dialog";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -127,9 +130,12 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
         title={`Requisición ${req.folio}`}
         description={`${MOTIVOS[req.motivo as keyof typeof MOTIVOS] ?? req.motivo} · almacén ${req.warehouse.name}`}
         breadcrumb={
-          <Link href="/requisiciones" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/requisiciones" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Requisiciones
           </Link>
+            <PasarRegistros base="/requisiciones" id={id} />
+          </span>
         }
         actions={
           <div className="flex items-center gap-1.5">
@@ -212,6 +218,7 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
               ) : null}
               <div className="mt-2">
                 <CompraDialog
+                  moneda={user.organization.currency}
                   almacenes={almacenes}
                   refacciones={refaccionesCatalogo.map((r) => ({ id: r.id, code: r.code, name: r.name, unit: r.unit, costo: r.unitCost }))}
                   proveedores={proveedores}
@@ -296,6 +303,17 @@ export default async function RequisicionPage({ params }: { params: Promise<{ id
             )}
           </Card>
         </div>
+      </div>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="materialRequest" anclaId={req.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la requisición" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="MaterialRequest" entidadId={req.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

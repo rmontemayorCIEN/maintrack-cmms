@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { vistaGuardada } from "@/lib/vistas";
 import { TablaKardex, TIPOS, type FilaKardex } from "./tabla-kardex";
 import { FiltroRefaccion } from "./filtro-refaccion";
+import { nombreDeMotivo } from "@/lib/motivos-movimiento";
 
 export const metadata = { title: "Kardex de almacén" };
 export const dynamic = "force-dynamic";
@@ -57,7 +58,7 @@ export default async function KardexPage({
       take: 1000,
       select: {
         id: true, movementType: true, quantity: true, unitCost: true, balanceAfter: true,
-        reference: true, entregadoA: true, createdAt: true,
+        reference: true, motivo: true, entregadoA: true, createdAt: true,
         part: { select: { code: true, name: true, unit: true } },
         warehouse: { select: { name: true } },
         user: { select: { name: true } },
@@ -69,6 +70,7 @@ export default async function KardexPage({
             id: true, folio: true,
             purchaseRequest: { select: { id: true, folio: true } },
             recibidoPor: { select: { name: true } },
+            recibidoPorNombre: true,
           },
         },
       },
@@ -86,7 +88,9 @@ export default async function KardexPage({
       efecto: m.movementType === "ADJUST" ? 0 : SUMAN.includes(m.movementType) ? 1 : -1,
       saldoDespues: m.balanceAfter,
       costoUnitario: m.unitCost,
-      referencia: m.reference,
+      // El motivo primero: es lo que se puede agrupar. La referencia queda
+      // detras, con el detalle que el catalogo no captura.
+      referencia: [nombreDeMotivo(m.motivo), m.reference].filter(Boolean).join(" · ") || null,
       entregadoA: quienRecibio(m),
       usuario: m.user?.name ?? null,
       documento: documentoDeMovimiento(m),

@@ -4,6 +4,7 @@ import { fail, ok, parseDate, withAuth, withVista } from "@/lib/api";
 import { verificarCupo } from "@/lib/planes";
 import { validarFechasDeActivo } from "@/lib/calidad-datos";
 import { logAudit } from "@/lib/audit";
+import { contiene } from "@/lib/busqueda-texto";
 
 const schema = z.object({
   code: z.string().min(1),
@@ -12,6 +13,7 @@ const schema = z.object({
   siteId: z.string(),
   locationId: z.string().optional().nullable(),
   categoryId: z.string().optional().nullable(),
+  centroDeCostoId: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
   manufacturer: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
         organizationId: orgId,
         active: true,
         ...(q
-          ? { OR: [{ name: { contains: q } }, { code: { contains: q } }, { serialNumber: { contains: q } }] }
+          ? { OR: [{ name: contiene(q) }, { code: contiene(q) }, { serialNumber: contiene(q) }] }
           : {}),
       },
       include: {
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
         organizationId: orgId,
         locationId: input.locationId || null,
         categoryId: input.categoryId || null,
+        centroDeCostoId: input.centroDeCostoId || null,
         parentId: input.parentId || null,
         purchaseDate: parseDate(input.purchaseDate),
         warrantyExpiry: parseDate(input.warrantyExpiry),

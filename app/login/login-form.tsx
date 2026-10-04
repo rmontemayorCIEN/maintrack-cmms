@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Activity, Loader2, ShieldCheck, TrendingUp, Wrench } from "lucide-react";
 import { Button } from "@/components/ui";
+import { LEMA, MARCA, SUBLEMA, TEXTO_PRUEBA } from "@/lib/comercial";
 
 /**
  * La pantalla de acceso no anuncia cuentas ni prellena credenciales.
@@ -16,7 +17,7 @@ import { Button } from "@/components/ui";
  *
  * Al sistema entra solo quien fue dado de alta desde Configuracion.
  */
-export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
+export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { permiteAlta?: boolean; destino?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +39,7 @@ export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
       setError(data.error ?? "No fue posible iniciar sesión");
       return;
     }
-    router.push("/dashboard");
+    router.push(destino);
     router.refresh();
   }
 
@@ -51,20 +52,15 @@ export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600">
               <Wrench className="h-5 w-5" />
             </span>
-            MainTrack CMMS
+            {MARCA}
           </div>
-          <p className="mt-10 max-w-md text-3xl font-semibold leading-tight">
-            Mantenimiento preventivo, correctivo y predictivo en una sola plataforma.
-          </p>
-          <p className="mt-4 max-w-md text-sm text-slate-300">
-            Programe planes por calendario o por medidor, controle el backlog de fallas y
-            anticipe averias con monitoreo de condición y proyección de vida útil.
-          </p>
+          <p className="mt-10 max-w-md text-3xl font-semibold leading-tight">{LEMA}</p>
+          <p className="mt-4 max-w-md text-sm text-slate-300">{SUBLEMA}</p>
         </div>
         <div className="relative grid gap-4 text-sm text-slate-300">
-          <Feature icon={<Activity className="h-4 w-4" />} text="Indicadores MTTR, MTBF, disponibilidad y cumplimiento de PM" />
-          <Feature icon={<TrendingUp className="h-4 w-4" />} text="Alertas predictivas con tendencia y fecha estimada de falla" />
-          <Feature icon={<ShieldCheck className="h-4 w-4" />} text="Multiempresa, roles, bitácora de auditoria y API REST" />
+          <Feature icon={<Activity className="h-4 w-4" />} text="Disponibilidad, cumplimiento preventivo y costo por equipo, al día" />
+          <Feature icon={<TrendingUp className="h-4 w-4" />} text="Alertas por tendencia antes de que el equipo falle" />
+          <Feature icon={<ShieldCheck className="h-4 w-4" />} text="Cada rol ve lo suyo; cada empresa, solo su información" />
         </div>
       </div>
 
@@ -74,10 +70,10 @@ export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
               <Wrench className="h-5 w-5" />
             </span>
-            MainTrack CMMS
+            {MARCA}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h1>
-          <p className="mt-1 text-sm text-slate-500">Acceda a su espacio de trabajo.</p>
+          <p className="mt-1 text-sm text-slate-500">Entre con el correo y la contraseña que le dio su empresa.</p>
 
           <form onSubmit={submit} className="mt-6 grid gap-4">
             <div>
@@ -118,14 +114,11 @@ export function LoginForm({ permiteAlta = false }: { permiteAlta?: boolean }) {
             Invitar a registrarse cuando el servidor lo va a rechazar manda a la
             persona a llenar un formulario que termina en error.
           */}
-          {permiteAlta ? (
-            <p className="mt-6 text-center text-xs text-slate-500">
-              ¿Nueva empresa?{" "}
-              <Link href="/register" className="font-medium text-brand-600 hover:underline">
-                Cree su espacio de trabajo
-              </Link>
-            </p>
-          ) : null}
+          <p className="mt-6 text-center text-xs text-slate-500">
+            ¿Aún no usa {MARCA}?{" "}
+            <Link href="/#demostracion" className="font-medium text-brand-600 hover:underline">Solicite una demostración</Link>
+            {" "}o{" "}<Link href="/contratar" className="font-medium text-brand-600 hover:underline">{permiteAlta ? `pruébelo ${TEXTO_PRUEBA}` : "solicite su contratación"}</Link>
+          </p>
         </div>
       </div>
     </div>

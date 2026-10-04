@@ -11,10 +11,11 @@
  *
  *   npx tsx scripts/prueba-avisos.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { SignJWT } from "jose";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -50,6 +51,7 @@ async function esperarServidor(base: string, limiteMs: number) {
 }
 
 const MIN = 60_000;
+const DIA = 24 * 60 * MIN;
 
 async function main() {
   const { prisma } = await import("../lib/db");
@@ -74,7 +76,7 @@ async function main() {
 
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3204";
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "dev", "-p", "3204", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: 3204 });
 
   // Receptor de webhooks local: responde lo que se le pida, guarda lo que llega.
   const recibidos: Array<{ headers: Record<string, string>; cuerpo: string }> = [];
@@ -334,14 +336,53 @@ async function main() {
     const env = await enviarResumenes(A.id, cA, lunes8);
     const env2 = await enviarResumenes(A.id, cA, new Date(lunes8.getTime() + 10 * MIN));
     revisar("   se manda una vez por persona por día; quien no tiene nada no recibe", env.diarios > 0 && env2.diarios === 0 && env.vacios > 0, { env, env2 });
+    /**
+     * El resumen semanal mira la semana ANTERIOR a `lunes8`, o sea del 14 al
+     * 21 de septiembre de 2026. Las ordenes que esta prueba crea nacen con la
+     * fecha de HOY, que casi nunca cae ahi: la revision pasaba mientras el
+     * calendario real anduvo dentro de esa semana y empezo a fallar el lunes
+     * 21, sin que nadie hubiera tocado nada.
+     *
+     * Es el mismo defecto del caso 27 de mas abajo con otra cara —una prueba
+     * que depende del dia en que se corre— y el mismo arreglo: sembrar los
+     * datos DENTRO de la ventana que se va a consultar, en vez de confiar en
+     * que la ventana alcance a los datos.
+     *
+     * Van ya completadas a proposito: asi suman a las cifras de la semana sin
+     * aparecer como pendientes ni como vencidas en las revisiones que siguen,
+     * que usan esta misma empresa.
+     */
+    const enLaSemana = (dias: number) => new Date(lunes8.getTime() - dias * DIA);
+    await prisma.workOrder.createMany({
+      data: [1, 2].map((n) => ({
+        organizationId: A.id, number: `SEM-${n}-${sello}`, title: `Trabajo de la semana pasada ${n}`,
+        maintenanceType: "CORRECTIVE", priority: "MEDIUM", status: "COMPLETED", siteId: sitio.id,
+        createdAt: enLaSemana(5), completedAt: enLaSemana(3),
+      })),
+    });
+
     const rSem = await resumenSemanal(A.id, { id: sup.id, role: "SUPERVISOR", name: "Sup" }, cA, lunes8);
-    revisar("25. resumen semanal: la semana anterior completa, con su comparación y pendientes", rSem.periodo.startsWith("Semana del") && titulos(rSem).includes("Órdenes de la semana"), titulos(rSem));
+    const semanal = rSem.secciones.find((x) => x.titulo === "Órdenes de la semana");
+    revisar("25. resumen semanal: la semana anterior completa, con su comparación y pendientes",
+      rSem.periodo.startsWith("Semana del") && !!semanal, titulos(rSem));
+    // Que la seccion exista no basta: existiria igual con las cifras en cero.
+    // Lo que se sembro tiene que aparecer contado.
+    revisar("   y las cifras son las de esa semana, no las de hoy",
+      !!semanal && semanal.items.some((i) => i.texto.startsWith("Creadas: 2"))
+        && semanal.items.some((i) => i.texto.startsWith("Completadas: 2")),
+      semanal?.items.map((i) => i.texto).join(" | "));
 
     // ─────────────────────────────────────────── 26-30 Canales
     console.log("\n26-30. Correo y navegador");
     await prisma.preferenciaAvisos.deleteMany({ where: { userId: { in: [tec1.id] } } });
     const otP = await prisma.workOrder.create({ data: { organizationId: A.id, number: `P-${sello}`, title: "Para correo que falla", maintenanceType: "CORRECTIVE", priority: "MEDIUM", status: "ASSIGNED", siteId: sitio.id, assignedToId: tecPermanente.id } });
     await avisarNuevaOrden(A.id, otP.id);
+    // Se fuerza a que toque ya, igual que en el caso 27 de abajo: la OT es de
+    // prioridad media, asi que fuera del horario de avisos la entrega nace
+    // programada para el siguiente dia habil y `procesarEntregas` no la toma.
+    // Sin esto la prueba pasaba de dia y fallaba de noche, siempre igual de
+    // callada: decia «sin reintentos» cuando lo que pasaba es que ni se intento.
+    await prisma.entregaAviso.updateMany({ where: { organizationId: A.id, userId: tecPermanente.id, canal: "CORREO" }, data: { programadaPara: new Date() } });
     await procesarEntregas({ organizationId: A.id });
     const eP = await prisma.entregaAviso.findFirst({ where: { userId: tecPermanente.id, canal: "CORREO" } });
     revisar("26. el correo falla y la operación no: la orden existe, el aviso quedó en la campana", Boolean(await prisma.workOrder.findUnique({ where: { id: otP.id } })) && (await avisosDe(tecPermanente.id, "OT_ASIGNADA")).length === 1 && Boolean(eP));
@@ -380,7 +421,24 @@ async function main() {
     const cred = await pedir("POST", "/api/integraciones/credenciales", cAdmin, { nombre: "Pasarela sensores", alcances: ["lecturas:crear", "solicitudes:crear", "activos:leer"] });
     const sec = cred.json.secreto as string;
     const lista = await pedir("GET", "/api/integraciones/credenciales", cAdmin);
-    revisar("31. la credencial se crea y su secreto se ve UNA vez", cred.status === 201 && /^mt_[a-z0-9]{10}_/.test(sec) && !JSON.stringify(lista.json).includes(sec.split("_")[2]));
+    /**
+     * La parte secreta es TODO lo que va despues del prefijo, no el primer
+     * trozo entre guiones bajos.
+     *
+     * Con `split("_")[2]` esta revision fallaba sola cada tantas corridas y
+     * parecia la intermitencia de la suite. No lo era: el secreto aleatorio
+     * trae un guion bajo la mitad de las veces —es base64url— y entonces ese
+     * trozo quedaba en unos pocos caracteres, que aparecen por casualidad
+     * entre los identificadores y las fechas de la lista. Medido: 9 de cada
+     * 100 secretos dejan un trozo de menos de seis caracteres.
+     *
+     * Lo que se quiere comprobar es que el secreto no se puede volver a leer,
+     * y para eso hay que buscarlo entero.
+     */
+    const parteSecreta = sec.split("_").slice(2).join("_");
+    revisar("31. la credencial se crea y su secreto se ve UNA vez",
+      cred.status === 201 && /^mt_[a-z0-9]{10}_/.test(sec)
+        && parteSecreta.length >= 20 && !JSON.stringify(lista.json).includes(parteSecreta));
     const bearer = { Authorization: `Bearer ${sec}` };
     const act = await pedir("GET", "/api/v1/activos", bearer);
     revisar("   con ella se consulta la API, solo lo de su empresa y sin costos", act.status === 200 && (act.json.datos as Array<{ codigo: string; costoAdquisicion?: number }>).every((a) => ["CR-1", "BO-1"].includes(a.codigo) && !("costoAdquisicion" in a)));
@@ -524,7 +582,7 @@ async function main() {
     usarTransportes();
     receptor.close();
     for (const id of [...creadas].reverse()) await prisma.organization.delete({ where: { id } }).catch(() => undefined);
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }
+    await apagarServidor(servidor, 3204);
   }
 
   console.log("\nAislamiento de la prueba");

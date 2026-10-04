@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { almacenPorOmision, aplicarMovimiento } from "@/lib/almacen";
+import { contiene } from "@/lib/busqueda-texto";
 
 const schema = z.object({
   code: z.string().min(1),
@@ -9,6 +10,8 @@ const schema = z.object({
   description: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
   unit: z.string().min(1),
+  /// REFACCION (se consume) o HERRAMIENTA (sale y regresa).
+  naturaleza: z.enum(["REFACCION", "HERRAMIENTA"]).optional(),
   unitCost: z.coerce.number().min(0).default(0),
   quantityOnHand: z.coerce.number().min(0).default(0),
   minQuantity: z.coerce.number().min(0).default(0),
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
       where: {
         organizationId: orgId,
         active: true,
-        ...(q ? { OR: [{ name: { contains: q } }, { code: { contains: q } }] } : {}),
+        ...(q ? { OR: [{ name: contiene(q) }, { code: contiene(q) }] } : {}),
       },
       include: { supplier: { select: { name: true } } },
       orderBy: { code: "asc" },

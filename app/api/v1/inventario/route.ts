@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { conCredencial, pagina, paginacion } from "@/lib/integraciones/api";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     const q = url.searchParams.get("q")?.trim();
     const costos = quien.alcances.includes("costos:leer");
     const filas = await prisma.part.findMany({
-      where: { organizationId: quien.organizationId, active: true, ...(q ? { OR: [{ code: { contains: q } }, { name: { contains: q } }] } : {}) },
+      where: { organizationId: quien.organizationId, active: true, ...(q ? { OR: [{ code: contiene(q) }, { name: contiene(q) }] } : {}) },
       orderBy: { id: "asc" }, take: p.take, ...(p.cursor ? { cursor: p.cursor, skip: p.skip } : {}),
       select: {
         id: true, code: true, name: true, unit: true, quantityOnHand: true, minQuantity: true, maxQuantity: true, unitCost: true,

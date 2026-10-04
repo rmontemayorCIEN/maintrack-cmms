@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { nextWorkOrderNumber } from "./numbering";
 import { tocanEn } from "./frecuencias";
 import { addDays, startOfDay } from "./utils";
@@ -14,6 +15,7 @@ import {
   reglaDeOrganizacion,
   sembrarLoQueFalte,
 } from "./calendario-actividad";
+import { conCandado } from "./procesos";
 
 export type GenerationResult = {
   generated: number;
@@ -220,6 +222,8 @@ async function generarPorMedidor(
         status: plan.assignedToId ? "ASSIGNED" : "OPEN",
         priority: plan.priority,
         assetId: plan.assetId,
+        // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+        centroDeCostoId: await centroDeCostoDelActivo(organizationId, plan.assetId),
         siteId: plan.asset?.siteId ?? null,
         locationId: plan.asset?.locationId ?? null,
         planId: plan.id,
@@ -759,6 +763,8 @@ async function generarPorActividad(
         status: plan.assignedToId ? "ASSIGNED" : "OPEN",
         priority: plan.priority,
         assetId: primera.assetId,
+        // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+        centroDeCostoId: await centroDeCostoDelActivo(organizationId, primera.assetId),
         siteId: asset?.siteId ?? null,
         locationId: asset?.locationId ?? null,
         planId: plan.id,
@@ -833,14 +839,36 @@ export async function generateScheduledWorkOrders(
   organizationId: string,
   options: { horizonDays?: number; userId?: string | null; dryRun?: boolean } = {},
 ): Promise<GenerationResult> {
-  const [porActividad, porMedidor] = [
-    await generarPorActividad(organizationId, options),
-    await generarPorMedidor(organizationId, options),
-  ];
+  const generar = async (): Promise<GenerationResult> => {
+    const [porActividad, porMedidor] = [
+      await generarPorActividad(organizationId, options),
+      await generarPorMedidor(organizationId, options),
+    ];
+    return {
+      generated: porActividad.generated + porMedidor.generated,
+      skipped: porActividad.skipped + porMedidor.skipped,
+      details: [...porActividad.details, ...porMedidor.details],
+    };
+  };
+
+  // Un ensayo no escribe nada, y bloquear por el dejaria al cron esperando a
+  // que alguien cierre una pantalla.
+  if (options.dryRun) return generar();
+
+  /**
+   * El candado va AQUI y no en la ruta del cron porque esta es la funcion que
+   * comparten los dos caminos que pueden chocar: la corrida automatica y el
+   * boton «generar ahora» de la pantalla de planes. Puesto en la ruta, el
+   * boton se le colaria por un lado.
+   *
+   * Es por empresa: que una planta este generando no debe detener a otra.
+   */
+  const corrida = await conCandado(`scheduler:${organizationId}`, generar, { organizationId });
+  if (corrida.corrio) return corrida.resultado;
   return {
-    generated: porActividad.generated + porMedidor.generated,
-    skipped: porActividad.skipped + porMedidor.skipped,
-    details: [...porActividad.details, ...porMedidor.details],
+    generated: 0,
+    skipped: 0,
+    details: [{ plan: "—", reason: `El programador ${corrida.motivo} para esta empresa; no se generó nada para no duplicar.` }],
   };
 }
 

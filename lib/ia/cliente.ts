@@ -150,6 +150,30 @@ export async function analizarConIa<T extends z.ZodType>(params: {
   esfuerzo?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Imagen a analizar, en base64 y con su tipo. */
   imagen?: { base64: string; tipo: "image/jpeg" | "image/png" | "image/webp" };
+  /**
+   * Varias imagenes de una vez, cada una con su etiqueta.
+   *
+   * La etiqueta va como texto JUSTO ANTES de su imagen, y no es adorno: sin
+   * ella el modelo ve un monton de fotos sueltas y no puede decir cual es
+   * cual. Con ella puede contestar «en la foto de la parada 3», que es lo
+   * unico que hace el hallazgo util para quien lo lee.
+   *
+   * Cada imagen cuesta del orden de mil seiscientos tokens de entrada, asi
+   * que quien llame acota cuantas manda: no es lo mismo doce que doscientas.
+   */
+  imagenes?: Array<{ base64: string; tipo: "image/jpeg" | "image/png" | "image/webp"; etiqueta: string }>;
+  /**
+   * Un PDF a leer, en base64.
+   *
+   * El modelo lo lee entero —texto y diseño— sin que nadie extraiga el texto
+   * antes. Eso importa para lo unico que se usa hoy: sacar de una norma lo que
+   * exige, CITANDO el renglon. Con el texto plano extraido aparte se pierden
+   * los numerales y las tablas, que es justo donde vive la obligacion.
+   *
+   * Cuesta mucho mas que una imagen: un PDF de treinta paginas son decenas de
+   * miles de tokens de entrada. Quien lo use tiene que saberlo.
+   */
+  documento?: { base64: string; nombre: string };
 }): Promise<ResultadoIa<z.infer<T>>> {
   const modelo = params.modelo ?? MODELO_PREDETERMINADO;
   const client = obtenerCliente();
@@ -177,15 +201,55 @@ export async function analizarConIa<T extends z.ZodType>(params: {
       model: modelo,
       max_tokens: params.maxTokens ?? 16000,
       system: params.sistema,
-      thinking: { type: "adaptive" },
+      /**
+       * Haiku no admite ni pensamiento adaptativo ni nivel de esfuerzo: la
+       * API contesta 400 y la llamada se pierde entera. Los dos rechazos son
+       * distintos y aparecen uno tras otro, asi que quien lo descubra por las
+       * malas lo va a descubrir dos veces.
+       *
+       * Se detecta aqui y no en cada funcion a proposito: quien elija Haiku
+       * para una tarea barata no tiene por que saber esto, y si dependiera de
+       * acordarse, el primer olvido seria una funcion que nunca contesta. Y el
+       * fallo se disfraza de otra cosa: quien la llame ve un «no se pudo»
+       * normal, no un modelo mal configurado.
+       */
+      ...(modelo.includes("haiku") ? {} : { thinking: { type: "adaptive" as const } }),
       output_config: {
-        effort: params.esfuerzo ?? "high",
+        // El esfuerzo va solo donde se admite; ver la nota de arriba.
+        ...(modelo.includes("haiku") ? {} : { effort: params.esfuerzo ?? "high" }),
         format: { type: "json_schema", schema: esquemaJson },
       },
       messages: [
         {
           role: "user",
-          content: params.imagen
+          content: params.documento
+            ? [
+                {
+                  type: "document" as const,
+                  source: { type: "base64" as const, media_type: "application/pdf" as const, data: params.documento.base64 },
+                  title: params.documento.nombre,
+                  // SIN `citations`: la API las rechaza cuando se pide salida
+                  // estructurada —«Citations cannot be enabled when output
+                  // format is set»— y aqui toda respuesta es estructurada. No
+                  // se pierde nada: el esquema de quien lo use le exige la
+                  // cita textual como campo, que ademas queda guardada.
+                },
+                { type: "text" as const, text: mensaje },
+              ]
+            : params.imagenes?.length
+            ? [
+                // Cada foto anunciada por su etiqueta, y el encargo al final:
+                // asi el modelo ya vio todo cuando lee que tiene que hacer.
+                ...params.imagenes.flatMap((img) => [
+                  { type: "text" as const, text: img.etiqueta },
+                  {
+                    type: "image" as const,
+                    source: { type: "base64" as const, media_type: img.tipo, data: img.base64 },
+                  },
+                ]),
+                { type: "text" as const, text: mensaje },
+              ]
+            : params.imagen
             ? [
                 {
                   type: "image" as const,
@@ -353,4 +417,49 @@ export async function conversarConIa(params: {
     console.error(`IA (${params.funcion}) fallo:`, detalle);
     throw new Error(`No fue posible responder la consulta. ${detalle}`);
   }
+}
+
+/**
+ * El error del proveedor, dicho para una persona.
+ *
+ * ── Por que existe ──
+ *
+ * Las rutas de IA devolvian `error.message` tal cual, y eso le ponia enfrente
+ * al usuario cosas como:
+ *
+ *   401 401 {"type":"error","error":{"type":"authentication_error",
+ *   "message":"API key is invalid."},"request_id":null}
+ *
+ * Quien lo ve no puede hacer nada con eso, y peor: parece que el sistema se
+ * rompio. Casi siempre es una de cinco cosas, y cada una tiene una salida
+ * distinta —esperar, reintentar, o avisarle a soporte—.
+ *
+ * El detalle crudo NO se pierde: queda en `AiUsage.error`, que es donde este
+ * proyecto manda a buscar cuando algo de IA falla
+ * (`scripts/ultimo-error-ia.ts`). Aqui solo se decide que leer la persona.
+ */
+export function motivoLegible(error: unknown): string {
+  const crudo = error instanceof Error ? error.message : String(error ?? "");
+  const t = crudo.toLowerCase();
+
+  if (/authentication|api key|401|invalid x-api-key/.test(t)) {
+    return "La llave del servicio de inteligencia artificial no es válida. Avise a soporte: no es algo que se resuelva reintentando.";
+  }
+  if (/credit|billing|payment|quota|insufficient/.test(t)) {
+    return "La cuenta del servicio de inteligencia artificial no tiene crédito disponible. Avise a soporte.";
+  }
+  if (/rate.?limit|429|overloaded|529|capacity/.test(t)) {
+    return "El servicio de inteligencia artificial está saturado en este momento. Espere un minuto y vuelva a intentar.";
+  }
+  if (/timeout|timed out|aborted|abort|etimedout/.test(t)) {
+    return "La inteligencia artificial tardó demasiado en contestar. Vuelva a intentar; si se repite, pruebe con menos información.";
+  }
+  if (/enotfound|econnreset|econnrefused|fetch failed|network|socket/.test(t)) {
+    return "No se pudo contactar al servicio de inteligencia artificial. Revise la conexión e intente de nuevo.";
+  }
+  if (/validation|invalid_request|400|schema/.test(t)) {
+    return "El servicio de inteligencia artificial rechazó la petición. Avise a soporte; el detalle quedó registrado.";
+  }
+  // Lo desconocido se dice como desconocido, no se disfraza de otra cosa.
+  return "No fue posible completar la consulta a la inteligencia artificial. El detalle quedó registrado; si se repite, avise a soporte.";
 }

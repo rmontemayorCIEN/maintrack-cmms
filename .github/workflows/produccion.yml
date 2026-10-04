@@ -1,0 +1,176 @@
+# Liberacion a produccion. SOLO con aprobacion de Rafael.
+#
+# Reemplaza al antiguo deploy.yml, que publicaba en cada push a main sin
+# pruebas y sin aprobacion, con una llave JSON de cuenta de servicio y una
+# lista de secretos INCOMPLETA —lo que habria apagado los avisos al celular y
+# la IA sin que nada fallara, porque --set-secrets reemplaza la lista entera—.
+#
+# Aqui no se escribe el comando de despliegue: se llama a scripts/deploy.sh,
+# que es el unico lugar que conoce la lista completa de secretos, el bucket de
+# archivos y la conexion a Cloud SQL. Un `gcloud run deploy` escrito a mano se
+# lleva todo eso por delante; ya paso una vez.
+name: Liberar a produccion
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Dos liberaciones a la vez se pisarian en la migracion. Esta espera a que la
+# anterior termine, y NO se cancela: una migracion a medias es peor que lenta.
+concurrency:
+  group: produccion
+  cancel-in-progress: false
+
+env:
+  PROYECTO: maintrack-cmms-4821
+  SERVICIO: maintrack-cmms
+  REGION: us-central1
+  INSTANCIA_SQL: maintrack-db
+
+jobs:
+  liberar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Seguro doble. La puerta de verdad es el environment de abajo, pero un
+    # environment que TODAVIA no existe GitHub lo crea al vuelo y SIN reglas:
+    # no detiene nada. Mientras la federacion de identidad no este puesta,
+    # esto ni siquiera arranca. El dia que se configure, la puerta que manda
+    # vuelve a ser la aprobacion.
+    if: vars.WIF_PROVIDER != ''
+
+    # ESTA es la puerta. El environment «produccion» exige aprobacion manual
+    # en GitHub: mientras nadie apruebe, el trabajo queda detenido aqui y no
+    # toca ni la base ni el servicio. Es el unico punto donde un agente no
+    # puede pasar solo.
+    environment:
+      name: produccion
+      url: ${{ steps.publicado.outputs.url }}
+
+    permissions:
+      contents: read
+      id-token: write        # para Workload Identity Federation, sin llaves
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Entrar a Google Cloud (sin llaves JSON)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_CUENTA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Guardar a que revision volver ANTES de tocar nada. Sin esto, la reversa
+      # no tiene a donde regresar.
+      - name: Anotar la revision que hoy sirve
+        id: anterior
+        run: |
+          set -euo pipefail
+          REV=$(gcloud run services describe "$SERVICIO" --region "$REGION" \
+                --project "$PROYECTO" --format='value(status.traffic[0].revisionName)')
+          echo "revision=$REV" >> "$GITHUB_OUTPUT"
+          echo "Si algo sale mal se vuelve a: $REV"
+
+      # El esquema vive en SQLite para desarrollo; produccion es PostgreSQL con
+      # el MISMO schema.prisma. Este script hace ese cambio.
+      - name: Poner el esquema en PostgreSQL
+        run: ./scripts/use-postgres.sh
+
+      # Se conecta por el proxy de Cloud SQL y NO abriendo la base a una IP
+      # publica, que es como se hace desde la Mac. La IP de un servidor de
+      # GitHub cambia en cada corrida, y dejar la base abierta a una IP que no
+      # se controla es peor que el problema que resuelve.
+      - name: Levantar el proxy de Cloud SQL
+        run: |
+          set -euo pipefail
+          CONEXION=$(gcloud sql instances describe "$INSTANCIA_SQL" \
+                     --project "$PROYECTO" --format='value(connectionName)')
+          curl -sSL -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --port 5432 "$CONEXION" &
+          for i in $(seq 1 30); do
+            (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+      # La migracion va ANTES de publicar y DESPUES de la aprobacion. Al reves
+      # el codigo nuevo sale a pedir columnas que la base no tiene: eso dejo
+      # caido el detalle de ordenes en la revision 00108.
+      - name: Migrar la base
+        run: |
+          set -euo pipefail
+          CADENA=$(gcloud secrets versions access latest --secret=cmms-database-url --project "$PROYECTO")
+          CLAVE=$(printf '%s' "$CADENA" | sed -n 's|^postgresql://maintrack:\(.*\)@localhost/maintrack?host=.*$|\1|p')
+          [ -z "$CLAVE" ] && { echo "No se pudo leer la cadena de conexion del Secret Manager."; exit 1; }
+          # La clave nunca se imprime ni queda en el registro: viaja como
+          # variable de este paso y se va con el.
+          DATABASE_URL="postgresql://maintrack:$CLAVE@127.0.0.1:5432/maintrack" npx prisma migrate deploy
+
+      - name: Publicar
+        id: publicado
+        run: |
+          set -euo pipefail
+          npm run deploy
+          URL=$(gcloud run services describe "$SERVICIO" --region "$REGION" \
+                --project "$PROYECTO" --format='value(status.url)')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      # ── Que lo publicado sea lo que ATIENDE
+      #
+      # Esto va ANTES del humo y no despues, porque el humo pega contra la
+      # direccion del servicio y no sabe que revision hay detras. La primera
+      # liberacion salio verde con los clientes en el codigo de cuatro horas
+      # antes: se publico una revision sana que nunca recibio trafico, y el
+      # humo la confirmo... probando la vieja.
+      #
+      # Una liberacion que no cambia lo que ve el cliente no es una
+      # liberacion, aunque todos los pasos digan que si.
+      - name: Comprobar que la revision nueva es la que atiende
+        run: |
+          set -euo pipefail
+          NUEVA=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                  --format='value(status.latestCreatedRevisionName)')
+          SIRVE=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                  --format='value(status.traffic[0].revisionName)')
+          echo "  Se publico: $NUEVA"
+          echo "  Atiende   : $SIRVE"
+          if [ "$NUEVA" != "$SIRVE" ]; then
+            echo ""
+            echo "ERROR: se publico «$NUEVA» pero quien atiende es «$SIRVE»."
+            echo ""
+            echo "       Los clientes seguirian con el codigo anterior y todo lo"
+            echo "       demas diria que la liberacion salio bien."
+            echo ""
+            echo "       Suele pasar cuando el trafico quedo clavado a una"
+            echo "       revision: revise que deploy.sh publique con --to-latest."
+            exit 1
+          fi
+
+      - name: Prueba de humo
+        # Sin navegador: solo peticiones. Lo que prueba es que ESTA revision
+        # atienda con ESTOS secretos y ESTA base, no como se ve.
+        run: npx tsx scripts/humo.ts "${{ steps.publicado.outputs.url }}"
+
+      # Si el humo fallo, el trafico vuelve a la revision anterior. La base ya
+      # migro y no se deshace: las migraciones son aditivas justamente para que
+      # la version anterior siga funcionando contra el esquema nuevo.
+      - name: Regresar a la revision anterior si algo fallo
+        if: failure() && steps.anterior.outputs.revision != ''
+        run: |
+          set -euo pipefail
+          echo "Regresando el trafico a ${{ steps.anterior.outputs.revision }}"
+          gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+            --to-revisions="${{ steps.anterior.outputs.revision }}=100"
+          echo "Listo. La base quedo migrada: las migraciones son aditivas y la"
+          echo "revision anterior funciona contra el esquema nuevo."

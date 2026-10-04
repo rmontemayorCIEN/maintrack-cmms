@@ -78,7 +78,7 @@ const crearColumnas = (zona: string): Columna<FilaRequisicion>[] => [
     texto: (r) => String(r.devuelto),
     pinta: (r) => (r.devuelto ? <span className="text-slate-700">{r.devuelto}</span> : <span className="text-slate-300">—</span>),
   },
-  { id: "creada", etiqueta: "Pedida", texto: (r) => formatDate(new Date(r.createdAt), zona) },
+  { id: "creada", etiqueta: "Pedida", texto: (r) => formatDate(new Date(r.createdAt), zona), ordenPor: (r) => new Date(r.createdAt).getTime() },
   { id: "cerrada", etiqueta: "Cerrada", texto: (r) => (r.cerradaEl ? formatDate(new Date(r.cerradaEl), zona) : "—") },
   { id: "nota", etiqueta: "Nota", texto: (r) => guion(r.nota) },
 ];
@@ -97,6 +97,7 @@ export function TablaRequisiciones({ requisiciones, vistaInicial }: { requisicio
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="requisiciones"
+      paso={{ base: "/requisiciones", etiqueta: (r) => r.folio }}
       sustantivo="requisiciones"
       ejemploFiltro='Filtrar: "balero", "paro", "solicitada"…'
     />

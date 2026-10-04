@@ -56,7 +56,7 @@ export async function expedienteDeFallas(organizationId: string, assetId: string
     }),
     // El paro sale de los eventos de paro no planeados, como en los indicadores.
     prisma.downtimeEvent.findMany({
-      where: { assetId, asset: { organizationId }, planned: false, startedAt: dentroDe(periodo) },
+      where: { assetId, organizationId, planned: false, startedAt: dentroDe(periodo) },
       select: { minutes: true },
     }),
   ]);

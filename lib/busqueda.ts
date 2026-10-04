@@ -78,17 +78,20 @@ export async function buscar(
   const exactoPrimero = <T extends { titulo: string }>(xs: T[], clave: (x: T) => string) =>
     [...xs].sort((a, b) => Number(normalizar(clave(b)) === q) - Number(normalizar(clave(a)) === q));
 
-  agregar("orden", "Órdenes de trabajo", exactoPrimero(
-    ordenes.filter((o) => coincide(q, o.number, o.title, o.asset?.code, o.asset?.name)).map((o) => ({
-      tipo: "orden", id: o.id, titulo: `${o.number} · ${o.title}`, contexto: o.asset ? `${o.asset.code} · ${o.asset.name}` : "Sin equipo",
-      enlace: `/work-orders/${o.id}`, estado: o.status, folio: o.number,
-    })), (x) => x.folio));
+  // Los equipos van primero, y no es casual: se busca por nombre de equipo
+  // mucho mas seguido que por folio. Quien busca una orden concreta escribe
+  // su folio completo, y ese sale arriba de su propio grupo de todos modos.
   agregar("activo", "Equipos", exactoPrimero(
     activos.filter((a) => coincide(q, a.code, a.name, a.serialNumber, a.manufacturer, a.model)).map((a) => ({
       tipo: "activo", id: a.id, titulo: `${a.code} · ${a.name}`,
       contexto: [a.location?.name, a.manufacturer, a.model, a.serialNumber ? `Serie ${a.serialNumber}` : null].filter(Boolean).join(" · ") || "—",
       enlace: `/assets/${a.id}`, estado: a.status, codigo: a.code,
     })), (x) => x.codigo));
+  agregar("orden", "Órdenes de trabajo", exactoPrimero(
+    ordenes.filter((o) => coincide(q, o.number, o.title, o.asset?.code, o.asset?.name)).map((o) => ({
+      tipo: "orden", id: o.id, titulo: `${o.number} · ${o.title}`, contexto: o.asset ? `${o.asset.code} · ${o.asset.name}` : "Sin equipo",
+      enlace: `/work-orders/${o.id}`, estado: o.status, folio: o.number,
+    })), (x) => x.folio));
   agregar("refaccion", "Refacciones", exactoPrimero(
     refacciones.filter((p) => coincide(q, p.code, p.name, p.description, p.category)).map((p) => ({
       tipo: "refaccion", id: p.id, titulo: `${p.code} · ${p.name}`, contexto: `${p.category ?? "Sin categoría"} · ${p.quantityOnHand} ${p.unit} en existencia`,

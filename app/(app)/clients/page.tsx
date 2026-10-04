@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Receipt, Sparkles } from "lucide-react";
+import { LifeBuoy, Receipt, Sparkles, UserPlus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
@@ -11,6 +11,7 @@ import { consumoPorOrganizacion } from "@/lib/ia/consumo";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { formatoUsd } from "@/lib/ia/precios";
 import { avancePuestaEnMarcha } from "@/lib/puesta-en-marcha";
+import { formatDateTime } from "@/lib/utils";
 
 export const metadata = { title: "Empresas cliente" };
 export const dynamic = "force-dynamic";
@@ -28,18 +29,25 @@ export default async function ClientsPage() {
     orderBy: { createdAt: "asc" },
   });
 
+  const [prospectosNuevos, soporteAbierto] = await Promise.all([
+    prisma.prospecto.count({ where: { estado: "NUEVA" } }),
+    prisma.solicitudSoporte.count({ where: { estado: { in: ["RECIBIDA", "EN_REVISION"] } } }),
+  ]);
+
   const organizaciones = await prisma.organization.findMany({
     orderBy: { createdAt: "desc" },
     select: {
       id: true, name: true, slug: true, plan: true, status: true,
       industry: true, tipoInstalacion: true, trialEndsAt: true, createdAt: true,
-      iaComplemento: true, iaExtra: true,
+      iaComplemento: true, iaExtra: true, registrosPropios: true, cumplimientoNormas: true,
       _count: { select: { users: true, assets: true, workOrders: true } },
     },
   });
 
   const consumoIa = await consumoPorOrganizacion();
   const tecnico = await estadoTecnicoPlataforma();
+  // La consola es del operador: las horas van en SU zona, no en la de un cliente.
+  const zona = user.organization.timezone;
   // Avance de puesta en marcha por cliente: una cuenta estancada en 20% a las
   // tres semanas es una cuenta que no va a renovar, y conviene saberlo antes.
   // En serie a proposito: cada avance son varias decenas de conteos y la
@@ -75,6 +83,12 @@ export default async function ClientsPage() {
           >
             <Receipt className="h-3.5 w-3.5" /> Cobranza
           </Link>
+          <Link href="/clients/prospectos" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <UserPlus className="h-3.5 w-3.5" /> Prospectos{prospectosNuevos ? <span className="rounded-full bg-amber-100 px-1.5 text-amber-900">{prospectosNuevos}</span> : null}
+          </Link>
+          <Link href="/clients/soporte" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <LifeBuoy className="h-3.5 w-3.5" /> Soporte{soporteAbierto ? <span className="rounded-full bg-amber-100 px-1.5 text-amber-900">{soporteAbierto}</span> : null}
+          </Link>
           </>
         }
       />
@@ -89,6 +103,42 @@ export default async function ClientsPage() {
           tone={organizaciones.some((o) => o.status === "SUSPENDED") ? "warn" : "good"}
         />
       </div>
+
+      {/* Procesos que corren solos. Un proceso muerto calla igual que uno sano:
+          esta tabla es la única forma de notar la diferencia sin abrir los
+          registros de Cloud Run. */}
+      <Card className="mb-5">
+        <CardHeader
+          title="Procesos programados"
+          subtitle="Lo que corre sin que nadie lo pida. «Callado» significa que lleva más de tres periodos sin terminar una corrida: o dejó de correr, o algo lo está deteniendo."
+        />
+        <div className="table-wrap">
+          <table className="data">
+            <thead><tr><th>Proceso</th><th>Cada</th><th>Última corrida</th><th>Estado</th></tr></thead>
+            <tbody>
+              {tecnico.procesos.map((p) => (
+                <tr key={p.clave}>
+                  <td className="text-xs font-medium text-slate-700">{p.nombre}</td>
+                  <td className="text-xs text-slate-500">{p.cadaMinutos < 60 ? `${p.cadaMinutos} min` : p.cadaMinutos < 1440 ? `${p.cadaMinutos / 60} h` : `${p.cadaMinutos / 1440} días`}</td>
+                  <td className="text-xs text-slate-500">
+                    {p.ultimoFin ? formatDateTime(p.ultimoFin, zona) : "nunca"}
+                    {p.desdeMinutos !== null ? <span className="text-slate-400"> · hace {p.desdeMinutos < 60 ? `${p.desdeMinutos} min` : `${Math.round(p.desdeMinutos / 60)} h`}</span> : null}
+                  </td>
+                  <td className="text-xs">
+                    {p.corriendo ? <Badge tone="info">corriendo</Badge>
+                      : p.callado ? <Badge tone="danger">callado</Badge>
+                      : p.sinDatos ? <Badge tone="muted">aún no le toca</Badge>
+                      : p.ultimoOk === false ? <Badge tone="danger">falló</Badge>
+                      : <Badge tone="success">al día</Badge>}
+                    {p.fallasSeguidas > 1 ? <span className="ml-1 text-red-600">{p.fallasSeguidas} fallas seguidas</span> : null}
+                    {p.ultimoError ? <p className="mt-0.5 text-[0.6875rem] text-red-700">{p.ultimoError}</p> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Estado técnico de avisos e integraciones: solo conteos, sin contenido de las empresas. */}
       {tecnico.empresas.length || tecnico.plataforma.correo === "sin proveedor" ? (

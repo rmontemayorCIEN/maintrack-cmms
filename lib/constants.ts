@@ -68,6 +68,22 @@ export const MAINTENANCE_TYPE_COLORS: Record<string, string> = {
   SUPPORT: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
+/**
+ * El mismo color, pero solido: para barras y graficas, donde un tono de fondo
+ * de badge no se distingue. Van juntos para que el preventivo sea del mismo
+ * color en la etiqueta de una orden y en la barra del reporte; separados, un
+ * dia dejan de coincidir y el lector tiene que volver a aprender la leyenda.
+ */
+export const MAINTENANCE_TYPE_BAR: Record<string, string> = {
+  PREVENTIVE: "bg-sky-500",
+  CORRECTIVE: "bg-orange-500",
+  PREDICTIVE: "bg-violet-500",
+  INSPECTION: "bg-emerald-500",
+  SAFETY: "bg-red-500",
+  IMPROVEMENT: "bg-teal-500",
+  SUPPORT: "bg-slate-400",
+};
+
 export const WO_STATUS = {
   DRAFT: "DRAFT",
   OPEN: "OPEN",
@@ -184,6 +200,16 @@ export const REQUEST_STATUS_LABELS: Record<string, string> = {
   REJECTED: "Rechazada",
   CONVERTED: "Convertida en OT",
 };
+/**
+ * Las solicitudes que siguen esperando algo de alguien.
+ *
+ * Rechazada y Convertida ya terminaron su vida: la primera porque se decidio
+ * que no, la segunda porque ya es una orden de trabajo y el seguimiento pasa
+ * a la orden. Vive aqui, junto a las etiquetas, para que nadie vuelva a
+ * escribir la lista a mano en una consulta.
+ */
+export const REQUEST_OPEN_STATUSES = ["PENDING", "APPROVED"];
+
 export const REQUEST_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800 border-amber-200",
   APPROVED: "bg-blue-100 text-blue-700 border-blue-200",

@@ -1,0 +1,71 @@
+# Al cerrar una propuesta, su version de prueba se borra.
+#
+# Sin esto cada propuesta deja una revision viva para siempre: se acumulan,
+# ensucian la lista de revisiones —donde hay que buscar a cual regresar cuando
+# algo falla— y siguen apuntando a la base de pruebas.
+name: Borrar la version de prueba
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+env:
+  PROYECTO: maintrack-cmms-4821
+  SERVICIO: maintrack-cmms
+  REGION: us-central1
+
+jobs:
+  borrar:
+    runs-on: ubuntu-latest
+    if: vars.SQL_PRUEBAS != ''
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_CUENTA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Quitar la etiqueta y su revision
+        run: |
+          set -euo pipefail
+          ETIQUETA="pr-${{ github.event.pull_request.number }}"
+          REV=$(gcloud run services describe "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+                --format=json | jq -r --arg t "$ETIQUETA" \
+                '.status.traffic[] | select(.tag==$t) | .revisionName')
+          if [ -z "$REV" ] || [ "$REV" = "null" ]; then
+            echo "No habia version de prueba para $ETIQUETA. Nada que borrar."
+            exit 0
+          fi
+          # Quitar la etiqueta es LO QUE IMPORTA: saca la version de prueba de
+          # circulacion y libera la liga. Una revision etiquetada tampoco se
+          # deja borrar, asi que va primero.
+          gcloud run services update-traffic "$SERVICIO" --region "$REGION" --project "$PROYECTO" \
+            --remove-tags="$ETIQUETA"
+          echo "Etiqueta $ETIQUETA retirada: la liga de prueba ya no responde."
+
+          # Borrar la revision es aseo, no necesidad: sin trafico no atiende
+          # nada y no cuesta nada.
+          #
+          # Y Cloud Run se NIEGA a borrar la revision mas reciente. La vista
+          # previa casi siempre lo es —se publica justo antes de cerrar la
+          # propuesta—, asi que este paso fallaba SIEMPRE y pintaba de rojo una
+          # limpieza que en realidad habia hecho su trabajo. Nacio roto y se
+          # descubrio al tercer uso.
+          #
+          # Ahora solo eso se perdona. Cualquier otro error sigue siendo error.
+          SALIDA=$(gcloud run revisions delete "$REV" --region "$REGION" --project "$PROYECTO" --quiet 2>&1) && {
+            echo "Borrada la revision $REV."
+            exit 0
+          }
+          if printf '%s' "$SALIDA" | grep -qiE "latest created revision|cannot be directly deleted"; then
+            echo "La revision $REV es la mas reciente y Cloud Run no la borra."
+            echo "No es un problema: ya no tiene etiqueta ni trafico. El siguiente"
+            echo "despliegue la deja de ser, y Cloud Run recoge las viejas solo."
+            exit 0
+          fi
+          echo "$SALIDA"
+          exit 1

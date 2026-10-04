@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
+import { Comentarios } from "@/components/comentarios";
 import { motivoSinOtActiva } from "@/lib/reglas-ot";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -27,6 +29,7 @@ import { ReviewActions } from "../review-actions";
 import { TriageSolicitud } from "./triage";
 import { iaConfigurada } from "@/lib/ia/cliente";
 import { iaDeLaOrganizacion } from "@/lib/planes";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -110,9 +113,12 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
       <PageHeader
         title={`${solicitud.number} — ${solicitud.title}`}
         breadcrumb={
-          <Link href="/requests" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/requests" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Solicitudes
           </Link>
+            <PasarRegistros base="/requests" id={id} />
+          </span>
         }
         actions={
           solicitud.status === "PENDING" && can(user.role, "request:review") ? (
@@ -238,6 +244,17 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             ) : null}
           </dl>
         </Card>
+      </div>
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="workRequest" anclaId={solicitud.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la solicitud" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="WorkRequest" entidadId={solicitud.id} yo={user.id} zona={user.organization.timezone} />
       </div>
     </>
   );

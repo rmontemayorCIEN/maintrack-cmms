@@ -15,7 +15,10 @@ import {
   PRIORITY_LABELS,
 } from "@/lib/constants";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { agruparPorCodigo, fallasCodificadas } from "@/lib/fallas";
+import { agruparPorCodigo, agruparPorFamiliaDeCausa, fallasCodificadas } from "@/lib/fallas";
+import { costoPorCentroDeCosto, esEjeDeMezcla, esUnidadDeMezcla, mezclaDeMantenimiento, type EjeDeMezcla, type UnidadDeMezcla } from "@/lib/indicadores";
+import { MezclaDeMantenimiento } from "./mezcla";
+import { PorQueFalla } from "@/components/por-que-falla";
 
 export const metadata = { title: "Reportes" };
 export const dynamic = "force-dynamic";
@@ -24,16 +27,20 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ days?: string }>;
+  searchParams: Promise<{ days?: string; eje?: string; mide?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
   const days = diasDeParametro(params.days);
+  // Los cortes de la mezcla viven en la dirección: así el filtro se puede
+  // guardar, mandar por mensaje y volver a abrir igual.
+  const eje: EjeDeMezcla = params.eje && esEjeDeMezcla(params.eje) ? params.eje : "categoria";
+  const mide: UnidadDeMezcla = params.mide && esUnidadDeMezcla(params.mide) ? params.mide : "ordenes";
   const currency = user.organization.currency;
   const orgId = user.organizationId;
   const periodo = await periodoDeLaEmpresa(orgId, days);
 
-  const [kpis, trend, ranking, byTechnician, failureCodes, backlogAging, materialPorTipo] = await Promise.all([
+  const [kpis, trend, ranking, byTechnician, fallas, backlogAging, materialPorTipo, porCentro, mezcla] = await Promise.all([
     calcularIndicadores(orgId, periodo),
     tendenciaMensual(orgId, 12),
     costoYParoPorActivo(orgId, periodo, 10),
@@ -46,13 +53,22 @@ export default async function ReportsPage({
     // Pasa por fallasCodificadas y no por un groupBy directo: ese contaba
     // cualquier OT con codigo, incluidos preventivos codificados por error, y
     // el Pareto no coincidia con el analisis de recurrencia.
-    fallasCodificadas(orgId, periodo.desde, periodo.hasta).then(agruparPorCodigo),
+    // Se traen las fallas UNA vez y de ahi salen las dos lecturas: que falló
+    // (código) y por qué (familia de causa). Consultarlas dos veces daría el
+    // mismo número por el doble de trabajo, y permitiría que un día no
+    // coincidieran.
+    fallasCodificadas(orgId, periodo.desde, periodo.hasta),
     prisma.workOrder.findMany({
       where: { organizationId: orgId, status: { in: ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"] } },
       select: { id: true, createdAt: true, priority: true, estimatedHours: true },
     }),
     costoDeMaterialPorTipo(orgId, periodo.desde, periodo.hasta),
+    costoPorCentroDeCosto(orgId, periodo),
+    mezclaDeMantenimiento(orgId, periodo, eje),
   ]);
+
+  const failureCodes = agruparPorCodigo(fallas);
+  const porQueFalla = agruparPorFamiliaDeCausa(fallas);
 
   const [technicians, codes] = await Promise.all([
     prisma.user.findMany({
@@ -107,7 +123,9 @@ export default async function ReportsPage({
             {Object.entries(PERIODOS_INDICADORES).map(([d, label]) => ({ days: Number(d), label })).map((period) => (
               <Link
                 key={period.days}
-                href={`/reports?days=${period.days}`}
+                // Cambiar el periodo conserva el corte de la mezcla: perderlo
+                // obligaba a volver a elegirlo en cada rango.
+                href={`/reports?days=${period.days}&eje=${eje}&mide=${mide}`}
                 className={`rounded-lg border px-2.5 py-1.5 text-xs ${
                   days === period.days
                     ? "border-brand-600 bg-brand-600 text-white"
@@ -243,6 +261,67 @@ export default async function ReportsPage({
       {/* `grid-cols-[minmax(0,1fr)]`: en el telefono es una sola columna, y una
           columna implicita se mide por el contenido —las tablas de aqui abajo la
           inflaban y sacaban de lado la pantalla completa. */}
+      <MezclaDeMantenimiento
+        filas={mezcla.filas} tipos={mezcla.tipos} total={mezcla.total}
+        eje={eje} unidad={mide} days={days} moneda={currency}
+      />
+
+      {/* El gasto en el idioma de contabilidad. Va antes del Pareto de activos
+          porque contesta otra pregunta y a otra persona: el Pareto es del jefe
+          de mantenimiento —qué equipo me está costando— y esto es de quien
+          responde por el presupuesto del área. */}
+      {porCentro.length ? (
+        <Card className="mt-4">
+          <CardHeader
+            title="Costo por centro de costo"
+            subtitle={`Lo gastado en órdenes terminadas del periodo, agrupado como lo lleva su contabilidad. ${
+              porCentro.some((c) => !c.id)
+                ? "Las órdenes sin centro salen aparte: no se reparten entre los demás ni se esconden, para que la suma cuadre."
+                : ""
+            }`.trim()}
+          />
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Centro</th>
+                  <th className="num">Órdenes</th>
+                  <th className="num">Mano de obra</th>
+                  <th className="num">Refacciones</th>
+                  <th className="num">Servicios</th>
+                  <th className="num">Preventivo</th>
+                  <th className="num">Correctivo</th>
+                  <th className="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porCentro.map((c) => (
+                  <tr key={c.id ?? "sin"} className={c.id ? undefined : "text-slate-500"}>
+                    <td>
+                      <span className="font-medium">{c.name}</span>
+                      {c.id ? <span className="block text-xs text-slate-500">{c.code}</span> : null}
+                    </td>
+                    <td className="num">{c.ordenes}</td>
+                    <td className="num">{formatCurrency(c.manoDeObra, currency)}</td>
+                    <td className="num">{formatCurrency(c.refacciones, currency)}</td>
+                    <td className="num">{formatCurrency(c.servicios, currency)}</td>
+                    <td className="num">{formatCurrency(c.preventivo, currency)}</td>
+                    <td className="num">{formatCurrency(c.correctivo, currency)}</td>
+                    <td className="num font-semibold">{formatCurrency(c.total, currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {porCentro.some((c) => !c.id) ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Para que el gasto caiga solo en su centro, asígnele uno a cada equipo en su ficha: la orden lo hereda al
+              crearse. Una orden ya creada conserva el centro que tenía, aunque el equipo cambie después.
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader
@@ -397,6 +476,11 @@ export default async function ReportsPage({
               </div>
             )}
           </Card>
+
+          {/* Qué falló y por qué, uno al lado del otro: el código es el
+              síntoma y la familia de causa es el origen, y separarlos es lo
+              que permite atacar patrones en vez de repetir reparaciones. */}
+          <PorQueFalla causas={porQueFalla} moneda={currency} />
         </div>
       </div>
     </>

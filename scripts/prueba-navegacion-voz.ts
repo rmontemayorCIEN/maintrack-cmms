@@ -1,0 +1,383 @@
+/**
+ * «Llévame a…»: que lleve a donde se pidió, y solo a donde se puede.
+ *
+ * Lo que se cuida aquí, en orden de lo que más caro saldría:
+ *
+ *   1. Que NO sea una puerta trasera. Decir en voz alta el nombre de una
+ *      pantalla que el rol no ve no puede abrirla. El menú ya filtra, pero el
+ *      menú es dibujo: quien manda es la ruta.
+ *   2. Que no adivine. Con dos equipos que se llaman parecido, elegir uno
+ *      tiene la mitad de probabilidades de llevar al equivocado —y sin que se
+ *      note, porque la pantalla se ve igual de bien—.
+ *   3. Que un filtro no se pierda en silencio. «Mis órdenes» tiene que ganarle
+ *      a «órdenes»: llevar a la lista completa se ve bien y contesta otra cosa.
+ *
+ *   npx tsx scripts/prueba-navegacion-voz.ts
+ */
+import { type ChildProcess } from "node:child_process";
+import { SignJWT } from "jose";
+import { prisma } from "../lib/db";
+import { destinoDe, quitarVerbo, intencionDeOrden, folioPedido, esPregunta, DESTINOS, ATAJOS } from "../lib/navegacion-voz";
+import { existsSync, readdirSync } from "fs";
+import { join } from "path";
+import { pantallasQueSePuedenPedir, SIN_VOZ } from "../lib/pantallas";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
+
+const PUERTO = 3218;
+const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO}`;
+
+let fallas = 0;
+function revisar(que: string, bien: boolean, detalle: unknown = "") {
+  const d = typeof detalle === "string" ? detalle : JSON.stringify(detalle);
+  console.log(`  ${bien ? "ok  " : "FALLA"} ${que}${d ? ` · ${d}` : ""}`);
+  if (!bien) fallas++;
+}
+
+async function esperarServidor(limiteMs = 120_000) {
+  const hasta = Date.now() + limiteMs;
+  while (Date.now() < hasta) {
+    try {
+      const r = await fetch(`${base}/login`, { signal: AbortSignal.timeout(8000) });
+      if (r.status < 500) return;
+    } catch { /* todavia no */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error(`El servidor no respondió en ${limiteMs / 1000} s`);
+}
+
+async function main() {
+  let servidor: ChildProcess | null = null;
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: PUERTO });
+
+  const sello = `nav-${Date.now()}`;
+  const creadas: string[] = [];
+
+  try {
+    console.log("\nQuitar el verbo y quedarse con el destino\n");
+    revisar("«llévame al almacén» → «almacen»", quitarVerbo("Llévame al almacén") === "almacen", quitarVerbo("Llévame al almacén"));
+    revisar("«ábreme las órdenes» → «ordenes»", quitarVerbo("Ábreme las órdenes") === "ordenes", quitarVerbo("Ábreme las órdenes"));
+    // El verbo largo tiene que probarse ANTES que el corto: si «ir a» ganara,
+    // de «quiero ir a compras» quedaria «quiero» y no coincidiria con nada.
+    revisar("«quiero ir a compras» → «compras»", quitarVerbo("Quiero ir a compras") === "compras", quitarVerbo("Quiero ir a compras"));
+    revisar("sin verbo también sirve: «almacén»", quitarVerbo("almacén") === "almacen");
+
+    console.log("\nLos nombres que la gente usa de verdad\n");
+    const mismos = ["almacen", "refacciones", "inventario"].map((n) => destinoDe(n)?.ruta);
+    revisar("«almacén», «refacciones» e «inventario» llevan al mismo lado",
+      new Set(mismos).size === 1 && mismos[0] === "/inventory", mismos);
+    revisar("«llévame a los equipos» llega a activos", destinoDe("llévame a los equipos")?.ruta === "/assets");
+    revisar("«enséñame el mapa de líneas» llega a conjuntos", destinoDe("enséñame el mapa de líneas")?.ruta === "/conjuntos");
+
+    console.log("\nUn filtro no se puede perder en el camino\n");
+    revisar("«mis órdenes» NO cae en la lista completa", destinoDe("mis órdenes")?.ruta === "/work-orders?mias=1", destinoDe("mis órdenes")?.ruta);
+    revisar("   ni con verbo delante: «llévame a mis órdenes»",
+      destinoDe("llévame a mis órdenes")?.ruta === "/work-orders?mias=1", destinoDe("llévame a mis órdenes")?.ruta);
+    revisar("   y el artículo sí se quita: «llévame a las órdenes» es la lista completa",
+      destinoDe("llévame a las órdenes")?.ruta === "/work-orders", destinoDe("llévame a las órdenes")?.ruta);
+    revisar("«las vencidas» lleva al filtro de vencidas", destinoDe("las vencidas")?.ruta === "/work-orders?vencidas=1", destinoDe("las vencidas")?.ruta);
+    revisar("«órdenes» a secas sí es la lista completa", destinoDe("órdenes")?.ruta === "/work-orders");
+
+    console.log("\nComo habla la gente de verdad\n");
+    // Estos seis salieron del registro de lo que NO se entendio la primera vez
+    // que alguien lo uso. Nadie dice los nombres exactos de las pantallas.
+    revisar("«abre solicitudes de servicio» —el nombre del menú— llega",
+      destinoDe("Abre solicitudes de servicio")?.ruta === "/requests", destinoDe("Abre solicitudes de servicio")?.ruta);
+    revisar("«pregunte a sus datos» encuentra «pregúntale a tus datos»",
+      destinoDe("Abre pregunte a sus datos")?.ruta === "/consulta", destinoDe("Abre pregunte a sus datos")?.ruta);
+    revisar("«escuchar el parte del día» lleva al inicio, que es donde está",
+      destinoDe("Escuchar el parte del día")?.ruta === "/dashboard", destinoDe("Escuchar el parte del día")?.ruta);
+    // Y lo contrario: nombrar algo concreto NO puede llevar a la lista. Llegar
+    // a una pantalla que se ve bien pero no es la pedida es peor que no llegar.
+    revisar("«el equipo compresor de tornillo» NO cae en la lista de activos",
+      destinoDe("Abre el equipo compresor de tornillo") === null, destinoDe("Abre el equipo compresor de tornillo")?.ruta);
+    revisar("«la orden 124» NO cae en la lista de órdenes",
+      destinoDe("abre la orden 124") === null, destinoDe("abre la orden 124")?.ruta);
+    revisar("   pero «la orden de trabajo», sin número, sí es la lista",
+      destinoDe("abre la orden de trabajo")?.ruta === "/work-orders", destinoDe("abre la orden de trabajo")?.ruta);
+
+    console.log("\nLo que NO se reconoce se dice, no se adivina\n");
+    // «Ordenes de compra» empieza igual que «ordenes de trabajo» pero NO es lo
+    // mismo, y la coincidencia es contra el nombre completo justamente por
+    // esto: quien llega a la lista de OT creyendo ver compras se va con una
+    // idea falsa de su operacion.
+    revisar("«órdenes de compra» va a compras, no a órdenes de trabajo",
+      destinoDe("órdenes de compra")?.ruta === "/compras", destinoDe("órdenes de compra")?.ruta);
+    revisar("una frase sin sentido no inventa destino", destinoDe("azul con queso") === null);
+    revisar("una frase vacía tampoco", destinoDe("") === null);
+
+    console.log("\nLo que pide orden de fecha\n");
+    revisar("«la orden más antigua» se reconoce", intencionDeOrden("llévame a la orden más antigua")?.clase === "masAntigua");
+    revisar("«la solicitud más reciente» también", intencionDeOrden("ábreme la solicitud más reciente")?.clase === "masReciente");
+    revisar("«el almacén» no es una intención de orden", intencionDeOrden("llévame al almacén") === null);
+
+    console.log("\nToda pantalla que existe se puede pedir hablando\n");
+    /**
+     * El rondin se agrego al menu y a la tabla de permisos, y quedo fuera del
+     * catalogo de voz: «llevame a rondines» no encontraba nada. Ahora los
+     * destinos SALEN del menu, asi que esto vigila la clase entera —cada
+     * pantalla nueva nace pudiendose pedir— y no solo el caso que falló.
+     */
+    const delMenu = pantallasQueSePuedenPedir();
+    const sinNombre = delMenu.filter((i) => !DESTINOS.some((d) => d.ruta === i.href));
+    revisar("ninguna pantalla del catálogo se queda sin poder pedirse",
+      sinNombre.length === 0, sinNombre.map((i) => i.href).join(" "));
+    const noSeEncuentran = delMenu.filter((i) => destinoDe(i.etiqueta)?.ruta !== i.href);
+    revisar("y a cada una se llega diciendo su nombre",
+      noSeEncuentran.length === 0,
+      noSeEncuentran.map((i) => `${i.etiqueta}→${destinoDe(i.etiqueta)?.ruta ?? "nada"}`).join(" | "));
+    revisar("«llévame a Rondines» —el que se había quedado fuera— llega",
+      destinoDe("llévame a Rondines")?.ruta === "/rondines", destinoDe("llévame a Rondines")?.ruta);
+    /**
+     * El kardex vive detras de un boton dentro de Almacen. «Abre kardex»
+     * dejaba a la persona en Almacen: se parecia lo suficiente para ganar, y
+     * el kardex no competia porque el catalogo salia solo del menu.
+     */
+    revisar("«abre kardex» abre el kardex, no el almacén donde vive",
+      destinoDe("abre kardex")?.ruta === "/inventory/kardex", destinoDe("abre kardex")?.ruta);
+    for (const [frase, esperada] of [
+      ["llévame a conteos cíclicos", "/inventory/conteos"],
+      ["ábreme traspasos", "/inventory/traspasos"],
+      ["enséñame los equivalentes", "/inventory/equivalencias"],
+      ["llévame a qué equipos no tienen plan", "/plans/cobertura"],
+      ["abre el levantamiento", "/assets/levantamiento"],
+      ["quiero una nueva orden", "/work-orders/new"],
+    ] as const) {
+      revisar(`   «${frase}» → ${esperada}`, destinoDe(frase)?.ruta === esperada, destinoDe(frase)?.ruta ?? "nada");
+    }
+    // Y el almacén sigue siendo el almacén: llevar de más es tan malo como de menos.
+    revisar("   «llévame al almacén» sigue llegando al almacén",
+      destinoDe("llévame al almacén")?.ruta === "/inventory", destinoDe("llévame al almacén")?.ruta);
+
+    console.log("\nNinguna pantalla se queda fuera sin decirlo\n");
+    /**
+     * Esta es la que habria atrapado lo del kardex. Recorre las pantallas que
+     * EXISTEN de verdad —los `page.tsx` del proyecto— en vez de una lista
+     * escrita a mano, que es justo lo que se desincroniza.
+     */
+    const raiz = join(process.cwd(), "app", "(app)");
+    const pantallasReales: string[] = [];
+    const recorrer = (dir: string, ruta: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (!e.isDirectory()) continue;
+        // Las rutas con parámetro —`[id]`— no se piden por nombre: se llega a
+        // ellas por un folio o un código, que ya resuelve la búsqueda.
+        if (e.name.startsWith("[") || e.name.startsWith("(")) continue;
+        const sub = join(dir, e.name);
+        const r = `${ruta}/${e.name}`;
+        if (existsSync(join(sub, "page.tsx"))) pantallasReales.push(r);
+        recorrer(sub, r);
+      }
+    };
+    recorrer(raiz, "");
+    const enCatalogo = new Set(delMenu.map((i) => i.href));
+    const olvidadas = pantallasReales.filter((r) => !enCatalogo.has(r) && !(r in SIN_VOZ));
+    revisar(`las ${pantallasReales.length} pantallas del proyecto están en el catálogo o en SIN_VOZ`,
+      olvidadas.length === 0, olvidadas.join(" "));
+    // Y al revés: un destino que apunte a una pantalla que ya no existe.
+    const fantasmas = delMenu.filter((i) => !pantallasReales.includes(i.href) && i.href !== "/dashboard" && !pantallasReales.includes(i.href.split("?")[0]));
+    revisar("y ningún destino apunta a una pantalla que no existe",
+      fantasmas.length === 0, fantasmas.map((i) => i.href).join(" "));
+
+    console.log("\nEl catálogo está sano\n");
+    const rutas = DESTINOS.map((d) => d.ruta);
+    revisar("ninguna pantalla está repetida", new Set(rutas).size === rutas.length);
+    /**
+     * Un nombre puede estar en dos pantallas SI en una de ellas es el nombre
+     * oficial: entonces gana esa, y es un criterio decidido.
+     *
+     * «Tablero» es el nombre de Tablero y a la vez como mucha gente llama al
+     * Inicio; «reportes» es el nombre de Reportes y como se llama a las
+     * solicitudes de falla. Prohibir esos cruces obligaría a empobrecer el
+     * vocabulario. Lo que NO puede pasar es que un nombre sea sinónimo suelto
+     * de dos pantallas: ahí no habría con qué decidir.
+     */
+    const sinonimosSueltos = DESTINOS.flatMap((d) => d.nombres.filter((n) => n !== d.oficial));
+    const ambiguos = sinonimosSueltos.filter((n, i) => sinonimosSueltos.indexOf(n) !== i);
+    revisar("ningún sinónimo apunta a dos pantallas sin forma de decidir",
+      ambiguos.length === 0, ambiguos.join(" "));
+    // Y cuando un nombre choca con el oficial de otra, gana el oficial.
+    revisar("   «tablero» lleva a Tablero, no al Inicio que lo tiene de sinónimo",
+      destinoDe("tablero")?.ruta === "/board", destinoDe("tablero")?.ruta);
+    revisar("   «reportes» lleva a Reportes, no a Solicitudes",
+      destinoDe("reportes")?.ruta === "/reports", destinoDe("reportes")?.ruta);
+    revisar("   pero «reportes de falla» sigue llevando a Solicitudes",
+      destinoDe("reportes de falla")?.ruta === "/requests", destinoDe("reportes de falla")?.ruta);
+    const chocan = ATAJOS.flatMap((a) => a.frases).filter((f) => DESTINOS.flatMap((d) => d.nombres).includes(f));
+    revisar("ningún atajo choca con el nombre de una pantalla", chocan.length === 0, chocan.join(" "));
+
+    // ─────────────────────────────────────── Contra el sistema de verdad ────
+    const org = await prisma.organization.create({
+      data: { name: sello, slug: sello, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" },
+    });
+    creadas.push(org.id);
+    const sitio = await prisma.site.create({ data: { organizationId: org.id, name: "Planta", code: "P1" } });
+    const jefa = await prisma.user.create({
+      data: { organizationId: org.id, email: `j-${sello}@t.mx`, name: "Jefa", role: "ADMIN", passwordHash: "x" },
+    });
+    const mirona = await prisma.user.create({
+      data: { organizationId: org.id, email: `v-${sello}@t.mx`, name: "Consulta", role: "VIEWER", passwordHash: "x" },
+    });
+
+    const vieja = await prisma.workOrder.create({
+      data: { organizationId: org.id, number: "OT-000101", title: "La más vieja", maintenanceType: "CORRECTIVE",
+        priority: "MEDIUM", status: "OPEN", siteId: sitio.id, createdAt: new Date(Date.now() - 90 * 86_400_000) },
+    });
+    await prisma.workOrder.create({
+      data: { organizationId: org.id, number: "OT-000102", title: "La de ayer", maintenanceType: "CORRECTIVE",
+        priority: "MEDIUM", status: "OPEN", siteId: sitio.id, createdAt: new Date(Date.now() - 86_400_000) },
+    });
+    // Una orden cerrada MAS vieja todavia: no debe ganar, porque «la más
+    // antigua» quiere decir «la que lleva más tiempo esperando», no la más
+    // vieja de la historia.
+    await prisma.workOrder.create({
+      data: { organizationId: org.id, number: "OT-000103", title: "Cerrada hace años", maintenanceType: "CORRECTIVE",
+        priority: "MEDIUM", status: "CLOSED", siteId: sitio.id, createdAt: new Date(Date.now() - 900 * 86_400_000) },
+    });
+
+    await esperarServidor();
+    const secreto = new TextEncoder().encode(process.env.AUTH_SECRET!);
+    const credencial = (u: { id: string; email: string; name: string; role: string }) =>
+      new SignJWT({ userId: u.id, organizationId: org.id, email: u.email, name: u.name, role: u.role })
+        .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2h").sign(secreto);
+    const deJefa = await credencial(jefa);
+    const deMirona = await credencial(mirona);
+
+    const navegar = async (jwt: string, texto: string) => {
+      const r = await fetch(`${base}/api/ia/navegar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: `mt_session=${jwt}` },
+        body: JSON.stringify({ texto }),
+      });
+      return { status: r.status, json: await r.json().catch(() => ({})) as Record<string, unknown> };
+    };
+
+    console.log("\nLleva de verdad, contra el sistema\n");
+    const alAlmacen = await navegar(deJefa, "llévame al almacén");
+    revisar("«llévame al almacén» devuelve la ruta del almacén",
+      alAlmacen.status === 200 && alAlmacen.json.ruta === "/inventory", { ruta: alAlmacen.json.ruta });
+
+    const laVieja = await navegar(deJefa, "llévame a la orden de trabajo más antigua");
+    revisar("«la orden más antigua» lleva a la que lleva más tiempo esperando",
+      laVieja.json.ruta === `/work-orders/${vieja.id}`, { ruta: laVieja.json.ruta, esperada: `/work-orders/${vieja.id}` });
+    revisar("   y no a una cerrada hace años, aunque sea más vieja",
+      !String(laVieja.json.ruta ?? "").includes("C-"));
+
+    console.log("\nNo es una puerta trasera\n");
+    // VIEWER no ve compras. Decirlo en voz alta no puede abrirlas.
+    const colada = await navegar(deMirona, "llévame a compras");
+    revisar("quien no ve compras no entra diciéndolo en voz alta",
+      colada.json.ruta === null, { ruta: colada.json.ruta, mensaje: colada.json.mensaje });
+    revisar("   y se le explica, en vez de dejarlo probando",
+      String(colada.json.mensaje ?? "").includes("perfil"), colada.json.mensaje);
+    const suya = await navegar(deMirona, "llévame a los activos");
+    revisar("pero lo que sí ve, sí se le abre", suya.json.ruta === "/assets", { ruta: suya.json.ruta });
+
+    console.log("\nLo concreto llega a lo concreto, no a la lista\n");
+    const equipo = await prisma.asset.create({
+      data: { organizationId: org.id, siteId: sitio.id, code: "CMP-77", name: "Compresor de tornillo", criticality: "B" },
+    });
+    const alEquipo = await navegar(deJefa, "abre el equipo compresor de tornillo");
+    revisar("«abre el equipo compresor de tornillo» abre el compresor",
+      alEquipo.json.ruta === `/assets/${equipo.id}`, { ruta: alEquipo.json.ruta });
+    console.log("\nUn folio dicho por su número\n");
+    // «La orden once» tiene que llegar a OT-000011, no buscar «11» y toparse
+    // con la 11, la 110 y la 1100.
+    revisar("«la orden de trabajo 11» arma OT-000011", folioPedido("llévame a la Orden de Trabajo 11") === "OT-000011", folioPedido("llévame a la Orden de Trabajo 11"));
+    revisar("   y dicho con letra también: «la orden once»", folioPedido("abre la orden once") === "OT-000011");
+    revisar("«orden de compra 5» no cae en órdenes de trabajo", folioPedido("la orden de compra 5") === "OC-000005", folioPedido("la orden de compra 5"));
+    revisar("«la solicitud 203» arma SS-000203", folioPedido("abre la solicitud 203") === "SS-000203");
+    revisar("y una frase sin folio no inventa uno", folioPedido("llévame al almacén") === null);
+    revisar("   ni «la orden más antigua», que es otra cosa", folioPedido("la orden más antigua") === null);
+
+    const alFolio = await navegar(deJefa, "abre la orden 101");
+    revisar("«abre la orden 101» abre exactamente esa orden",
+      alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, folio: vieja.number });
+    /**
+     * Que no sea la orden de la otra empresa: se compara contra SU
+     * identificador, no contra su número.
+     *
+     * Buscar «900» dentro de la ruta fallaba sola cada tantas corridas: la
+     * ruta lleva un identificador aleatorio de veinticinco caracteres, y de
+     * vez en cuando contiene «900» por pura casualidad. Es el mismo error que
+     * la revisión del secreto de las credenciales —comprobar un fragmento de
+     * texto contra un valor aleatorio— y se ve igual de raro: una prueba que
+     * pasa casi siempre y un día no.
+     */
+    revisar("   y es exactamente esa orden, no otra que se le parezca",
+      alFolio.json.ruta === `/work-orders/${vieja.id}`, { ruta: alFolio.json.ruta, esperada: `/work-orders/${vieja.id}` });
+
+    console.log("\nUn solo micrófono: el verbo decide\n");
+    /**
+     * Con un microfono para todo, algo tiene que separar «llevame al almacen»
+     * de «cuanto llevo gastado». Lo hace el verbo, no un modelo: quien habla
+     * ya marca la diferencia sin proponerselo.
+     */
+    revisar("«cuánto llevo gastado» es pregunta", esPregunta("cuánto llevo gastado en el compresor"));
+    revisar("«por qué se paró la línea 2» también", esPregunta("por qué se paró la línea 2"));
+    revisar("«dime cuántas refacciones faltan» también", esPregunta("dime cuántas refacciones faltan"));
+    revisar("«llévame al almacén» NO es pregunta", !esPregunta("llévame al almacén"));
+    revisar("«ábreme las vencidas» tampoco", !esPregunta("ábreme las vencidas"));
+    // Una orden de ir gana aunque la frase suene a pregunta: «llevame a lo que
+    // mas gasta» es navegar, no consultar.
+    revisar("una orden de ir gana aunque mencione una cifra",
+      !esPregunta("llévame a lo que más gasta"));
+    revisar("y «mis órdenes», que no lleva verbo, se navega", !esPregunta("mis órdenes"));
+
+    // Lo que importa del reparto: una pregunta que menciona una pantalla NO
+    // puede acabar abriendo la lista en vez de contestar el número.
+    const comoPregunta = await navegar(deJefa, "cuántas órdenes vencidas tengo");
+    revisar("«cuántas órdenes vencidas tengo» no abre la lista: la trata como pregunta",
+      comoPregunta.json.ruta === null, { tipo: comoPregunta.json.tipo, ruta: comoPregunta.json.ruta });
+    const comoOrden = await navegar(deJefa, "llévame a las vencidas");
+    revisar("   y «llévame a las vencidas» sí navega",
+      comoOrden.json.ruta === "/work-orders?vencidas=1", { tipo: comoOrden.json.tipo, ruta: comoOrden.json.ruta });
+
+    console.log("\nCuando no entiende\n");
+    const perdida = await navegar(deJefa, "llévame a la luna");
+    revisar("no inventa un destino", perdida.json.ruta === null, { ruta: perdida.json.ruta });
+    revisar("   dice lo que oyó, que casi siempre explica el problema solo",
+      String(perdida.json.texto ?? "").includes("luna"), perdida.json.texto);
+    revisar("   y da ejemplos de lo que sí puede decir",
+      Array.isArray(perdida.json.ejemplos) && (perdida.json.ejemplos as unknown[]).length > 0);
+
+    console.log("\nLo que NO debe pasar\n");
+    const otra = await prisma.organization.create({
+      data: { name: `${sello}-b`, slug: `${sello}-b`, plan: "PROFESSIONAL", status: "ACTIVE", timezone: "America/Monterrey" },
+    });
+    creadas.push(otra.id);
+    const sitioAjeno = await prisma.site.create({ data: { organizationId: otra.id, name: "Ajena", code: "AJ" } });
+    const ajena = await prisma.workOrder.create({
+      data: { organizationId: otra.id, number: "OT-000900", title: "De otra empresa", maintenanceType: "CORRECTIVE",
+        priority: "MEDIUM", status: "OPEN", siteId: sitioAjeno.id, createdAt: new Date(Date.now() - 400 * 86_400_000) },
+    });
+    const cruzada = await navegar(deJefa, `llévame a ${ajena.number}`);
+    revisar("no lleva a una orden de otra empresa, ni buscándola por su folio",
+      cruzada.json.ruta === null, { ruta: cruzada.json.ruta });
+    // Y la mas antigua de la empresa propia sigue siendo la propia, no la
+    // ajena, que es 400 dias mas vieja.
+    const otraVez = await navegar(deJefa, "la orden más antigua");
+    revisar("y «la más antigua» sigue siendo la de su empresa",
+      otraVez.json.ruta === `/work-orders/${vieja.id}`, { ruta: otraVez.json.ruta });
+
+    const sinSesion = await fetch(`${base}/api/ia/navegar`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto: "almacén" }),
+    });
+    revisar("sin sesión no contesta", sinSesion.status === 401, { status: sinSesion.status });
+  } finally {
+    for (const id of creadas) {
+      await prisma.workOrder.deleteMany({ where: { organizationId: id } });
+      await prisma.asset.deleteMany({ where: { organizationId: id } });
+      await prisma.site.deleteMany({ where: { organizationId: id } });
+      await prisma.user.deleteMany({ where: { organizationId: id } });
+      await prisma.aiUsage.deleteMany({ where: { organizationId: id } });
+      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
+    }
+    await apagarServidor(servidor, PUERTO);
+  }
+
+  console.log(`\n${fallas ? `${fallas} revisión(es) fallaron` : "Todo bien"}\n`);
+}
+
+main()
+  .catch((e) => { console.error(e); fallas++; })
+  .finally(async () => { await prisma.$disconnect(); process.exit(fallas ? 1 : 0); });

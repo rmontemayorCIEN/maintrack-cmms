@@ -62,12 +62,13 @@ export const CAMPO_BUSCABLE = {
 } as const;
 
 export const CONTROLES_TABLA: Array<{ nombre: string; explica: string }> = [
+  { nombre: "Ordenar", explica: "Toque el titulo de una columna y la lista se ordena por ella; otro toque la invierte; el tercero quita el orden y la deja como llego. La flecha aparece solo en la columna que manda. Los montos y las fechas se ordenan por su valor, no como texto: 900 va antes que 1,200 y enero antes que febrero. Si hay grupos, el orden vale dentro de cada grupo." },
   { nombre: "Filtrar", explica: "Busca en TODAS las columnas, incluidas las que tiene ocultas. Esconder una columna es decision de presentacion, no de que se puede encontrar." },
   { nombre: "Agrupar por…", explica: "Junta los renglones por el criterio que elija. Cada grupo trae su conteo y se pliega con un clic." },
   { nombre: "+ nivel 2 y + nivel 3", explica: "Agrupa dentro de lo agrupado, hasta tres niveles. Por ejemplo Sitio › Categoría › Criticidad." },
   { nombre: "Contraer todo / Expandir todo", explica: "Cierra o abre todos los grupos de golpe. Contraer cierra todos los niveles, para bajar de nivel en nivel al volver a abrir." },
   { nombre: "Columnas", explica: "Prende, apaga y acomoda columnas con las flechas. Las dos primeras son fijas: sin ellas la tabla deja de identificar de que habla." },
-  { nombre: "Guardar vista", explica: "Deja su arreglo permanente. Es SUYO, no de la empresa: el almacenista y el jefe de mantenimiento no miran lo mismo." },
+  { nombre: "Guardar vista", explica: "Deja su arreglo permanente: columnas, grupos y el orden que haya elegido. Es SUYO, no de la empresa: el almacenista y el jefe de mantenimiento no miran lo mismo." },
   { nombre: "De fabrica", explica: "Regresa a las columnas originales y quita la agrupación." },
 ];
 
@@ -154,6 +155,30 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/inventory/proyeccion": {
+    titulo: "Lo que va a pedir el preventivo",
+    que: "Las refacciones que los planes van a consumir en los próximos meses, con la fecha en que tocan. Es para comprar antes de que haga falta, no cuando ya paró el equipo.",
+    hacer: [
+      "Ver qué refacciones se van a necesitar y cuándo",
+      "Elegir el horizonte: 3 meses, 6 meses o un año",
+      "Verlo por semana, por mes o por trimestre",
+      "Saber cuánto NO alcanza con lo que hay hoy",
+    ],
+    flujo: [
+      "Sale de cruzar dos cosas que el sistema ya sabía por separado: el calendario de qué actividad toca en qué equipo y qué día, y las refacciones que cada actividad tiene cargadas. Es la misma proyección que pinta el calendario, no un cálculo aparte: si fueran dos, un día dejarían de coincidir y nadie sabría cuál vale.",
+      "Arriba dice SIEMPRE a cuántas actividades cubre. Si los planes no tienen refacciones cargadas, la tabla sale corta y eso se leería como «no hay que comprar nada», que es lo contrario de la verdad. Mientras la cobertura sea baja, la cifra es un piso.",
+      "Para subir la cobertura se cargan las refacciones en cada plan, en «Recursos» de la actividad: qué se consume y cuánto. Los planes que redactó la IA ya las traen; los que se importaron o se capturaron a mano, normalmente no.",
+      "«Falta» es lo que NO alcanza: lo que va a consumir más el mínimo, menos lo que hay hoy. Si hay doce y el plan va a pedir ocho, no hay nada que comprar por este concepto. El mínimo entra porque quedarse en cero justo cuando toca el preventivo es igual que no tenerlo.",
+      "El orden es por lo que más pesa en dinero, no por cantidad: veinte tornillos no son el problema, un rodamiento de doce mil sí.",
+      "Esto es lo que el PLAN compromete, no el consumo total del almacén. Lo correctivo no se puede proyectar —una falla no tiene fecha— así que comprar exactamente esta cantidad deja sin margen el día que algo se rompa.",
+      "Solo entran los planes por calendario con equipos asignados y fecha próxima. Los planes por medidor dependen del uso y se proyectan en Predictivo.",
+    ],
+    campos: [
+      { nombre: "Hay", explica: "La existencia actual de esa refacción, sumando todos los almacenes." },
+      { nombre: "Falta", explica: "Cuánto comprar para llegar al horizonte sin quedarse corto, contando el mínimo. En blanco significa que alcanza con lo que hay." },
+      { nombre: "Las columnas de periodo", explica: "Cuánto cae en cada tramo. La primera es la más cercana y es la que decide si hay que pedir hoy: si el tiempo de entrega del proveedor es de dos semanas, lo de la primera columna ya va tarde." },
+    ],
+  },
   "/inventory/analisis": {
     titulo: "Análisis de almacén",
     camposBuscables: true,
@@ -239,6 +264,111 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Solo aparece lo que su rol puede abrir, y siempre de su empresa: quien reporta encuentra sus reportes, no los de otros.",
       "El folio exacto sale primero. Cada registro aparece una sola vez.",
       "Para preguntas en lenguaje natural, use Pregunte a sus datos.",
+      "El micrófono de la barra de arriba sirve para las dos cosas: llevarlo a donde pida —«llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3»— y contestarle preguntas sobre sus datos —«cuánto llevo gastado en el compresor», «por qué se paró la línea 2»—. Lo que decide es cómo empiece la frase: «llévame» o «ábreme» es ir; «cuánto», «cuántas» o «por qué» es preguntar.",
+      "Mientras revisa sus datos no lo deja en silencio: un pulso suave acompaña la espera hasta que tiene la respuesta. Una pregunta de las que consultan muchas cosas tarda más de treinta segundos, y sin nada que suene eso parece que se cortó.",
+      "Si pidió ir a algún lado le dice «vamos para allá» antes de llevarlo. Es la forma de saber cuál de las dos cosas entendió —ir o contestar— sin esperar a que la pantalla cambie.",
+      "De omisión contesta CONCISO: dice lo que usted preguntó, en unos diez o quince segundos, y deja el detalle escrito en pantalla. Se cambia en Ajustes → Apariencia. Medido con «¿cuántos activos tenemos?»: la respuesta completa dura 40 segundos hablada y la concisa 10, con la misma cifra.",
+      "Un tono corto avisa el instante exacto en que empieza a oírlo: hable después de ese tono. Le contesta HABLANDO, con la voz que usted escogió en Ajustes → Apariencia, y la respuesta también queda escrita para comprobar una cifra.",
+      "Una vez que lo toca, sigue escuchando: al terminar de atender lo que dijo vuelve a escuchar sin que usted toque nada. Se detiene al cerrarlo, al cambiar de pantalla, si dos veces seguidas no le entiende, o si pasan doce segundos sin que nadie hable —así no se queda el micrófono abierto si usted se distrajo—.",
+      "«Llévame a la orden de trabajo 11» abre la OT-000011, no una lista con todo lo que contenga «11». Funciona con el número dicho en cifra o en letra, y distingue series: «orden de compra 5» es una compra.",
+      "También llegan las pantallas que viven detrás de un botón, no solo las del menú: «abre kardex» abre el kardex, no el almacén donde vive. Igual con conteos cíclicos, traspasos, equivalencias, análisis e indicadores de almacén, el levantamiento, la cobertura de planes y una orden nueva.",
+      "Nunca lleva a una pantalla que su perfil no puede abrir, y si no entiende le enseña lo que oyó —que casi siempre explica el problema solo— y ejemplos de lo que sí puede decir.",
+    ],
+    botones: [
+      { nombre: "Micrófono (arriba, junto a la búsqueda)", explica: "Háblele al sistema: lo lleva a donde pida o le contesta hablando lo que pregunte. Un tono avisa cuándo empezar, se corta solo cuando usted termina de hablar, y sigue escuchando hasta que lo cierre. Sirve para pantallas («el almacén», «compras»), para filtros («mis órdenes», «las vencidas») y para buscar un equipo o un folio. Si lo que dice coincide con varias cosas, abre la búsqueda para que usted elija en vez de adivinar." },
+    ],
+    noPuedo: [
+      { sintoma: "Se cortó antes de que yo terminara", porque: "Hizo una pausa larga y lo tomó por el final. Vuelva a tocar el micrófono: en el dictado, lo nuevo se agrega a lo anterior y no se pierde nada." },
+      { sintoma: "No veo el micrófono en la barra de arriba", porque: "El navegador no puede grabar, o el plan no incluye los comandos de voz. La búsqueda y el menú hacen lo mismo escribiendo." },
+      { sintoma: "Dije una pantalla y me contesta que no está disponible para mi perfil", porque: "Es correcto: la voz no abre nada que su rol no pueda ver. Es la misma regla del menú." },
+      { sintoma: "Me llevó a la búsqueda en vez de al equipo que dije", porque: "Lo que dijo coincide con más de un registro. Preferimos que usted elija a llevarlo al equivocado sin que se note." },
+      { sintoma: "Me volvió a pedir permiso del micrófono", porque: "Lo suelta cuando pasan 25 segundos sin usarlo, cuando usted lo cierra, o cuando lo abre y no habla nadie —eso es lo que apaga el indicador de grabación del teléfono—. Encadenar «llévame a…» con una pregunta NO vuelve a pedirlo. Para que Safari deje de preguntar del todo, instale MainTrack en la pantalla de inicio: Compartir → Agregar a inicio." },
+      { sintoma: "Me contesta escrito pero no lo oigo", porque: "Este aparato no dejó reproducir el audio, o su plan no incluye la voz. Se le avisa dentro de la misma respuesta, y lo escrito está completo." },
+    ],
+  },
+
+  "/vigencias": {
+    titulo: "Garantías y vigencias",
+    que: "Los papeles que se vencen y que alguien tiene que renovar a tiempo: garantías de equipo, pólizas de seguro, fianzas, contratos de servicio, calibraciones de instrumentos, permisos de operación, licencias del personal y certificados. Lo que en casi toda planta vive en una carpeta o en un Excel que solo una persona sabe abrir.",
+    hacer: [
+      "Registrar un documento con su vigencia y a quién se le reclama",
+      "Ver de un golpe qué está vencido y qué se vence pronto",
+      "Anotar qué cubre y qué no, para cuando llegue la falla",
+      "Cancelar uno que dejó de aplicar, sin borrar la historia",
+    ],
+    flujo: [
+      "Todo cuelga de algo: un equipo, una refacción, una persona o un servicio externo. De una sola cosa, y es a propósito: una vigencia que no aparece en ningún expediente está viva y nadie la ve, y una que aparece en dos deja la duda de cuál manda al renovar. Si una póliza cubre cinco equipos, se registra una por equipo.",
+      "El tipo decide de qué puede colgar. Una licencia de montacargas es de una persona y una calibración es de un instrumento; ofrecer siempre las cuatro opciones invitaba a colgar la póliza del seguro de un usuario.",
+      "Cada tipo avisa con su propia anticipación, y no es un detalle: una póliza avisa con 60 días porque hay que cotizar, y una calibración con 30 porque se agenda con el laboratorio. Poner el mismo plazo a todo era garantizar que la mitad avisara tarde y la otra demasiado pronto.",
+      "El aviso se cierra solo cuando se registra otra vigencia DEL MISMO TIPO, sobre lo mismo, que cubra más lejos. Así se renueva de verdad: la póliza vieja se queda como historia de la planta y se carga la nueva. No hay que ir a apagar el aviso a mano.",
+      "La GARANTÍA hace algo más que avisar: cuando alguien abre una orden correctiva, de seguridad o de mejora de un equipo que todavía está cubierto, se le dice antes de guardarla, y al responsable del trabajo le llega un aviso. Es el momento en que el dato vale dinero — repararlo con gente y refacciones propias es pagar lo que el proveedor ya cubrió, y en algunos contratos abrirlo sin avisar cancela la garantía.",
+      "No se avisa en preventivo. Un engrasado programado no se le reclama al proveedor, y avisar ahí habría convertido la advertencia en ruido que se aprende a ignorar — y entonces no sirve el día que importa.",
+      "La fecha de garantía que ya estaba en la ficha del equipo sigue ahí y sigue funcionando: ahora es un reflejo de la vigencia. La verdad es el documento, que además dice a quién reclamarle y qué cubre.",
+      "Nada se borra. Una póliza cancelada antes de vencer se apaga y se conserva: borrarla dejaría sin explicación los avisos que ya salieron.",
+      "Un documento sin fecha de vencimiento es válido y no avisa nunca. Un certificado de fábrica no se renueva.",
+      "Tres descuidos que cuestan: registrar una garantía sin decir a quién se le reclama —el aviso llega y nadie sabe con quién renovar—; capturar una póliza que cubre cinco equipos como un solo documento; y suponer que mover la fecha de la vieja es renovar. Se puede, pero lo que el sistema reconoce como renovación es que exista la nueva.",
+    ],
+    botones: [
+      { nombre: "Registrar documento", explica: "Da de alta una garantía, póliza, fianza, contrato, calibración, permiso, licencia o certificado. Pregunta de qué cuelga, desde y hasta cuándo, y a quién se le reclama." },
+      { nombre: "Cancelar (la ✕ de cada renglón)", explica: "Lo apaga sin borrarlo: deja de avisar y se queda en la lista como cancelado. Se puede reactivar." },
+    ],
+    campos: [
+      { nombre: "Cómo le llaman", explica: "El nombre con el que su gente lo pide: «Garantía de fábrica», «Póliza GNP 44812». No es el tipo: el tipo ya está aparte." },
+      { nombre: "Qué cubre y qué no", explica: "Lo que alguien va a leer el día que llegue la falla, con el equipo parado y el proveedor al teléfono. Vale más que el folio: «cubre motor y tarjeta, no cubre consumibles ni daño por sobretensión»." },
+      { nombre: "¿A quién se le reclama?", explica: "El proveedor, la aseguradora o el laboratorio. Es lo que convierte el aviso en una llamada: sin esto, quien lo recibe sabe que se vence y no a quién marcarle." },
+      { nombre: "Hasta", explica: "La fecha de vencimiento. Vacía significa que no caduca, y entonces no avisa." },
+    ],
+  },
+  "/rondines": {
+    titulo: "Rondines",
+    que: "El recorrido por la planta: lo que se ve, dónde y cuándo. Lo que hoy se queda en el pasillo o en una libreta que nadie vuelve a leer.",
+    hacer: [
+      "Empezar un recorrido, diciendo qué área va a caminar",
+      "Anotar cada parada dictando lo que ve",
+      "Escanear el código del punto, si lo tiene",
+      "Decir de qué equipo era cuando el sistema no lo puede saber solo",
+    ],
+    flujo: [
+      "Se empieza eligiendo el área. No es un trámite: es lo que después permite saber de qué equipo habla aunque no haya códigos pegados. Dentro de la línea 2, «la bomba 3» es una sola; en toda la planta pueden ser cuatro.",
+      "En cada parada se dicta lo que se ve. El equipo se resuelve después, y muchas veces solo.",
+      "Las fotos se toman antes de anotar la parada —se ve algo, se fotografía y se cuenta— y se suben cuando la parada queda guardada. Si alguna no sube por falta de señal, la parada se guarda igual y la foto queda con su botón de reintentar: no hay que volver a caminar el pasillo.",
+      "También se pueden agregar fotos después, desde el detalle del recorrido. En el rondín no siempre da tiempo.",
+      "De qué equipo se trata se busca en este orden: el código QR del punto, el equipo que usted elija, lo que se dictó, y el área. Solo cuando ninguno alcanza se le pregunta.",
+      "Cuando se le pregunta, no viene nada marcado: hay que elegir. Es a propósito — una respuesta ya puesta se acepta sin leerla.",
+      "«Ninguno: no es de un equipo en particular» es una respuesta válida y a veces la correcta. Un charco en un pasillo no es de ninguna máquina, y atribuírselo a la de al lado ensucia el historial de esa máquina para siempre.",
+      "Si el recorrido se interrumpe —se bloquea el teléfono, se cae la señal— al volver a entrar se continúa el mismo, no se abre otro.",
+      "Un recorrido sin ninguna parada se cancela solo: no hubo recorrido que guardar.",
+      "Con el complemento de IA, las fotos del recorrido se pueden revisar: señala fugas, guardas faltantes, pasillos obstruidos y deterioro. Propone; no crea nada. Usted acepta lo que vale —y eso levanta una solicitud— o lo descarta.",
+      "Cada hallazgo dice EN QUÉ SE BASA: «mancha oscura de unos 40 cm bajo la brida derecha». Eso es lo que le permite abrir la foto y decir que no. Si solo dijera «hay una fuga», no habría cómo contradecirlo.",
+      "Lo que no se ve en una foto no se dice: vibración, ruido, temperatura o el estado interno de una máquina no salen en una imagen. Y una lista vacía es una respuesta correcta: significa que el área se ve bien.",
+      "Volver a revisar reemplaza las propuestas pendientes, pero respeta lo que usted ya aceptó o descartó: eso es una decisión suya y no se borra por volver a preguntarle a la máquina.",
+      "En cada parada queda registrado CÓMO se supo de qué equipo era. Una identificada por su código vale distinto que una deducida de lo que se oyó, y quien lo lea un mes después tiene derecho a saberlo.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo —avisarle a producción, conseguir un equivalente, pedir una cotización—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
+    ],
+    botones: [
+      { nombre: "Empezar recorrido", explica: "Abre un recorrido nuevo. Si ya tenía uno a medias, lo continúa en vez de abrir otro." },
+      { nombre: "Dictar", explica: "Graba lo que usted dice y lo escribe en la observación de la parada. Se corta solo al terminar de hablar, y aguanta las pausas de quien se acuerda de algo a media frase. Pensado para el piso, con las manos ocupadas." },
+      { nombre: "Escanear punto", explica: "Lee el código QR del punto de reporte. Es la forma más confiable de saber dónde está: no se equivoca nunca." },
+      { nombre: "Anotar parada", explica: "Guarda lo que vio. Si hace falta saber de qué equipo era, se le pregunta enseguida." },
+      { nombre: "Tomar foto / Elegir archivo", explica: "Agrega fotos a la parada. Se ven antes de subirlas y se puede quitar la que salió mal. Se suben al anotar la parada." },
+      { nombre: "Revisar las fotos", explica: "Mira las fotos del recorrido y propone lo que un jefe de mantenimiento notaría al pasar. No crea nada: cada propuesta se acepta o se descarta." },
+      { nombre: "Levantar solicitud (en un hallazgo)", explica: "Convierte el hallazgo en una solicitud de servicio, con la foto y en qué se basó. De ahí sigue el camino normal: alguien la revisa y decide si se vuelve orden." },
+      { nombre: "No es (en un hallazgo)", explica: "Lo descarta. Queda registrado como descartado, no se borra: si siempre se descarta lo mismo, conviene saberlo." },
+      { nombre: "Terminar", explica: "Cierra el recorrido. Lo que anotó queda para comparar con el siguiente." },
+    ],
+    noPuedo: [
+      { sintoma: "No me deja anotar paradas, solo ver", porque: "Registrar un recorrido pide el mismo permiso que ejecutar trabajo. Consulta entra a mirar." },
+      { sintoma: "Escaneé el código y no lo reconoce", porque: "El punto no existe, está dado de baja, o el código es de otra empresa. Puede anotar la parada dictando y decir de qué equipo era." },
+      { sintoma: "Me pregunta de qué equipo es y yo no sé", porque: "Elija «Ninguno». Un hallazgo sin equipo sirve igual para que alguien vaya a verlo, y es mejor que atribuírselo al equipo equivocado." },
+      { sintoma: "Revisó las fotos y no encontró nada", porque: "Puede ser que el área se vea bien, y entonces es la respuesta correcta. También puede que las fotos no alcancen a mostrarlo: revise si dice que alguna no sirve, y en el próximo recorrido acérquese o alumbre mejor." },
+      { sintoma: "Propuso algo que claramente no es", porque: "Para eso está «No es». Mire la línea de «en la foto se ve»: si lo que describe no está ahí, descártelo sin dudar. La máquina propone, usted decide." },
+      { sintoma: "No veo el botón de revisar las fotos", porque: "Revisar fotos con IA va con el complemento IA Avanzada. El recorrido, las paradas y las fotos funcionan igual sin él." },
+      { sintoma: "Una foto se quedó en rojo y no subió", porque: "Se cayó la señal a media nave. La parada sí se guardó. Toque «Reintentar las fotos» cuando tenga señal, o agréguela después desde el detalle del recorrido." },
+      { sintoma: "No aparece mi recorrido en la lista", porque: "Los que se cerraron sin ninguna parada se cancelan y no se listan." },
+    ],
+    preguntas: [
+      { pregunta: "¿Para qué sirve hacer rondines si ya los hago a ojo?", respuesta: "Para poder comparar. Un recorrido suelto vale poco; dos del mismo punto separados por un mes contestan la pregunta que hoy nadie puede contestar: si aquella mancha creció, si la corrosión avanzó, si lo que se reportó se atendió." },
+      { pregunta: "¿Y si la planta no tiene códigos QR pegados?", respuesta: "Se puede recorrer igual: basta decir el área al empezar y dictar lo que ve. Los códigos se imprimen desde «Puntos de reporte QR» cuando quiera, y a partir de ahí cada parada es de un toque." },
     ],
   },
 
@@ -255,15 +385,74 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/soporte": {
+    titulo: "Soporte",
+    que: "Pedir ayuda al equipo de MainTrack y ver en qué va. Es el canal de soporte: no hace falta correo ni teléfono.",
+    hacer: ["Escribir qué intentaba hacer y qué pasó, elegir la severidad y enviar", "Ver el folio, el estado y la respuesta", "Agregar información, subir la severidad si urge más o confirmar que quedó resuelto"],
+    flujo: [
+      "Horario: lunes a viernes de 9:00 a 18:00, hora del centro de México, días hábiles. Los tiempos objetivo son de respuesta, no de solución, y dependen de la severidad y del plan (la tabla está en la misma pantalla).",
+      "Severidad: Crítica si nadie puede usar MainTrack o hay riesgo de perder datos; Alta si una función principal no sirve y no hay forma de rodearlo; Media si hay forma de seguir; Baja para dudas y sugerencias.",
+      "Los datos técnicos (navegador, pantalla, idioma, conexión y hora) se adjuntan solo si deja la casilla marcada; no incluyen contraseñas ni datos de su operación.",
+      "Cada quien ve sus solicitudes; la administración ve las de toda la empresa. Cuando hay respuesta, llega un aviso a la campana.",
+      "Si no puede entrar a MainTrack, su administrador lo reporta desde otra cuenta de la empresa.",
+    ],
+  },
+
+  "/demo/presentacion": {
+    titulo: "Presentación",
+    que: "La presentación al cliente en diapositivas, a pantalla completa: el problema, qué es y qué no es MainTrack, los cinco casos sobre esta empresa, la inteligencia artificial, cómo se arranca, los precios y el cierre.",
+    hacer: ["Avanzar y retroceder con las flechas del teclado, o con los botones de abajo", "Saltar a cualquier diapositiva desde el índice", "Abrir la pantalla real desde los botones de cada caso y regresar con «Atrás»", "Salir con Escape"],
+    flujo: [
+      "Una diapositiva a la vez y sin menú: lo que se proyecta es solo el tema del que se está hablando.",
+      "Los textos, los precios y los límites salen de la misma fuente que el sitio comercial, así que nunca dicen algo distinto de lo que el cliente ya leyó.",
+      "Los botones «abrir en el sistema» llevan a la pantalla real de la empresa demostrativa. Para volver, la banda morada de arriba ofrece «Volver a la presentación» con el nombre del caso, y regresa a la misma diapositiva; el «Atrás» del navegador también sirve. El ofrecimiento desaparece al salir de la presentación.",
+      "Cada diapositiva de caso indica con qué cuenta conviene estar dentro, y trae una nota para quien presenta que no se proyecta hasta abrirla.",
+    ],
+  },
+
+  "/demo": {
+    titulo: "Guía de la demostración",
+    que: "Solo existe en la empresa demostrativa: la presentación al cliente, cinco historias sobre el sistema real y cómo dejar la demo como nueva.",
+    hacer: ["Iniciar la presentación en diapositivas", "Presentar un caso suelto desde su historia", "Seguir el orden recomendado para una demostración de 20 a 30 minutos", "Abrir los registros que usa cada historia", "Reiniciar el recorrido guiado", "Restaurar la demo al terminar (dirección o gerencia)"],
+    flujo: [
+      "Cada historia dice con qué rol se muestra, cuánto tarda, el problema, los pasos y el resultado que se explica.",
+      "Todo lo que se captura durante la demostración funciona igual que en una cuenta real. Restaurar lo borra y vuelve a sembrar la historia de 90 días con fechas al día; se conservan la empresa y las cuentas.",
+      "Mientras se restaura, la demo muestra «se está restaurando» y no atiende a nadie; tarda menos de un minuto. La operación queda en la auditoría.",
+      "En la demo no se puede cambiar el plan, crear credenciales de API ni conectar avisos a otros sistemas, y nunca genera cargos.",
+    ],
+  },
+
+  "/clients/prospectos": {
+    titulo: "Prospectos",
+    que: "Las solicitudes de demostración y de contratación que llegan del sitio, para darles seguimiento. Solo para el operador.",
+    hacer: ["Cambiar el estado: contactada, demostración agendada o realizada, propuesta, ganada, perdida", "Anotar el resultado o el motivo de la pérdida", "Dar de alta la empresa en Empresas cliente cuando se gana"],
+    flujo: [
+      "Llegan con origen y fecha; una solicitud repetida por la misma persona el mismo día no se duplica.",
+      "Arriba se ve cuántas son nuevas, cuántas demostraciones se hicieron, la tasa de las ganadas y los motivos de pérdida.",
+      "No es un CRM: si se usa otro, esta lista sirve de entrada y se lleva allá.",
+    ],
+  },
+
+  "/clients/soporte": {
+    titulo: "Soporte a clientes",
+    que: "Las solicitudes de soporte de todas las empresas, abiertas primero y por severidad. Solo para el operador.",
+    hacer: ["Responder y cambiar el estado: en revisión, esperando al cliente, resuelta o cerrada", "Revisar los datos técnicos que el cliente adjuntó"],
+    flujo: [
+      "Cada cambio le llega a quien lo pidió en su campana. La primera respuesta queda registrada para medir el tiempo contra el objetivo del plan.",
+      "Una solicitud resuelta se cierra cuando el cliente lo confirma; si no responde en 5 días hábiles, ciérrela usted.",
+    ],
+  },
+
   "/clients": {
     titulo: "Empresas cliente",
     que: "Las cuentas que opera desde esta plataforma. Solo para el operador.",
-    hacer: ["Dar de alta una empresa eligiendo cómo empieza: vacía, con configuración recomendada o con datos de demostración", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance y su estado operativo"],
+    hacer: ["Dar de alta una empresa eligiendo cómo empieza: vacía, con configuración recomendada o con datos de demostración", "Entrar a su cuenta para dar soporte o hacer la implementación", "Ver su avance y su estado operativo", "Vigilar los procesos que corren solos y las entregas de avisos de todas las empresas"],
     flujo: [
       "Estado comercial y estado operativo son dos cosas. El comercial —en prueba, activa, suspendida— lo decide usted. El operativo —en configuración, lista para operar, operando— sale de la puesta en marcha y nunca cambia el comercial.",
       "Al dar de alta se explica qué trae cada opción antes de crear. Vacía: la empresa, su responsable y los catálogos técnicos indispensables. Recomendada: además, los catálogos de su giro, su primer sitio y el almacén. Demostración: además, un juego chico marcado «[DEMO]». Ninguna inventa órdenes ni indicadores.",
       "Al entrar a una cuenta se ve un aviso permanente arriba, y todo lo que haga queda en la bitácora de esa empresa.",
       "El acceso se revalida en cada petición: si se retira el privilegio, la sesión deja de servir de inmediato.",
+      "«Procesos programados» dice cuándo corrió por última vez cada tarea automática. «Callado» significa que lleva más de tres periodos sin terminar: un proceso detenido calla igual que uno sano, y esta tabla es la única forma de notar la diferencia sin abrir los registros del servidor.",
     ],
   },
 
@@ -271,17 +460,33 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Inicio",
     que: "Lo que usted tiene que ver primero, según su rol: el dueño, el estado de la empresa; supervisión, el trabajo del día; el técnico, sus órdenes; compras, requisiciones y entregas; quien reporta, sus reportes.",
     hacer: [
+      "Escuchar el parte del día antes de entrar a la planta, o en el camino",
       "Usar las acciones rápidas de arriba para lo que hace todos los días",
       "Entrar directo a cada pendiente desde su renglón",
+      "Ver de un vistazo cómo está cada área o sistema de la planta, y entrar a la que trae problema",
       "Ver los resultados del periodo (dueño)",
+      "Actualizar los indicadores al momento, si acaba de cerrar trabajo",
     ],
     flujo: [
       "Cada rol ve un inicio distinto. No es una pantalla por rol: son los mismos registros, ordenados para lo que cada quien hace.",
       "Un registro aparece una vez, en el primer bloque que le toca: una orden crítica y vencida sale en «críticas», no repetida en «vencidas».",
       "Los colores siempre van con palabras («Urgente», «Revisar», «Al día»): se leen igual con el sol de frente o sin distinguir colores.",
       "Si no hay nada pendiente, se dice «Todo al día» en vez de mostrar bloques vacíos.",
+      "En dirección y administración, el cumplimiento, la disponibilidad, el costo y los problemas de captura se calculan cada 15 minutos y abajo del resumen dice de cuándo son; con «Actualizar» se recalculan al momento. Son ventanas de 30 días: cerrar una orden mueve esas cifras décimas. Todo lo demás del inicio —vencidas, críticas, refacciones agotadas, compras por firmar— es de este instante.",
       "Los números salen de las órdenes y del almacén; no se capturan en ningún lado. En «Resultados», cada tarjeta de indicador abre su fórmula y los registros que la forman.",
       "Quien ejecuta no ve costos: mano de obra, refacciones y valor de equipos los ven la administración, supervisión y consulta.",
+      "«Cómo está la planta» agrupa por sistema cuando la empresa tiene sistemas armados en el mapa de sistemas, y por área cuando todavía no. Un cuadro por equipo, hasta veinte; con más equipos los cuadros se reparten, pero un estado con al menos un equipo nunca desaparece de la barra.",
+      "Cada renglón dice siempre las dos cosas —cómo están sus equipos y qué trae pendiente— para que los renglones se puedan sumar. Las órdenes vencidas que no cuelgan de ningún equipo no caben en ningún área y se cuentan aparte, al pie.",
+      "Los equipos dados de baja no cuentan en ningún lado de esa franja. Quien no ve activos —compras y quien solo reporta— tampoco ve la franja.",
+      "«El parte del día» dice, en menos de un minuto, lo que está fuera de servicio, las órdenes vencidas, las alertas sin atender, lo que espera su firma y las refacciones críticas agotadas. Va de lo más urgente a lo menos, y si no hay nada lo dice también.",
+      "Las cifras del parte NO las escribe la inteligencia artificial: las calcula el sistema y la IA solo las acomoda para que se oigan como una persona hablando. Al recibir la redacción se revisa número por número, y si aparece alguno que no estaba en los datos, se descarta toda la redacción y se lee la versión del sistema. Sin el complemento de IA el parte funciona igual, solo que más plano.",
+      "La voz se genera en el servidor y se guarda: la primera vez tarda unos segundos, y de ahí en adelante suena al instante sin volver a costar. Si no se puede generar —sin señal, o una falla— se usa la voz del propio aparato, que suena metálica pero dice exactamente lo mismo: más vale un parte feo que ningún parte.",
+      "Cada quien escoge con qué voz lo escucha, en Ajustes → Apariencia. Hay doce y se pueden probar antes de elegir, porque los nombres no dicen cómo suenan. La voz es de cada persona, no de la empresa.",
+      "El mismo parte queda escrito abajo del botón, porque escuchando no hay forma de comprobar una cifra.",
+      "El parte no modifica nada, a propósito: se piensa para oírlo en el camino, y dictar un cierre de orden manejando es capturar mal un dato que después nadie puede explicar.",
+    ],
+    botones: [
+      { nombre: "Escuchar", explica: "Arma el parte del día y lo lee en voz alta. Vuelto a tocar, lo detiene. El texto queda en pantalla aunque no se escuche." },
     ],
   },
 
@@ -333,8 +538,11 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/backlog": {
     titulo: "Trabajo pendiente",
+    tablaConfigurable: true,
     que: "Todo el trabajo que falta: órdenes abiertas y actividades que no se pudieron hacer, separadas por lo que les impide avanzar.",
     hacer: [
+      "Tocar un recuadro de arriba para ver solo esa categoría, y tocarlo otra vez para quitar el filtro",
+      "Reagrupar por equipo, responsable, motivo u origen, cuando la pregunta no es «qué lo detiene» sino «de quién es» o «de qué máquina es»",
       "Ver de un vistazo cuántas órdenes están en espera, vencidas, sin responsable, sin programar o a tiempo, y cuántas actividades no se realizaron",
       "Leer por cada renglón su origen, activo, prioridad, horas estimadas, motivo, responsable, antigüedad y la próxima acción",
       "Ver qué quedó pendiente en cada equipo y por qué",
@@ -342,6 +550,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Ver cuánto lleva esperando cada actividad",
     ],
     flujo: [
+      "La lista nace agrupada por lo que impide avanzar, que es la pregunta de todos los días. Los recuadros de arriba no solo cuentan: tocar uno deja en la lista solo esa categoría, y el filtro queda escrito para poder afinarlo o quitarlo.",
       "Cada orden abierta cae en UNA categoría, la más urgente de resolver: en espera, vencida, sin responsable, sin programar o programada a tiempo. Si además le pasa otra cosa (vencida y sin responsable), aparece como aviso debajo del folio; no se cuenta dos veces.",
       "Una actividad suelta no se mezcla con una orden completa: las actividades no realizadas tienen su propia sección.",
       "Cuando una actividad de una orden no se puede hacer —no hay refacción, no hay quien, no se pudo parar el equipo— el técnico la libera indicando el motivo («Otro motivo» exige explicarlo).",
@@ -383,6 +592,36 @@ export const AYUDA: Record<string, FichaAyuda> = {
         respuesta:
           "Que se intentó y se volvió a trabar. Una vez es un contratiempo; tres veces es una señal de que algo no se está resolviendo: una refacción que nadie pidió, un servicio que nadie contrató o un equipo que nunca se puede parar.",
       },
+    ],
+  },
+
+  "/work-orders/cierre": {
+    titulo: "Qué falta para cerrar",
+    tablaConfigurable: true,
+    que: "El estado de cada orden ya trabajada, bloque por bloque, para saber cuáles se pueden cerrar sin abrirlas una por una.",
+    hacer: [
+      "Ver de un golpe cuáles órdenes están listas para cerrar",
+      "Tocar «Listas para cerrar» para dejar en la lista solo esas",
+      "Leer qué le falta exactamente a cada una, en palabras",
+      "Agrupar por responsable para ver qué trae cada quien sin cerrar",
+      "Ordenar por lo que lleva más tiempo esperando validación",
+    ],
+    flujo: [
+      "Es el cierre administrativo visto de arriba: la ficha de la orden dice qué le falta a ESA orden, y esta pantalla lo dice de todas a la vez.",
+      "Cada casilla es un bloque de la orden. Verde: ya tiene lo suyo. Ámbar: es lo que detiene el cierre. Gris: no se capturó y no se exige —hay trabajos que legítimamente no consumen material—. El color va con ícono y con texto, para quien no distingue colores.",
+      "Es EL MISMO criterio que aplica el sistema al cerrar, no uno parecido: si aquí dice «lista», al cerrar no le van a pedir nada más. Un semáforo que hubiera que verificar orden por orden no serviría de nada.",
+      "Solo entran las órdenes que ya se trabajaron: completadas, en proceso y en espera. Una recién abierta saldría con todo en ámbar —claro que le falta todo, no ha empezado— y eso es ruido, no información.",
+      "Se ordena de entrada por lo que lleva más tiempo esperando validación, que es lo que primero se atora en el cierre de mes.",
+    ],
+    campos: [
+      { nombre: "Falta", explica: "Cuántos bloques detienen el cierre. «Lista» significa cero: se puede cerrar ya." },
+      { nombre: "Esperando", explica: "Días desde que el técnico la completó. Es el tiempo que lleva parada en el escritorio de quien valida, no el tiempo del trabajo." },
+      { nombre: "Qué falta", explica: "Lo mismo que le diría la orden al intentar cerrarla, con sus palabras. Así no hay que adivinar qué significa el ámbar." },
+    ],
+    noPuedo: [
+      { sintoma: "Una orden que sí trabajé no aparece", porque: "Si sigue abierta o asignada no entra: el tablero es de trabajo ya empezado. Iníciela y aparecerá." },
+      { sintoma: "Dice «lista» pero no me deja cerrarla", porque: "No debería pasar: es el mismo criterio. Si ocurre, abra la orden —ahí verá el motivo exacto— y avísenos, porque significa que el tablero se desincronizó del servidor." },
+      { sintoma: "El bloque de materiales está en gris y sí usé refacciones", porque: "El gris dice que no hay costo de refacciones ni de servicios cargado en la orden. Cárguelas en Materiales y se pone verde." },
     ],
   },
 
@@ -431,20 +670,31 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Crear una orden correctiva a mano",
       "Filtrar por estado, tipo, prioridad o responsable",
       "Acomodar columnas, agrupar hasta en tres niveles y guardar su vista",
+      "Quitar horas, refacciones o servicios cargados por error, mientras la orden no esté cerrada",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Las preventivas las genera el programador desde los planes; no se capturan una por una.",
       "Las correctivas nacen de una solicitud, de una alerta predictiva o a mano.",
       "Una misma orden puede juntar trabajo de varios orígenes: el preventivo del mes de esa bomba, más la fuga que alguien reportó. Cada actividad conserva de dónde vino.",
       "El ciclo es Borrador → Abierta → Asignada → En proceso (con pausas En espera) → Completada → Cerrada, más Cancelada. Cada orden muestra solo las acciones válidas para su estado y para el rol de quien la ve.",
       "Completada significa que el técnico terminó el trabajo (cierre técnico). Cerrada significa que un supervisor validó horas, paro, refacciones, servicios, costos, diagnóstico, pendientes y evidencia (cierre administrativo).",
+      "Lo que se cargó por error se puede quitar mientras la orden no esté cerrada: horas, refacciones y servicios traen su botón. Quitar una refacción NO borra el movimiento del almacén: genera una devolución que lo compensa, así que la pieza vuelve a estar disponible y el kardex sigue explicando a dónde se fue cada cosa. Un técnico quita las horas que él capturó; supervisión, las de cualquiera.",
       "Para iniciar, la orden necesita responsable: quien la inicia puede tomarla; un supervisor puede iniciarla sin responsable solo con motivo.",
       "Poner en espera, cancelar, devolver a proceso, reabrir y reactivar piden motivo. Todo cambio de estado queda en «Historial de estados» con quién, cuándo y por qué, y el motivo también se anota en la bitácora de la orden.",
+      "La solución se puede dictar en vez de escribirla: el botón «Dictar» graba hasta un minuto, lo pasa a texto y lo agrega a lo que ya haya en el campo, sin borrarlo. Está pensado para el piso, con las manos ocupadas. Lo dictado se revisa y se corrige antes de completar: la transcripción se equivoca con códigos de refacción y con nombres propios.",
       "Al completarla se pide la solución aplicada; horas registradas (o por qué no hay); si requería paro, los minutos (o confirmar que no hubo paro); en fallas, código y causa raíz (o «Sin determinar» con justificación); todas las actividades hechas o enviadas al backlog, y evidencia solo si la empresa la exige para equipos críticos o de seguridad.",
       "Al cerrarlas, sus horas, refacciones y servicios alimentan el costo por equipo. Una orden cerrada ya no acepta horas, refacciones, servicios ni cambios de actividades: para corregirla, administración la reabre con motivo.",
       "Cambiar la fecha compromiso de una orden ya programada pide el motivo de la reprogramación. Si la fecha no es laborable o el responsable no tiene capacidad ese día, el sistema advierte, propone días y personas con lugar, y deja programarla así si usted lo confirma.",
       "En las preventivas, el plan ya dice qué refacciones se van a consumir: la requisición se arma con eso y descuenta lo que ya se pidió o se consumió.",
       "Al pedir, el sistema dice cuánto cubre el almacén y cuánto no, para poder empezar con lo que hay y mandar el resto a compras.",
+      "Desde que la orden se INICIA, arriba aparece qué le falta para poder cerrarse: la solución, las horas, los minutos de paro, el diagnóstico, las actividades sin resolver y la evidencia, según lo que pida esa orden. Cada punto es una liga que lleva a la tarjeta donde se captura. Antes de iniciarla no se muestra —a una orden que nadie ha empezado no le «faltan» las horas— y cuando ya no falta nada, lo dice en verde.",
+      "El índice está en los dos tamaños: en el teléfono como una tira arriba que se desliza de lado, y en escritorio de pie al costado, acompañando el desplazamiento. Es la misma lista y las mismas señas.",
+      "Las secciones que no tocan en ese momento nacen recogidas, a un toque de abrirse: el procedimiento y la seguridad se leen antes de empezar y luego se recogen; la bitácora se abre sola cuando la orden está en espera, porque ahí está el motivo; las lecturas se ofrecen mientras el trabajo está en proceso. Una sección con algo pendiente SIEMPRE nace abierta, sin importar el estado: esconder lo que falta para cerrar sería peor que mostrar de más.",
+      "El índice no solo lleva: marca. En ámbar la sección que detiene el cierre, en verde la que ya tiene lo suyo, y en gris la que todavía está vacía. Materiales, lecturas y bitácora no detienen el cierre —una orden no se queda «sin bitácora»— pero sí se ponen en verde en cuanto se captura algo ahí, para que se note que quedó guardado. Los colores van acompañados de un ícono, para quien no los distingue.",
+      "El procedimiento y las indicaciones de seguridad se confirman con «Lo leí y lo entendí»: queda registrado quién y cuándo, y aparece en el historial de la orden. No es obligatorio para iniciar, a propósito: obligar a marcarlo invita a marcarlo sin leer, y un registro que dice «leído» cuando nadie leyó es peor que no tenerlo.",
+      "Si alguien edita el procedimiento o la seguridad DESPUÉS de que se confirmó, la confirmación deja de valer y la pantalla lo dice: lo que esa persona leyó ya no es lo que la orden dice hoy. Se vuelve a leer y se confirma. Sin eso bastaría confirmar un texto y cambiarlo luego para que el registro siguiera diciendo «leído».",
+      "La lectura que se registra desde la orden queda ligada a ESE trabajo: así se distingue el horómetro que tomó el técnico durante la reparación del que capturó el operador en su ronda, y el índice puede decir si ya se registró el de este trabajo.",
       "En el teléfono, cada orden se lee en el orden del trabajo: qué es, dónde está el equipo, estado, prioridad y vencimiento; luego actividades, seguridad, tiempo, materiales, lecturas, evidencias y resultado, con un índice arriba para saltar a cada paso. Lo secundario (servicios, procedimiento, historial, datos completos) está plegado: se abre al tocarlo. Las acciones del paso siguiente quedan fijas abajo: aceptar, iniciar, pausar o reportar bloqueo, terminar y enviar a revisión, y pedir apoyo.",
       "«Aceptar» le dice a supervisión que usted ya vio la orden asignada y la va a atender, sin iniciarla todavía. Queda en la bitácora y aparece solo para el responsable, antes de iniciar.",
       "«Pausar o reportar bloqueo» deja la orden en espera con el motivo. Para pedir ayuda sin pausar, toque «Pedir apoyo»: lo lleva a la bitácora con la casilla «Pedir apoyo a supervisión» marcada; la nota queda en la orden y a supervisión le llega un aviso.",
@@ -453,6 +703,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Si otra persona cambió un dato de la orden mientras usted la editaba, no se pisa: se avisa qué cambió, se carga lo vigente y lo que usted escribió se queda en el formulario para revisarlo.",
       "La lista acepta ligas con filtros: «mis órdenes», vencidas, sin responsable, por estado o por prioridad. En el teléfono se ve como tarjetas; en computadora, como tabla.",
       "Quien ejecuta no ve costos en la orden ni en la lista: los ven la administración, supervisión y consulta.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
+      "Junto a la conversación están los COMPROMISOS: lo que se acordó y no es una orden de trabajo —cotizar con tres proveedores, hablar con seguridad, mandar el reporte—. Llevan responsable y fecha, y al responsable le llega un aviso que se cierra solo cuando el compromiso se marca hecho. Puede cerrarlo su responsable o quien lo anotó.",
+      "Y el botón «Avísenme» de la conversación le manda a usted todo lo que pase con este registro, aunque no sea el responsable ni quien lo pidió. Es copia, no reemplazo: quien tenía que enterarse se sigue enterando.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -472,6 +725,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Generar requisición (en preventivas)", explica: "Arma la requisición sola con las refacciones que el plan pide y que todavía no se han pedido ni consumido. Solo hay que revisar, ajustar y enviar." },
       { nombre: "Pedir otra cosa", explica: "Requisición manual desde la misma orden, para lo que el técnico descubre que hace falta y no estaba en el plan." },
       { nombre: "Generar procedimiento (en correctivas)", explica: "Propone cómo asegurar el equipo, los pasos en orden, qué medir y contra qué, y qué refacciones del catálogo llevar. Al aplicarlo, los pasos se vuelven actividades que el técnico va palomeando." },
+      { nombre: "Dictar (al completar la orden)", explica: "Graba lo que usted dice y lo escribe en «Solución aplicada». Se corta solo cuando usted termina, aguantando las pausas de quien piensa a media frase. Hasta un minuto por vez, y se puede dictar varias veces: cada una se agrega a lo anterior. Revise el texto antes de completar." },
+      { nombre: "Codificar con IA (al completar la orden)", explica: "Lee lo que usted escribió o dictó y propone código de falla, causa raíz y las refacciones que sugiere cargar. Usted acepta o corrige; no se guarda nada por su cuenta." },
       { nombre: "Exportar CSV", explica: "Baja lo que esta viendo, con los filtros aplicados, para llevarlo a una hoja de cálculo." },
       { nombre: "Los cuatro desplegables de arriba", explica: "Filtran contra la base de datos, no solo lo que ve. Sirven para acotar antes de trabajar." },
     ],
@@ -481,6 +736,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "No me deja completar la orden", porque: "Le falta información esencial y el mensaje dice qué: solución, horas o su justificación, duración del paro o confirmar que no hubo, código y causa de la falla o su justificación, actividades sin resolver, o evidencia si la empresa la exige." },
       { sintoma: "No veo «Validar y cerrar»", porque: "Cerrar lo hace un supervisor, administrador o propietario. El técnico completa; la validación es de otra persona a propósito." },
       { sintoma: "No veo «Reabrir» en una orden cerrada", porque: "Reabrir una orden cerrada lo autoriza solo administración o el propietario, y pide motivo." },
+      { sintoma: "No veo el botón de dictar", porque: "El navegador no puede grabar —pasa en navegadores viejos o sin permiso de micrófono para el sitio— o el plan no incluye el dictado. Escriba el texto y el resto funciona igual." },
+      { sintoma: "Dicté y dice que no me entendió", porque: "Con una banda corriendo al lado el micrófono no alcanza. Acérquese el teléfono a la boca, o apártese del ruido. Ese intento no le descuenta nada." },
       { sintoma: "No me deja iniciar", porque: "La orden no tiene responsable. Elija «Tomarla yo» al iniciar, o pida que se la asignen." },
       { sintoma: "No me deja cancelar o pausar sin escribir nada", porque: "Esos pasos piden motivo: queda en el historial de la orden para quien la retome." },
       { sintoma: "Al guardar la fecha me pide un motivo", porque: "Mover la fecha compromiso de una orden ya programada es una reprogramación y se registra con su motivo." },
@@ -557,10 +814,15 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Las rutinas que se repiten: qué se le hace a cada equipo, cada cuánto, con qué refacciones y cuánto cuesta.",
     hacer: [
       "Dar de alta un plan con sus actividades, refacciones, mano de obra y servicios",
-      "Generarlo con IA a partir del equipo",
+      "Generarlo con IA a partir del equipo, o completar con IA lo que consume un plan que ya existe",
       "Ejecutar el programador para que nazcan las órdenes",
     ],
     flujo: [
+      "Decir QUÉ CONSUME cada actividad no es un adorno del plan: es lo que después contesta qué hay que comprar y cuándo (Almacén › «Lo que va a pedir el preventivo»). Un plan sin eso genera órdenes correctas y deja al almacén adivinando.",
+      "La mayoría de las actividades de un preventivo NO consumen material —revisar, medir, limpiar, probar no gastan nada— y dejarlas sin refacción es correcto. Lo que sí conviene revisar es un plan entero sin una sola refacción.",
+      "Medido en producción, lo que faltaba no eran las refacciones del plan sino las del CATÁLOGO: los planes describen bien el trabajo y consumen cosas que el almacén no tiene dadas de alta —grasa EP-2 para un montacargas cuando solo hay grado alimenticio, por ejemplo—. Por eso la sugerencia distingue las tres: lo que consume del catálogo, lo que no consume nada, y lo que consume algo que hay que dar de alta.",
+      "El nombre abre el expediente del plan: sus equipos con la próxima fecha y la última ejecución, sus actividades con recursos, las órdenes que ha generado y su cumplimiento. Editar se hace ahí mismo.",
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Un mismo plan se puede aplicar a varios equipos iguales. Diez compresores del mismo modelo llevan un solo plan, no diez: se define una vez y se aplica a todos con el botón «Equipos».",
       "Cada actividad lleva su fecha en CADA equipo. Al aplicar el plan todas arrancan con la fecha que se dé en común; las que en la realidad van distinto se corrigen en «Equipos → Fechas de sus actividades».",
       "Qué equipos van en cada plan lo decide usted: dos compresores de la misma categoría pueden llevar planes distintos si cambia una actividad o la frecuencia. Lo que el sistema sí vigila es que ningún equipo se quede sin plan, y lo avisa en «Equipos y sus planes».",
@@ -573,6 +835,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Cada actividad tiene su propia fecha, contada desde la última vez que se hizo ESA actividad en ESE equipo. Al asignar el plan usted dice cuándo se hizo por última vez o desde cuándo arranca; después manda el historial. Si el aceite se cambió fuera de ciclo porque la máquina ya estaba abierta, solo ese calendario se recorre.",
       "«Mensual» no es lo mismo que «cada 30 días»: doce veces treinta días se corren cinco al año. Y si en Configuración → Órdenes de trabajo eligió contar en días hábiles, «cada 15 días» son 15 días de trabajo, saltando los que su empresa no labora. Eso aplica solo a los intervalos en días; un trimestre son tres meses siempre.",
       "Las actividades que caen cerca salen en UNA sola orden: el técnico va una vez y hace todo lo que toca. Qué tan cerca lo decide «cuánto se puede adelantar un preventivo», en Configuración. La ventana siempre adelanta, nunca retrasa: nada se difiere por acompañar a otra cosa.",
+      "Abajo hay COMPROMISOS: lo que se acordó aquí y no es una orden de trabajo —cotizar con tres proveedores, revisar una frecuencia con producción, hablar con alguien—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
 ],
     tablaConfigurable: true,
     campos: [
@@ -592,6 +855,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Ejecutar programador", explica: "Convierte planes en órdenes. Le dice plan por plan si genero o por que no." },
       { nombre: "El desplegable de horizonte", explica: "Por omisión genera lo que toca hoy. Ampliarlo a 7 o 30 días adelanta la generación, útil antes de un puente." },
       { nombre: "Generar con IA", explica: "Propone la rutina completa a partir del equipo: actividades, tiempos, refacciones y frecuencia. Se revisa antes de guardar." },
+      { nombre: "Sugerir qué consume cada actividad", explica: "En un plan que ya existe, propone qué refacción gasta cada actividad usando SOLO el catálogo de su empresa. Se marca renglón por renglón y nada se guarda hasta que usted le da guardar; lo que ya tenía capturado no se pisa. Aparece en el detalle del plan, y solo mientras alguna actividad no diga qué consume." },
+      { nombre: "Lo que falta en el catálogo (dentro de la sugerencia)", explica: "Cuando una actividad consume algo que su almacén no tiene dado de alta, se propone el alta completa —código en el estilo que usted ya usa, nombre, unidad y cantidad— y se puede corregir antes de crearla. Al marcarla, la refacción se da de alta y queda colgada de su actividad en un solo paso. Nace sin existencia ni mínimo: eso se captura en Almacén con el primer conteo o la primera compra. Requiere permiso de almacén, porque el catálogo es de todos." },
       { nombre: "Pausar (en cada renglon)", explica: "Deja de generar órdenes sin borrar el plan ni su historial." },
     ],
     noPuedo: [
@@ -647,8 +912,12 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Eliminar un activo capturado por error",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Todo cuelga de aquí: los planes, las órdenes, las refacciones y los costos se acumulan por activo.",
       "La criticidad decide el orden de atención cuando hay varias cosas detenidas a la vez.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
+      "Junto a la conversación están los COMPROMISOS: lo que se acordó y no es una orden de trabajo —cotizar con tres proveedores, hablar con seguridad, mandar el reporte—. Llevan responsable y fecha, y al responsable le llega un aviso que se cierra solo cuando el compromiso se marca hecho. Puede cerrarlo su responsable o quien lo anotó.",
+      "Y el botón «Avísenme» de la conversación le manda a usted todo lo que pase con este registro, aunque no sea el responsable ni quien lo pidió. Es copia, no reemplazo: quien tenía que enterarse se sigue enterando.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -683,17 +952,25 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Almacén de refacciones",
     que: "Qué hay, en qué almacén, cuánto vale y qué está por acabarse.",
     hacer: [
+      "Ver de un vistazo qué familia está sufriendo, en la franja de arriba",
       "Registrar entradas, salidas y ajustes",
       "Ver la existencia de un almacén específico con el selector de arriba",
       "Entrar al kardex, a los traspasos, a los conteos y a los indicadores",
     ],
     flujo: [
+      "La franja de arriba dice cómo está el almacén por familia: un cuadro por refacción, y el color dice si hay de menos, de más, o si nadie ha dicho cuánto debería haber. Cada renglón lleva a esa familia.",
+      "El gris de «sin mínimo» no es un término medio entre bien y mal: es que esa refacción no tiene mínimo capturado, así que no hay contra qué compararla. Capturarlo es lo que hace que el almacén se pueda vigilar solo.",
+      "«Bajo mínimo» quiere decir lo mismo aquí, en la franja y en el análisis del almacén: hay menos de lo que se dijo que debía haber. Las agotadas van incluidas.",
+      "Si no se han capturado familias, la franja se ve en un solo renglón y lo dice: al ponerle familia a cada refacción se abre por familia.",
+      "La clave abre el expediente de la refacción: existencia por almacén, últimos movimientos, en qué equipos se ha ido, compras, planes que la piden, equivalentes y fichas técnicas. Editar se hace ahí mismo.",
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Cada refacción puede tener equivalentes: la misma pieza de otra marca, o un sustituto que sirve cuando la original no llega. Se registran con el botón «Equivalentes» del renglón.",
       "En un sustituto, la salvedad —«requiere espaciador de 2 mm»— es lo más importante del registro: sin ella alguien monta la pieza equivocada creyendo que hizo bien.",
       "La relación se guarda una sola vez y sirve en los dos sentidos: si A sirve para B, B sirve para A.",
       "La existencia baja sola cuando se surte una requisición o se consume en una orden de trabajo.",
       "Sube cuando se recibe una compra o cuando alguien devuelve lo que no usó.",
       "Cada uno de esos movimientos queda en el kardex con el documento que lo originó.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo —avisarle a producción, conseguir un equivalente, pedir una cotización—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -855,6 +1132,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Recibir de vuelta lo que no se usó",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Pedir no descuenta existencia. El almacén baja hasta que se surte.",
       "Cada renglón se liga a la ACTIVIDAD de la orden que necesita ese material, y de ahí sale su tipo: una misma requisición puede llevar el engrase del preventivo y el sello de una falla, cada uno con su clasificación.",
       "Si el material es de la orden completa se elige «Consumo general de la OT» y no se le inventa tipo. Los vales anteriores a este cambio se muestran como «Actividad no especificada»: no se les asigna una actividad sin evidencia.",
@@ -862,6 +1140,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo devuelto baja ese consumo: el cargo original no se borra, se le anota lo que regresó y el costo de la orden queda en lo que de verdad se usó.",
       "Lo que el almacén no puede cubrir se manda a compras sin volver a capturarlo. Lo que ya está en una compra abierta deja de aparecer como faltante, para no comprarlo dos veces.",
       "Si la refacción no tiene costo capturado, se puede surtir, pero se avisa: el consumo entraría en $0 y el costo del equipo saldría corto.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
+      "Junto a la conversación están los COMPROMISOS: lo que se acordó y no es una orden de trabajo —cotizar con tres proveedores, hablar con seguridad, mandar el reporte—. Llevan responsable y fecha, y al responsable le llega un aviso que se cierra solo cuando el compromiso se marca hecho. Puede cerrarlo su responsable o quien lo anotó.",
+      "Y el botón «Avísenme» de la conversación le manda a usted todo lo que pase con este registro, aunque no sea el responsable ni quien lo pidió. Es copia, no reemplazo: quien tenía que enterarse se sigue enterando.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -891,6 +1172,36 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/compras/planificador": {
+    titulo: "Qué hay que comprar",
+    que: "Lo que se va a acabar antes de que alcance a llegar, para pedirlo a tiempo en vez de cuando ya falta.",
+    hacer: [
+      "Ver qué urge, ordenado por lo que ya va tarde",
+      "Cambiar el horizonte: 30, 90 o 180 días",
+      "Abrir cualquier renglón para ver de dónde salió la cifra",
+      "Desmarcar lo que no quiera y mandar el resto a una requisición de compra",
+    ],
+    flujo: [
+      "Cruza tres cosas: lo que los preventivos programados van a pedir y qué día, lo que de verdad ha salido del almacén en los últimos 180 días, y lo que tarda cada proveedor.",
+      "La urgencia no es una escala inventada: compara cuándo se acaba el material contra cuánto tarda en llegar. Una pieza que se acaba en diez días y tarda quince aparece como «Ya va tarde», porque pedirla hoy ya no alcanza.",
+      "Lo que ya está pedido y no ha llegado se descuenta. Si lo que viene en camino alcanza, la refacción no aparece: no hay que pedirla otra vez.",
+      "Lo planeado y lo consumido NO se suman: el consumo real ya incluye los preventivos que se hicieron, así que sumarlos compraría de más. Se toma el mayor de los dos y cada renglón dice cuál mandó.",
+      "La cantidad repone hasta el máximo del almacén si está declarado; si no, cubre la demanda del horizonte más el mínimo.",
+      "No crea nada solo. Propone, usted ajusta y la requisición se levanta con los renglones ya cargados.",
+      "Lo correctivo no tiene fecha, así que la parte de la demanda que sale del historial es un ritmo, no una predicción. El día en que se acaba se calcula solo con lo que el plan compromete, que es lo único que sí tiene calendario.",
+    ],
+    campos: [
+      { nombre: "Cuándo", explica: "«Ya va tarde» significa que no alcanza a llegar aunque se pida hoy: el material se acaba antes que el tiempo de entrega del proveedor. Debajo dice en cuántos días se acaba y cuántos tarda." },
+      { nombre: "Viene", explica: "Lo que ya está pedido en una compra viva y todavía no llega. Se resta de lo que hay que pedir, y por eso una refacción en cero puede no aparecer: ya viene en camino." },
+      { nombre: "Va a hacer falta", explica: "La demanda del horizonte. La etiqueta de al lado dice de dónde salió: «plan» si mandaron los preventivos, «uso» si mandó el consumo real, «mín.» si solo se está reponiendo el mínimo." },
+      { nombre: "Pedir", explica: "La cantidad propuesta, ya descontado lo que viene en camino. Se puede cambiar en la requisición: esto propone, no decide." },
+    ],
+    noPuedo: [
+      { sintoma: "Sale vacío o con muy poco, y sé que falta material", porque: "Si sus planes no tienen refacciones cargadas, lo que consumen no entra. Arriba se lo dice, con el nombre de los planes. Cárgueselas al plan y vuelva a mirar." },
+      { sintoma: "Una refacción que está en cero no aparece", porque: "Porque ya está pedida y lo que viene en camino alcanza. Ábrala en el almacén y verá en qué compra viene." },
+      { sintoma: "No me cuadra la cantidad con lo que consumimos", porque: "Lo planeado y lo consumido no se suman: el consumo real ya incluye los preventivos que se hicieron. Se toma el mayor de los dos, y el renglón desplegado dice cuál mandó." },
+    ],
+  },
   "/compras": {
     titulo: "Requisiciones de compra",
     camposBuscables: true,
@@ -901,12 +1212,15 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Anotar la orden de compra y recibir la mercancía",
     ],
     flujo: [
-      "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción.",
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
+      "Si el proceso interno de compras está apagado, se anota el folio de la orden de su propio sistema y salta a recepción. Apagarlo no borra las cotizaciones que ya se hayan capturado: se siguen viendo, solo que sin poder cambiarlas.",
       "Si está encendido, entre autorizar y recibir van las cotizaciones, el comparativo y la orden de compra.",
       "Al recibir, la existencia sube solo por lo que de verdad llegó y el costo promedio de la refacción se recalcula.",
+      "Mientras no haya cotización elegida, la tabla muestra lo que se estimó al pedir. En cuanto se elige una, muestra lo cotizado y el total de la compra pasa a ser ese: por eso la cifra de un renglón puede cambiar sin que nadie la edite. Lo que el proveedor elegido no surte se marca «No lo surte» y queda fuera del total, porque tampoco entró en el de su cotización.",
       "Debajo del monto de autorización que tenga configurado su empresa, la requisición nace autorizada y lo dice; de ahí para arriba necesita firma, y sin firma no se puede colocar.",
       "La recepción admite parciales y no se puede recibir más de lo pedido. Si el mismo recibo se envía dos veces —doble clic, reintento— el material entra una sola vez.",
       "Mientras una compra siga viva, el almacén marca esa refacción como «Ya pedida» para que no se vuelva a comprar por mínimo.",
+      "Abajo hay COMPROMISOS: lo que se acordó aquí y no es una orden de trabajo —cotizar con tres proveedores, revisar una frecuencia con producción, hablar con alguien—. Llevan responsable y fecha, y a quien le toca le llega un aviso que se cierra solo al marcarlo hecho.",
     ],
     tablaConfigurable: true,
     campos: [
@@ -960,6 +1274,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/requests": {
     titulo: "Solicitudes de servicio",
     camposBuscables: true,
+    tablaConfigurable: true,
     que: "Lo que reporta quien no es de mantenimiento: se revisa y se convierte en orden, o se descarta. Quien reporta ve aquí solo sus reportes («Mis reportes») y en qué van.",
     hacer: [
       "Levantar una solicitud a mano",
@@ -967,7 +1282,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Analizar con IA lo que llegó por el portal público",
     ],
     flujo: [
+      "Desde el detalle se pasa al anterior o al siguiente con las flechas de junto al título —o con las flechas del teclado—, siguiendo el orden y el filtro de esta lista. No aparecen si se llegó por una liga directa o por la búsqueda.",
       "Es la puerta de entrada del trabajo correctivo desde el resto de la empresa.",
+      "La lista se agrupa por estado, prioridad, equipo o quien reportó, se ordena tocando el título de una columna y se le eligen columnas; su arreglo se guarda y es suyo. Quien ve solo sus reportes no tiene la agrupación por solicitante, porque ahí todo es suyo.",
       "Lo que llega por código QR trae el contexto que ese punto tenga: un QR pegado a un equipo trae el equipo; uno a la entrada de un área trae solo el área. Quien reporta nunca escoge equipo, y es a propósito — quien no trae el código tampoco se sabe la clave, y un equipo mal escogido ensucia el historial de uno que no falló y deja sin registro al que sí.",
       "Por eso el equipo lo pone QUIEN REVISA. Al aprobar aparece el buscador de equipos; si la solicitud llegó sin uno, la pantalla lo advierte: una orden sin activo no entra al expediente de ningún equipo ni cuenta en su historial de fallas.",
       "Quien tiene cuenta en el sistema no necesita ningún QR: levanta la solicitud desde aquí, con el buscador de equipos y su foto. El portal público existe para quien NO tiene cuenta.",
@@ -979,6 +1296,9 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Lo que se escribe y no se envía se conserva unas horas en ese dispositivo (si se cae la señal o se cierra sin querer). Las fotos se eligen antes, se ven, se pueden quitar, y se suben al enviar; si una falla, se reintenta sola esa.",
       "Quien reporta y el técnico ven sus propias solicitudes (el técnico, también las de sus órdenes); quien revisa, todas.",
       "Una solicitud convertida que no tiene una OT activa —porque nunca quedó ligada a una orden, o porque su orden está cancelada— se muestra «Sin OT activa» y aparece en la calidad de captura. El sistema no le inventa ni le reasigna una orden: alguien decide si se vuelve a atender.",
+      "Abajo de todo hay una conversación pegada a este registro: lo que se hable ahí queda aquí para siempre, no en un chat suelto donde se pierde en veinte minutos. Mencione a alguien con el botón @ y le llega un aviso con el texto y la liga. Nombrarse a uno mismo no avisa. Cada quien puede borrar lo suyo, y queda marcado como eliminado en vez de dejar un hueco.",
+      "Junto a la conversación están los COMPROMISOS: lo que se acordó y no es una orden de trabajo —cotizar con tres proveedores, hablar con seguridad, mandar el reporte—. Llevan responsable y fecha, y al responsable le llega un aviso que se cierra solo cuando el compromiso se marca hecho. Puede cerrarlo su responsable o quien lo anotó.",
+      "Y el botón «Avísenme» de la conversación le manda a usted todo lo que pase con este registro, aunque no sea el responsable ni quien lo pidió. Es copia, no reemplazo: quien tenía que enterarse se sigue enterando.",
     ],
     campos: [
       { nombre: "Posible condición de riesgo", explica: "Aparece en rojo cuando lo reportado menciona algo peligroso. Se detecta al recibir, en el acto y sin IA, porque un «huele a gas» no puede esperar a que alguien abra la bandeja." },
@@ -1071,10 +1391,16 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/board": {
     titulo: "Tablero",
     que: "Las órdenes por estado, para mover trabajo de una etapa a otra.",
-    hacer: ["Arrastrar órdenes entre columnas para cambiar su estado"],
+    hacer: [
+      "Arrastrar órdenes entre columnas para cambiar su estado",
+      "Acotar el tablero a una familia de equipo, a equipos concretos, a un responsable o a un tipo de mantenimiento",
+    ],
     flujo: [
       "Es la misma información que la lista de órdenes, vista por avance en vez de por renglones.",
       "Arrastrar sirve para los pasos que no piden datos. Completar, pausar, cancelar o iniciar una orden sin responsable se hacen desde la orden: el tablero le dice qué falta y le da el enlace.",
+      "Los filtros son los MISMOS del calendario, con los mismos nombres: responsable, tipo de mantenimiento, familia de equipo y equipos concretos. Quien aprende a acotar una pantalla ya sabe acotar la otra.",
+      "Elegir equipos concretos manda sobre la familia: si escogió tres compresores y luego una familia distinta, siguen mandando los equipos, porque es lo último que usted señaló.",
+      "Con filtro puesto, el conteo y las horas de cada columna son de lo que se está viendo, y arriba se dice cuántas órdenes quedaron fuera. Arrastrar sigue funcionando igual, y el filtro se conserva al mover una tarjeta.",
     ],
   },
 
@@ -1148,10 +1474,32 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Preguntas en español sobre su propia operación, contestadas con sus datos reales.",
     hacer: [
       "Preguntar cosas como «¿qué equipo me costó más este trimestre?» o «¿qué refacciones se acabaron?»",
+      "Escuchar la respuesta, con el botón de bocina de cada una",
+      "Copiar la respuesta, para pegarla en un correo o en una junta",
+      "Cambiar al modo hablado: toque el micrófono, haga su pregunta y el sistema contesta en voz alta (plan Enterprise)",
     ],
     flujo: [
       "No inventa: consulta sus órdenes, activos, almacén y costos con herramientas de solo lectura.",
       "Nunca ve datos de otra empresa: la organización la pone el servidor, no la pregunta.",
+      "Lo que se escucha es exactamente la respuesta que está en pantalla: no se le vuelve a preguntar a la IA para leerla, así que oír y leer nunca se contradicen, y no se cobra dos veces la misma respuesta.",
+      "Al decirla se traducen los importes y porcentajes a como los diría una persona —«128 mil 400 pesos», «87.5 por ciento»— sin redondear ninguna cifra. Los códigos de equipo se dicen tal cual, porque así se llaman en la planta.",
+      "La voz es la que cada quien escogió en Ajustes → Apariencia.",
+      "El modo hablado es otra forma de usar lo mismo, no otra cosa: escribiendo se relee y se compara; hablando se va en el camino. Por eso se entra a propósito, con «Prefiero preguntar y escuchar», y se sale con «Volver al modo escrito».",
+      "Mientras revisa sus datos dice «déjeme revisar» en vez de quedarse callado: entre la pregunta y la respuesta pasan segundos, y un silencio largo se siente como que se descompuso.",
+      "La pregunta se graba y se entiende en el servidor, no en el teléfono: el reconocimiento de voz del navegador no existe en el iPhone, que es justo donde esto sirve. La grabación se corta sola a los 30 segundos.",
+      "El permiso del micrófono se pide una sola vez por visita, no en cada pregunta. Si el teléfono lo vuelve a pedir cada vez que entra, es Safari: instale MainTrack en la pantalla de inicio —Compartir → Agregar a inicio— y el permiso se queda guardado, además de que abre sin barra del navegador.",
+      "Al salir del modo hablado se suelta el micrófono, para que no quede el indicador de grabación encendido en el teléfono.",
+      "Si no se entiende lo que dijo —ruido de planta, el teléfono lejos— lo dice y se puede repetir o escribir. No contesta una pregunta que usted no hizo.",
+      "Mientras revisa los datos se oye un pulso suave. Está a propósito: un silencio en medio de una conversación se siente como que se cortó la llamada. Se calla solo en cuanto empieza a contestar.",
+      "El modo hablado NO modifica nada, a propósito: se piensa para usarse en el camino, y dictar el cierre de una orden manejando es capturar mal un dato que después nadie puede explicar.",
+      "Todo lo que se dice queda también escrito abajo, porque escuchando no hay forma de comprobar una cifra.",
+      "Cada empresa tiene un máximo de audios al mes. Al llegar, la voz se apaga y se avisa; lo escrito sigue funcionando igual.",
+    ],
+    botones: [
+      { nombre: "Escuchar la respuesta", explica: "Lee en voz alta esa respuesta. Vuelto a tocar, la detiene. Solo suena una a la vez." },
+      { nombre: "Prefiero preguntar y escuchar", explica: "Entra al modo hablado. Se sale con «Volver al modo escrito»." },
+      { nombre: "Micrófono", explica: "Toque para hablar, toque otra vez al terminar. Se corta solo a los 30 segundos. Si prefiere, el campo de abajo sigue aceptando la pregunta escrita." },
+      { nombre: "Copiar", explica: "Copia esa respuesta al portapapeles, tal como está escrita." },
     ],
   },
 
@@ -1194,6 +1542,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El mismo acomodo se ve de tres maneras: «cómo está ahora» (el estado vivo de cada equipo), «lo que costó» (horas de paro y dinero, con su periodo) y «lo que trae pendiente» (planes vencidos y órdenes abiertas). Cruzado con el filtro de familia, cada combinación es la pregunta de alguien: solo compresores + cómo están ahora es la mañana del jefe de mantenimiento; solo bombas + lo que costó es su junta de presupuesto.",
       "En el lienzo, si su línea es una cadena, acomódela de izquierda a derecha: el dibujo dice el orden sin que el sistema guarde ninguna secuencia. El mismo equipo puede estar en varios grupos y tiene una posición distinta en cada lienzo — acomodar uno no mueve los demás.",
       "Dos equipos nunca quedan encimados. Si suelta uno sobre otro se intercambian de lugar; si cae sobre varios, se va al primer hueco libre.",
+      "Abajo hay COMPROMISOS: lo que se acordó y no es una orden de trabajo. Un sistema lo miran varias áreas a la vez, así que aquí es donde se apunta quién hace qué —«producción confirma la ventana», «eléctrico revisa el arrancador»— con responsable y fecha, y un aviso que se cierra solo al marcarlo hecho.",
     ],
     botones: [
       {
@@ -1251,6 +1600,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "El mantenimiento planeado se reporta aparte y NO se cuenta como pérdida: contarlo así haría ver caro justamente lo que conviene fomentar.",
       "Los periodos son ventanas móviles y no trimestres de calendario. «Este trimestre» a cinco días de empezado compararía cinco días contra noventa y mostraría un desplome que no ocurrió.",
       "Un arrastre de menos de un día se ignora: casi siempre es un toque que se resbaló, y aplicarlo dejaría la pantalla vacía sin que se entienda por qué.",
+      "«Por qué para» agrupa las fallas del periodo por la FAMILIA de su causa raíz —práctica de mantenimiento, operación, desgaste, ambiente— y dice qué se hace con cada una: un pico en operación no lo arregla ningún plan de mantenimiento, es capacitación. Arriba dice sobre cuántas fallas está hablando: las que se cerraron sin causa no entran en el reparto y se cuentan aparte, porque un porcentaje sobre la mitad de los datos es un número preciso y falso.",
     ],
     botones: [
       {
@@ -1286,12 +1636,47 @@ export const AYUDA: Record<string, FichaAyuda> = {
   "/reports": {
     titulo: "Reportes",
     que: "Los cortes de información para llevar a una junta o a un cierre de mes.",
-    hacer: ["Elegir periodo (30 días, 90 días, 6 meses, 12 meses) y exportar", "Abrir cualquier indicador para ver su fórmula y los registros que lo forman"],
+    hacer: ["Elegir periodo (30 días, 90 días, 6 meses, 12 meses) y exportar", "Abrir cualquier indicador para ver su fórmula y los registros que lo forman", "Cortar la mezcla de mantenimiento por tipo de equipo, área, centro de costo o sitio, y medirla en órdenes, horas o costo"],
     flujo: [
       "Los indicadores son los mismos del Panel de control y del Diagnóstico IA: una sola fuente de cálculo.",
       "El periodo son días completos en la zona horaria de la empresa, hoy incluido.",
       "El costo cuenta órdenes TERMINADAS en el periodo; las canceladas no suman. El paro sale de los eventos de paro, y el planeado se reporta aparte: no resta disponibilidad.",
       "El costo de material por tipo de mantenimiento se atribuye a la ACTIVIDAD que consumió la refacción. Una orden preventiva que además atendió una falla reparte su material entre los dos tipos; lo que se cargó sin actividad se cuenta con el tipo de la orden y se muestra en su propia columna.",
+      "«Preventivo, correctivo y predictivo» contesta en qué se está yendo el mantenimiento. Se agrupa por tipo de equipo, área, centro de costo o sitio, y se mide en órdenes, horas o costo: la misma mezcla vista de tres maneras. La barra es proporcional —de un golpe se ve si un grupo es mayormente preventivo o mayormente correctivo— y el tamaño real está en la tabla.",
+      "Las órdenes de APOYO no entran en esa mezcla. Prestar manos a producción o mover un equipo consume horas y cuesta dinero, pero no es trabajo sobre la salud de una máquina: contarlas diría que los equipos fallan más de lo que fallan.",
+      "Tampoco se reinterpreta el tipo: se usa el que la orden tiene. Un preventivo bien ejecutado no se vuelve falla aunque haya encontrado algo — eso metería un evento que nunca ocurrió.",
+      "Lo que no tiene ese dato capturado sale como «Sin asignar», aparte y al final. No se reparte entre los demás, porque una regla inventada daría un número preciso y falso, ni se esconde, porque entonces la suma no cuadraría con el total del periodo.",
+      "«Costo por centro de costo» es el mismo gasto en el idioma de su contabilidad, con mano de obra, refacciones y servicios separados. Para que caiga en su centro, cada equipo necesita el suyo en su ficha: la orden lo hereda al crearse.",
+      "Los filtros viven en la dirección, así que el corte que arme se puede guardar en favoritos, mandar por mensaje y volver a abrir igual. Cambiar el periodo conserva el corte.",
+    ],
+  },
+
+  "/presupuestos": {
+    titulo: "Presupuestos",
+    que: "Cuánto se puede gastar en cada centro de costo, contra lo que de verdad se lleva gastado.",
+    hacer: [
+      "Capturar el presupuesto de cada centro, mes por mes",
+      "Ver cuánto se lleva ejercido y cuánto queda disponible",
+      "Cambiar de mes o ver el año completo",
+      "Ver en qué se fue: mano de obra, refacciones, servicios y otros",
+    ],
+    flujo: [
+      "Se presupuesta por MES, no por año: de los meses sale el trimestre y el año sumando, y al revés no. Repartir una cifra anual entre doce miente en cuanto hay un paro programado o una temporada alta.",
+      "Se captura un solo monto por centro, no desglosado. El gasto real sí se muestra desglosado, así que se ve en qué se fue sin obligar a mantener cuatro cifras al día: un presupuesto desglosado que nadie actualiza es peor que uno solo que sí se cuida.",
+      "Se captura en la misma pantalla donde se compara: escriba el monto y salga de la casilla, se guarda solo. El año completo es de solo lectura.",
+      "Dejar la casilla vacía QUITA el presupuesto; escribir 0 lo deja en cero. No es lo mismo: cero significa «este centro no gasta este mes», vacío significa «nadie lo ha presupuestado», y la pantalla los muestra distinto.",
+      "Un centro con gasto y sin presupuesto se avisa arriba con su clave: ese gasto es real y no se está comparando contra nada. Si solo saliera lo presupuestado, el total se vería mejor de lo que es.",
+      "Cada cambio queda en la bitácora con el monto, el mes y quién lo dejó así: el historial de una cifra que se ajusta varias veces es justo lo que se audita.",
+    ],
+    campos: [
+      { nombre: "Gastado", explica: "El costo de las órdenes TERMINADAS en ese mes, por su fecha de término. Es el mismo criterio del costo por centro de costo: no hay dos respuestas a «cuánto llevamos»." },
+      { nombre: "Diferencia", explica: "Lo que queda disponible. En rojo cuando ya se rebasó, y ahí el número es por cuánto se pasó." },
+      { nombre: "Ejercido", explica: "El porcentaje gastado del presupuesto. Verde hasta 89 %, ámbar de 90 a 100, rojo arriba de 100. Sin presupuesto capturado no hay porcentaje, y con presupuesto en cero tampoco: no se divide entre cero." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo ningún centro de costo", porque: "Los presupuestos cuelgan del centro de costo. Déselos de alta en Catálogos con la misma clave que usa su contabilidad, y asígneselos a los equipos: las órdenes lo heredan del equipo." },
+      { sintoma: "El gasto no cuadra con lo que llevo comprado", porque: "Aquí cuenta lo EJECUTADO —órdenes terminadas—, no lo comprometido. Una compra autorizada que todavía no llega no aparece: sumarla haría que el ejercido pareciera mayor de lo que es. Lo que viene en camino se ve en «Qué hay que comprar»." },
+      { sintoma: "Capturé el presupuesto y no cambió el total del año", porque: "Revise que esté en el año correcto. El presupuesto es de un mes de un año: si captura enero de 2027 no cambia 2026." },
     ],
   },
 
@@ -1301,6 +1686,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: ["Cambiar el periodo", "Abrir un indicador y cada orden que aporta a su cifra"],
     flujo: [
       "Una orden cuenta como FALLA (MTBF, MTTR, tiempo de respuesta) solo si es correctiva, tiene código de falla en la orden o en una actividad, o trae una actividad de una solicitud clasificada como falla. Una preventiva o de seguridad sin falla registrada no cuenta. El detalle dice por qué cuenta cada una.",
+      "El Pareto de códigos dice QUÉ falló —el síntoma— y «Por qué falla» dice el ORIGEN, agrupando por la familia de la causa raíz: práctica de mantenimiento, instalación, operación, desgaste normal, ambiente, causa externa o diseño. Cada familia trae qué se hace con ella, porque un pico en desgaste se ataca con reemplazo programado y uno en operación con capacitación.",
+      "«Por qué falla» dice arriba sobre cuántas fallas está hablando. Las que se cerraron sin causa raíz no entran en el reparto y se cuentan aparte: un porcentaje calculado sobre la mitad de los datos es un número preciso y falso, y quien lo repita en una junta no tendría cómo saberlo.",
       "La suma del detalle es exactamente la cifra de la tarjeta (o su numerador, en porcentajes y promedios).",
       "«Con los datos de hoy» muestra la fórmula con los números reales del periodo.",
       "Completada es la fecha de finalización operativa; el cierre administrativo es aparte y no cambia el cumplimiento.",
@@ -1314,7 +1701,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/catalogs": {
     titulo: "Catálogos",
-    que: "Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, causas de falla, cuadrillas.",
+    que: "Las listas que alimentan el resto del sistema: sitios, ubicaciones, almacenes, categorías, centros de costo, causas de falla, cuadrillas.",
     hacer: ["Dar de alta y editar cada catálogo", "Borrar los que no estén en uso"],
     campos: [
       {
@@ -1324,8 +1711,17 @@ export const AYUDA: Record<string, FichaAyuda> = {
       },
     ],
     flujo: [
+      "Si todavía no tiene centros de costo, el sistema le propone los que suele tener una instalación como la suya —una planta separa producción de sus servicios auxiliares; un hospital, el equipo médico de los gases medicinales—. Es la ESTRUCTURA lo que se propone: qué conviene separar.",
+      "Las CLAVES que vienen en esa propuesta son provisionales y hay que cambiarlas por las de su contabilidad. Son la llave para conciliar: si su contador usa otras, el costo por centro y los presupuestos dejan de cuadrar con finanzas, y eso se descubre meses después con historial ya cargado.",
+      "La propuesta no pisa nada: un centro que ya exista con esa clave se respeta tal cual, con su nombre.",
       "Un catálogo limpio es lo que después permite agrupar y comparar. Texto libre no se puede agrupar.",
       "Los proveedores tienen pantalla propia porque a ellos les cuelga información real.",
+      "Los CENTROS DE COSTO son el eje contable, el único que no es de mantenimiento: sitio, ubicación y categoría dicen dónde está el equipo y qué es; el centro de costo dice a quién se le carga el gasto. Con él, el costo de mantenimiento sale agrupado como lo lleva su contabilidad y se puede llevar a una junta de presupuesto sin traducirlo a mano.",
+      "No se inventan: se traen del ERP con la misma clave que usan allá, porque esa clave es lo que permite conciliar. Se importan como cualquier catálogo, y como cambian dos veces al año, un archivo al año alcanza.",
+      "Un equipo pertenece a un centro de costo y sus órdenes lo heredan AL CREARSE. En la orden se puede cambiar, para el trabajo que paga otra área —una modificación que pide producción, un montaje que carga a un proyecto—.",
+      "Se copia, no se consulta: si el año que viene mueve un equipo a otro centro, lo ya gastado se queda donde se gastó. Es a propósito. Si el histórico se recalculara, los reportes del año pasado cambiarían solos y quien lleva la contabilidad dejaría de confiar en el sistema.",
+      "Un centro con gasto encima no se borra: se desactiva. Así deja de ofrecerse al capturar y lo histórico sigue explicándose.",
+      "El resultado se ve en Reportes › Costo por centro de costo, con mano de obra, refacciones, servicios y el corte entre preventivo y correctivo. Las órdenes sin centro salen aparte, no se reparten entre los demás: repartirlas con una regla inventada daría un número preciso y falso, y esconderlas haría que la suma no cuadre con el total.",
     ],
     noPuedo: [
       { sintoma: "No me deja borrar un registro", porque: "Algo lo está usando. El mensaje le dice exactamente qué y cuántos." },
@@ -1345,6 +1741,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Encender los avisos al teléfono y activar cada aparato",
       "Elegir qué avisos le llegan y por dónde; y, si administra, cómo avisa la empresa: canales, horario, resúmenes, recordatorios y escalamiento",
       "Crear credenciales de API y webhooks para otros sistemas, y revisar el historial de entregas",
+      "Poner a la mano las pantallas que usa a diario, hasta arriba de su menú",
+      "Plegar la columna del menú con el botón de junto al logotipo, para ganar ancho en el tablero, el calendario o los reportes",
       "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [
@@ -1358,7 +1756,15 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "En «Avisos», los avisos obligatorios (seguridad, órdenes críticas, contraseñas) no se pueden apagar. Un aviso configurable tampoco se apaga cuando usted es el responsable directo de algo alto o la única persona que puede atenderlo.",
       "Los avisos no críticos respetan un horario (por omisión de 8 a 18, días laborables, en la zona de la empresa); los críticos salen a cualquier hora. Si el correo o el celular fallan, el aviso sigue en el centro de avisos y se reintenta.",
       "En «Integración», el secreto de una credencial o de un webhook se ve una sola vez, al crearlo. Revocar corta el acceso en la siguiente petición. Cada credencial y cada webhook son solo de esta empresa.",
+      "Los permisos de una credencial se marcan uno por uno y lo que no marque no existe para ese sistema. Dos van juntos y conviene entenderlos: «compras:escribir» deja que su ERP informe el folio con que colocó la compra y registre la recepción de la mercancía —que entra al almacén con su kardex y su costo, igual que si la capturara una persona—, y «costos:leer» es lo que decide si además ve los montos. Una integración que nada más confirma folios no necesita ver precios.",
+      "Las recepciones que manda una integración se ven en la ficha de la compra y en el kardex a nombre de esa integración, no en blanco: se sabe siempre si la entrada la capturó alguien o la mandó el ERP.",
       "En «Organización» hay cinco preguntas sobre su negocio. No son un trámite: alimentan el diagnóstico, los planes que propone la IA y las refacciones sugeridas. La más útil es «¿qué NO puede parar?».",
+      "En «Lo que más uso» marca las pantallas que abre a diario y aparecen hasta arriba del menú, en el orden en que las eligió. Caben ocho: un acceso rápido de veinte renglones vuelve a ser un menú y no resuelve nada.",
+      "Ahí también salen sus registros propios, uno por uno y con su nombre —«Bitácora de diésel», no «Registros propios»—, porque así es como los busca quien los llena. Anclar es personal: no le cambia el menú a nadie más, y por eso la ayuda y el comando de voz siguen funcionando igual para todos.",
+      "Esos accesos son SUYOS, no de la empresa: el almacenista vive en existencias y requisiciones, y dirección en indicadores y reportes; no hay un acomodo que les sirva a los dos. Marcar los suyos no le cambia el menú a nadie más.",
+      "Lo que NO cambian es cómo se llaman las cosas ni en qué grupo están. Es a propósito: de los nombres del menú salen los comandos de voz («llévame a almacén») y con esos nombres está escrita toda la ayuda. Si cada quien renombrara sus grupos, pedir una pantalla hablando dejaría de funcionarle y el soporte por teléfono no podría guiarlo.",
+      "Si cambia de rol y pierde acceso a una pantalla anclada, deja de aparecer en su menú pero no se borra: si le devuelven el permiso, vuelve sola.",
+      "En «Apariencia» escoge la voz con que lo escucha Y qué tanto le contesta hablando. «Concisa» dice lo que preguntó y deja el detalle escrito; «Completa» dice también el contexto que no pidió pero cambia la lectura. Las dos son suyas, no de la empresa: al que va manejando le sirve una y al que revisa sentado, la otra.",
     ],
     campos: [
       { nombre: "Pedir evidencia al completar órdenes de equipos críticos o de seguridad", explica: "Encendido, una orden de un equipo con criticidad A o de tipo seguridad no se puede completar sin al menos una foto o documento adjunto. Las demás no la piden. Apagado por omisión: exigir evidencia en todo llena el sistema de fotos de relleno." },
@@ -1435,9 +1841,25 @@ export const AYUDA: Record<string, FichaAyuda> = {
 
   "/glossary": {
     titulo: "Glosario",
-    que: "Qué significa cada término del sistema, en el lenguaje de mantenimiento.",
-    hacer: ["Consultar un término"],
-    flujo: ["Si algo en otra pantalla no se entiende, probablemente esté aquí."],
+    que: "Qué significa cada término del sistema, y qué significa en SU planta con sus propios datos.",
+    hacer: [
+      "Consultar un término",
+      "Preguntar qué significa ese término en su operación, con sus cifras",
+    ],
+    flujo: [
+      "Si algo en otra pantalla no se entiende, probablemente esté aquí. Donde aparezcan dentro del sistema van subrayados con puntos: al tocarlos se abre la definición sin salir de la pantalla.",
+      "Los términos que el sistema calcula traen SU cifra ahí mismo, con el periodo y la cuenta hecha con sus propios números —el MTBF dice «2,323 h» y debajo «(30,240 h − 39.1 h) ÷ 13 fallas»—. Es la misma cifra de Reportes, del mismo periodo: dos números distintos para lo mismo sería peor que no enseñar ninguno.",
+      "Las cifras solo las ve quien puede abrir Indicadores. Para los demás la definición sale completa; lo que falta es el número, no el concepto.",
+      "La definición es la misma para todos. Lo que no da ningún diccionario es el botón «Qué significa en mi planta»: ahí el sistema consulta SUS datos y le dice cómo va el suyo, qué lo está moviendo y en qué pantalla verlo. Preguntar por el MTBF, por ejemplo, contesta con su cifra, la fórmula con sus números, y los modos de falla que lo están hundiendo.",
+      "Cuando el sistema NO calcula ese indicador, lo dice y explica qué haría falta, en vez de dar una cifra parecida. El OEE necesita datos de producción —rendimiento y calidad— que un sistema de mantenimiento no captura; presentar la disponibilidad como si fuera OEE sería engañoso.",
+      "Usa la misma bolsa mensual que la ayuda con IA: es la misma conversación, anclada a un concepto en vez de a una pantalla.",
+    ],
+    botones: [
+      { nombre: "Qué significa en mi planta", explica: "Abre una pregunta sobre ese término, contestada con sus datos reales. Trae tres sugerencias que sirven para cualquier término —qué significa aquí, dónde lo veo, qué hago con él— y acepta la pregunta que usted quiera escribir." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo el botón de preguntar", porque: "Su plan no incluye la ayuda con IA, o el servidor no la tiene configurada. El glosario sigue sirviendo como glosario." },
+    ],
   },
 
   "/puesta-en-marcha": {
@@ -1461,6 +1883,265 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Comenzar a operar pasa por la misma revisión que muestra la pantalla, y queda en la bitácora con quién lo declaró y cuándo. No cambia el estado comercial de la cuenta.",
     ],
   },
+  "/registros": {
+    titulo: "Registros propios",
+    que: "Las tablas que su empresa arma para lo que lleva aparte porque ni su ERP ni MainTrack lo tienen: el diésel que se carga a cada equipo, el equipo de protección que se entrega a cada persona, el análisis del agua de la torre, la gestión administrativa de sus contratos. Lo que hoy vive en un Excel que solo una persona sabe abrir.",
+    hacer: [
+      "Capturar en las tablas que su empresa armó",
+      "Filtrar, agrupar, ordenar y exportar lo capturado",
+      "Ver la suma de las columnas de cantidad e importe",
+      "Armar una tabla nueva desde un formato ya hecho, o en blanco (administración)",
+      "Agregar columnas a una tabla que ya tiene datos, sin perder nada",
+    ],
+    flujo: [
+      "Lo que hace que esto no sea una hoja de cálculo son las columnas que apuntan a SUS datos. La columna «Equipo» de la bitácora de diésel no es texto que alguien volvió a escribir: es el equipo del padrón. Por eso se puede preguntar cuánto diésel lleva ese generador, y el Excel nunca pudo.",
+      "Quién VE una tabla y quién CAPTURA en ella son dos cosas distintas, y cada tabla las declara por separado. El técnico puede consultar una tabla que solo administración llena. Su rol puede no ver ninguna: entonces esta pantalla sale vacía, y eso es lo correcto, no un problema de accesos.",
+      "Armar una tabla y capturar en ella son dos cosas distintas, y por eso viven en dos lugares. Armar es definir esquema —o sea configuración— y está en el menú bajo Configuración, para quien tenga permiso de Ajustes. Capturar es del día a día y está aquí, en «Sus registros», para quien la tabla diga.",
+      "Si usa una tabla todos los días, ánclela: en Ajustes, en «Lo que más uso», cada tabla aparece con SU nombre —«Bitácora de diésel»— y se pone hasta arriba del menú. Es personal: no le cambia el menú a nadie más.",
+      "Cada tabla pide una explicación de para qué es, y no es un adorno: es lo que lee esta ayuda y lo que le permite a la IA contestar preguntas sobre ella. Una tabla llamada «Control 2» sin explicación queda muda para el sistema y para quien entre el año que viene.",
+      "Las columnas se pueden renombrar sin perder nada: por dentro cada columna guarda su propia clave, que se fija al crearla y no cambia. Lo que NO se cambia es el tipo de una columna que ya tiene datos —de número a texto, por ejemplo—: los valores viven en la columna del tipo y cambiarlo los dejaría invisibles sin un solo mensaje de error. Para eso se agrega una columna nueva.",
+      "Una tabla se apaga, no se borra: se sigue consultando y deja de recibir captura. Lo mismo un renglón. Lo que se capturó es historia de la planta.",
+      "Si una columna apunta a un equipo que después se borró del padrón, la lista dice «ya no existe» en vez de un guion. Es a propósito: un dato que desaparece sin avisar es peor que un error en pantalla.",
+      "Estas tablas todavía NO avisan. Si lo que necesita es que el sistema le avise antes de una fecha —una garantía, una póliza, un contrato, una calibración, un permiso, una licencia—, eso ya existe y vive en «Garantías y vigencias», que es la única pantalla que avisa. Registrarlo en las dos partes es válido: aquí el seguimiento administrativo, allá la fecha que dispara el aviso.",
+      "Los límites son doce tablas por empresa y veinticuatro columnas por tabla. No es burocracia: es lo que mantiene esto como un módulo que se puede soportar y no como una plataforma con tablas que nadie explicó.",
+    ],
+    botones: [
+      { nombre: "Armar una tabla", explica: "Abre los formatos ya hechos —contratos, combustible, equipo de protección, análisis de agua, herramienta, contratistas, energía— para ajustar uno, o empezar en blanco. Pide el nombre, la explicación, quién captura y quién ve. También está en el menú, en Configuración: armar una tabla es definir esquema, no capturar." },
+      { nombre: "Capturar", explica: "Abre el formulario de esa tabla, armado a partir de sus columnas. Las que apuntan a equipos, refacciones, personal o proveedores traen buscador." },
+    ],
+    campos: [
+      { nombre: "Para qué es (la explicación de la tabla)", explica: "Obligatoria. Es lo que lee la ayuda y lo que la IA necesita para contestar sobre esta tabla. Sin ella, la tabla existe y nadie —ni el sistema— sabe qué significa." },
+      { nombre: "Quién puede capturar", explica: "Se elige de los permisos que ya existen, no se inventa uno por tabla. «Quien ejecuta trabajo» es lo normal para una bitácora de campo; «Solo administración» para algo contable." },
+      { nombre: "Quién la ve", explica: "Los roles que la encuentran en el menú y la pueden abrir. Ver no es capturar: se puede abrir a todos y dejar la captura en administración." },
+      { nombre: "Se ve en la lista", explica: "Si la columna aparece sin tener que abrir la tabla de columnas. Una tabla de veinte columnas con las veinte visibles no se lee en un teléfono; el resto se prende cuando se necesita." },
+      { nombre: "No se puede dejar vacía", explica: "El renglón se rechaza si falta. Úselo con lo que de verdad no sirve de nada sin dato: si todo es obligatorio, la gente deja de capturar." },
+    ],
+    tablaConfigurable: true,
+    camposBuscables: true,
+    noPuedo: [
+      { sintoma: "No veo «Registros propios» en el menú", porque: "Se contrata aparte y su cuenta no lo tiene activo. No es un permiso que falte: pídalo desde Soporte." },
+      { sintoma: "La pantalla está vacía y sé que hay tablas", porque: "Su rol no está entre los que ven esas tablas. Quien las armó decide qué roles las ven, tabla por tabla." },
+      { sintoma: "Veo la tabla pero no el botón de capturar", porque: "Ver y capturar son permisos distintos. Esa tabla pide un permiso que su rol no tiene, o la tabla está apagada." },
+      { sintoma: "«No se pudo guardar» y una lista de motivos", porque: "Falta un campo obligatorio, un número no es número, o se eligió una opción que ya no está en la lista. Los motivos vienen todos juntos, no de uno en uno." },
+      { sintoma: "Me dice que lo que elegí «no existe en esta empresa»", porque: "El equipo, la persona o el proveedor que venía seleccionado se dio de baja mientras el formulario estaba abierto. Vuelva a elegirlo." },
+      { sintoma: "No me deja quitar una opción de una lista", porque: "Esa opción ya está capturada en algún renglón, y quitarla dejaría esos renglones con un valor que la lista ya no ofrece. Déjela, o arme una columna nueva." },
+      { sintoma: "No me deja cambiar el tipo de una columna", porque: "No se puede, a propósito. Los valores viven en la columna que corresponde al tipo, así que cambiarlo dejaría invisible todo lo capturado. Agregue una columna nueva del tipo que necesita." },
+      { sintoma: "No me deja crear otra tabla", porque: "Llegó al límite de doce activas. Apague una que ya no use: lo capturado en ella se conserva y se sigue consultando." },
+      { sintoma: "La lista no muestra todos los renglones", porque: "Se traen los mil más recientes. El pie lo dice con el total real; use el filtro para encontrar uno anterior." },
+    ],
+    preguntas: [
+      { pregunta: "¿Esto avisa cuando algo se vence?", respuesta: "Todavía no. Lo que avisa antes de una fecha es «Garantías y vigencias», y ahí ya están garantías, pólizas, fianzas, contratos de servicio, calibraciones, permisos y licencias. Si lo que lleva aquí tiene vencimiento, regístrelo también allá: aquí el seguimiento administrativo, allá el aviso." },
+      { pregunta: "¿Puedo poner aquí los actos y condiciones inseguras?", respuesta: "Se puede, pero no conviene: eso no es un registro sino un proceso corto —hallazgo, responsable, corrección, cierre, estadística— y una tabla propia no tiene estados ni convierte nada en orden de trabajo. Eso ya existe en Rondines, con su categoría de seguridad y su paso a solicitud." },
+      { pregunta: "Si renombro una columna, ¿pierdo lo capturado?", respuesta: "No. Cada columna guarda su propia clave interna, que se fija al crearla y no cambia con el nombre. Renombrar «Litros» a «Litros cargados» cambia el encabezado y nada más." },
+      { pregunta: "¿Puedo agregar una columna a una tabla que ya tiene mil renglones?", respuesta: "Sí, y no le pasa nada a lo capturado. Los renglones anteriores quedan con esa columna vacía, que es lo correcto: nadie la llenó." },
+      { pregunta: "¿Se puede exportar?", respuesta: "Sí, con el mismo botón que el resto de las listas del sistema, y se lleva lo que tiene en pantalla: su filtro, su orden y sus columnas." },
+      { pregunta: "¿Dónde veo los registros de un equipo en particular?", respuesta: "Filtre por él en la tabla. El sistema sabe que esa columna es ese equipo —no un texto parecido—, así que el filtro lo encuentra escrito como sea." },
+    ],
+  },
+  "/registros/nueva": {
+    titulo: "Armar un registro propio",
+    que: "Donde se define una tabla nueva: cómo se llama, para qué es, qué columnas tiene, quién captura y quién la ve.",
+    hacer: [
+      "Arrancar de un formato ya hecho y ajustarlo",
+      "Empezar en blanco cuando ninguno se parece",
+      "Elegir el tipo de cada columna, incluidas las que apuntan a sus datos",
+      "Decidir quién captura y quién ve, que son cosas distintas",
+    ],
+    flujo: [
+      "Arranca en los formatos ya hechos a propósito. Quien empieza en una pantalla vacía suele poner tres columnas de texto y ninguna explicación, y a los dos meses la tabla tiene «Bomba 3», «bomba tres» y «B-3» como si fueran tres equipos. Un formato entrega el caso ya pensado, con las columnas amarradas a los datos de verdad, y se ajusta antes de guardar.",
+      "Cada formato dice POR QUÉ no es un módulo del sistema. Sirve para decidir si lo que quiere llevar va aquí o ya existe en otra pantalla.",
+      "Los tipos de columna vienen en dos grupos. «Datos sueltos» es lo de siempre: texto, cantidad, importe, fecha, sí o no, lista de opciones. «De sus datos de MainTrack» es lo que cambia todo: equipo, refacción, persona, ubicación, sitio, proveedor, centro de costo y orden de trabajo. Esas no guardan texto, guardan el registro.",
+      "La explicación de para qué es la tabla es obligatoria. Es lo que después lee la ayuda y lo que la IA necesita para poder contestar sobre esta tabla.",
+      "Todo se puede cambiar después —el nombre, la explicación, quién captura, quién ve, agregar columnas— menos el tipo de una columna que ya tiene datos.",
+    ],
+    campos: [
+      { nombre: "Cómo se llama", explica: "El nombre que su gente va a usar. De aquí sale la dirección de la pantalla, que después ya no cambia aunque renombre la tabla: así una liga guardada sigue funcionando." },
+      { nombre: "Qué guarda (el tipo de la columna)", explica: "Decide con qué control se captura y qué se puede hacer después: las cantidades y los importes se suman, las fechas se ordenan por fecha de verdad, las listas se agrupan, y las que apuntan a sus datos permiten encontrar el registro desde el equipo o la persona." },
+      { nombre: "Las opciones, una por renglón", explica: "Solo para las listas. Van una por línea y no separadas por coma, porque una opción legítima puede traer coma: «Aceite 15W40, tambo»." },
+    ],
+    noPuedo: [
+      { sintoma: "No me deja guardar y me marca varios errores", porque: "Se muestran todos juntos a propósito: corregir una tabla de doce columnas descubriendo los errores de uno en uno es peor." },
+      { sintoma: "Me dice que dos columnas se llaman igual", porque: "Por dentro se convierten en la misma clave —«Litros» y «litros» son la misma— y una se comería a la otra." },
+      { sintoma: "Me pide al menos dos opciones en una lista", porque: "Una lista de una sola opción no es una lista: eso es un valor fijo y no hace falta capturarlo." },
+    ],
+    preguntas: [
+      { pregunta: "¿Qué gano con que una columna sea «Equipo» en vez de texto?", respuesta: "Que es el equipo. Se elige con buscador en vez de escribirlo, nadie lo escribe de tres formas distintas, y el registro se puede encontrar desde ese equipo. Escrito a mano es una cadena de texto que se parece al nombre del equipo." },
+      { pregunta: "¿Puedo cambiar las columnas después?", respuesta: "Puede renombrarlas, hacerlas obligatorias o no, cambiar su orden, agregar nuevas y apagar las que ya no usa. Lo único que no cambia es el tipo de una que ya tiene datos." },
+    ],
+  },
+  "/normas": {
+    titulo: "Cumplimiento normativo",
+    que: "Las normas que su empresa debe cumplir, y con qué las está cumpliendo. No es un módulo aparte del trabajo: es el índice que dice qué plan, qué documento y qué registro de los que ya tiene responden a cada obligación, y si están al corriente.",
+    hacer: [
+      "Elegir las normas que le aplican, de las que le proponemos por su giro",
+      "Dar de alta una norma propia: un requisito de su corporativo o de su cliente",
+      "Decir con qué se cumple cada obligación, amarrándola a lo que ya existe",
+      "Marcar lo que no le aplica, con su razón",
+      "Colgarle a la norma su publicación oficial, su guía o el manual del que depende: archivos y enlaces",
+      "Sacar el expediente de una norma para una inspección",
+    ],
+    flujo: [
+      "La idea de fondo: una obligación periódica ES un plan de mantenimiento; un dictamen que vence ES una vigencia; un dato de laboratorio ES un registro propio. El sistema ya sabe hacer todo eso. Lo que este módulo agrega es saber cuál responde a cuál, y avisar si se atrasó.",
+      "Por eso la evidencia no se inventa: sale del trabajo que de verdad se hizo. La orden se generó sola, se asignó, se cerró con foto y con fecha. Nadie palomeó una lista — y eso es lo que la hace valer en una inspección.",
+      "El catálogo lo redactamos nosotros y NO lo revisó un especialista: le da el punto de partida, con las obligaciones ya desglosadas. Quien confirma que esas obligaciones son las que le aplican a SU instalación es su especialista, y su firma queda con nombre, puesto y fecha — en la pantalla y en el expediente impreso. Es la firma que un inspector quiere ver: no qué software armó la lista, sino quién responde por ella.",
+      "Hay dos clases de norma y NO prometen lo mismo. Las del catálogo las mantenemos nosotros y le avisamos cuando cambian. Las que usted da de alta no las actualiza nadie: si el requisito cambia, hay que cambiarlo aquí. Va marcado en la lista.",
+      "Una obligación sin nada amarrado NO se cuenta como incumplida ni como cumplida: dice «sin respaldo». El sistema no tiene con qué opinar, y contarla de cualquiera de los dos lados sería inventar.",
+      "Una obligación puede tener VARIOS respaldos a la vez —un rondín, un documento y un registro propio—, y entonces los tres tienen que estar al corriente para que se vea verde. Si algo es una alternativa que usted no usa, no lo amarre: el estado toma el peor de lo que encuentre.",
+      "Los documentos de la norma contestan «¿de dónde salió esto?». Lo que traiga la asistencia con IA queda marcado con un aviso: el modelo puede dar por vigente una versión derogada con la misma seguridad con que da la vigente, y quien decide si el documento sirve es usted. La publicación en el Diario Oficial es la única que manda.",
+      "Cuando una obligación tiene varios respaldos, manda el peor. Si una de sus tres plantas trae el plan vencido, la obligación no está al corriente: lo contrario sería una máquina de presumir cumplimiento.",
+      "No verá ningún porcentaje de cumplimiento. Un «87% cumplido» es una cifra que se ve seria, que nadie puede reproducir y que se acaba presumiendo en una junta. Lo que verá son conteos, que sí se pueden verificar uno por uno.",
+      "Cada norma dice lo que pide y que aquí NO se lleva. Eso está a propósito: el peor servicio sería dejarle creer que con esto ya cumplió todo.",
+      "El expediente saca lo real del periodo: las órdenes cerradas con su evidencia, los documentos con su vigencia y los registros capturados. Y al final dice qué quedó sin respaldo — mejor que lo descubra ahí que enfrente del inspector.",
+      "Si su empresa está certificada, el código de su formato impreso se configura en Ajustes, en «Órdenes», y aparece al pie de cada orden. Eso NO depende de este módulo: le sirve aunque no lo contrate.",
+    ],
+    botones: [
+      { nombre: "Seguir (en el catálogo)", explica: "Agrega esa norma a su lista, con todas sus obligaciones. No crea ningún plan ni documento: usted decide después con qué cumple cada una." },
+      { nombre: "Agregar una norma propia", explica: "Para un requisito que no está en el catálogo. Usted define sus obligaciones y de qué tipo es cada una." },
+      { nombre: "Registrar quién la revisó", explica: "La firma de su especialista: nombre, puesto o cédula, y la fecha que pone el sistema. Puede ser alguien externo, no necesita cuenta. Mientras nadie firme, la pantalla y el expediente dicen que el contenido está sin confirmar — y eso es a propósito." },
+      { nombre: "Agregar enlace", explica: "Guarda la liga al sitio oficial de la norma junto a ella. Lo que traiga la asistencia con IA queda marcado con un aviso: a usted le toca confirmar que sea la versión vigente." },
+      { nombre: "Leer con IA", explica: "Lee el PDF que usted colgó y propone lo que esa norma exige, cada obligación con la cita textual del renglón que la sustenta. No usa lo que el modelo recuerde de la norma: si no puede citar, no propone. Nada se agrega solo — usted aprueba renglón por renglón." },
+      { nombre: "Decir con qué se cumple", explica: "Amarra un plan, un documento, un registro propio, un rondín o una orden a esa obligación. Puede amarrar varios." },
+      { nombre: "No nos aplica", explica: "Pide la razón, y la guarda con fecha. En una inspección preguntan por qué NO tiene algo, y tenerlo escrito es la respuesta." },
+      { nombre: "Expediente", explica: "La evidencia del periodo, lista para imprimir: trabajo realizado, documentos, registros y lo que quedó sin respaldo." },
+      { nombre: "Actualizar desde el catálogo", explica: "Aparece cuando la norma cambió. Solo agrega lo que falta: no borra ni pisa lo que usted ya amarró." },
+    ],
+    campos: [
+      { nombre: "Sin respaldo", explica: "No es incumplimiento: es que nada del sistema está amarrado a esa obligación. Puede que se cumpla por fuera; si es así, conviene registrarlo aquí." },
+      { nombre: "Del catálogo / Propia", explica: "Quién la mantiene. Del catálogo: nosotros, y le avisamos si cambia. Propia: usted, y nadie le va a avisar." },
+      { nombre: "Cambió", explica: "El catálogo va en una versión más nueva que la que usted adoptó. Al actualizar se agregan las obligaciones nuevas sin tocar su trabajo." },
+      { nombre: "Cada cuántos días", explica: "El periodo con el que se mide si está al corriente. Sin periodo, basta con que exista el respaldo." },
+    ],
+    noPuedo: [
+      { sintoma: "No veo «Cumplimiento normativo» en el menú", porque: "Se contrata aparte y su cuenta no lo tiene activo. No es un permiso que falte." },
+      { sintoma: "Veo las normas pero no puedo amarrar nada", porque: "Decidir a qué se obliga la empresa es configuración: hace falta permiso de Ajustes. Consultar sí puede." },
+      { sintoma: "No me deja marcar algo como «no aplica»", porque: "Falta la razón. Un hueco sin explicar no sirve de nada en una inspección; uno explicado y fechado sí." },
+      { sintoma: "Al amarrar me dice que eso «no existe en esta empresa»", porque: "El plan o el documento que eligió se borró mientras tenía la pantalla abierta. Vuelva a elegir." },
+      { sintoma: "Una obligación sigue en rojo aunque acabo de cerrar la orden", porque: "Lo que se mide es el plan, no la última orden: si el plan quedó vencido o apagado, la obligación lo refleja. Revise la próxima fecha del plan." },
+      { sintoma: "Amarré el plan correcto y aun así aparece vencida", porque: "Manda el peor de los respaldos. Si hay otro plan amarrado que sí está vencido, ese decide. Quite lo que no corresponda." },
+    ],
+    preguntas: [
+      { pregunta: "¿Esto garantiza que cumplo con la ley?", respuesta: "No, y es importante que quede claro: le ayuda a organizar y conservar la evidencia de lo que su empresa hace. Si cumple o no lo determina la autoridad o su especialista en seguridad e higiene." },
+      { pregunta: "¿El contenido de las normas está verificado?", respuesta: "Mientras la pantalla lo diga, está en revisión. Úselo para organizarse y confírmelo con su especialista antes de darlo por definitivo." },
+      { pregunta: "¿Puedo llevar un requisito de mi cliente o de mi corporativo?", respuesta: "Sí, con «Agregar una norma propia». Es el caso de una maquila con matriz afuera o de una planta automotriz: se auditan igual de duro y la evidencia sale del mismo lugar." },
+      { pregunta: "¿Qué pasa si borro el plan que tenía amarrado?", respuesta: "El respaldo se va con él y la obligación vuelve a «sin respaldo». Es a propósito: seguir contándola como cumplida cuando su plan ya no existe sería la peor mentira posible aquí." },
+      { pregunta: "¿Puedo amarrar la misma obligación a varias cosas?", respuesta: "Sí. «Revisar extintores cada mes» pueden ser tres planes si tiene tres sitios. Pero recuerde que manda el peor: amarre solo lo que de verdad sostiene esa obligación." },
+      { pregunta: "¿Dónde sale la norma en la orden impresa?", respuesta: "Al pie, junto al código de su formato. La orden hereda las normas del plan que la generó, y también se le puede amarrar una directamente." },
+    ],
+  },
+  "/normas/nueva": {
+    titulo: "Agregar una norma propia",
+    que: "Dar de alta un requisito que no está en nuestro catálogo: el estándar de su corporativo, lo que exige su cliente, o una norma que todavía no hemos incluido.",
+    hacer: [
+      "Ponerle la clave con la que su gente la nombra",
+      "Desglosar qué exige, una obligación por renglón",
+      "Elegir de qué tipo es cada una, que decide con qué se cumple",
+    ],
+    flujo: [
+      "Lo primero que verá es lo que NO se promete: una norma propia no la actualiza nadie. Si el requisito cambia, hay que cambiarlo aquí a mano.",
+      "El tipo de cada obligación es la decisión importante, porque decide con qué pieza del sistema se cumple y cómo se mide: lo que se hace cada cierto tiempo es una actividad y se cumple con un plan; lo que vence es un documento y se cumple con una vigencia; lo que se anota es un dato y se cumple con un registro propio.",
+      "La clave es lo que va a ver en la lista y lo que aparece al pie de la orden impresa. Conviene que sea la que usa su gente: «COR-14» y no «Estándar corporativo número catorce».",
+    ],
+    noPuedo: [
+      { sintoma: "No me deja guardar sin obligaciones", porque: "Una norma sin obligaciones no tiene nada que seguir: no habría qué amarrar ni qué medir." },
+      { sintoma: "Me dice que la clave ya existe", porque: "Ya tiene una norma con esa clave. Use otra o edite la que ya tiene." },
+    ],
+  },
+  "/inventory/herramientas": {
+    titulo: "Herramientas",
+    que: "Lo que sale del almacén y regresa: quién la tiene, desde cuándo, en qué estado salió y en qué estado volvió. Y cuando algo no vuelve, cuánto costó y a quién se le quedó.",
+    hacer: [
+      "Prestar una herramienta a alguien, con su propósito y su estado de salida",
+      "Recibirla de vuelta, anotando cómo regresó",
+      "Dar de baja lo que se perdió, se rompió o terminó su vida útil",
+      "Ver quién trae qué, y qué lleva demasiado tiempo fuera",
+      "Ver qué se está perdiendo y cuánto cuesta (solo quien ve costos)",
+    ],
+    flujo: [
+      "Una herramienta NO es una refacción, y por eso se comporta distinto: una refacción se consume —sale y no vuelve— y una herramienta sale y regresa. Se da de alta en el mismo catálogo del almacén, marcándola como «Herramienta» en vez de «Refacción».",
+      "Prestar NO descuenta la existencia. La herramienta sigue siendo de la empresa, así que «Tiene» no baja; lo que baja es lo libre. Suena raro la primera vez y es a propósito: si el préstamo descontara existencia tendría que pasar por el kardex, y entonces cada devolución entraría como si fuera una compra y ensuciaría el costo promedio de todo el almacén.",
+      "Dar de baja SÍ descuenta, y sí entra al kardex con su costo. Ese es el único momento en que la herramienta deja de existir, y de ahí sale el reporte de lo que se pierde.",
+      "El estado de salida no es un adorno: es lo único que después permite decir que algo regresó peor de como se fue. Sin él es la palabra de uno contra la del otro.",
+      "Cada almacén decide cómo entrega. «Con almacenista» exige registrar quién la entregó, así que quedan los dos en el registro. «Autoservicio» la registra quien se la lleva, sin segunda firma —es el carrito de dados junto al torno—. Se configura en Catálogos, en Almacenes.",
+      "El problema real del autoservicio no es la salida, que se registra sola porque la persona quiere la herramienta: es la devolución que nadie confirma. Por eso lo que lleva más de 15 días fuera le llega al responsable del almacén, y por eso conviene conciliar con un conteo físico de vez en cuando.",
+      "Lo que se perdió se cuenta por persona, pero SOLO lo que se le atribuye: perdida o dañada. El fin de vida útil y lo que dejó de usarse se informan aparte y no se le cargan a nadie. Meter ahí una herramienta que duró ocho años sería acusar a alguien del desgaste normal, y un reporte que acusa mal deja de usarse a la segunda vez.",
+    ],
+    botones: [
+      { nombre: "Prestar", explica: "Registra que alguien se lleva una herramienta. Pide para quién, de qué almacén, cuántas, cómo sale y para qué." },
+      { nombre: "Devolver", explica: "La herramienta volvió. Pregunta cómo regresó y lo compara con cómo salió." },
+      { nombre: "No volvió", explica: "Da de baja lo que se perdió o se rompió. Dice antes de guardar si va a contar como pérdida de esa persona o como desgaste." },
+      { nombre: "Qué se está perdiendo", explica: "El reporte por persona, con el costo real del almacén. Solo para quien ve costos." },
+    ],
+    campos: [
+      { nombre: "Tiene", explica: "Lo que la empresa posee. No baja al prestar: baja solo cuando algo se da de baja." },
+      { nombre: "Prestadas", explica: "Lo que está fuera ahora mismo. La suma de lo que trae la gente." },
+      { nombre: "Libres", explica: "Lo que se puede prestar hoy: lo que tiene menos lo prestado. Es el número que decide si alcanza." },
+      { nombre: "Se tardaron", explica: "Lo que lleva más de 15 días fuera. No significa que se haya perdido: significa que hay que ir a preguntar." },
+      { nombre: "Cómo sale / cómo regresó", explica: "Nueva, buena, usada o para reparar. Comparados, detectan el maltrato; por separado no dicen nada." },
+    ],
+    noPuedo: [
+      { sintoma: "No encuentro la herramienta al prestar", porque: "Solo se ofrecen las que tienen piezas libres. Si está toda prestada, no aparece: vea quién la trae en «Quién trae qué»." },
+      { sintoma: "Me dice que está dada de alta como refacción", porque: "Una refacción se consume y no se presta. Cámbiela a «Herramienta» en su ficha del almacén." },
+      { sintoma: "Me pide quién la entregó", porque: "Ese almacén entrega con almacenista. Si es un carrito de autoservicio, márquelo así en Catálogos → Almacenes." },
+      { sintoma: "Dice que alguien tomó la última mientras registraba", porque: "Dos personas pidieron la misma pieza al mismo tiempo y una ganó. Vuelva a intentar: es preferible eso a que dos se lleven la misma." },
+      { sintoma: "La existencia no bajó después de prestar", porque: "Es correcto y es el diseño: prestar mueve posesión, no valor. Lo que bajó es lo libre." },
+      { sintoma: "Una baja no aparece en el reporte de pérdidas", porque: "Se registró como fin de vida útil o como que ya no se usa, y eso no se le atribuye a nadie. Aparece arriba, como desgaste." },
+    ],
+    preguntas: [
+      { pregunta: "¿Por qué no baja la existencia al prestar?", respuesta: "Porque la herramienta sigue siendo suya. Si bajara, el préstamo tendría que pasar por el kardex y cada devolución entraría como una compra: el costo promedio de todo su almacén dejaría de ser confiable en una semana." },
+      { pregunta: "¿Cómo sé de dónde sale el costo de lo perdido?", respuesta: "Del costo promedio del almacén, el mismo que usa el kardex. No es una estimación: cada renglón corresponde a una baja registrada con su fecha y quién la autorizó, y se puede revisar en la bitácora." },
+      { pregunta: "¿Puedo llevar herramientas con número de serie, una por una?", respuesta: "Todavía no. Hoy se llevan por cantidad. Si una herramienta es cara y vale la pena individualizarla, por ahora conviene darla de alta como un activo, donde ya tiene expediente, QR y calibración." },
+      { pregunta: "¿Y las cajas de herramienta completas?", respuesta: "Todavía no se arman kits. Por ahora se prestan pieza por pieza." },
+      { pregunta: "¿Qué pasa si alguien se va de la empresa con herramienta?", respuesta: "Aparece en «Quién trae qué» mientras no se cierre. Ciérrelo con «No volvió» y el motivo que corresponda: así queda el costo y no se queda abierto para siempre." },
+    ],
+  },
+  "/inventory/herramientas/perdidas": {
+    titulo: "Qué se está perdiendo",
+    que: "La herramienta que se dio de baja por pérdida o daño, con su costo y quién la traía.",
+    hacer: ["Ver a quién se le pierde y cuánto cuesta", "Ver qué herramienta es la que más se pierde"],
+    flujo: [
+      "Cuenta solo lo que se le atribuye a quien la traía: perdida o dañada. El fin de vida útil y lo que dejó de usarse van aparte, arriba, y NO se le cargan a nadie.",
+      "El costo es el costo promedio del almacén, el mismo del kardex. Cada renglón es una baja registrada con fecha y responsable, así que el número se puede defender renglón por renglón — que es justo lo que hace falta cuando se va a hablar con alguien de esto.",
+      "Es un reporte que nombra personas y les pone una cifra al lado. Solo lo ve quien ve costos de almacén.",
+    ],
+    preguntas: [
+      { pregunta: "¿Sirve para descontarle a alguien?", respuesta: "Eso es una decisión suya y de recursos humanos, no del sistema. Lo que el sistema le da es el dato, con su respaldo: qué se perdió, cuándo, cuánto costó y quién lo traía." },
+    ],
+  },
+  "/inventory/herramientas/cajas": {
+    titulo: "Cajas de herramienta",
+    que: "Grupos de herramienta que salen y regresan juntos: la caja del mecánico, la del eléctrico. Se prestan de un golpe y, al volver, se marca pieza por pieza qué regresó.",
+    hacer: [
+      "Armar una caja con lo que trae: herramienta del almacén y unidades con número de serie",
+      "Prestarla completa a una persona",
+      "Recibirla marcando qué regresó y qué no",
+      "Apagar una caja que ya no se usa, sin borrar su historia",
+    ],
+    flujo: [
+      "Una caja existe por UNA razón: ver qué falta cuando vuelve incompleta. Prestar pieza por pieza ya se podía; lo que no se podía era saber que de las catorce llaves regresaron trece.",
+      "Por dentro no hay un «préstamo de caja»: cada pieza sale como su propio resguardo y comparten una misma salida. Por eso una llave que se perdió entra al reporte de pérdidas igual que cualquier otra herramienta, sin nada especial.",
+      "Si al salir falta una pieza —está prestada, no hay disponible—, la caja SALE con lo demás y se le dice cuál no pudo llevarse y por qué. Negarla entera dejaría al técnico sin nada, que es peor que salir con trece de catorce sabiéndolo.",
+      "Al recibirla se marca qué regresó. Lo que no vuelve sigue abierto a nombre de quien lo trae: se puede ir a buscar, o darse de baja desde Herramientas como cualquier pérdida.",
+      "Puede mezclar lo del almacén —que va por cantidad— con unidades que tienen número de serie, que son piezas únicas.",
+    ],
+    botones: [
+      { nombre: "Armar una caja", explica: "Le pone clave y nombre, y se eligen las piezas que trae. La clave es corta y estable: CAJA-MEC." },
+      { nombre: "Prestar", explica: "Saca la caja completa a nombre de una persona. Si algo no está, avisa cuál y sale con el resto." },
+      { nombre: "Recibir", explica: "Marca pieza por pieza qué regresó. Lo que no marque se queda fuera, a nombre de quien la trae." },
+    ],
+    campos: [
+      { nombre: "Regresó incompleta", explica: "Volvieron algunas piezas y otras no. La caja sigue contando como fuera mientras le falte algo." },
+      { nombre: "Días fuera", explica: "Desde que salió. Pasando quince, conviene ir a preguntar." },
+    ],
+    noPuedo: [
+      { sintoma: "No puedo armar una caja", porque: "Antes hace falta tener herramienta en el catálogo: se da de alta en Almacén marcándola como «Herramienta», o como un equipo con «se presta»." },
+      { sintoma: "La caja salió con menos piezas de las que trae", porque: "Alguna estaba prestada o no había disponible. El aviso dice cuál y por qué; el resto sí salió." },
+      { sintoma: "Recibí la caja pero sigue apareciendo fuera", porque: "Le falta alguna pieza por regresar. Búsquela, o dé de baja lo que no volvió desde Herramientas." },
+    ],
+    preguntas: [
+      { pregunta: "¿Para qué sirve una caja si puedo prestar pieza por pieza?", respuesta: "Para dos cosas: sacar catorce piezas con un clic en vez de catorce, y sobre todo para saber qué falta cuando vuelve. Sin caja, nadie lleva la cuenta de que el martillo no regresó." },
+      { pregunta: "¿Qué pasa con lo que no regresa?", respuesta: "Sigue abierto a nombre de quien lo trae, como si se lo hubiera llevado suelto. Se le da de baja desde Herramientas con su motivo, y si fue pérdida entra al reporte de lo que se pierde." },
+    ],
+  },
 };
 
 /**
@@ -1475,6 +2156,9 @@ export const SIN_AYUDA = [
   // y la propia pantalla explica lo unico que hay que saber.
   "/restablecer",
   "/work-orders/[id]/print",
+  // El expediente es una SALIDA para imprimir y entregar, no una pantalla con
+  // la que se interactua: lo que hay que saber de el se explica en /normas.
+  "/normas/[clave]/expediente",
   "/billing/[id]/print",
   "/requests/puntos/imprimir",
   "/clients/cobranza",

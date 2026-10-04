@@ -13,6 +13,11 @@ const schema = z.object({
   iaComplemento: z.boolean().optional(),
   /// Operaciones de IA sueltas para el periodo en curso.
   iaExtra: z.coerce.number().int().min(0).max(10_000).optional(),
+  /// «Registros propios»: se activa cuando el cliente lo contrata. Es lo
+  /// unico que hace alcanzable el modulo, asi que vive donde se cobra.
+  registrosPropios: z.boolean().optional(),
+  /// «Cumplimiento normativo»: el otro que se cobra aparte.
+  cumplimientoNormas: z.boolean().optional(),
 });
 
 /** Cambio de plan o suspension de una empresa cliente. */
@@ -21,7 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { error, user } = await requireSuperAdmin();
   if (error) return error;
 
-  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true, name: true } });
+  const org = await prisma.organization.findUnique({ where: { id }, select: { id: true, name: true, esDemo: true, plan: true } });
   if (!org) return fail("Empresa no encontrada", 404);
 
   if (id === user.organizacionPropia.id) {
@@ -29,10 +34,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const input = schema.parse(await request.json());
+  // La demo no se suspende ni se cancela por cobranza: no tiene cargos (Bloque 7).
+  if (org.esDemo && (input.status === "SUSPENDED" || input.status === "CANCELLED")) {
+    return fail("La empresa demostrativa no se suspende ni se cancela; si ya no se usa, avísele a quien administra la plataforma.", 409);
+  }
+  /*
+   * Al dejarla ACTIVA se borra la fecha de prueba.
+   *
+   * Mientras el estado no sea TRIAL esa fecha no hace nada, asi que es
+   * tentador dejarla. Pero es un dato que miente esperando: el dia que alguien
+   * vuelva a poner la cuenta en prueba heredaria una fecha ya vencida y la
+   * cuenta quedaria en solo lectura de inmediato, sin que nadie entienda por
+   * que. Se limpia donde se causa.
+   */
+  const datos = input.status === "ACTIVE" ? { ...input, trialEndsAt: null } : input;
+
   const actualizada = await prisma.organization.update({
     where: { id },
-    data: input,
-    select: { id: true, name: true, plan: true, status: true },
+    data: datos,
+    select: { id: true, name: true, plan: true, status: true, trialEndsAt: true },
   });
 
   await logAudit({
@@ -41,7 +61,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     entity: "Organization",
     entityId: id,
     action: "CLIENT_UPDATED",
-    summary: `${org.name}: ${JSON.stringify(input)}`,
+    // El cambio de plan surte efecto hoy: queda la fecha para cuadrar la siguiente nota de cobro.
+    summary: input.plan && input.plan !== org.plan
+      ? `${org.name}: plan ${org.plan} → ${input.plan}, efectivo el ${new Date().toLocaleDateString("es-MX", { timeZone: "America/Monterrey" })}`
+      : `${org.name}: ${JSON.stringify(input)}`,
+    changes: { ...input, efectivoEl: new Date().toISOString() },
   });
 
   return ok({ organization: actualizada });

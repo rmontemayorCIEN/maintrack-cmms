@@ -15,6 +15,7 @@ export type Permission =
   | "purchase:authorize"
   | "purchase:receive"
   | "predictive:write"
+  | "vigencia:write"
   | "settings:write"
   | "user:manage"
   | "billing:manage"
@@ -44,6 +45,11 @@ const MATRIX: Record<Permission, string[]> = {
   "purchase:authorize": ["OWNER", "ADMIN"],
   "purchase:receive": ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN", "COMPRAS"],
   "predictive:write": ["OWNER", "ADMIN", "SUPERVISOR"],
+  // Una garantia, una poliza o un contrato los captura quien los tiene en la
+  // mano —administracion, o supervision cuando llega el equipo nuevo—, no
+  // quien ejecuta el trabajo. Verlas si es de todos los que ven la pantalla:
+  // el tecnico necesita saber que el equipo esta cubierto antes de abrirlo.
+  "vigencia:write": ["OWNER", "ADMIN", "SUPERVISOR"],
   "settings:write": ["OWNER", "ADMIN"],
   "user:manage": ["OWNER", "ADMIN"],
   "billing:manage": ["OWNER"],

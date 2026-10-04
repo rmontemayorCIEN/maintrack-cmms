@@ -7,6 +7,7 @@ import { AdjuntosRefaccion } from "./adjuntos-refaccion";
 import { EquivalenciasRefaccion } from "./equivalencias-refaccion";
 import { MovementForm } from "./movement-form";
 import { PartDialog } from "./part-dialog";
+import Link from "next/link";
 
 type Adjunto = {
   id: string; name: string; kind: string; size: number;
@@ -21,6 +22,8 @@ export type FilaRefaccion = {
   quantityOnHand: number; minQuantity: number; maxQuantity: number;
   /** Folios de compras abiertas que ya traen esta refaccion en camino. */
   enCompra?: string[];
+  /** Las compras ya colocadas que traen esta refaccion, para ir a recibirlas. */
+  comprasPorRecibir?: Array<{ id: string; folio: string }>;
   bin: string | null; supplierId: string | null; proveedor: string | null;
   moneda: string;
   adjuntos: Adjunto[]; enlaces: Enlace[];
@@ -63,40 +66,18 @@ export function TablaRefacciones({
   const FIJAS: Columna<FilaRefaccion>[] = [
     {
       id: "code", etiqueta: "Código", texto: (p) => p.code,
-      /*
-        La clave abre la ficha de la refaccion.
-        Una clave subrayada se entiende sola —se toca y entra al detalle— y le
-        quita un control al renglon. El boton de "Editar" al final ocupaba
-        ancho y terminaba encimado sobre el campo de cantidad.
-      */
-      pinta: (p) =>
-        editable ? (
-          <PartDialog
-            suppliers={suppliers}
-            familias={familias}
-            unidades={unidades}
-            puedeGestionarCatalogos={puedeGestionarCatalogos}
-            refaccion={{
-              id: p.id, code: p.code, name: p.name,
-              description: p.description, category: p.category,
-              unit: p.unit, unitCost: p.unitCost,
-              minQuantity: p.minQuantity, maxQuantity: p.maxQuantity,
-              bin: p.bin, supplierId: p.supplierId,
-            }}
-            disparador={(abrir) => (
-              <button
-                type="button"
-                onClick={abrir}
-                title={`Ver y editar ${p.code}`}
-                className="whitespace-nowrap text-left font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
-              >
-                {p.code}
-              </button>
-            )}
-          />
-        ) : (
-          <span className="whitespace-nowrap font-medium text-slate-700">{p.code}</span>
-        ),
+      /* La clave abre el expediente de la refacción: existencia por almacén,
+         kardex, en qué equipos se ha ido, compras y equivalentes. Editar vive
+         ahí dentro, que es donde se ve lo que se va a cambiar. */
+      pinta: (p) => (
+        <Link
+          href={`/inventory/${p.id}`}
+          title={`Abrir ${p.code}`}
+          className="whitespace-nowrap font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-800 hover:decoration-brand-600"
+        >
+          {p.code}
+        </Link>
+      ),
     },
     {
       id: "name", etiqueta: "Refacción",
@@ -166,8 +147,8 @@ export function TablaRefacciones({
           ? <Badge tone="danger">Agotada</Badge>
           : bajoMinimo(p) ? <Badge tone="warning">Bajo mínimo</Badge> : <Badge tone="success">Surtida</Badge>,
     },
-    { id: "costoUnit", etiqueta: "Costo unit.", alineaDerecha: true, texto: (p) => formatCurrency(p.unitCost, p.moneda) },
-    { id: "valor", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.quantityOnHand * p.unitCost, p.moneda) },
+    { id: "costoUnit", etiqueta: "Costo unit.", alineaDerecha: true, texto: (p) => formatCurrency(p.unitCost, p.moneda), ordenPor: (p) => p.unitCost },
+    { id: "valor", etiqueta: "Valor en piso", alineaDerecha: true, texto: (p) => formatCurrency(p.quantityOnHand * p.unitCost, p.moneda), ordenPor: (p) => p.quantityOnHand * p.unitCost },
     { id: "minimo", etiqueta: "Mínimo", alineaDerecha: true, texto: (p) => formatNumber(p.minQuantity, 0) },
     { id: "maximo", etiqueta: "Máximo", alineaDerecha: true, texto: (p) => formatNumber(p.maxQuantity, 0) },
     { id: "unidad", etiqueta: "Unidad", agrupable: true, texto: (p) => p.unit },
@@ -185,11 +166,12 @@ export function TablaRefacciones({
       deFabrica={DE_FABRICA}
       vistaInicial={vistaInicial}
       clave="refacciones"
+      paso={{ base: "/inventory", etiqueta: (r) => `${r.code} · ${r.name}` }}
       sustantivo="refacciones"
       ejemploFiltro='Filtrar: "balero", "agotada", "filtro"…'
       // Solo el movimiento rapido: la ficha se abre desde la clave.
       acciones={editable ? (p) => (
-        <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} />
+        <MovementForm partId={p.id} unit={p.unit} warehouseId={warehouseId} compras={p.comprasPorRecibir ?? []} />
       ) : undefined}
     />
   );

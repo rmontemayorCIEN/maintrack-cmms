@@ -40,10 +40,24 @@ export type Movimiento = {
   goodsReceiptId?: string | null;
   /// A quien se le entrego fisicamente. Solo aplica en salidas y devoluciones.
   entregadoA?: string | null;
+  /// Por que entro o se ajusto, del catalogo de `lib/motivos-movimiento.ts`.
+  /// Solo lo piden las entradas y los ajustes: lo demas ya trae su documento.
+  motivo?: string | null;
   userId?: string | null;
 };
 
-export class ErrorDeAlmacen extends Error {}
+/**
+ * Lo que el almacen rechaza por regla de negocio, no por falla del sistema.
+ *
+ * Llevaba el 409 implicito y terminaba contestando 500 —«error inesperado»—
+ * cuando alguien perdia la carrera por la ultima pieza. El dato quedaba bien,
+ * pero a la persona se le decia que el sistema se habia roto en vez de «otro
+ * la tomo primero, vuelva a intentar». 409 es exactamente eso: el registro ya
+ * cambio.
+ */
+export class ErrorDeAlmacen extends Error {
+  constructor(mensaje: string, readonly codigo = 409) { super(mensaje); }
+}
 
 type Cliente = PrismaClient | Prisma.TransactionClient;
 
@@ -144,6 +158,7 @@ export async function aplicarMovimiento(m: Movimiento, tx?: Cliente): Promise<nu
       materialRequestId: m.materialRequestId ?? null,
       goodsReceiptId: m.goodsReceiptId ?? null,
       entregadoA: m.entregadoA ?? null,
+      motivo: m.motivo ?? null,
       userId: m.userId ?? null,
       movementType: m.tipo,
       quantity: cantidad,

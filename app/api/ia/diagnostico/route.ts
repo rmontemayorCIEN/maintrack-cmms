@@ -1,6 +1,6 @@
 import { fail, ok, withAuth } from "@/lib/api";
 import { generarDiagnostico } from "@/lib/ia/diagnostico";
-import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
+import { IaNoConfigurada, iaConfigurada, motivoLegible } from "@/lib/ia/cliente";
 import { logAudit } from "@/lib/audit";
 
 export const maxDuration = 300;
@@ -35,7 +35,7 @@ export async function POST() {
       return ok({ id: r.reporte.id }, 201);
     } catch (error) {
       if (error instanceof IaNoConfigurada) return fail(error.message, 503);
-      const mensaje = error instanceof Error ? error.message : "No fue posible generar el diagnóstico";
+      const mensaje = motivoLegible(error);
       return fail(mensaje, 502);
     }
   });

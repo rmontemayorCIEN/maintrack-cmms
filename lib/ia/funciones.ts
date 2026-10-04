@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN" | "NORMA_DOCUMENTO";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -20,7 +20,65 @@ export type DefinicionFuncionIA = {
   disponible: boolean;
 };
 
+/**
+ * Las que tienen bolsa propia y NO gastan la del plan.
+ *
+ * Las dos son de uso cotidiano y baratas, y las dos dejarian de usarse si
+ * compitieran con el trabajo: nadie pregunta como se usa el sistema si eso le
+ * quita un levantamiento, ni escucha el parte del dia si eso le quita un
+ * diagnostico. Lo que la bolsa del plan raciona es lo caro y lo puntual.
+ *
+ * Quien agregue una funcion aqui tiene que darle su cupo en los dos planes
+ * (`lib/planes.ts`) y su caso en `puedeUsarIa`, o se quedara sin limite.
+ */
+export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO", "NAVEGAR"] as const;
+
+/**
+ * Las funciones con bolsa propia, como tipo.
+ *
+ * Sale de la lista de arriba a proposito, y no es un detalle de estilo: con
+ * esto `lib/planes.ts` esta OBLIGADO a darle cupo a cada una en los dos
+ * planes, porque el tipo del mapa de bolsas se deriva de aqui. Antes eran dos
+ * campos sueltos —`operacionesAyuda`, `operacionesBrief`— y agregar una
+ * tercera sin su cupo compilaba: quedaba sin limite ninguno y nadie se
+ * enteraba hasta la factura.
+ */
+export type ClaveConBolsa = (typeof CON_BOLSA_PROPIA)[number];
+
+/** Si esta funcion se raciona aparte y NO toca la bolsa del plan. */
+export function tieneBolsaPropia(clave: string): clave is ClaveConBolsa {
+  return (CON_BOLSA_PROPIA as readonly string[]).includes(clave);
+}
+
 export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
+  RONDIN: {
+    nombre: "Revisar las fotos del rondín",
+    descripcion:
+      "Mira las fotos del recorrido por la planta y señala lo que un jefe de mantenimiento notaría al pasar: fugas, guardas faltantes, pasillos obstruidos, deterioro. Propone; nada se crea solo, y cada hallazgo dice en qué se basa para que usted lo pueda contradecir mirando la foto.",
+    operaciones: 2,
+    disponible: true,
+  },
+  NAVEGAR: {
+    nombre: "Navegar hablando",
+    descripcion:
+      "Decir a dónde quiere ir y que el sistema lo lleve: «llévame a las órdenes vencidas», «ábreme el almacén», «enséñame la bomba 3». Lo que se dice se interpreta con reglas, no con el modelo: es instantáneo y solo cuesta oír.",
+    operaciones: 1,
+    disponible: true,
+  },
+  DICTADO: {
+    nombre: "Dictado del técnico",
+    descripcion:
+      "El técnico cierra la orden hablándole al teléfono, en el piso y con las manos sucias, en vez de escribir. Lo que dicta se transcribe y queda en el texto del cierre, que es de donde sale todo lo demás.",
+    operaciones: 1,
+    disponible: true,
+  },
+  BRIEF: {
+    nombre: "Brief del día, para escuchar",
+    descripcion:
+      "Lo que la dirección necesita saber hoy, contado como lo diría una persona, para oírlo en el camino. Las cifras las calcula el sistema; la IA solo las hilvana, y se verifica que no haya agregado ninguna.",
+    operaciones: 1,
+    disponible: true,
+  },
   DIAGNOSTICO: {
     nombre: "Diagnóstico semanal",
     descripcion:
@@ -54,6 +112,15 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     descripcion:
       "Entrevista sobre la instalación y propone el inventario de activos completo, agrupado por sistema, listo para revisar y dar de alta.",
     operaciones: 3,
+    disponible: true,
+  },
+  NORMA_DOCUMENTO: {
+    nombre: "Lectura del documento de una norma",
+    descripcion:
+      "Lee el PDF que el cliente colgo de una norma —su publicacion oficial o su guia— y propone lo que exige, cada obligacion con la cita textual del renglon que la sustenta. No usa lo que el modelo recuerde de la norma: si no puede citar, no propone.",
+    // Un PDF de norma son decenas de miles de tokens de entrada, muy por
+    // encima de cualquier otra funcion. Cuesta como cuatro.
+    operaciones: 4,
     disponible: true,
   },
   FOTO_AREA: {

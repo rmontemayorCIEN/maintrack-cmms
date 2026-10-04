@@ -7,6 +7,17 @@ import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/compone
 import { formatNumber } from "@/lib/utils";
 import { formatoUsd } from "@/lib/ia/precios";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
+
+/**
+ * Como se llama cada cosa en el desglose.
+ *
+ * «VOZ» no esta en el catalogo de funciones a proposito: no se vende aparte
+ * ni consume operaciones del plan. Pero cuesta, y el costo lo paga la
+ * plataforma —no el cliente—, asi que es AQUI, en el panel del operador,
+ * donde tiene que verse.
+ */
+const NOMBRE_DE_FUNCION = (clave: string) =>
+  clave === "VOZ" ? "Voz" : (FUNCIONES_IA[clave as ClaveFuncionIA]?.nombre ?? clave);
 import { periodoActual } from "@/lib/ia/consumo";
 import { nombrePeriodo } from "@/lib/cobranza";
 import { COMPLEMENTO_IA, iaDeLaOrganizacion, planDe } from "@/lib/planes";
@@ -219,7 +230,7 @@ export default async function ConsumoIaPage({
                         {consumo?.funciones.length ? (
                           <p className="text-[0.6875rem] text-slate-400">
                             {consumo.funciones
-                              .map((f) => `${FUNCIONES_IA[f.funcion as ClaveFuncionIA]?.nombre ?? f.funcion}: ${f.llamadas}`)
+                              .map((f) => `${NOMBRE_DE_FUNCION(f.funcion)}: ${f.llamadas}`)
                               .join(" · ")}
                           </p>
                         ) : null}

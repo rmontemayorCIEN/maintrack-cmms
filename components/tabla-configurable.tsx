@@ -3,10 +3,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Columns3, Loader2,
+  ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronUp, Columns3, Loader2,
   RotateCcw, Search, X,
 } from "lucide-react";
 import { Button, Card } from "@/components/ui";
+import { RegistrarLista } from "@/components/paso-registros";
+import { compararValores, siguienteOrden, type Orden } from "@/lib/orden-tabla";
 
 /**
  * Tabla de lista configurable por usuario.
@@ -26,11 +28,22 @@ export type Columna<T> = {
   alineaDerecha?: boolean;
   /** Texto plano. Es lo que se agrupa, se filtra y se ordena. */
   texto: (f: T) => string;
+  /**
+   * Con que se ordena, cuando el texto no sirve.
+   *
+   * El texto de una columna de dinero es «$1,200» y el de una fecha
+   * «26 sep 2026»: ordenarlos como palabras pone el 1,200 antes que el 900 y
+   * los meses en orden alfabetico. Las columnas de numero y de fecha declaran
+   * aqui su valor real —el numero, o la fecha en milisegundos— y las de texto
+   * no necesitan nada.
+   */
+  ordenPor?: (f: T) => string | number;
   /** Presentacion. Si falta, se pinta el texto. */
   pinta?: (f: T) => React.ReactNode;
 };
 
-export type Vista = { columnas?: string[]; grupos?: string[] };
+export type { Orden } from "@/lib/orden-tabla";
+export type Vista = { columnas?: string[]; grupos?: string[]; orden?: Orden | null };
 
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -38,8 +51,8 @@ const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g,
 const TARJETAS_POR_TANDA = 40;
 
 export function TablaConfigurable<T extends { id: string }>({
-  filas, fijas, columnas, deFabrica, vistaInicial, clave,
-  ejemploFiltro, acciones, sustantivo = "registros", busquedaInicial = "",
+  filas, fijas, columnas, deFabrica, vistaInicial, clave, total,
+  ejemploFiltro, paso, acciones, sustantivo = "registros", busquedaInicial = "",
 }: {
   filas: T[];
   /** Columnas que siempre van al frente. Sin ellas la tabla deja de identificar de que habla. */
@@ -51,6 +64,21 @@ export function TablaConfigurable<T extends { id: string }>({
   /** Con que nombre se guarda la preferencia de esta tabla. */
   clave: string;
   ejemploFiltro?: string;
+  /**
+   * Para pasar de un registro a otro desde el detalle sin volver aquí
+   * (components/paso-registros.tsx): la ruta base del detalle y cómo se
+   * nombra cada renglón. La secuencia que se guarda es la que se ve: con su
+   * filtro, su orden y sus grupos.
+   */
+  paso?: { base: string; etiqueta: (f: T) => string };
+  /**
+   * Cuantos hay en la base, si son mas de los que se trajeron.
+   *
+   * Sin esto el pie decia «200 de 200» aunque hubiera 3 000: el tope de la
+   * consulta se veia igual que «ya no hay mas», y quien buscaba una orden que
+   * si existia concluia que el sistema la habia perdido.
+   */
+  total?: number;
   acciones?: (f: T) => React.ReactNode;
   sustantivo?: string;
   /** Texto con que arranca el filtro: el que trae una liga (un aviso, un pendiente). */
@@ -58,12 +86,29 @@ export function TablaConfigurable<T extends { id: string }>({
 }) {
   const router = useRouter();
   const porId = useMemo(() => new Map(columnas.map((c) => [c.id, c])), [columnas]);
+  /**
+   * Para ordenar hacen falta TAMBIEN las columnas fijas.
+   *
+   * `porId` es de las que se pueden mostrar u ocultar, y el folio o el codigo
+   * no estan ahi. Tocar el encabezado de una fija movia el indicador y dejaba
+   * la lista intacta: cambiaba el estado, pero al ordenar no se encontraba la
+   * columna y se devolvia la lista sin tocar. Compilaba y el `aria-sort` decia
+   * la verdad; lo unico que lo delataba era leer las filas despues del clic,
+   * que es lo que hace la prueba de interfaz.
+   */
+  const paraOrdenar = useMemo(
+    () => new Map([...fijas, ...columnas].map((c) => [c.id, c])),
+    [fijas, columnas],
+  );
 
   const [seleccion, setSeleccion] = useState<string[]>(
     vistaInicial.columnas?.filter((id) => porId.has(id)) ?? deFabrica,
   );
   const [grupos, setGrupos] = useState<string[]>(
     (vistaInicial.grupos ?? []).filter((id) => porId.get(id)?.agrupable).slice(0, 3),
+  );
+  const [orden, setOrden] = useState<Orden | null>(
+    vistaInicial.orden && paraOrdenar.has(vistaInicial.orden.id) ? vistaInicial.orden : null,
   );
   const [busqueda, setBusqueda] = useState(busquedaInicial);
   const [panel, setPanel] = useState(false);
@@ -109,6 +154,29 @@ export function TablaConfigurable<T extends { id: string }>({
     );
   }, [filas, busqueda, columnas, fijas]);
 
+  // ── Orden ─────────────────────────────────────────────────────────────
+  const ordenados = useMemo(() => {
+    if (!orden) return filtrados;
+    const col = paraOrdenar.get(orden.id);
+    if (!col) return filtrados;
+    const clave = col.ordenPor ?? col.texto;
+    const signo = orden.dir === "asc" ? 1 : -1;
+    // Copia: `filtrados` puede ser el mismo arreglo que `filas`, y ordenarlo
+    // en su lugar cambiaria el orden de la lista de quien la paso.
+    return [...filtrados].sort((a, b) => signo * compararValores(clave(a), clave(b)));
+  }, [filtrados, orden, paraOrdenar]);
+
+  /**
+   * Un clic ordena, el segundo invierte, el tercero lo quita.
+   *
+   * El tercer estado no es un adorno: sin el, una vez que se toca una columna
+   * ya no se puede volver al orden con que llego la lista, que muchas veces
+   * es el que importa —lo mas reciente primero, o el orden del folio—.
+   */
+  function alternarOrden(id: string) {
+    setOrden((prev) => siguienteOrden(prev, id));
+  }
+
   // ── Agrupacion en hasta tres niveles ──────────────────────────────────
   type Nodo = { clave: string; etiqueta: string; nivel: number; filas: T[]; hijos: Nodo[] };
 
@@ -130,8 +198,18 @@ export function TablaConfigurable<T extends { id: string }>({
           return { clave: k, etiqueta, nivel, filas: suyas, hijos: armar(suyas, resto, nivel + 1, k) };
         });
     }
-    return grupos.length ? armar(filtrados, grupos, 0, "") : [];
-  }, [filtrados, grupos, porId]);
+    return grupos.length ? armar(ordenados, grupos, 0, "") : [];
+  }, [ordenados, grupos, porId]);
+
+  // La secuencia tal como se ve: agrupada si hay grupos, filtrada siempre.
+  const secuencia = useMemo(() => {
+    if (!paso) return [];
+    const salida: T[] = [];
+    if (grupos.length) (function recorrer(nodos: Nodo[]) { for (const n of nodos) { if (n.hijos.length) recorrer(n.hijos); else salida.push(...n.filas); } })(arbol);
+    else salida.push(...ordenados);
+    return salida.map((f) => ({ id: f.id, etiqueta: paso.etiqueta(f) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, arbol, ordenados, grupos]);
 
   const todasLasClaves = useMemo(() => {
     const salida: string[] = [];
@@ -154,7 +232,7 @@ export function TablaConfigurable<T extends { id: string }>({
     });
     setGuardando(false);
     if (!r.ok) { setError("No fue posible guardar la vista"); return; }
-    if (!vista) { setSeleccion(deFabrica); setGrupos([]); setCerrados(new Set()); }
+    if (!vista) { setSeleccion(deFabrica); setGrupos([]); setCerrados(new Set()); setOrden(null); }
     router.refresh();
   }
 
@@ -284,23 +362,25 @@ export function TablaConfigurable<T extends { id: string }>({
     );
   }
 
+  /**
+   * `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
+   * telefono.
+   *
+   * Una rejilla sin columnas declaradas arma una columna implicita de tamano
+   * `auto`, y una pista `auto` se mide por el CONTENIDO, no por la pantalla.
+   * La tabla de aqui abajo mide mil trescientos pixeles, asi que la pista
+   * crecia a mil trescientos y arrastraba consigo a la barra de filtros, a la
+   * tarjeta y al documento entero —el `overflow-x: auto` de .table-wrap nunca
+   * alcanzaba a desplazarse porque su contenedor tambien habia crecido—.
+   * Peor: con el documento desbordado, los dialogos `position: fixed` se
+   * miden contra ese ancho inflado y sus campos terminan fuera de la pantalla.
+   *
+   * Con `minmax(0,1fr)` la pista se queda del ancho disponible y el
+   * desplazamiento lateral vuelve a ocurrir donde debe: dentro de la tabla.
+   */
   return (
-    /*
-      `minmax(0,1fr)` no es adorno: sin el, la pantalla se sale de lado en el
-      telefono.
-
-      Una rejilla sin columnas declaradas arma una columna implicita de tamano
-      `auto`, y una pista `auto` se mide por el CONTENIDO, no por la pantalla.
-      La tabla de aqui abajo mide mil trescientos pixeles, asi que la pista
-      crecia a mil trescientos y arrastraba consigo a la barra de filtros, a la
-      tarjeta y al documento entero —el `overflow-x: auto` de .table-wrap nunca
-      alcanzaba a desplazarse porque su contenedor tambien habia crecido—.
-      Peor: con el documento desbordado, los dialogos `position: fixed` se
-      miden contra ese ancho inflado y sus campos terminan fuera de la pantalla.
-
-      Con `minmax(0,1fr)` la pista se queda del ancho disponible y el
-      desplazamiento lateral vuelve a ocurrir donde debe: dentro de la tabla.
-    */
+    <>
+    {paso ? <RegistrarLista base={paso.base} items={secuencia} /> : null}
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       {/* ── Barra de control ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -381,7 +461,7 @@ export function TablaConfigurable<T extends { id: string }>({
               <Button type="button" variant="secondary" onClick={() => guardar(null)} disabled={guardando}>
                 <RotateCcw className="h-3.5 w-3.5" /> De fabrica
               </Button>
-              <Button type="button" onClick={() => guardar({ columnas: seleccion, grupos })} disabled={guardando}>
+              <Button type="button" onClick={() => guardar({ columnas: seleccion, grupos, orden })} disabled={guardando}>
                 {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Guardar vista
               </Button>
             </div>
@@ -427,7 +507,7 @@ export function TablaConfigurable<T extends { id: string }>({
           <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">Ningún registro coincide con «{busqueda}».</p>
         ) : (
           <ul className="grid gap-2">
-            {grupos.length ? <GruposEnTarjetas nodos={arbol} /> : filtrados.slice(0, mostradas).map((f) => <Tarjeta key={f.id} f={f} />)}
+            {grupos.length ? <GruposEnTarjetas nodos={arbol} /> : ordenados.slice(0, mostradas).map((f) => <Tarjeta key={f.id} f={f} />)}
           </ul>
         )}
         {!grupos.length && filtrados.length > mostradas ? (
@@ -443,12 +523,46 @@ export function TablaConfigurable<T extends { id: string }>({
           <table className="data">
             <thead>
               <tr>
-                {fijas.map((c) => (
-                  <th key={c.id} className={c.alineaDerecha ? "text-right" : undefined}>{c.etiqueta}</th>
-                ))}
-                {visibles.map((c) => (
-                  <th key={c.id} className={c.alineaDerecha ? "text-right" : undefined}>{c.etiqueta}</th>
-                ))}
+                {[...fijas, ...visibles].map((c) => {
+                  const suyo = orden?.id === c.id ? orden.dir : null;
+                  return (
+                    <th
+                      key={c.id}
+                      className={c.alineaDerecha ? "text-right" : undefined}
+                      /* Para quien usa lector de pantalla, y para las pruebas. */
+                      aria-sort={suyo === "asc" ? "ascending" : suyo === "desc" ? "descending" : "none"}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => alternarOrden(c.id)}
+                        title={
+                          suyo === null
+                            ? `Ordenar por ${c.etiqueta}`
+                            : suyo === "asc"
+                              ? `Invertir el orden por ${c.etiqueta}`
+                              : `Quitar el orden por ${c.etiqueta}`
+                        }
+                        className={`inline-flex min-h-8 items-center gap-1 rounded px-1 text-left hover:text-slate-900 ${
+                          c.alineaDerecha ? "flex-row-reverse" : ""
+                        } ${suyo ? "text-slate-900" : ""}`}
+                      >
+                        <span>{c.etiqueta}</span>
+                        {/*
+                          La flecha solo aparece en la columna que manda. Un
+                          indicador gris en todas —el patron de «se puede
+                          ordenar»— llena el encabezado de simbolos y deja de
+                          verse cual esta activo, que es el unico dato util.
+                        */}
+                        {suyo ? (
+                          <ChevronUp
+                            aria-hidden="true"
+                            className={`h-3 w-3 shrink-0 transition-transform ${suyo === "desc" ? "rotate-180" : ""}`}
+                          />
+                        ) : null}
+                      </button>
+                    </th>
+                  );
+                })}
                 {acciones ? <th className="w-10" /> : null}
               </tr>
             </thead>
@@ -462,7 +576,7 @@ export function TablaConfigurable<T extends { id: string }>({
               ) : grupos.length ? (
                 <Grupos nodos={arbol} />
               ) : (
-                filtrados.map((f) => <Fila key={f.id} f={f} />)
+                ordenados.map((f) => <Fila key={f.id} f={f} />)
               )}
             </tbody>
           </table>
@@ -471,8 +585,10 @@ export function TablaConfigurable<T extends { id: string }>({
 
       <p className="text-[0.6875rem] text-slate-500">
         {filtrados.length} de {filas.length} {sustantivo}
+        {total !== undefined && total > filas.length ? ` · hay ${Number(total).toLocaleString("es-MX")} en total; afine la búsqueda para ver el resto` : ""}
         {grupos.length ? ` · agrupados por ${grupos.map((g) => porId.get(g)?.etiqueta).join(" › ")}` : ""}
       </p>
     </div>
+    </>
   );
 }

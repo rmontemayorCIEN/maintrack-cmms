@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { centroDeCostoDelActivo } from "./centro-de-costo";
 import { nextWorkOrderNumber } from "./numbering";
 import { logAudit } from "./audit";
 
@@ -409,6 +410,8 @@ export async function ingestSensorReading(params: {
         status: "OPEN",
         priority: sensor!.asset.criticality === "A" ? "CRITICAL" : "HIGH",
         assetId: sensor!.assetId,
+        // El eje contable se hereda del equipo. Ver lib/centro-de-costo.ts.
+        centroDeCostoId: await centroDeCostoDelActivo(params.organizationId, sensor!.asset.id),
         siteId: sensor!.asset.siteId,
         locationId: sensor!.asset.locationId,
         // Ya critico: se atiende pronto. La fecha de cruce no aplica, ya cruzo.

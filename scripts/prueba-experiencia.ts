@@ -12,9 +12,10 @@
  *
  *   npx tsx scripts/prueba-experiencia.ts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { SignJWT } from "jose";
+import { apagarServidor, levantarServidor } from "./servidor-de-prueba";
 
 function llaveDeSesion(): string {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
@@ -54,7 +55,7 @@ async function main() {
 
   let servidor: ChildProcess | null = null;
   const base = process.env.BASE_URL ?? "http://127.0.0.1:3206";
-  if (!process.env.BASE_URL) servidor = spawn("npx", ["next", "dev", "-p", "3206", "-H", "127.0.0.1"], { stdio: "ignore", detached: true });
+  if (!process.env.BASE_URL) servidor = levantarServidor({ puerto: 3206 });
 
   const sello = `ex-${Date.now()}`;
   const creadas: string[] = [];
@@ -216,6 +217,21 @@ async function main() {
       bCodigo.find((g) => g.tipo === "activo")?.resultados[0]?.id === equipo.id && bSerie.some((g) => g.resultados.some((r) => r.id === equipo.id)) &&
       bCodigo.every((g) => new Set(g.resultados.map((r) => r.id)).size === g.resultados.length));
 
+    /**
+     * Los equipos salen ANTES que las órdenes.
+     *
+     * Se busca por nombre de equipo mucho más seguido que por folio, y quien
+     * busca una orden concreta escribe su folio completo —que sale primero
+     * dentro de su propio grupo de todos modos—. Nadie vigilaba este orden, y
+     * en una lista de cinco grupos el primero es casi el único que se mira.
+     */
+    const conAmbos = await buscar(await aU("SUPERVISOR"), "valvula");
+    const tipos = conAmbos.map((g) => g.tipo);
+    const iEquipos = tipos.indexOf("activo");
+    const iOrdenes = tipos.indexOf("orden");
+    revisar("    y los equipos salen antes que las órdenes de trabajo",
+      iEquipos >= 0 && (iOrdenes < 0 || iEquipos < iOrdenes), tipos.join(" → "));
+
     // ═══════════════════════════════════════════ 19-26: el técnico desde el teléfono
     console.log("\n19-26. La orden completa del técnico");
     const r19 = await pedir("POST", `/api/work-orders/${ot.id}/status`, c.TECHNICIAN, { status: "IN_PROGRESS" });
@@ -357,6 +373,68 @@ async function main() {
       (await prisma.goodsReceipt.count({ where: { organizationId: A.id, clave: `rec-${sello}` } })) === 1,
       { partes: dobleParte.map((r) => r.status), horas: dobleHoras.map((r) => r.status), estado: dobleEstado.map((r) => r.status), existenciaAntes, existenciaDespues });
 
+    // Bloque 8: crear una ORDEN y crear una REQUISICION tampoco pueden
+    // duplicarse. Eran los dos unicos formularios sin defensa de servidor: lo
+    // unico que los cuidaba era que el boton se deshabilitara en el navegador,
+    // y eso no sobrevive a un reintento de red ni a una segunda pestana.
+    const dobleOT = await Promise.all([1, 2].map(() => pedir("POST", "/api/work-orders", c.SUPERVISOR, {
+      title: `Doble creacion ${sello}`, maintenanceType: "CORRECTIVE", priority: "MEDIUM",
+      assetId: equipo.id, aceptarAdvertencias: true,
+    })));
+    const creadas = await prisma.workOrder.count({ where: { organizationId: A.id, title: `Doble creacion ${sello}` } });
+    const dobleReq = await Promise.all([1, 2].map(() => pedir("POST", "/api/requisiciones", c.TECHNICIAN, {
+      renglones: [{ partId: parte.id, descripcion: "Material del doble toque", cantidadSolicitada: 1 }],
+      urgencia: "NORMAL", assetId: equipo.id,
+    })));
+    const requisiciones = await prisma.materialRequest.count({ where: { organizationId: A.id, solicitanteId: u.TECHNICIAN.id } });
+    revisar("39b. crear una orden y crear una requisición dos veces seguidas dejan UNA de cada una",
+      creadas === 1 && dobleOT.map((r) => r.status).sort().join() === "201,409" &&
+      requisiciones === 1 && dobleReq.map((r) => r.status).sort().join() === "201,409",
+      { ot: dobleOT.map((r) => r.status), creadas, req: dobleReq.map((r) => r.status), requisiciones });
+
+    // Quitar lo que se cargó por error. Lo que de verdad importa aquí no es
+    // que desaparezca el renglón, sino que la refacción REGRESE al almacén:
+    // borrarla sin devolverla dejaría al almacén creyendo que hay menos de lo
+    // que hay, y al kardex sin explicación de a dónde se fue.
+    const antesDeQuitar = (await prisma.part.findUniqueOrThrow({ where: { id: parte.id } })).quantityOnHand;
+    const cargada = await pedir("POST", `/api/work-orders/${ot3.id}/parts`, c.TECHNICIAN, { partId: parte.id, quantity: 3 });
+    const trasCargar = (await prisma.part.findUniqueOrThrow({ where: { id: parte.id } })).quantityOnHand;
+    const linea = await prisma.workOrderPart.findFirstOrThrow({ where: { workOrderId: ot3.id, partId: parte.id, quantity: 3 } });
+    const costoConLaRefaccion = (await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } })).partsCost;
+    const quitada = await pedir("DELETE", `/api/work-orders/${ot3.id}/parts?linea=${linea.id}`, c.TECHNICIAN);
+    const trasQuitar = await prisma.part.findUniqueOrThrow({ where: { id: parte.id } });
+    const devolucion = await prisma.stockMovement.findFirst({ where: { workOrderId: ot3.id, partId: parte.id, movementType: "RETURN" } });
+    const otTrasQuitar = await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } });
+    revisar("39c. quitar una refacción cargada por error la devuelve al almacén, deja el movimiento en el kardex y recalcula el costo",
+      cargada.status === 201 && quitada.status === 200 &&
+      trasCargar === antesDeQuitar - 3 && trasQuitar.quantityOnHand === antesDeQuitar &&
+      !!devolucion && devolucion.quantity === 3 &&
+      otTrasQuitar.partsCost === costoConLaRefaccion - 3 * parte.unitCost &&
+      (await prisma.workOrderPart.count({ where: { id: linea.id } })) === 0,
+      { antes: antesDeQuitar, tras: trasQuitar.quantityOnHand, devolucion: devolucion?.quantity, costo: [costoConLaRefaccion, otTrasQuitar.partsCost] });
+
+    // Y las horas: ahí sí es borrar, porque no movieron nada fuera de la orden.
+    const horas = await pedir("POST", `/api/work-orders/${ot3.id}/labor`, c.TECHNICIAN, { hours: 2, notes: "capturada por error" });
+    const lineaHoras = await prisma.workOrderLabor.findFirstOrThrow({ where: { workOrderId: ot3.id, hours: 2 } });
+    const ajena = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${lineaHoras.id}`, c.REQUESTER);
+    const propias = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${lineaHoras.id}`, c.TECHNICIAN);
+    const otTrasHoras = await prisma.workOrder.findUniqueOrThrow({ where: { id: ot3.id } });
+    // Un técnico no puede borrar lo que capturó otro; quien supervisa, sí:
+    // es quien valida el trabajo antes de cerrarlo.
+    const deOtro = await prisma.workOrderLabor.create({ data: { workOrderId: ot3.id, userId: tec2.id, hours: 3, cost: 300, rate: 100, workedAt: new Date() } });
+    const deOtroPorElTecnico = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${deOtro.id}`, c.TECHNICIAN);
+    const deOtroPorSupervision = await pedir("DELETE", `/api/work-orders/${ot3.id}/labor?linea=${deOtro.id}`, c.SUPERVISOR);
+    revisar("39e. un técnico no quita las horas de otro; supervisión sí",
+      deOtroPorElTecnico.status === 403 && deOtroPorSupervision.status === 200 &&
+      (await prisma.workOrderLabor.count({ where: { id: deOtro.id } })) === 0,
+      { tecnico: deOtroPorElTecnico.status, supervision: deOtroPorSupervision.status });
+
+    revisar("39d. el técnico quita las horas que capturó por error; el costo y las horas de la orden se rehacen",
+      horas.status === 201 && ajena.status === 403 && propias.status === 200 &&
+      (await prisma.workOrderLabor.count({ where: { id: lineaHoras.id } })) === 0 &&
+      otTrasHoras.actualHours === 0.5,
+      { ajena: ajena.status, propias: propias.status, horas: otTrasHoras.actualHours });
+
     // ═══════════════════════════════════════════ 41: conflicto
     console.log("\n41. Conflicto por cambio simultáneo");
     const e1 = await pedir("PATCH", `/api/work-orders/${ot2.id}`, c.SUPERVISOR, { title: "Lubricar rodamientos", base: { title: "Lubricar" }, aceptarAdvertencias: true });
@@ -373,7 +451,11 @@ async function main() {
     const comprasTec = await Promise.all([pagina("/compras", c.TECHNICIAN), pagina(`/compras/${compraId}`, c.TECHNICIAN)]);
     revisar("técnico: sin Compras completas (ni en el menú ni por dirección), sin configuración ni empresas cliente",
       !menuTec.includes("/compras") && comprasTec.every((r) => r.texto.includes(SIN_PERMISO)) && !menuTec.some((h) => ["/settings?s=usuarios", "/catalogs", "/clients", "/import"].includes(h)) &&
-      menuTec.includes("/escanear") && accionesRapidasDe("TECHNICIAN").some((a) => a.etiqueta === "Registrar lectura"));
+      menuTec.includes("/escanear") && accionesRapidasDe("TECHNICIAN").some((a) => a.etiqueta === "Registrar lectura"),
+      // Con detalle a proposito: sin el, una pagina que truena (500) se ve
+      // identica a una que si dejo entrar al tecnico —el texto de error tampoco
+      // trae SIN_PERMISO— y la falla acusa a los permisos sin serlo.
+      { menu: menuTec, compras: comprasTec.map((r) => ({ status: r.status, sinPermiso: r.texto.includes(SIN_PERMISO) })) });
     const admin = inicios.ADMIN;
     const auditoria = await pagina("/settings?s=auditoria", c.ADMIN);
     revisar("administrador: su inicio liga a usuarios, configuración, catálogos, calidad, puesta en marcha y auditoría, y la auditoría abre",
@@ -462,7 +544,7 @@ async function main() {
     revisar("44. archivo de otra empresa: ni se abre ni se le cuelga nada (404)", archivoAjeno.status === 404 && subirAjeno.status === 404, [archivoAjeno.status, subirAjeno.status]);
   } finally {
     for (const id of [...creadas].reverse()) await prisma.organization.delete({ where: { id } }).catch((e) => console.error("no se borró", id, e));
-    if (servidor?.pid) { try { process.kill(-servidor.pid, "SIGTERM"); } catch { /* ya terminó */ } }
+    await apagarServidor(servidor, 3206);
   }
 
   console.log("\nAislamiento de la prueba");

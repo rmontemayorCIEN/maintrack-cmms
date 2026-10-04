@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Compromisos } from "@/components/compromisos";
+import { Comentarios } from "@/components/comentarios";
 import { notFound } from "next/navigation";
 import { ArrowLeft, LifeBuoy, Printer } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -31,14 +33,23 @@ import { CommentsPanel } from "./comments-panel";
 import { Adjuntos } from "@/components/adjuntos";
 import { esFalla, tipoDeActividad } from "@/lib/fallas";
 import { datosDeCierre, requiereEvidencia } from "@/lib/workorders";
-import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable } from "@/lib/reglas-ot";
+import { accionesDisponibles, faltantesDeCierre, inicioSinResponsable, motivoValido, type SeccionDeOrden } from "@/lib/reglas-ot";
 import { puedeVerRuta, verCostos } from "@/lib/pantallas";
 import { MeterReadingForm } from "../../meters/reading-form";
-import { FichaDeEjecucion, IndiceDeSecciones } from "./ejecucion";
+import { FichaDeEjecucion, IndiceDeSecciones, type EstadoDeSeccion, type SeccionDelIndice } from "./ejecucion";
+import { FaltaParaCerrar } from "./faltantes";
+import { ResultadoDelTrabajo } from "./resultado";
+import { Row } from "./fila";
 import { AceptarOrden } from "./aceptar";
 import { Plegable } from "@/components/plegable";
+import { SeccionPlegable } from "./seccion";
+import { ConfirmarSeguridad } from "./confirmar-seguridad";
+import { estadoDeSeguridad } from "@/lib/seguridad-ot";
+import { naceAbierta } from "@/lib/secciones-orden";
+import { herramientaQueHaceFalta } from "@/lib/herramientas";
 import { BitacoraDeEstados } from "./bitacora";
 import { MaterialPorActividad } from "./material-actividad";
+import { PasarRegistros } from "@/components/paso-registros";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +78,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       location: { select: { name: true } },
       plan: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true, color: true } },
+      // Quien confirmo haber leido la seguridad: sin esto el aviso diria
+      // «Alguien confirmó» en vez del nombre, y el registro pierde su valor.
+      seguridadLeidaPor: { select: { name: true } },
       createdBy: { select: { name: true } },
       failureCode: true,
       rootCause: true,
@@ -171,7 +185,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       ])
     : [[], [], [], []];
 
-  const [tecnicosWo, cuadrillasWo, activosWo] = await Promise.all([
+  const [tecnicosWo, cuadrillasWo, activosWo, centrosWo] = await Promise.all([
     // Responsables posibles: quien ejecuta. Un solicitante o una cuenta de consulta no pueden iniciar la orden.
     prisma.user.findMany({
       where: { organizationId: user.organizationId, active: true, role: { in: ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN"] } },
@@ -186,6 +200,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     prisma.asset.findMany({
       where: { organizationId: user.organizationId, active: true },
       orderBy: { code: "asc" }, take: 500,
+      select: { id: true, code: true, name: true },
+    }),
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: user.organizationId, active: true },
+      orderBy: { code: "asc" },
       select: { id: true, code: true, name: true },
     }),
   ]);
@@ -275,6 +294,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const medidores = wo.assetId
     ? await prisma.meter.findMany({ where: { organizationId: user.organizationId, assetId: wo.assetId }, select: { id: true, name: true, unit: true, currentValue: true }, orderBy: { name: "asc" } })
     : [];
+  /*
+   * Lecturas tomadas EN esta orden, no del medidor en general: el horometro
+   * que capturo el operador en su ronda no dice nada de este trabajo. Solo se
+   * pregunta si el equipo tiene medidores; si no, la seccion ni existe.
+   */
+  const lecturasDeLaOrden = medidores.length
+    ? await prisma.meterReading.count({
+        where: { organizationId: user.organizationId, workOrderId: wo.id, estado: { not: "ANULADA" } },
+      })
+    : 0;
+  const seguridad = estadoDeSeguridad(wo);
   const vencida = Boolean(wo.dueDate && wo.dueDate < new Date() && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status));
 
   // Orden activa sin responsable: se dice en la orden, no solo al presionar «Iniciar».
@@ -323,6 +353,39 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     moneda: user.organization.currency,
     faltantes: wo.status === "COMPLETED" ? faltantesDeCierre(datosCierre) : [],
   };
+
+  /**
+   * Lo que falta para cerrar, desde que la orden se INICIA y no solo al
+   * intentar completarla.
+   *
+   * Antes de iniciar no se enseña: a una orden que nadie ha empezado no «le
+   * faltan» las horas, no se ha trabajado. Mostrarlo ahí volvía la pantalla
+   * una regañina de entrada, y a la tercera vez nadie la lee. Ya cerrada o
+   * cancelada tampoco: no hay nada que hacer con la lista.
+   */
+  const faltantes = ["IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(wo.status) ? faltantesDeCierre(datosCierre) : [];
+  const mostrarFaltantes = faltantes.length > 0 || wo.status === "COMPLETED";
+  /*
+   * Que herramienta pide el plan y si esta libre HOY.
+   *
+   * Va aqui y no en «Recursos planeados» porque no es lo mismo: aquello es lo
+   * que se preve GASTAR, y esto es lo que hay que TENER EN LA MANO. Mezclarlos
+   * haria creer que el torquimetro se consume.
+   */
+  const herramienta = await herramientaQueHaceFalta(user.organizationId, wo.id);
+
+  const faltaEn = new Set(faltantes.map((f) => f.seccion));
+
+  // El mismo contenido para el teléfono y la computadora: se arma una vez.
+  const resultado = {
+    completado: Boolean(wo.completedAt),
+    resolucion: wo.resolution,
+    codigoFalla: wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : null,
+    causaRaiz: wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : null,
+    requiereParo: wo.requiresShutdown,
+    esFalla: esFalla(wo.maintenanceType),
+    evidenciaRequerida,
+  };
   const canExecute = can(user.role, "workorder:execute");
   const canEdit = can(user.role, "workorder:write");
   const doneTasks = wo.tasks.filter((t) => t.done).length;
@@ -334,16 +397,50 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const aceptadaPor = aceptacion ? `Usted la aceptó el ${formatDateTime(aceptacion.createdAt, zona)}` : null;
   const puedePedirApoyo = canExecute && ["OPEN", "ASSIGNED", "IN_PROGRESS", "ON_HOLD"].includes(wo.status);
   const hayAcciones = accionesDisponibles({ status: wo.status, iniciada: !!wo.startedAt, conResponsable: !!wo.assignedToId }, user.role).length > 0;
-  // La secuencia del trabajo, en el orden en que se hace.
-  const indice = [
-    { id: "actividades", texto: "Actividades" },
-    ...(wo.procedure || wo.safetyNotes ? [{ id: "seguridad", texto: "Seguridad" }] : []),
-    { id: "tiempo", texto: "Tiempo" },
-    { id: "materiales", texto: "Materiales" },
-    ...(medidores.length ? [{ id: "lecturas", texto: "Lecturas" }] : []),
-    { id: "evidencias", texto: "Evidencias" },
-    { id: "bitacora", texto: "Bitácora" },
-    { id: "resultado-movil", texto: "Resultado" },
+  /**
+   * La secuencia del trabajo, en el orden en que se hace, cada paso con su
+   * señal.
+   *
+   * «Hecho» se marca SOLO donde el sistema lo sabe de verdad: actividades
+   * resueltas, horas registradas, evidencia subida, solución escrita. Las que
+   * no tienen noción de completas —seguridad, materiales, lecturas,
+   * bitácora— se quedan neutras en vez de inventarles un estado. Un palomeado
+   * de adorno es peor que ninguno: hace creer que ya se revisó.
+   */
+  const conHoras = horasRegistradas > 0 || motivoValido(wo.motivoSinHoras);
+  const seña = (id: string, hecho: boolean): EstadoDeSeccion =>
+    faltaEn.has(id as SeccionDeOrden) ? "falta" : hecho ? "hecho" : "neutro";
+  const indice: SeccionDelIndice[] = [
+    { id: "actividades", texto: "Actividades", estado: seña("actividades", wo.tasks.length > 0 && datosCierre.actividadesSinResolver === 0) },
+    /*
+     * Seguridad era el unico paso sin nada que hacer: puro texto, y su chip
+     * nunca cambiaba. Ahora se confirma haberlo leido —queda quien y cuando—
+     * y el chip lo refleja. En ambar cuando el texto cambio DESPUES de
+     * confirmarse: lo que esa persona leyo ya no es lo que la orden dice.
+     */
+    ...(wo.procedure || wo.safetyNotes
+      ? [{
+          id: "seguridad", texto: "Seguridad",
+          estado: (seguridad.estado === "CONFIRMADO" ? "hecho"
+            : seguridad.estado === "CAMBIO_DESPUES" ? "falta"
+            : "neutro") as EstadoDeSeccion,
+        }]
+      : []),
+    { id: "tiempo", texto: "Tiempo", estado: seña("tiempo", conHoras) },
+    /*
+     * Estos tres no detienen el cierre —una orden no se queda «sin bitacora»—
+     * pero SI se ponen en verde cuando ya tienen algo capturado. Estaban fijos
+     * en gris, asi que cargar una refaccion o registrar el horometro no movia
+     * nada y parecia que no se habia guardado. Lo reporto Rafael.
+     */
+    { id: "materiales", texto: "Materiales", estado: wo.partsCost > 0 || wo.serviceCost > 0 ? "hecho" : "neutro" },
+    ...(medidores.length
+      ? [{ id: "lecturas", texto: "Lecturas", estado: (lecturasDeLaOrden > 0 ? "hecho" : "neutro") as EstadoDeSeccion }]
+      : []),
+    { id: "evidencias", texto: "Evidencias", estado: seña("evidencias", wo.attachments.length > 0) },
+    { id: "bitacora", texto: "Bitácora", estado: wo.comments.length > 0 ? "hecho" : "neutro" },
+    // El faltante dice «resultado»; el ancla del teléfono es «resultado-movil».
+    { id: "resultado-movil", texto: "Resultado", estado: seña("resultado", motivoValido(wo.resolution)) },
   ];
 
   return (
@@ -351,9 +448,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       <PageHeader
         title={`${wo.number} — ${wo.title}`}
         breadcrumb={
-          <Link href="/work-orders" className="inline-flex items-center gap-1 hover:text-brand-600">
+          <span className="flex flex-wrap items-center gap-2">
+            <Link href="/work-orders" className="inline-flex items-center gap-1 hover:text-brand-600">
             <ArrowLeft className="h-3 w-3" /> Órdenes de trabajo
           </Link>
+            <PasarRegistros base="/work-orders" id={id} />
+          </span>
         }
         description={wo.description ?? undefined}
         actions={
@@ -368,6 +468,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 assignedToId: wo.assignedToId,
                 teamId: wo.teamId,
                 assetId: wo.assetId,
+                centroDeCostoId: wo.centroDeCostoId,
                 dueDate: wo.dueDate?.toISOString() ?? null,
                 scheduledStart: wo.scheduledStart?.toISOString() ?? null,
                 estimatedHours: wo.estimatedHours,
@@ -378,6 +479,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               tecnicos={tecnicosWo}
               cuadrillas={cuadrillasWo}
               activos={activosWo}
+              centrosDeCosto={centrosWo}
               editable={can(user.role, "workorder:write") && !["CLOSED", "CANCELLED"].includes(wo.status)}
             />
             <Link
@@ -428,6 +530,10 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               {puedeAceptar ? <AceptarOrden workOrderId={wo.id} /> : null}
               {hayAcciones ? <WorkOrderActions
               iaDisponible={iaConfigurada() && iaDeLaOrganizacion(user.organization).funciones.includes("CIERRE_OT")}
+              /* El dictado NO depende de `iaConfigurada()`: eso mira la llave
+                 del modelo, y transcribir no pasa por el modelo. Amarrarlos
+                 dejaria al tecnico sin microfono por una llave que no usa. */
+              dictadoDisponible={iaDeLaOrganizacion(user.organization).funciones.includes("DICTADO")}
                 workOrderId={wo.id}
                 status={wo.status}
                 failureCodes={failureCodes}
@@ -470,6 +576,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           )}
         </div>
       ) : null}
+
+      {mostrarFaltantes ? <FaltaParaCerrar faltantes={faltantes} /> : null}
 
       {/* minmax(0,1fr): sin esto la columna crece con el contenido (un nombre de equipo largo) y se corta en el teléfono. */}
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3">
@@ -528,10 +636,11 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
           </section>
           {wo.procedure || wo.safetyNotes ? (
-          <section id="seguridad" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-          {wo.procedure || wo.safetyNotes ? (
-            <Card>
-              <CardHeader title="Procedimiento y seguridad" />
+            <SeccionPlegable
+              id="seguridad"
+              titulo="Procedimiento y seguridad"
+              abiertaPorOmision={naceAbierta("seguridad", wo.status)}
+            >
               {wo.procedure ? (
                 <div className="mb-4">
                   <p className="label">Procedimiento</p>
@@ -544,10 +653,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                   <p className="mt-1 whitespace-pre-wrap text-sm text-amber-900">{wo.safetyNotes}</p>
                 </div>
               ) : null}
-            </Card>
-          ) : null}
-
-          </section>
+              <ConfirmarSeguridad
+                workOrderId={wo.id}
+                estado={seguridad}
+                puedeConfirmar={canExecute && !["CLOSED", "CANCELLED"].includes(wo.status)}
+                cuandoTexto={
+                  seguridad.estado === "CONFIRMADO" || seguridad.estado === "CAMBIO_DESPUES"
+                    ? formatDateTime(seguridad.cuando, zona)
+                    : null
+                }
+              />
+            </SeccionPlegable>
           ) : null}
           <section id="tiempo" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
@@ -573,6 +689,35 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
 
           </section>
           <section id="materiales" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          {herramienta.declarada ? (
+            <Card>
+              <CardHeader
+                title="Herramienta que hace falta"
+                subtitle="Lo que el plan pide tener en la mano para este trabajo, y si está libre ahora."
+              />
+              <ul className="mt-2 space-y-1.5">
+                {herramienta.piezas.map((p, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                    <span className="font-medium text-slate-700">{p.que}</span>
+                    {p.cantidad !== 1 ? <span className="text-slate-500">×{formatNumber(p.cantidad, 2)}</span> : null}
+                    <Badge tone={p.disponible ? "success" : "warning"}>
+                      {p.disponible ? "Disponible" : "No está"}
+                    </Badge>
+                    {/* El porque importa mas que el estado: «la trae Ana» dice
+                        a quien ir a buscar, «no hay ninguna libre» no. */}
+                    <span className="text-slate-500">{p.porque}</span>
+                  </li>
+                ))}
+              </ul>
+              {herramienta.piezas.some((p) => !p.disponible) ? (
+                <p className="mt-2 text-[0.6875rem] text-amber-700">
+                  Falta herramienta para hacer este trabajo. Consígala antes de asignar la orden, o va a bajar
+                  alguien a piso a darse cuenta ahí.
+                </p>
+              ) : null}
+            </Card>
+          ) : null}
+
           {hayPlaneado ? (
             <Card>
               <CardHeader
@@ -638,21 +783,24 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
           </section>
           {medidores.length > 0 ? (
-          <section id="lecturas" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-            <Card>
-              <CardHeader title="Lecturas del equipo" subtitle="Registre el horómetro o contador si lo tomó en este trabajo." />
+            <SeccionPlegable
+              id="lecturas"
+              titulo="Lecturas del equipo"
+              subtitulo={`${medidores.length} medidor(es)`}
+              abiertaPorOmision={naceAbierta("lecturas", wo.status)}
+            >
+              <p className="mb-2 text-xs text-slate-500">Registre el horómetro o contador si lo tomó en este trabajo.</p>
               <ul className="grid gap-3">
                 {medidores.map((m) => (
                   <li key={m.id} className="rounded-lg border border-slate-200 p-3">
                     <p className="mb-2 text-sm font-medium text-slate-800">
                       {m.name} <span className="font-normal text-slate-500">· actual {m.currentValue === null ? "sin lectura" : `${formatNumber(m.currentValue, 1)} ${m.unit}`}</span>
                     </p>
-                    {canExecute && !["CLOSED", "CANCELLED"].includes(wo.status) ? <MeterReadingForm meterId={m.id} unit={m.unit} current={m.currentValue} /> : null}
+                    {canExecute && !["CLOSED", "CANCELLED"].includes(wo.status) ? <MeterReadingForm meterId={m.id} unit={m.unit} current={m.currentValue} workOrderId={wo.id} /> : null}
                   </li>
                 ))}
               </ul>
-            </Card>
-          </section>
+            </SeccionPlegable>
           ) : null}
           <section id="evidencias" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
           <Card>
@@ -675,9 +823,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
 
           </section>
-          <section id="bitacora" className="grid min-w-0 scroll-mt-28 grid-cols-[minmax(0,1fr)] content-start gap-4">
-          <Card>
-            <CardHeader title="Bitácora" subtitle="Notas del equipo. Si necesita ayuda, pida apoyo aquí." />
+          <SeccionPlegable
+            id="bitacora"
+            titulo="Bitácora"
+            subtitulo={wo.comments.length ? `${wo.comments.length} nota(s)` : "Sin notas"}
+            abiertaPorOmision={naceAbierta("bitacora", wo.status)}
+          >
+            <p className="mb-2 text-xs text-slate-500">Notas del equipo. Si necesita ayuda, pida apoyo aquí.</p>
             <CommentsPanel
               workOrderId={wo.id}
               comments={wo.comments.map((c) => ({
@@ -689,28 +841,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               }))}
               editable={canExecute}
             />
-          </Card>
-
-          </section>
+          </SeccionPlegable>
           {/* 10. Resultado: qué se pedirá al terminar (o lo que quedó). El botón está en la barra de abajo. */}
           <section id="resultado-movil" className="grid min-w-0 scroll-mt-28 lg:hidden">
             <Card>
               <CardHeader title="Resultado" subtitle={wo.completedAt ? "Lo que quedó registrado al terminar" : "Al terminar se le pedirá esto"} />
-              {wo.completedAt ? (
-                <dl className="grid gap-3 text-sm">
-                  <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
-                  <Row label="Código de falla">{wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}</Row>
-                  <Row label="Causa raíz">{wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}</Row>
-                </dl>
-              ) : (
-                <ul className="grid list-disc gap-1 pl-5 text-sm text-slate-700">
-                  <li>La solución aplicada o el resumen del trabajo.</li>
-                  <li>Horas registradas (o por qué no hay).</li>
-                  {wo.requiresShutdown ? <li>Los minutos de paro del equipo.</li> : null}
-                  {esFalla(wo.maintenanceType) ? <li>Código de falla y causa raíz (o por qué no se determinó).</li> : null}
-                  <li>Todas las actividades hechas o enviadas al backlog{evidenciaRequerida ? ", y la evidencia" : ""}.</li>
-                </ul>
-              )}
+              <ResultadoDelTrabajo {...resultado} />
               <p className="mt-3 text-xs text-slate-500">Después toque «Terminar y enviar a revisión» abajo: supervisión la revisa y la cierra.</p>
             </Card>
           </section>
@@ -828,37 +964,37 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           </Card>
           ) : null}
 
-          {wo.completedAt ? (
-            <Card id="resultado" className="hidden lg:block">
-              <CardHeader title="Resultado del trabajo" />
-              <dl className="grid gap-3 text-sm">
-                <Row label="Código de falla">
-                  {wo.failureCode ? `${wo.failureCode.code} — ${wo.failureCode.description}` : "—"}
-                </Row>
-                <Row label="Causa raiz">
-                  {wo.rootCause ? `${wo.rootCause.code} — ${wo.rootCause.description}` : "—"}
-                </Row>
-                <Row label="Solución aplicada">{wo.resolution ?? "—"}</Row>
-              </dl>
-            </Card>
-          ) : null}
+          {/* Existe aunque la orden no haya terminado: es el ancla a la que llevan
+              los faltantes, y es donde quien revisa desde su escritorio ve qué
+              se le va a pedir. Antes solo aparecía ya completada. */}
+          <Card id="resultado" className="hidden scroll-mt-28 lg:block">
+            <CardHeader
+              title="Resultado del trabajo"
+              subtitle={wo.completedAt ? "Lo que quedó registrado al terminar" : "Al terminar se le pedirá esto"}
+            />
+            <ResultadoDelTrabajo {...resultado} />
+          </Card>
           </Plegable>
         </div>
       </div>
       {/* Lugar para la barra de acciones fija del teléfono: el final de la orden no queda debajo. */}
       {canExecute && (hayAcciones || puedeAceptar || puedePedirApoyo) ? <div className="h-32 lg:hidden" aria-hidden /> : null}
+
+      {/* Lo que se hable de este registro queda aquí, no en un chat
+          suelto donde se pierde en veinte minutos. */}
+      <div className="mt-4">
+        <Comentarios ancla="workOrder" anclaId={wo.id} yo={user.id} zona={user.organization.timezone} titulo="Conversación de la orden" />
+      </div>
+
+      {/* Lo que se acordó y no es una orden de trabajo. */}
+      <div className="mt-4">
+        <Compromisos entidad="WorkOrder" entidadId={wo.id} yo={user.id} zona={user.organization.timezone} />
+      </div>
     </>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-700">{children}</dd>
-    </div>
-  );
-}
+
 
 function CostRow({ label, value }: { label: string; value: string }) {
   return (

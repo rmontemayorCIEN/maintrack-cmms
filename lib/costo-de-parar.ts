@@ -85,7 +85,7 @@ export async function costoDeParar(
 ): Promise<ResumenCosto> {
   const eventos = await prisma.downtimeEvent.findMany({
     where: {
-      asset: { organizationId },
+      organizationId,
       ...(opciones?.desde || opciones?.hasta
         ? { startedAt: { ...(opciones.desde ? { gte: opciones.desde } : {}), ...(opciones.hasta ? { lt: opciones.hasta } : {}) } }
         : {}),
@@ -344,7 +344,7 @@ export async function eventosDeParo(
   rango: { desde: Date; hasta: Date },
 ): Promise<EventoDeParo[]> {
   const eventos = await prisma.downtimeEvent.findMany({
-    where: { asset: { organizationId }, startedAt: { gte: rango.desde, lt: rango.hasta } },
+    where: { organizationId, startedAt: { gte: rango.desde, lt: rango.hasta } },
     orderBy: { startedAt: "asc" },
     select: {
       id: true, startedAt: true, minutes: true, planned: true,

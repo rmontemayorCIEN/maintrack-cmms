@@ -118,8 +118,12 @@ export function SelectorBuscable({
     }
   }
 
+  // min-w-0 y max-w-full no son adorno: la etiqueta elegida va en una sola
+  // linea sin cortar, asi que sin esto el selector le impone SU ancho al
+  // contenedor. En el armador de cajas eso empujaba la pagina 102 px a lo
+  // ancho en telefono, con barra horizontal y todo.
   return (
-    <div ref={contenedor} className={cn("relative", className)}>
+    <div ref={contenedor} className={cn("relative min-w-0 max-w-full", className)}>
       {name ? <input type="hidden" name={name} value={valor} /> : null}
       <button
         type="button"

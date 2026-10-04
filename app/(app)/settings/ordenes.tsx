@@ -14,7 +14,8 @@ import { Button, Card } from "@/components/ui";
  * cuenta el siguiente cuando uno se cierra tarde.
  */
 export function ConfiguracionOrdenes({
-  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, generacion, evidenciaCriticas, editable,
+  multiOrigen, horizonteDias, recalculo, diasHabiles, jornadaDias, generacion, evidenciaCriticas,
+  codigoFormato, revisionFormato, editable,
 }: {
   /** Pedir evidencia al completar ordenes de equipos criticos o de seguridad. */
   evidenciaCriticas: boolean;
@@ -28,12 +29,17 @@ export function ConfiguracionOrdenes({
   jornadaDias: string;
   /** AUTOMATICA | MANUAL. Quien arma las ordenes preventivas. */
   generacion: string;
+  /** El codigo del formato impreso dentro del sistema de calidad del cliente. */
+  codigoFormato: string | null;
+  revisionFormato: string | null;
   editable: boolean;
 }) {
   const router = useRouter();
   const [mezcla, setMezcla] = useState(multiOrigen);
   const [dias, setDias] = useState(String(horizonteDias));
   const [desde, setDesde] = useState(recalculo === "PROGRAMADO" ? "PROGRAMADO" : "CIERRE");
+  const [codigo, setCodigo] = useState(codigoFormato ?? "");
+  const [revision, setRevision] = useState(revisionFormato ?? "");
   const [habiles, setHabiles] = useState(diasHabiles);
   const [evidencia, setEvidencia] = useState(evidenciaCriticas);
   const [modo, setModo] = useState(generacion === "MANUAL" ? "MANUAL" : "AUTOMATICA");
@@ -70,6 +76,8 @@ export function ConfiguracionOrdenes({
         otDiasHabiles: habiles,
         otGeneracion: modo,
         otEvidenciaCriticas: evidencia,
+        codigoFormatoOT: codigo.trim(),
+        revisionFormatoOT: revision.trim(),
       }),
     });
     setGuardando(false);
@@ -232,6 +240,48 @@ export function ConfiguracionOrdenes({
           </p>
         </div>
 
+
+        {/*
+          El formato controlado.
+
+          Esto NO es la norma: es como identifica ESTA empresa la hoja dentro
+          de su sistema de calidad. El auditor de ISO no busca que el papel
+          diga «ISO 9001»; busca el codigo del formato registrado en su sistema
+          documental. Por eso lo escribe el cliente y no sale de ningun
+          catalogo nuestro, y por eso le sirve aunque nunca contrate el modulo
+          de cumplimiento.
+        */}
+        <div className="border-t border-slate-200 pt-5">
+          <h2 className="text-sm font-semibold text-slate-900">La orden impresa, como formato de su sistema de calidad</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Si su empresa está certificada, la hoja impresa lleva el código del formato y su revisión al pie.
+            Déjelo vacío si no lo usa.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[2fr_1fr]">
+            <div>
+              <label className="label" htmlFor="codigo-formato">Código del formato</label>
+              <input
+                id="codigo-formato" className="input" value={codigo} maxLength={40} disabled={!editable}
+                onChange={(e) => setCodigo(e.target.value)} placeholder="FOR-MTTO-012"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="revision-formato">Revisión</label>
+              <input
+                id="revision-formato" className="input" value={revision} maxLength={12} disabled={!editable}
+                onChange={(e) => setRevision(e.target.value)} placeholder="3"
+              />
+            </div>
+          </div>
+          {codigo.trim() ? (
+            <p className="mt-2 text-[0.6875rem] text-slate-500">
+              En el pie de cada orden impresa se leerá:{" "}
+              <span className="font-medium text-slate-700">
+                {codigo.trim()}{revision.trim() ? ` · Rev. ${revision.trim()}` : ""}
+              </span>
+            </p>
+          ) : null}
+        </div>
         {editable ? (
           <div className="flex items-center gap-3">
             <Button onClick={guardar} disabled={guardando}>

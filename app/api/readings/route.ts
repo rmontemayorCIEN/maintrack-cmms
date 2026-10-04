@@ -12,6 +12,8 @@ const schema = z.object({
   tipo: z.enum(["LECTURA", "REINICIO", "SUSTITUCION"]).default("LECTURA"),
   confirmar: z.boolean().optional(),
   justificacion: z.string().optional(),
+  /** De que orden sale, cuando se captura desde una. */
+  workOrderId: z.string().optional(),
 });
 
 /**
@@ -40,6 +42,14 @@ export async function POST(request: Request) {
         note: input.note,
         confirmar: input.confirmar,
         justificacion: input.justificacion,
+        // Acotado por empresa: una orden ajena no puede quedar como origen de
+        // esta lectura ni por error ni a proposito.
+        workOrderId: input.workOrderId
+          ? (await prisma.workOrder.findFirst({
+              where: { id: input.workOrderId, organizationId: orgId },
+              select: { id: true },
+            }))?.id ?? null
+          : null,
       });
       if (!r.ok) return fail(r.validacion.mensaje, 409, { requiereConfirmacion: true, validacion: r.validacion });
       return ok(r, 201);

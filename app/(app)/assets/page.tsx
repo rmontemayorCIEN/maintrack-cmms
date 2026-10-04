@@ -16,6 +16,7 @@ import { verCostos } from "@/lib/pantallas";
 import { AssetDialog } from "./asset-dialog";
 import { TablaActivos, type FilaActivo } from "./tabla-activos";
 import { vistaGuardada } from "@/lib/vistas";
+import { contiene } from "@/lib/busqueda-texto";
 
 export const metadata = { title: "Activos" };
 export const dynamic = "force-dynamic";
@@ -23,14 +24,14 @@ export const dynamic = "force-dynamic";
 export default async function AssetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; criticality?: string; status?: string; siteId?: string; nuevo?: string }>;
+  searchParams: Promise<{ q?: string; criticality?: string; status?: string; siteId?: string; locationId?: string; nuevo?: string }>;
 }) {
   const user = await requireUser();
   const conCostos = verCostos(user.role);
   const params = await searchParams;
   const orgId = user.organizationId;
 
-  const [assets, sites, locations, categories] = await Promise.all([
+  const [assets, sites, locations, categories, centrosDeCosto] = await Promise.all([
     prisma.asset.findMany({
       where: {
         organizationId: orgId,
@@ -38,13 +39,14 @@ export default async function AssetsPage({
         ...(params.criticality ? { criticality: params.criticality } : {}),
         ...(params.status ? { status: params.status } : {}),
         ...(params.siteId ? { siteId: params.siteId } : {}),
+        ...(params.locationId ? { locationId: params.locationId } : {}),
         ...(params.q
           ? {
               OR: [
-                { name: { contains: params.q } },
-                { code: { contains: params.q } },
-                { serialNumber: { contains: params.q } },
-                { manufacturer: { contains: params.q } },
+                { name: contiene(params.q) },
+                { code: contiene(params.q) },
+                { serialNumber: contiene(params.q) },
+                { manufacturer: contiene(params.q) },
               ],
             }
           : {}),
@@ -68,6 +70,13 @@ export default async function AssetsPage({
       where: { organizationId: orgId },
       select: { id: true, name: true },
     }),
+    // Solo los activos: un centro dado de baja no se vuelve a ofrecer, pero lo
+    // ya cargado con él sigue explicándose.
+    prisma.centroDeCosto.findMany({
+      where: { organizationId: orgId, active: true },
+      select: { id: true, name: true, code: true },
+      orderBy: { code: "asc" },
+    }),
   ]);
 
   const openByAsset = await prisma.workOrder.groupBy({
@@ -78,6 +87,11 @@ export default async function AssetsPage({
   const openMap = new Map(openByAsset.map((row) => [row.assetId, row._count._all]));
 
   const vista = vistaGuardada(user.vistasTabla, "activos");
+  /**
+   * El area por la que se esta filtrando, para decirlo en pantalla. Una lista
+   * recortada sin decir por que se lee como si faltaran equipos.
+   */
+  const areaFiltrada = params.locationId ? locations.find((l) => l.id === params.locationId) ?? null : null;
 
   const filas: FilaActivo[] = assets.map((a) => ({
     id: a.id,
@@ -112,7 +126,9 @@ export default async function AssetsPage({
     <>
       <PageHeader
         title="Catálogo de activos"
-        description="Jerarquia de equipos con criticidad, estado operativo y valor de reposición."
+        description={areaFiltrada
+          ? `Equipos de ${areaFiltrada.name}. Criticidad, estado operativo y valor de reposición.`
+          : "Jerarquia de equipos con criticidad, estado operativo y valor de reposición."}
         actions={
           can(user.role, "asset:write") ? (
             <>
@@ -127,12 +143,20 @@ export default async function AssetsPage({
                 sites={sites}
                 locations={locations}
                 categories={categories}
+                centrosDeCosto={centrosDeCosto}
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
               />
             </>
           ) : null
         }
       />
+
+      {areaFiltrada ? (
+        <p className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Viendo solo los equipos de <span className="font-medium text-slate-900">{areaFiltrada.name}</span>
+          <Link href="/assets" className="font-medium text-brand-700 hover:underline">Ver todos</Link>
+        </p>
+      ) : null}
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Activos registrados" value={assets.length} />

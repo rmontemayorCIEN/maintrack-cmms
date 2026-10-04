@@ -26,15 +26,22 @@ const schema = z.object({
   assetId: z.string().optional().nullable(),
   partId: z.string().optional().nullable(),
   planId: z.string().optional().nullable(),
+  normaId: z.string().optional().nullable(),
+  /// Lo trajo la asistencia con IA. La pantalla lo advierte: el modelo puede
+  /// dar por vigente una version derogada con toda seguridad.
+  origenIa: z.boolean().optional(),
   title: z.string().trim().min(2).max(150),
   url: urlSegura,
   note: z.string().trim().max(300).optional().nullable(),
 });
 
-function destinoDe(d: { assetId?: string | null; partId?: string | null; planId?: string | null }) {
+function destinoDe(d: { assetId?: string | null; partId?: string | null; planId?: string | null; normaId?: string | null }) {
   if (d.assetId) return { clave: "assetId" as const, id: d.assetId, permiso: "asset:write" as const };
   if (d.partId) return { clave: "partId" as const, id: d.partId, permiso: "inventory:write" as const };
   if (d.planId) return { clave: "planId" as const, id: d.planId, permiso: "plan:write" as const };
+  // Mismo permiso que el resto de las rutas de normas: quien adopta una norma
+  // y le amarra evidencia es quien puede colgarle su publicacion oficial.
+  if (d.normaId) return { clave: "normaId" as const, id: d.normaId, permiso: "settings:write" as const };
   return null;
 }
 
@@ -46,7 +53,7 @@ export async function POST(request: Request) {
     if (!can(user.role, destino.permiso)) return fail("Sin permisos suficientes", 403);
 
     // El registro debe existir y ser de esta organizacion.
-    const tablas = { assetId: prisma.asset, partId: prisma.part, planId: prisma.maintenancePlan };
+    const tablas = { assetId: prisma.asset, partId: prisma.part, planId: prisma.maintenancePlan, normaId: prisma.normaAdoptada };
     const existe = await (tablas[destino.clave] as { findFirst: Function }).findFirst({
       where: { id: destino.id, organizationId: orgId },
       select: { id: true },
@@ -60,9 +67,10 @@ export async function POST(request: Request) {
         title: input.title,
         url: input.url,
         note: input.note ?? null,
+        origenIa: input.origenIa ?? false,
         [destino.clave]: destino.id,
       },
-      select: { id: true, title: true, url: true, note: true, createdAt: true },
+      select: { id: true, title: true, url: true, note: true, origenIa: true, createdAt: true },
     });
 
     await logAudit({

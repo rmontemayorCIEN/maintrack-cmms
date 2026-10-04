@@ -27,11 +27,11 @@ export const ETIQUETA_PRIORIDAD: Record<Prioridad, string> = {
 
 export type Categoria = "OBLIGATORIO" | "OPERATIVO" | "INFORMATIVO";
 
-export type Modulo = "ORDENES" | "SOLICITUDES" | "PREVENTIVO" | "MEDIDORES" | "ALMACEN" | "COMPRAS" | "ADMINISTRACION" | "RESUMENES";
+export type Modulo = "ORDENES" | "SOLICITUDES" | "PREVENTIVO" | "MEDIDORES" | "ALMACEN" | "COMPRAS" | "VIGENCIAS" | "ADMINISTRACION" | "RESUMENES" | "COMENTARIOS";
 export const ETIQUETA_MODULO: Record<Modulo, string> = {
   ORDENES: "Órdenes de trabajo", SOLICITUDES: "Solicitudes", PREVENTIVO: "Mantenimiento preventivo",
-  MEDIDORES: "Medidores y predictivo", ALMACEN: "Almacén", COMPRAS: "Compras",
-  ADMINISTRACION: "Administración", RESUMENES: "Resúmenes",
+  MEDIDORES: "Medidores y predictivo", ALMACEN: "Almacén", COMPRAS: "Compras", VIGENCIAS: "Garantías y vigencias",
+  ADMINISTRACION: "Administración", RESUMENES: "Resúmenes", COMENTARIOS: "Comentarios y menciones",
 };
 
 /**
@@ -72,6 +72,43 @@ export type DefinicionEvento = {
 const d = (x: DefinicionEvento) => x;
 
 export const EVENTOS = {
+  // ───────────────────────────────────────────── Comentarios
+  /**
+   * NO pide accion, y lo aprendio la suite.
+   *
+   * Estuvo con `requiereAccion: true` razonando que nombrar a alguien es
+   * pedirle algo. Eso es cierto de la intencion y falso del sistema: aqui
+   * «pide accion» significa que el aviso QUEDA PENDIENTE hasta que una
+   * condicion se resuelva sola —la OT se inicia, la compra se recibe— y por
+   * eso cada uno de esos tipos lleva su regla de ciclo de vida en
+   * `lib/avisos/condiciones.ts`.
+   *
+   * Una mencion no tiene esa condicion: nadie puede calcular «ya la
+   * contestaron». Dejarla pidiendo accion la habria vuelto un pendiente que no
+   * se puede cerrar nunca, que es peor que no marcarla.
+   *
+   * Es OPERATIVO y no obligatorio: se puede apagar, porque nadie corre peligro
+   * por no leer una mencion.
+   */
+  MENCION: d({
+    titulo: "Lo mencionaron", descripcion: "Alguien lo nombró en un comentario de una orden, un activo, una solicitud o una requisición.",
+    modulo: "COMENTARIOS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: false,
+    destinatarios: [["USUARIO_AFECTADO"]], quien: "La persona mencionada, y nadie más.", webhook: false,
+  }),
+
+  /**
+   * Un compromiso asignado SI pide accion, al reves que la mencion.
+   *
+   * Aqui si hay condicion que se resuelve sola: el compromiso pasa a HECHO o
+   * CANCELADO. Es exactamente lo que distingue a los avisos que quedan
+   * pendientes de los que solo informan.
+   */
+  COMPROMISO_ASIGNADO: d({
+    titulo: "Le dejaron un compromiso", descripcion: "Alguien anotó algo a su nombre en una orden, un activo, una solicitud o una requisición.",
+    modulo: "COMENTARIOS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: true,
+    destinatarios: [["USUARIO_AFECTADO"]], quien: "El responsable del compromiso.", webhook: false,
+  }),
+
   // ───────────────────────────────────────────── Órdenes de trabajo
   OT_ASIGNADA: d({
     titulo: "OT asignada", descripcion: "Le asignan una orden de trabajo.",
@@ -216,6 +253,42 @@ export const EVENTOS = {
   }),
 
   // ───────────────────────────────────────────── Almacén y compras
+  // ───────────────────────────────────────────── Vigencias
+  /**
+   * Los tres de vigencias, y por que son tres.
+   *
+   * «Por vencer» y «vencida» no son el mismo aviso con distinta urgencia: la
+   * accion cambia. Antes de vencerse hay que renovar a tiempo; despues, la
+   * planta esta operando sin cobertura y eso es una decision, no un tramite.
+   *
+   * Los dos PIDEN ACCION, o sea que quedan pendientes hasta que su condicion
+   * se resuelva sola —se renovo, o se cancelo—, y su regla esta en
+   * `lib/avisos/condiciones.ts`.
+   *
+   * El tercero NO pide accion, aunque duela: cuando se abre una correctiva de
+   * un equipo en garantia no hay condicion que el sistema pueda calcular
+   * —nadie puede saber si ya se le reclamo al proveedor—, y un aviso que pide
+   * accion sin forma de cerrarse se queda pendiente para siempre. Es la
+   * leccion que dejo MENCION.
+   */
+  VIGENCIA_POR_VENCER: d({
+    titulo: "Vigencia por vencer", descripcion: "Una garantía, póliza, contrato, calibración o permiso está por vencerse.",
+    modulo: "VIGENCIAS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: true,
+    destinatarios: [["ADMINISTRADORES"], ["SUPERVISORES"], ["PROPIETARIO"]],
+    quien: "Los destinatarios administrativos; si no hay, supervisión, y al final el propietario.", webhook: true,
+  }),
+  VIGENCIA_VENCIDA: d({
+    titulo: "Vigencia vencida", descripcion: "Se venció y no se ha renovado: el equipo o la persona quedó sin cobertura.",
+    modulo: "VIGENCIAS", prioridad: "ALTA", categoria: "OPERATIVO", requiereAccion: true,
+    destinatarios: [["ADMINISTRADORES"], ["SUPERVISORES"], ["PROPIETARIO"]],
+    quien: "Los destinatarios administrativos; si no hay, supervisión, y al final el propietario.", webhook: true,
+  }),
+  GARANTIA_EN_ORDEN: d({
+    titulo: "Se abrió trabajo sobre un equipo en garantía", descripcion: "Una orden correctiva, de seguridad o de mejora sobre un equipo que el proveedor todavía cubre.",
+    modulo: "VIGENCIAS", prioridad: "ALTA", categoria: "OPERATIVO", requiereAccion: false,
+    destinatarios: [["RESPONSABLE"], ["SUPERVISORES"], ["ADMINISTRADORES"]],
+    quien: "Quien va a hacer el trabajo; si no hay responsable, supervisión.", webhook: true,
+  }),
   REFACCION_BAJO_MINIMO: d({
     titulo: "Refacciones bajo mínimo", descripcion: "Refacciones en o por debajo de su mínimo (un aviso agrupado).",
     modulo: "ALMACEN", prioridad: "BAJA", categoria: "OPERATIVO", requiereAccion: true,
@@ -255,6 +328,14 @@ export const EVENTOS = {
     titulo: "Recepción parcial", descripcion: "Se recibió parte de una compra: hubo diferencia contra lo comprado.",
     modulo: "COMPRAS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: true,
     destinatarios: [["COMPRAS"], ["ALMACEN"]], quien: "Compras y almacén.", webhook: true,
+  }),
+  COMPRA_RECIBIDA: d({
+    titulo: "Ya llegó lo que pidió", descripcion: "El material de su solicitud de compra llegó completo al almacén.",
+    modulo: "COMPRAS", prioridad: "MEDIA", categoria: "OPERATIVO", requiereAccion: false,
+    // Los dos en el mismo eslabon: le llega a quien la pidio Y a quien tiene la
+    // orden detenida esperandola, que muchas veces no son la misma persona.
+    destinatarios: [["SOLICITANTE", "RESPONSABLE"]],
+    quien: "Quien la pidió y quien tiene la orden esperándola.", webhook: true,
   }),
 
   // ───────────────────────────────────────────── Administración

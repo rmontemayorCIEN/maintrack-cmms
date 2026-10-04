@@ -118,7 +118,7 @@ export function PanelSuscripcion({
             {PLANES[siguiente].incluye[1] ?? ""}
           </p>
           <p className="mt-2 text-[0.6875rem] text-brand-700">
-            Para cambiar de plan, contacte a su proveedor del servicio.
+            Para cambiar de plan, solicítelo en Suscripción: el cambio surte efecto el día que se confirma y la siguiente nota de cobro usa el plan nuevo.
           </p>
         </div>
       ) : null}
