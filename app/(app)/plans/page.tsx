@@ -228,13 +228,6 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
           busquedaInicial={busquedaInicial}
           editable={editable}
           assets={assets}
-          meters={meters}
-          technicians={technicians}
-          especialidades={opcEspecialidades}
-          refacciones={opcRefacciones}
-          servicios={opcServicios}
-          moneda={currency}
-          puedeCrearCatalogos={puedeCrearCatalogos}
         />
       )}
     </>
