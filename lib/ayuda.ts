@@ -785,6 +785,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Las piezas que no aplican no bajan el porcentaje: un plan de pura inspección visual no necesita refacciones ni herramientas, y no se le exigen.",
       "El avance no se guarda, se calcula cada vez que abre la pantalla. Lo único que se guarda es la meta, con quién la puso y cuándo, y queda en la bitácora.",
       "El ritmo se mide con los planes que de verdad se crearon en las últimas ocho semanas. La fecha de término es esa división, no una promesa.",
+      "«Cómo va avanzando» guarda una foto por semana, y es lo ÚNICO que se persiste del avance. Hacia atrás no existe: el día que se encendió empezó la historia, y las semanas anteriores no se pueden reconstruir porque «listo» se calcula, no se guardaba. La foto la toma sola la tarea programada que ya corre a diario.",
       "Las correcciones del agrupado se guardan POR EQUIPO, no por grupo. Es a propósito: la clave de un grupo cambia en cuanto alguien corrige un modelo mal escrito, y una corrección atada a esa clave quedaría apuntando a un grupo que ya no existe.",
       "Copiar un plan trae sus actividades con mano de obra, refacciones, servicios y herramientas, y su procedimiento. NO trae los equipos del original —esos siguen con el suyo— ni la confirmación de una actividad diaria, que es la firma de una persona y la copia todavía no tiene quién la firme.",
       "Cuando dos planes del mismo grupo comparten la mitad o más de sus actividades, se señalan como «planes que parecen el mismo». No se fusionan solos: puede que de verdad sean dos, uno mensual y otro anual.",
@@ -796,6 +797,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { nombre: "Sin modelo", explica: "Esos equipos no tienen fabricante ni modelo capturados, así que no se puede saber si son un tipo o tres. Se agrupan por familia y se le advierte: capturar el modelo parte el grupo bien." },
       { nombre: "Equipos iguales sin plan", explica: "Equipos del mismo grupo que no están en NINGÚN plan. No dice que le toquen a este plan: dice que están descubiertos." },
       { nombre: "Ritmo", explica: "Planes nuevos por semana en las últimas ocho. En cero cuando no se ha creado ninguno en ese plazo." },
+      { nombre: "Cómo va avanzando", explica: "La línea verde son los planes terminados y la gris los construidos, semana por semana. Con una sola foto no hay curva: aparece con la segunda." },
       { nombre: "Ajustado a mano", explica: "Alguien movió de grupo a alguno de esos equipos. Desde «Ajustar el grupo» se ve qué se cambió y se puede deshacer." },
     ],
     botones: [
@@ -865,7 +867,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       {
         pregunta: "¿Qué hace «Proponer un orden»?",
         respuesta:
-          "Cuando hay muchos equipos sin plan, el problema es la hoja en blanco. La IA lee su catálogo —cuántos equipos por familia, cuáles son críticos y cuáles generan más correctivo— y propone en qué orden armar el programa y qué lleva típicamente cada familia. No crea nada: es el orden, no el plan. El plan lo redacta después el generador, desde un equipo representativo.",
+          "Cuando hay muchos equipos sin plan, el problema es la hoja en blanco. La IA lee su catálogo —cuántos equipos por familia, cuáles son críticos y cuáles generan más correctivo— y propone en qué orden armar el programa y qué lleva típicamente cada familia. No crea nada: es el orden, no el plan. El plan lo redacta después el generador, desde un equipo representativo. CUÁNTOS planes faltan en cada familia no se lo pregunta al modelo: lo cuenta el constructor agrupando por fabricante y modelo, y a la IA solo se le pide decir si esos grupos llevan de verdad un plan cada uno o conviene juntarlos.",
       },
       {
         pregunta: "¿Un equipo puede tener varios planes?",

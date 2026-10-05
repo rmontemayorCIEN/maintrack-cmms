@@ -310,6 +310,7 @@ model Organization {
   resguardos         Resguardo[]
   kitsDeHerramientas KitDeHerramientas[]
   gruposDeEquipo     GrupoDeEquipo[]
+  fotosDeConstruccion FotoDeConstruccion[]
   amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
@@ -4552,5 +4553,38 @@ model GrupoDeEquipo {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
+}
+
+/// La foto semanal de como va la construccion de planes.
+///
+/// El avance del constructor se DERIVA, y por eso hacia atras no existe: hoy
+/// se puede decir cuantos planes estan listos, pero no cuantos lo estaban hace
+/// seis semanas. Esta tabla es la unica forma de tener esa curva, y solo sirve
+/// hacia adelante: lo que no se guardo esta semana no se recupera.
+///
+/// Una fila por empresa y por semana. La escribe la tarea programada que ya
+/// corre a diario, y por eso la clave es unica: pasar diez veces en la misma
+/// semana deja una sola foto, la ultima.
+model FotoDeConstruccion {
+  id             String @id @default(cuid())
+  organizationId String
+  /// El lunes de esa semana, "aaaa-mm-dd" en la zona de la empresa.
+  semana         String
+  /// Planes activos en ese momento.
+  planes         Int
+  listos         Int
+  enForma        Int
+  esqueleto      Int
+  /// El minimo sugerido y la meta que regia, para leer la curva en contexto.
+  sugeridos      Int
+  meta           Int
+  equiposTotal   Int
+  equiposCubiertos Int
+  tomadaEl       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, semana])
   @@index([organizationId])
 }
