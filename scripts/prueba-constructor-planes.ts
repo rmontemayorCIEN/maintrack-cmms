@@ -16,6 +16,7 @@ import { prisma } from "../lib/db";
 import { constructorDePlanes, fijarMetaDePlanes, piezasDelPlan, estadoDelPlan } from "../lib/constructor-planes";
 import { aplicarPlanDelGrupo, clonarPlan, corregirGrupo, claveAparte } from "../lib/constructor-acciones";
 import { altaDePlan } from "../lib/alta-de-plan";
+import { tomarFotoDeConstruccion, historiaDeConstruccion, claveDeSemana } from "../lib/constructor-historia";
 import { apagarServidor, colaDelLog, levantarServidor } from "./servidor-de-prueba";
 
 let fallos = 0;
@@ -66,6 +67,7 @@ async function main() {
       prisma.maintenancePlan.count({ where }),
       prisma.asset.count({ where }),
       prisma.auditLog.count({ where }),
+      prisma.fotoDeConstruccion.count({ where }),
       prisma.organization.count({ where: { id: { notIn: creadas }, metaPlanes: { not: null } } }),
     ]));
   };
@@ -400,13 +402,46 @@ async function main() {
     revisar("   y no se fusionan solos: los dos planes siguen ahí",
       (await prisma.maintenancePlan.count({ where: { organizationId: A.id, id: { in: [plan.id, gemelo.plan.id] }, active: true } })) === 2);
 
-    // ─────────────────────────────── 22-24 Aislamiento y permisos
-    console.log("\n22-24. Aislamiento entre empresas y permisos");
+    // ─────────────────────────────── 22-24 La foto semanal
+    console.log("\n22-24. La historia, una foto por semana");
+    const lunes = new Date("2026-09-21T15:00:00Z"); // lunes 9:00 en Monterrey
+    const miercoles = new Date("2026-09-23T15:00:00Z");
+    const lunesSiguiente = new Date("2026-09-28T15:00:00Z");
+    revisar("22. el lunes y el miércoles de la misma semana dan la misma clave",
+      claveDeSemana(lunes, "America/Monterrey") === claveDeSemana(miercoles, "America/Monterrey") &&
+      claveDeSemana(lunes, "America/Monterrey") === "2026-09-21" &&
+      claveDeSemana(lunesSiguiente, "America/Monterrey") === "2026-09-28",
+      { lunes: claveDeSemana(lunes, "America/Monterrey"), miercoles: claveDeSemana(miercoles, "America/Monterrey") });
+    revisar("   y el domingo todavía pertenece a la semana que termina",
+      claveDeSemana(new Date("2026-09-27T15:00:00Z"), "America/Monterrey") === "2026-09-21",
+      claveDeSemana(new Date("2026-09-27T15:00:00Z"), "America/Monterrey"));
+
+    const f1Foto = await tomarFotoDeConstruccion(A.id, lunes);
+    const f2Foto = await tomarFotoDeConstruccion(A.id, miercoles);
+    revisar("23. pasar dos veces en la misma semana deja UNA foto, la última",
+      f1Foto.nueva && !f2Foto.nueva && (await prisma.fotoDeConstruccion.count({ where: { organizationId: A.id } })) === 1,
+      { primera: f1Foto.nueva, segunda: f2Foto.nueva });
+    const cHoy = await constructorDePlanes(A.id);
+    revisar("   y guarda lo que el tablero muestra hoy", f2Foto.foto.planes === cHoy.construidos &&
+      f2Foto.foto.listos === cHoy.porEstado.listos && f2Foto.foto.meta === cHoy.meta && f2Foto.foto.sugeridos === cHoy.sugeridos,
+      { foto: f2Foto.foto.planes, tablero: cHoy.construidos });
+
+    await tomarFotoDeConstruccion(A.id, lunesSiguiente);
+    const historia = await historiaDeConstruccion(A.id);
+    revisar("24. la historia llega en orden, de la más vieja a la más nueva",
+      historia.length === 2 && historia[0].semana === "2026-09-21" && historia[1].semana === "2026-09-28",
+      historia.map((h) => h.semana));
+    await tomarFotoDeConstruccion(B.id, lunes);
+    revisar("   y cada empresa tiene la suya", (await historiaDeConstruccion(B.id)).length === 1 &&
+      (await prisma.fotoDeConstruccion.count({ where: { organizationId: A.id } })) === 2);
+
+    // ─────────────────────────────── 25-27 Aislamiento y permisos
+    console.log("\n25-27. Aislamiento entre empresas y permisos");
     await prisma.asset.create({ data: { organizationId: B.id, siteId: sitioB.id, code: "B-1", name: "De B", manufacturer: "Otra", model: "Z" } });
     await fijarMetaDePlanes({ organizationId: B.id, userId: duenoB.id, meta: 30 });
     const cA = await constructorDePlanes(A.id);
     const cB = await constructorDePlanes(B.id);
-    revisar("22. cada empresa ve solo lo suyo: grupos, planes y meta", cA.metaFijada === null && cB.metaFijada === 30 &&
+    revisar("25. cada empresa ve solo lo suyo: grupos, planes y meta", cA.metaFijada === null && cB.metaFijada === 30 &&
       cB.grupos.length === 1 && cB.planes.length === 0 &&
       cA.grupos.every((g) => g.equipos.every((e) => e.code !== "B-1")), { metaA: cA.metaFijada, metaB: cB.metaFijada, gruposB: cB.grupos.length });
 
@@ -432,7 +467,7 @@ async function main() {
     const cDuenoB = await sesion(duenoB);
 
     const lee = await pedir("GET", "/api/plans/constructor", cDueno);
-    revisar("23. el dueño lee su tablero por API", lee.status === 200 && (lee.json.sugeridos as number) === cA.sugeridos,
+    revisar("26. el dueño lee su tablero por API", lee.status === 200 && (lee.json.sugeridos as number) === cA.sugeridos,
       { status: lee.status, sugeridos: lee.json.sugeridos, log: lee.status >= 500 ? colaDelLog(PUERTO, 12, "constructor-planes") : undefined });
 
     const pone = await pedir("PUT", "/api/plans/constructor", cDueno, { meta: 9 });
@@ -441,7 +476,7 @@ async function main() {
       (await prisma.auditLog.count({ where: { organizationId: A.id, action: "PLAN_GOAL_CHANGED" } })) === 1, { status: pone.status });
 
     const tecIntenta = await pedir("PUT", "/api/plans/constructor", cTecnico, { meta: 1 });
-    revisar("24. un técnico no fija la meta (403), y la meta no cambió", tecIntenta.status === 403 &&
+    revisar("27. un técnico no fija la meta (403), y la meta no cambió", tecIntenta.status === 403 &&
       (await constructorDePlanes(A.id)).metaFijada === 9, { status: tecIntenta.status });
 
     const otraEmpresa = await pedir("GET", "/api/plans/constructor", cDuenoB);

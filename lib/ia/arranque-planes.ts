@@ -20,6 +20,7 @@ import { prisma } from "../db";
 import { analizarConIa, textoIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { coberturaPreventiva } from "../cobertura-planes";
+import { constructorDePlanes } from "../constructor-planes";
 
 const esquema = z.object({
   diagnostico: textoIa(
@@ -33,12 +34,14 @@ const esquema = z.object({
         orden: z.number().int().describe("1 es lo primero que conviene hacer."),
         porQue: textoIa(260, "Por que esta familia va en ese lugar. Con el dato que lo sostiene."),
         /**
-         * El caso de los compresores tipo A, B y C: una familia puede necesitar
-         * mas de un plan si los equipos difieren en actividades o frecuencia.
+         * Cuantos planes faltan NO se le pregunta al modelo: lo cuenta el
+         * constructor agrupando por modelo, y viene en el contexto. Lo que se
+         * le pide aqui es lo que si es criterio: si esos grupos de verdad
+         * llevan planes separados, o si conviene uno solo.
          */
-        cuantosPlanes: textoIa(
+        comoPartirlos: textoIa(
           200,
-          "Si con un plan basta para toda la familia, o si conviene revisar primero si hay modelos distintos que necesiten planes separados.",
+          "Si esos grupos de equipos iguales llevan de verdad un plan cada uno, o si conviene juntarlos en uno. Sin repetir el número: ese ya está contado.",
         ),
         frecuenciaSugerida: textoIa(90, "Cada cuanto, en lenguaje llano. «Mensual», «cada 500 horas»."),
         actividadesTipicas: z
@@ -53,7 +56,13 @@ const esquema = z.object({
   ).nullable(),
 });
 
-export type ArranqueDePlanes = z.infer<typeof esquema>;
+/**
+ * Lo que sale a la pantalla: lo que dijo el modelo, mas el numero que puso el
+ * codigo. Se juntan aqui para que la pantalla no tenga que sumar nada.
+ */
+export type ArranqueDePlanes = Omit<z.infer<typeof esquema>, "propuestas"> & {
+  propuestas: Array<z.infer<typeof esquema>["propuestas"][number] & { planesQueFaltan: number }>;
+};
 
 export async function proponerArranque(
   org: OrgConIa,
@@ -92,6 +101,16 @@ export async function proponerArranque(
     porFamilia.set(k, a);
   }
 
+  // Cuantos planes faltan por familia: un grupo de equipos iguales sin plan es
+  // un plan que falta. Sale del mismo calculo que el constructor, para que el
+  // numero sea el mismo en las dos pantallas.
+  const constructor = await constructorDePlanes(org.id);
+  const gruposPorFamilia = new Map<string, number>();
+  for (const g of constructor.grupos) {
+    if (g.estado !== "SIN_PLAN") continue;
+    gruposPorFamilia.set(g.categoria, (gruposPorFamilia.get(g.categoria) ?? 0) + 1);
+  }
+
   const categorias = await prisma.assetCategory.findMany({
     where: { organizationId: org.id },
     select: {
@@ -114,6 +133,9 @@ export async function proponerArranque(
         familia: c.name,
         equipos: c.assets.length,
         sinPlan: sinPlan.length,
+        // Lo cuenta el constructor, agrupando por fabricante y modelo. Es una
+        // cuenta, no una opinion: el modelo no la recalcula.
+        planesQueFaltan: gruposPorFamilia.get(c.name) ?? 0,
         criticos: sinPlan.filter((a) => a.criticality === "A").length,
         // Modelos distintos: la senal de que quiza haga falta mas de un plan.
         modelos: [...new Set(c.assets.map((a) => a.model).filter(Boolean))].slice(0, 8),
@@ -142,8 +164,10 @@ export async function proponerArranque(
       "- Los numeros ya vienen calculados. No los recalcules.\n" +
       "- El orden NO es por cantidad de equipos: se empieza por donde mas duele. Un correctivo caro " +
       "o un equipo critico pesan mas que veinte equipos sin historia.\n" +
-      "- Si una familia tiene modelos distintos, dilo: quiza necesite mas de un plan. Compresores tipo " +
-      "A y tipo B llevan planes distintos si cambian actividades o frecuencia.\n" +
+      "- Cuantos planes faltan en cada familia YA ESTA CONTADO (planesQueFaltan): es el numero de grupos " +
+      "de equipos iguales sin plan. No lo recalcules ni lo repitas como si fuera tuyo. En comoPartirlos " +
+      "di si esos grupos llevan de verdad un plan cada uno —compresores tipo A y tipo B, si cambian " +
+      "actividades o frecuencia— o si conviene juntarlos en uno.\n" +
       "- Las actividades que propongas son TIPICAS del tipo de equipo, no inventadas para impresionar. " +
       "Si no conoces el equipo, propon lo generico y dilo.\n" +
       "- Nada de torques, capacidades ni normas especificas: eso sale de la ficha del fabricante.\n" +
@@ -156,8 +180,11 @@ export async function proponerArranque(
         equiposTotales: cobertura.totalActivos,
         conPlan: cobertura.conPlan,
         sinPlan: cobertura.sinPlan.length,
+        planesQueFaltan: constructor.meta - constructor.construidos > 0 ? constructor.meta - constructor.construidos : 0,
+        planesConstruidos: constructor.construidos,
       },
       comoLeerlo: {
+        planesQueFaltan: "Cuantos planes faltan en esa familia, ya contado: un grupo de equipos iguales (misma marca y modelo) sin plan es un plan que falta. Es una cuenta, no una estimacion.",
         correctivoUltimoAno: "Órdenes correctivas de los últimos 12 meses en esa familia, con su costo y sus horas de paro. Donde mas se apaga fuego es donde mas falta preventivo.",
         modelos: "Modelos distintos dentro de la familia. Varios modelos suele significar que hace falta mas de un plan.",
         criticos: "Equipos de criticidad A sin plan. Son los que paran la producción.",
@@ -175,7 +202,9 @@ export async function proponerArranque(
     ...resultado.datos,
     propuestas: resultado.datos.propuestas
       .filter((p) => nombres.has(p.familia))
-      .sort((a, b) => a.orden - b.orden),
+      .sort((a, b) => a.orden - b.orden)
+      // El numero lo pone el codigo, no el modelo.
+      .map((p) => ({ ...p, planesQueFaltan: gruposPorFamilia.get(p.familia) ?? 0 })),
   };
 
   return { ok: true, propuesta, costoUsd: resultado.costoUsd };

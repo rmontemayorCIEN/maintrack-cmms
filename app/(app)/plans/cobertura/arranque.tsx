@@ -6,7 +6,7 @@ import { Badge, Button, Card } from "@/components/ui";
 
 type Propuesta = {
   familia: string; orden: number; porQue: string;
-  cuantosPlanes: string; frecuenciaSugerida: string;
+  comoPartirlos: string; planesQueFaltan: number; frecuenciaSugerida: string;
   actividadesTipicas: string[];
 };
 
@@ -72,9 +72,14 @@ export function ArranqueConIa({ sinPlan }: { sinPlan: number }) {
                   </span>
                   <span className="text-sm font-semibold text-slate-800">{p.familia}</span>
                   <Badge tone="info">{p.frecuenciaSugerida}</Badge>
+                  {p.planesQueFaltan > 0 ? (
+                    <Badge tone="warning">
+                      {p.planesQueFaltan === 1 ? "falta 1 plan" : `faltan ${p.planesQueFaltan} planes`}
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="mt-1 text-xs text-slate-600">{p.porQue}</p>
-                <p className="mt-1 text-xs text-amber-800">{p.cuantosPlanes}</p>
+                <p className="mt-1 text-xs text-amber-800">{p.comoPartirlos}</p>
                 {p.actividadesTipicas.length ? (
                   <ul className="mt-1.5 grid gap-0.5">
                     {p.actividadesTipicas.map((a, i) => (

@@ -24,8 +24,12 @@ type Gemelos = {
   grupo: string; grupoEtiqueta: string; parecido: number;
   planes: { id: string; nombre: string; actividades: number; equipos: number }[];
 };
+type Semana = {
+  semana: string; planes: number; listos: number; enForma: number; esqueleto: number;
+  sugeridos: number; meta: number; equiposTotal: number; equiposCubiertos: number;
+};
 type Datos = {
-  grupos: GrupoVista[]; planes: PlanVista[]; gemelos: Gemelos[];
+  grupos: GrupoVista[]; planes: PlanVista[]; gemelos: Gemelos[]; historia: Semana[];
   sugeridos: number; meta: number; metaFijada: number | null;
   metaFijadaPor: string | null; metaFijadaEl: string | null; sugeridoSuperaMeta: boolean;
   construidos: number; listos: number;
@@ -208,6 +212,8 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
           hint={datos.fechaTermino ? `faltan ${datos.meta - datos.construidos}` : "sin ritmo que proyectar"}
         />
       </div>
+
+      <Historia historia={datos.historia} meta={datos.meta} />
 
       <Card>
         <CardHeader
@@ -392,6 +398,62 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Cómo ha ido avanzando, semana por semana.
+ *
+ * Es una curva dibujada a mano con SVG y no una gráfica de la librería: son
+ * doce puntos y un solo trazo, y la librería pesa más que toda esta pantalla.
+ * Las gráficas de verdad siguen viviendo en `components/charts`.
+ */
+function Historia({ historia, meta }: { historia: Semana[]; meta: number }) {
+  // Con una sola foto no hay curva que dibujar: hay un punto. Se dice, porque
+  // callar se vería como que la pantalla no sirve.
+  if (historia.length < 2) {
+    return (
+      <Card>
+        <CardHeader title="Cómo va avanzando" subtitle="Una foto por semana. La historia empieza el día que se enciende: hacia atrás no existe, porque el avance se calcula." />
+        <p className="text-sm text-slate-500">
+          {historia.length === 0
+            ? "Todavía no hay fotos. La primera se toma sola esta semana."
+            : "Hay una sola foto. La curva aparece con la segunda, la semana que entra."}
+        </p>
+      </Card>
+    );
+  }
+
+  const tope = Math.max(meta, ...historia.map((h) => Math.max(h.listos, h.planes)), 1);
+  const ancho = 100;
+  const alto = 32;
+  const punto = (valor: number, i: number) => {
+    const x = (i / (historia.length - 1)) * ancho;
+    const y = alto - (valor / tope) * alto;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  };
+  const linea = (clave: "listos" | "planes") => historia.map((h, i) => punto(h[clave], i)).join(" ");
+  const primera = historia[0];
+  const ultima = historia[historia.length - 1];
+  const ganados = ultima.listos - primera.listos;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Cómo va avanzando"
+        subtitle="Una foto por semana: planes construidos y planes terminados."
+      />
+      <svg viewBox={`0 0 ${ancho} ${alto}`} className="h-24 w-full" preserveAspectRatio="none" role="img"
+        aria-label={`De ${primera.listos} a ${ultima.listos} planes listos en ${historia.length} semanas`}>
+        <polyline points={linea("planes")} fill="none" stroke="#cbd5e1" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <polyline points={linea("listos")} fill="none" stroke="#059669" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <p className="mt-2 text-xs text-slate-500" data-historia={historia.length}>
+        {historia.length} semanas · construidos {primera.planes} → {ultima.planes} ·{" "}
+        <span className="text-emerald-700">listos {primera.listos} → {ultima.listos}</span>
+        {ganados > 0 ? ` (+${ganados})` : ganados < 0 ? ` (${ganados})` : " (sin cambio)"}
+      </p>
+    </Card>
   );
 }
 

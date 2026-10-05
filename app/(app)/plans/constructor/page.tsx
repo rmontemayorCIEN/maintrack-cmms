@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { constructorDePlanes } from "@/lib/constructor-planes";
+import { historiaDeConstruccion } from "@/lib/constructor-historia";
 import { PageHeader } from "@/components/ui";
 import { PanelConstructor } from "./panel";
 
@@ -18,7 +19,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function ConstructorPage() {
   const user = await requireUser();
-  const c = await constructorDePlanes(user.organizationId);
+  const [c, historia] = await Promise.all([
+    constructorDePlanes(user.organizationId),
+    historiaDeConstruccion(user.organizationId),
+  ]);
 
   return (
     <>
@@ -38,6 +42,7 @@ export default async function ConstructorPage() {
           metaFijadaEl: c.metaFijadaEl?.toISOString() ?? null,
           fechaTermino: c.fechaTermino?.toISOString() ?? null,
           planes: c.planes.map((p) => ({ ...p, creadoEl: p.creadoEl.toISOString() })),
+          historia,
         }}
         editable={can(user.role, "plan:write")}
       />
