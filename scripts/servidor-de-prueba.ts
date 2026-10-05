@@ -48,6 +48,49 @@ import { tmpdir } from "node:os";
 const CARPETA = join(tmpdir(), "maintrack-servidores");
 
 /** Donde quedo el log de este servidor. */
+/**
+ * Los puertos a los que Chrome SE NIEGA a navegar.
+ *
+ * No son puertos ocupados: el servidor levanta bien y `curl` contesta 200,
+ * pero el navegador responde ERR_UNSAFE_PORT y la pagina nunca carga. La
+ * prueba de interfaz entonces reprueba TODO —ninguna barra, ningun menu, todas
+ * las rutas «se abrieron»— y parece que la aplicacion se rompio entera.
+ *
+ * Paso el 5-oct-2026 en la revision de una propuesta: el puerto al azar cayo
+ * en 3659 y la corrida se fue en rojo mientras en la Mac pasaba. Una de cada
+ * cuatrocientas corridas, que es justo la frecuencia que hace que se culpe al
+ * cambio del dia y se vuelva a intentar.
+ *
+ * La lista es la de Chromium (`net/base/port_util.cc`); aqui van los que caen
+ * en los rangos que usan las pruebas, mas los clasicos por si alguien mueve el
+ * rango.
+ */
+export const PUERTOS_QUE_CHROME_RECHAZA = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79,
+  87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137,
+  139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723,
+  2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669,
+  6679, 6697, 10080,
+]);
+
+/**
+ * Un puerto al azar del rango que el navegador SI acepta.
+ *
+ * El azar es a proposito —ver el comentario de `prueba-responsiva`: un puerto
+ * fijo deja que el servidor zombi de una corrida anterior conteste por el
+ * nuevo— pero el azar sin filtro cae tarde o temprano en un puerto bloqueado.
+ */
+export function puertoParaNavegador(desde: number, cuantos: number): number {
+  for (let i = 0; i < 50; i++) {
+    const puerto = desde + Math.floor(Math.random() * cuantos);
+    if (!PUERTOS_QUE_CHROME_RECHAZA.has(puerto)) return puerto;
+  }
+  // Rango entero bloqueado: no puede pasar con los rangos de las pruebas, y si
+  // alguien lo mueve ahi, mas vale decirlo que entregar un puerto inservible.
+  throw new Error(`No hay ningun puerto que el navegador acepte entre ${desde} y ${desde + cuantos - 1}`);
+}
+
 export function rutaDelLog(puerto: number, nombre?: string): string {
   const quien = nombre ?? basename(process.argv[1] ?? "prueba", ".ts");
   return join(CARPETA, `${quien}-${puerto}.log`);
