@@ -65,6 +65,7 @@ export type PlanExistente = {
   intervalMeter: number | null;
   meterId: string | null;
   leadTimeDays: number;
+  toleranceDays: number;
   priority: string;
   estimatedHours: number;
   assignedToId: string | null;
@@ -143,7 +144,7 @@ export function PlanDialog({
    * Borrador con el que abrir el formulario ya lleno —hoy lo produce la IA—.
    * Sigue siendo un alta: nada se guarda hasta que alguien revise y confirme.
    */
-  borrador?: Omit<PlanExistente, "id" | "equipos" | "intervalMeter" | "meterId" | "leadTimeDays" | "assignedToId"> & {
+  borrador?: Omit<PlanExistente, "id" | "equipos" | "intervalMeter" | "meterId" | "leadTimeDays" | "toleranceDays" | "assignedToId"> & {
     /** El equipo con el que la IA lo redacto: se propone como primer equipo. */
     assetId: string;
   };
@@ -183,6 +184,7 @@ export function PlanDialog({
     intervalDays: inicial?.intervalDays != null ? String(inicial.intervalDays) : "30",
     intervalMeter: plan?.intervalMeter != null ? String(plan.intervalMeter) : "",
     leadTimeDays: String(plan?.leadTimeDays ?? 3),
+    toleranceDays: String(plan?.toleranceDays ?? 2),
     priority: inicial?.priority ?? "MEDIUM",
     estimatedHours: String(inicial?.estimatedHours ?? 2),
     assignedToId: plan?.assignedToId ?? "",
@@ -290,6 +292,7 @@ export function PlanDialog({
       intervalDays: form.triggerType === "CALENDAR" ? Number(form.intervalDays) : null,
       intervalMeter: form.triggerType === "METER" ? Number(form.intervalMeter) : null,
       leadTimeDays: Number(form.leadTimeDays),
+      toleranceDays: Number(form.toleranceDays),
       estimatedHours: Number(form.estimatedHours),
       assignedToId: form.assignedToId || null,
       ...(plan
@@ -508,6 +511,15 @@ export function PlanDialog({
           <div>
             <label className="label">Anticipación (días)</label>
             <input type="number" inputMode="decimal" min="0" className="field" value={form.leadTimeDays} onChange={(e) => set("leadTimeDays", e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Tolerancia (días)</label>
+            <input
+              type="number" inputMode="decimal" min="0" max="365" className="field"
+              value={form.toleranceDays}
+              onChange={(e) => set("toleranceDays", e.target.value)}
+              title="Cuántos días se puede pasar antes de contar como incumplimiento"
+            />
           </div>
           <div>
             <label className="label">Prioridad</label>

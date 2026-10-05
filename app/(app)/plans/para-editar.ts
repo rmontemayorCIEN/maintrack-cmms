@@ -23,6 +23,7 @@ export function planParaEditar(plan: PlanParaEditar) {
     intervalMeter: plan.intervalMeter,
     meterId: plan.meterId,
     leadTimeDays: plan.leadTimeDays,
+    toleranceDays: plan.toleranceDays,
     priority: plan.priority,
     estimatedHours: plan.estimatedHours,
     assignedToId: plan.assignedToId,
