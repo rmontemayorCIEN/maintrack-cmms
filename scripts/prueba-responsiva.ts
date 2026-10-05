@@ -36,7 +36,7 @@ import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SignJWT } from "jose";
-import { levantarServidor } from "./servidor-de-prueba";
+import { levantarServidor, puertoParaNavegador } from "./servidor-de-prueba";
 // Cuantos formatos hay lo decide el catalogo, no esta prueba: con el numero
 // escrito aqui, quitar una plantilla rompia una prueba de OTRO modulo.
 import { PLANTILLAS } from "../lib/registros-plantillas";
@@ -178,8 +178,11 @@ async function main() {
    * Lo peor es como enganaba: fallaba solo en las pantallas cuyo archivo
    * habia cambiado desde ese build, asi que parecia senalar justo lo ultimo
    * que uno toco. Se persiguio medio dia un defecto que no existia.
+   *
+   * El azar se filtra: hay puertos a los que Chrome no navega aunque el
+   * servidor conteste (ver `PUERTOS_QUE_CHROME_RECHAZA`).
    */
-  const PUERTO_APP = 3400 + Math.floor(Math.random() * 400);
+  const PUERTO_APP = puertoParaNavegador(3400, 400);
   const base = process.env.BASE_URL ?? `http://127.0.0.1:${PUERTO_APP}`;
 
   /**
