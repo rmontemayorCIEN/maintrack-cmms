@@ -40,8 +40,7 @@ const guion = (v: string | null | undefined) => (v && v.trim() ? v : "—");
 const TRIGGER: Record<string, string> = { CALENDAR: "Calendario", METER: "Medidor", CONDITION: "Condicion" };
 
 export function TablaPlanes({
-  planes, vistaInicial, editable, assets, meters, technicians,
-  especialidades, refacciones, servicios, moneda, puedeCrearCatalogos, busquedaInicial, conCostos = true,
+  planes, vistaInicial, editable, assets, busquedaInicial, conCostos = true,
 }: {
   /** Sin costos (técnico): el costo estimado del plan no se ofrece. */
   conCostos?: boolean;
@@ -49,14 +48,8 @@ export function TablaPlanes({
   vistaInicial: Vista;
   busquedaInicial?: string;
   editable: boolean;
-  assets: React.ComponentProps<typeof PlanDialog>["assets"];
-  meters: React.ComponentProps<typeof PlanDialog>["meters"];
-  technicians: React.ComponentProps<typeof PlanDialog>["technicians"];
-  especialidades: React.ComponentProps<typeof PlanDialog>["especialidades"];
-  refacciones: React.ComponentProps<typeof PlanDialog>["refacciones"];
-  servicios: React.ComponentProps<typeof PlanDialog>["servicios"];
-  moneda: string;
-  puedeCrearCatalogos: boolean;
+  /** Solo para ofrecer equipos al asignarlos: el dialogo de edicion vive en la ficha del plan. */
+  assets: React.ComponentProps<typeof EquiposDelPlan>["activos"];
 }) {
   const zona = useZona();
   const FIJAS: Columna<FilaPlan>[] = [
@@ -81,7 +74,7 @@ export function TablaPlanes({
               planId={p.id} nombre={p.name} intervaloDias={p.intervalDays ?? null}
               porMedidor={p.triggerType === "METER"}
               editable={editable}
-              activos={assets.map((a) => ({ id: a.id, code: a.code, name: a.name }))}
+              activos={assets}
             />
           </div>
         </div>

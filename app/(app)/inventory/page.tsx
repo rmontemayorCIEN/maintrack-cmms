@@ -317,10 +317,6 @@ export default async function InventoryPage({
           refacciones={filas}
           vistaInicial={vista}
           editable={editable}
-          suppliers={suppliers}
-          familias={familias}
-          unidades={unidades}
-          puedeGestionarCatalogos={can(user.role, "settings:write")}
           warehouseId={almacenActivo?.id ?? null}
           conCostos={verCostosDeAlmacen(user.role)}
         />

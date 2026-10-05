@@ -6,7 +6,6 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { AdjuntosRefaccion } from "./adjuntos-refaccion";
 import { EquivalenciasRefaccion } from "./equivalencias-refaccion";
 import { MovementForm } from "./movement-form";
-import { PartDialog } from "./part-dialog";
 import Link from "next/link";
 
 type Adjunto = {
@@ -46,18 +45,13 @@ function nivel(p: FilaRefaccion) {
 }
 
 export function TablaRefacciones({
-  refacciones, vistaInicial, editable, suppliers, familias, unidades, puedeGestionarCatalogos,
-  warehouseId, conCostos = true,
+  refacciones, vistaInicial, editable, warehouseId, conCostos = true,
 }: {
   /** Sin costos (técnico): costo unitario y valor no se ofrecen. */
   conCostos?: boolean;
   refacciones: FilaRefaccion[];
   vistaInicial: Vista;
   editable: boolean;
-  suppliers: { id: string; name: string }[];
-  familias: { code: string; name: string }[];
-  unidades: { code: string; name: string }[];
-  puedeGestionarCatalogos: boolean;
   /** Almacen en el que se aplican los movimientos. Nulo = el general. */
   warehouseId?: string | null;
 }) {
