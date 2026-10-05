@@ -13,7 +13,12 @@ source "$(dirname "$0")/ip-publica.sh"
 source "$(dirname "$0")/proyecto.sh"
 cd "$(dirname "$0")/.."
 
-INSTANCIA_SQL="maintrack-db"
+# La instancia y el secreto se pueden cambiar para apuntar a la base de
+# PRUEBAS, y para eso existe `con-pruebas.sh`, que los pone y se llama distinto
+# a proposito: un error de dedo tiene que verse en el nombre del comando, no
+# esconderse en una variable.
+INSTANCIA_SQL="${MT_INSTANCIA_SQL:-maintrack-db}"
+SECRETO_DB="${MT_SECRETO_DB:-cmms-database-url}"
 PUERTA_ABIERTA=0
 SCRIPT="${1:?Falta el script a ejecutar}"; shift
 
@@ -47,10 +52,10 @@ MI_IP=$(ip_publica) || {
 
 gcloud sql instances patch "$INSTANCIA_SQL" --authorized-networks="$MI_IP/32" --quiet >/dev/null
 PUERTA_ABIERTA=1
-echo "Puerta abierta para $MI_IP"
+echo "Puerta abierta para $MI_IP → $INSTANCIA_SQL"
 
 IP_DB=$(gcloud sql instances describe "$INSTANCIA_SQL" --format="value(ipAddresses[0].ipAddress)")
-CLAVE=$(gcloud secrets versions access latest --secret=cmms-database-url \
+CLAVE=$(gcloud secrets versions access latest --secret="$SECRETO_DB" \
   | sed -n 's|^postgresql://maintrack:\(.*\)@localhost/maintrack?host=.*$|\1|p')
 [ -z "$CLAVE" ] && { echo "ERROR: no se pudo leer la cadena de conexion del Secret Manager."; exit 1; }
 
