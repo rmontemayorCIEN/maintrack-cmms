@@ -16,6 +16,12 @@ const schema = z.object({
   intervalDays: z.coerce.number().int().positive().nullable().optional(),
   intervalMeter: z.coerce.number().positive().nullable().optional(),
   leadTimeDays: z.coerce.number().int().min(0).optional(),
+  /**
+   * Cuantos dias puede pasarse un preventivo antes de contar como
+   * incumplimiento (lib/avisos/detectores.ts). Se aceptaba al crear y NO al
+   * editar, asi que valia 2 para todos y no habia forma de cambiarlo.
+   */
+  toleranceDays: z.coerce.number().int().min(0).max(365).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
   estimatedHours: z.coerce.number().min(0).optional(),
   requiresShutdown: z.coerce.boolean().optional(),

@@ -531,6 +531,30 @@ async function main() {
       edicion.status === 200 && trasEditar.length === 1 && trasEditar[0].kitId === caja.id && trasEditar[0].partId === null,
       { status: edicion.status, herramientas: trasEditar.length });
 
+    // La tolerancia: se aceptaba al crear y NO al editar, así que valía 2 para
+    // todos y nadie podía cambiarla. Es lo que decide si un preventivo tarde
+    // cuenta como incumplimiento, así que no es cosmético.
+    const conTolerancia = await pedir("POST", "/api/plans", cDueno, {
+      name: `Con tolerancia ${sello}`, maintenanceType: "PREVENTIVE", triggerType: "CALENDAR", intervalDays: 30,
+      leadTimeDays: 3, toleranceDays: 7, priority: "MEDIUM", estimatedHours: 1, requiresShutdown: false, active: true,
+      assetIds: [ga30a.id],
+      tasks: [{ title: "Revisar", taskType: "CHECK", required: true, cadaCuanto: 30, unidadFrecuencia: "DIAS", labor: [], parts: [], services: [] }],
+    });
+    const idTol = ((conTolerancia.json.plan ?? conTolerancia.json) as { id?: string })?.id ?? "";
+    const tolCreada = (await prisma.maintenancePlan.findUniqueOrThrow({ where: { id: idTol }, select: { toleranceDays: true } })).toleranceDays;
+    revisar("   la tolerancia se guarda al crear el plan", conTolerancia.status === 201 && tolCreada === 7,
+      { status: conTolerancia.status, tolerancia: tolCreada });
+
+    const tolEditada = await pedir("PATCH", `/api/plans/${idTol}`, cDueno, { toleranceDays: 15 });
+    const trasTol = (await prisma.maintenancePlan.findUniqueOrThrow({ where: { id: idTol }, select: { toleranceDays: true } })).toleranceDays;
+    revisar("   y al editarlo también: antes el PATCH la ignoraba y quedaba en 2 para siempre",
+      tolEditada.status === 200 && trasTol === 15, { status: tolEditada.status, tolerancia: trasTol });
+
+    const tolAbsurda = await pedir("PATCH", `/api/plans/${idTol}`, cDueno, { toleranceDays: 9999 });
+    const trasAbsurda = (await prisma.maintenancePlan.findUniqueOrThrow({ where: { id: idTol }, select: { toleranceDays: true } })).toleranceDays;
+    revisar("   una tolerancia absurda se rechaza y no pisa la buena", tolAbsurda.status >= 400 && trasAbsurda === 15,
+      { status: tolAbsurda.status, tolerancia: trasAbsurda });
+
     const basura = await pedir("PUT", "/api/plans/constructor", cDueno, { meta: "muchos" });
     revisar("   una meta que no es número se rechaza sin tocar nada", basura.status >= 400 &&
       (await constructorDePlanes(A.id)).metaFijada === 9, { status: basura.status });
