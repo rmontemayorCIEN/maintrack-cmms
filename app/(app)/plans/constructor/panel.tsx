@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, Loader2, Pencil, TrendingUp } from "lucide-react";
+import { AlertTriangle, Check, Copy, GitMerge, Loader2, Pencil, Scissors, TrendingUp } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Progress, Stat } from "@/components/ui";
 import { useZona } from "@/components/zona-empresa";
 import { formatDia } from "@/lib/utils";
+import { Dialogo } from "@/components/ui/dialogo";
 import type { EstadoPlan, PiezaPlan } from "@/lib/constructor-planes";
 
 type PlanVista = {
@@ -17,10 +18,14 @@ type GrupoVista = {
   clave: string; categoria: string; marca: string | null; modeloConocido: boolean;
   equipos: { id: string; code: string; name: string; criticality: string; conPlan: boolean }[];
   sinPlan: number; planes: { id: string; nombre: string; estado: EstadoPlan; avance: number }[];
-  estado: EstadoPlan | "SIN_PLAN"; criticidad: string;
+  estado: EstadoPlan | "SIN_PLAN"; criticidad: string; aMano: boolean;
+};
+type Gemelos = {
+  grupo: string; grupoEtiqueta: string; parecido: number;
+  planes: { id: string; nombre: string; actividades: number; equipos: number }[];
 };
 type Datos = {
-  grupos: GrupoVista[]; planes: PlanVista[];
+  grupos: GrupoVista[]; planes: PlanVista[]; gemelos: Gemelos[];
   sugeridos: number; meta: number; metaFijada: number | null;
   metaFijadaPor: string | null; metaFijadaEl: string | null; sugeridoSuperaMeta: boolean;
   construidos: number; listos: number;
@@ -51,6 +56,33 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verTodos, setVerTodos] = useState(false);
+  const [ajustando, setAjustando] = useState<GrupoVista | null>(null);
+  const [clonando, setClonando] = useState<GrupoVista | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  /** Toda acción pasa por la misma ruta, y al terminar se recarga del servidor. */
+  const accion = async (cuerpo: Record<string, unknown>, exito?: string) => {
+    setGuardando(true);
+    setError(null);
+    setAviso(null);
+    try {
+      const r = await fetch("/api/plans/constructor/acciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((j as { error?: string })?.error ?? "No se pudo completar la acción");
+      setAjustando(null);
+      setClonando(null);
+      if (exito) setAviso(exito);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo completar la acción");
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   const guardar = async (meta: number | null) => {
     setGuardando(true);
@@ -126,6 +158,7 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
         </div>
 
         {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+        {aviso ? <p className="mt-2 text-xs text-emerald-700">{aviso}</p> : null}
 
         <div className="mt-3">
           <Progress value={avance} tone={avance >= 80 ? "good" : avance >= 40 ? "warn" : "bad"} />
@@ -202,6 +235,7 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
                       <p className="text-xs text-slate-500">
                         {g.marca ?? "sin fabricante ni modelo capturados"}
                         {!g.modeloConocido ? " · sin modelo: puede que sean varios tipos" : ""}
+                        {g.aMano ? " · ajustado a mano" : ""}
                       </p>
                     </td>
                     <td className="py-2 pr-3 tabular-nums">
@@ -220,14 +254,41 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
                     </td>
                     <td className="py-2 text-xs">
                       {g.estado === "SIN_PLAN" ? (
-                        <Link href="/plans" className="text-brand-700 hover:underline">
-                          Armar su plan
-                        </Link>
+                        <span className="text-slate-500">Sin plan todavía</span>
                       ) : plan && plan.falta.length ? (
                         <span className="text-amber-800">{plan.falta.join(" · ")}</span>
                       ) : (
                         <span className="text-slate-400">—</span>
                       )}
+                      {editable ? (
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {g.estado === "SIN_PLAN" ? (
+                            <>
+                              <Link href="/plans" className="text-brand-700 hover:underline">Armar su plan</Link>
+                              {datos.planes.length ? (
+                                <button type="button" className="text-brand-700 hover:underline" onClick={() => setClonando(g)}>
+                                  Copiar uno que ya tenga
+                                </button>
+                              ) : null}
+                            </>
+                          ) : g.sinPlan > 0 && peor ? (
+                            <button
+                              type="button"
+                              className="text-brand-700 hover:underline disabled:opacity-50"
+                              disabled={guardando}
+                              onClick={() => accion(
+                                { accion: "APLICAR_AL_GRUPO", planId: peor.id, clave: g.clave },
+                                `«${peor.nombre}» se aplicó a los equipos que faltaban.`,
+                              )}
+                            >
+                              Aplicar «{peor.nombre}» a {g.sinPlan} equipo(s)
+                            </button>
+                          ) : null}
+                          <button type="button" className="text-slate-500 hover:underline" onClick={() => setAjustando(g)}>
+                            Ajustar el grupo
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -241,6 +302,28 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
           </Button>
         ) : null}
       </Card>
+
+      {datos.gemelos.length ? (
+        <Card>
+          <CardHeader
+            title="Planes que parecen el mismo"
+            subtitle="Cubren equipos del mismo grupo y comparten actividades. Puede que sean dos de verdad —uno mensual y otro anual—: solo se señalan."
+          />
+          <div className="space-y-3" data-gemelos={datos.gemelos.length}>
+            {datos.gemelos.map((g) => (
+              <div key={`${g.grupo}-${g.planes[0].id}-${g.planes[1].id}`} className="flex flex-wrap items-center gap-2 text-sm">
+                <GitMerge className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                <Link href={`/plans/${g.planes[0].id}`} className="font-medium text-slate-900 hover:underline">{g.planes[0].nombre}</Link>
+                <span className="text-xs text-slate-500">y</span>
+                <Link href={`/plans/${g.planes[1].id}`} className="font-medium text-slate-900 hover:underline">{g.planes[1].nombre}</Link>
+                <span className="text-xs text-slate-500">
+                  · {g.grupoEtiqueta} · comparten el {g.parecido}% de sus actividades
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader
@@ -286,6 +369,186 @@ export function PanelConstructor({ datos, editable }: { datos: Datos; editable: 
           ) : null}
         </div>
       </Card>
+
+      {ajustando ? (
+        <AjustarGrupo
+          grupo={ajustando}
+          grupos={datos.grupos}
+          guardando={guardando}
+          onCerrar={() => setAjustando(null)}
+          onCorregir={(equipos, destino, exito) => accion({ accion: "CORREGIR_GRUPO", equipos, destino }, exito)}
+        />
+      ) : null}
+
+      {clonando ? (
+        <CopiarPlan
+          grupo={clonando}
+          planes={datos.planes}
+          guardando={guardando}
+          onCerrar={() => setClonando(null)}
+          onClonar={(planId, nombre, equipos) =>
+            accion({ accion: "CLONAR", planId, nombre, equipos }, "La copia quedó lista. Revísela y ajústela.")
+          }
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Corregir el agrupado: separar un equipo que lleva su propio plan, unir este
+ * grupo con otro, o deshacer lo que ya se ajustó.
+ */
+function AjustarGrupo({
+  grupo, grupos, guardando, onCerrar, onCorregir,
+}: {
+  grupo: GrupoVista;
+  grupos: GrupoVista[];
+  guardando: boolean;
+  onCerrar: () => void;
+  onCorregir: (equipos: string[], destino: string | null, exito: string) => void;
+}) {
+  const [separar, setSeparar] = useState<string[]>([]);
+  const [destino, setDestino] = useState("");
+  const otros = grupos.filter((g) => g.clave !== grupo.clave);
+  const etiqueta = (g: GrupoVista) => [g.categoria, g.marca].filter(Boolean).join(" · ");
+
+  return (
+    <Dialogo
+      titulo={`Ajustar «${etiqueta(grupo)}»`}
+      descripcion="El agrupado se calcula solo. Aquí se corrige lo que el cálculo no puede saber, y se guarda esa corrección."
+      onCerrar={onCerrar}
+    >
+      <div className="space-y-4">
+        <div>
+          <p className="label">Separar equipos de este grupo</p>
+          <p className="mb-1.5 text-xs text-slate-500">Cada uno queda en su propio grupo y pedirá su propio plan.</p>
+          <div className="max-h-44 space-y-1 overflow-y-auto">
+            {grupo.equipos.map((e) => (
+              <label key={e.id} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300"
+                  checked={separar.includes(e.id)}
+                  onChange={(ev) => setSeparar(ev.target.checked ? [...separar, e.id] : separar.filter((x) => x !== e.id))}
+                />
+                <span className="font-medium">{e.code}</span>
+                <span className="text-slate-500">{e.name}</span>
+              </label>
+            ))}
+          </div>
+          <Button
+            size="sm"
+            className="mt-2"
+            disabled={guardando || separar.length === 0}
+            onClick={() => onCorregir(separar, `aparte:${separar[0]}`, `${separar.length} equipo(s) quedaron aparte.`)}
+          >
+            <Scissors className="h-3.5 w-3.5" />
+            Separar {separar.length || ""}
+          </Button>
+        </div>
+
+        {otros.length ? (
+          <div className="border-t border-slate-200 pt-3">
+            <p className="label">Unir este grupo con otro</p>
+            <p className="mb-1.5 text-xs text-slate-500">
+              Los {grupo.equipos.length} equipo(s) de aquí se mueven al grupo que elija, y comparten su plan.
+            </p>
+            <select className="field" value={destino} onChange={(e) => setDestino(e.target.value)}>
+              <option value="">Seleccione el grupo destino…</option>
+              {otros.map((g) => (
+                <option key={g.clave} value={g.clave}>{etiqueta(g)} ({g.equipos.length})</option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              className="mt-2"
+              disabled={guardando || !destino}
+              onClick={() => onCorregir(grupo.equipos.map((e) => e.id), destino, "Los grupos quedaron unidos.")}
+            >
+              <GitMerge className="h-3.5 w-3.5" />
+              Unir
+            </Button>
+          </div>
+        ) : null}
+
+        {grupo.aMano ? (
+          <div className="border-t border-slate-200 pt-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={guardando}
+              onClick={() => onCorregir(grupo.equipos.map((e) => e.id), null, "Vuelve a mandar el agrupado calculado.")}
+            >
+              Deshacer los ajustes de este grupo
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </Dialogo>
+  );
+}
+
+/** Copiar un plan que ya existe para los equipos de un grupo que no tiene. */
+function CopiarPlan({
+  grupo, planes, guardando, onCerrar, onClonar,
+}: {
+  grupo: GrupoVista;
+  planes: PlanVista[];
+  guardando: boolean;
+  onCerrar: () => void;
+  onClonar: (planId: string, nombre: string, equipos: string[]) => void;
+}) {
+  const etiqueta = [grupo.categoria, grupo.marca].filter(Boolean).join(" · ");
+  const sugeridos = planes.slice().sort((a, b) => b.avance - a.avance);
+  const [planId, setPlanId] = useState(sugeridos[0]?.id ?? "");
+  const [nombre, setNombre] = useState(`Preventivo ${etiqueta}`.slice(0, 120));
+  const [conEquipos, setConEquipos] = useState(true);
+
+  return (
+    <Dialogo
+      titulo={`Copiar un plan para «${etiqueta}»`}
+      descripcion="Se copian las actividades con su mano de obra, refacciones, servicios y herramientas. La copia nace aparte: cambiarla no toca al original."
+      onCerrar={onCerrar}
+      pie={
+        <>
+          <Button variant="ghost" onClick={onCerrar} disabled={guardando}>Cancelar</Button>
+          <Button
+            disabled={guardando || !planId || nombre.trim().length < 3}
+            onClick={() => onClonar(planId, nombre.trim(), conEquipos ? grupo.equipos.map((e) => e.id) : [])}
+          >
+            {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
+            Copiar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <div>
+          <label className="label">Plan a copiar</label>
+          <select className="field" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            {sugeridos.map((p) => (
+              <option key={p.id} value={p.id}>{p.nombre} · {p.actividades} actividad(es) · {p.avance}%</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Nombre de la copia</label>
+          <input className="field" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={120} />
+        </div>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300"
+            checked={conEquipos}
+            onChange={(e) => setConEquipos(e.target.checked)}
+          />
+          <span>
+            Aplicarla a los {grupo.equipos.length} equipo(s) de este grupo
+            <span className="block text-xs text-slate-500">Las fechas se reparten para no pararlos todos el mismo día.</span>
+          </span>
+        </label>
+      </div>
+    </Dialogo>
   );
 }

@@ -9,6 +9,14 @@ export type Opcion = { id: string; etiqueta: string; costo: number; unidad?: str
 export type LineaMO = { specialtyId: string; personas: string; hours: string };
 export type LineaRef = { partId: string; quantity: string };
 export type LineaSrv = { serviceId: string; quantity: string; nota: string };
+/**
+ * Una herramienta que la actividad necesita tener en la mano.
+ *
+ * `fuente` dice de dónde cuelga —del almacén, de un activo serializado o de
+ * una caja— porque las tres existen en el sistema y el modelo guarda
+ * exactamente una. No se consume: no entra al costo del plan.
+ */
+export type LineaHta = { fuente: "ALMACEN" | "ACTIVO" | "CAJA"; id: string; cantidad: string; nota: string };
 
 /**
  * Los recursos que una actividad del plan requiere.
@@ -18,26 +26,36 @@ export type LineaSrv = { serviceId: string; quantity: string; nota: string };
  * quien lo hace, con que material y que parte se contrata afuera.
  */
 export function RecursosTarea({
-  labor, parts, services,
-  especialidades, refacciones, servicios,
+  labor, parts, services, tools,
+  especialidades, refacciones, servicios, herramientas, herramientasActivo, cajas,
   moneda, puedeCrear,
-  onLabor, onParts, onServices,
+  onLabor, onParts, onServices, onTools,
   onEspecialidades, onServicios,
 }: {
   labor: LineaMO[];
   parts: LineaRef[];
   services: LineaSrv[];
+  tools: LineaHta[];
   especialidades: Opcion[];
   refacciones: Opcion[];
   servicios: Opcion[];
+  herramientas: Opcion[];
+  herramientasActivo: Opcion[];
+  cajas: Opcion[];
   moneda: string;
   puedeCrear: boolean;
   onLabor: (v: LineaMO[]) => void;
   onParts: (v: LineaRef[]) => void;
   onServices: (v: LineaSrv[]) => void;
+  onTools: (v: LineaHta[]) => void;
   onEspecialidades: (v: Opcion[]) => void;
   onServicios: (v: Opcion[]) => void;
 }) {
+  const opcionesDe = (fuente: LineaHta["fuente"]) =>
+    fuente === "ALMACEN" ? herramientas : fuente === "ACTIVO" ? herramientasActivo : cajas;
+  const hayHerramientas = herramientas.length + herramientasActivo.length + cajas.length > 0;
+  const primeraFuente: LineaHta["fuente"] =
+    herramientas.length ? "ALMACEN" : herramientasActivo.length ? "ACTIVO" : "CAJA";
   return (
     <div className="grid gap-3 rounded-lg bg-slate-50 p-3">
       {/* ------------------------------------------------------ Mano de obra */}
@@ -194,6 +212,61 @@ export function RecursosTarea({
                 {formatCurrency(Number(linea.quantity || 0) * (srv?.costo ?? 0), moneda)}
               </p>
               <Quitar onClick={() => onServices(services.filter((_, j) => j !== i))} />
+            </div>
+          );
+        })}
+      </Bloque>
+
+      {/* ------------------------------------------------------- Herramientas */}
+      <Bloque
+        titulo="Herramientas"
+        vacio="Sin herramientas declaradas."
+        hayFilas={tools.length > 0}
+        onAgregar={() =>
+          onTools([...tools, { fuente: primeraFuente, id: opcionesDe(primeraFuente)[0]?.id ?? "", cantidad: "1", nota: "" }])
+        }
+        deshabilitado={!hayHerramientas}
+        aviso={hayHerramientas ? null : "No hay herramientas ni cajas dadas de alta."}
+      >
+        {tools.map((linea, i) => {
+          const opciones = opcionesDe(linea.fuente);
+          // Un select cuyo valor no está entre sus opciones muestra la primera
+          // y conserva el valor viejo: el efectivo se deriva en cada render.
+          const valor = opciones.some((o) => o.id === linea.id) ? linea.id : "";
+          const cambiar = (cambio: Partial<LineaHta>) =>
+            onTools(tools.map((h, j) => (j === i ? { ...h, ...cambio } : h)));
+          return (
+            <div key={i} className="grid gap-1.5 md:grid-cols-[110px_1fr_80px_1fr_28px]">
+              <select
+                className="field"
+                value={linea.fuente}
+                title="De dónde sale la herramienta"
+                onChange={(e) => {
+                  const fuente = e.target.value as LineaHta["fuente"];
+                  cambiar({ fuente, id: opcionesDe(fuente)[0]?.id ?? "" });
+                }}
+              >
+                <option value="ALMACEN">Del almacén</option>
+                <option value="ACTIVO">Serializada</option>
+                <option value="CAJA">Caja</option>
+              </select>
+              <select className="field" value={valor} onChange={(e) => cambiar({ id: e.target.value })}>
+                <option value="">Seleccione…</option>
+                {opciones.map((o) => (
+                  <option key={o.id} value={o.id}>{o.etiqueta}</option>
+                ))}
+              </select>
+              <input
+                className="field" type="number" inputMode="decimal" min="0" step="1" title="Cuántas"
+                value={linea.cantidad}
+                onChange={(e) => cambiar({ cantidad: e.target.value })}
+              />
+              <input
+                className="field" placeholder="Para qué, o con qué medida"
+                value={linea.nota}
+                onChange={(e) => cambiar({ nota: e.target.value })}
+              />
+              <Quitar onClick={() => onTools(tools.filter((_, j) => j !== i))} />
             </div>
           );
         })}

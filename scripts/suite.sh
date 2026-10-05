@@ -13,8 +13,10 @@
 #      el cliente viejo, y en cuanto algo corre `prisma generate` —un build,
 #      por ejemplo— todo lo que sigue revienta. Dos veces se diagnostico como
 #      si fuera el cambio del dia.
-#   2. Un servidor de desarrollo propio corriendo: las pruebas levantan el
-#      suyo y compiten por `.next`.
+#   2. Un servidor de desarrollo DE ESTE PROYECTO corriendo: las pruebas
+#      levantan el suyo y compiten por `.next`. El de otro proyecto no
+#      estorba: en esta Mac conviven varios y bloquear por cualquiera
+#      obligaba a apagar trabajo ajeno para correr la suite.
 #   3. Algo contra produccion en paralelo, que cambia el esquema debajo.
 #
 # Y al final separa las fallas ESPERADAS —las que dependen de la llave de IA—
@@ -42,10 +44,26 @@ if [ "$PROVIDER" != "sqlite" ]; then
 fi
 echo "  ok  el esquema esta en SQLite"
 
-# ── 2. Ningun servidor propio compitiendo por .next.
-if pgrep -f "next (dev|start)" >/dev/null 2>&1; then
+# ── 2. Ningun servidor DE ESTE PROYECTO compitiendo por .next.
+#
+# Se mira la carpeta de trabajo de cada proceso, no solo su nombre: el `next
+# dev` de otro proyecto de la misma Mac no toca este `.next` y no tiene por que
+# detener la suite. Si no se puede averiguar la carpeta, se avisa y se sigue:
+# mas vale un aviso que un bloqueo por algo ajeno.
+AQUI=$(pwd -P)
+AJENOS=0
+PROPIOS=""
+for PID in $(pgrep -f "next (dev|start)" 2>/dev/null); do
+  CWD=$(lsof -a -p "$PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
+  if [ -z "$CWD" ]; then AJENOS=$((AJENOS + 1)); continue; fi
+  case "$CWD" in
+    "$AQUI"|"$AQUI"/*) PROPIOS="$PROPIOS $PID" ;;
+    *) AJENOS=$((AJENOS + 1)) ;;
+  esac
+done
+if [ -n "$PROPIOS" ]; then
   echo ""
-  echo "  ERROR: hay un servidor de desarrollo corriendo."
+  echo "  ERROR: hay un servidor de desarrollo de ESTE proyecto corriendo (PID:$PROPIOS)."
   echo ""
   echo "  Las pruebas levantan el suyo y compiten por .next: eso produce"
   echo "  errores 500 y tiempos de espera que no tienen que ver con el codigo."
@@ -54,7 +72,11 @@ if pgrep -f "next (dev|start)" >/dev/null 2>&1; then
   echo ""
   exit 1
 fi
-echo "  ok  no hay servidores de desarrollo corriendo"
+if [ "$AJENOS" -gt 0 ]; then
+  echo "  ok  no hay servidores de ESTE proyecto ($AJENOS de otro proyecto, no estorban)"
+else
+  echo "  ok  no hay servidores de desarrollo corriendo"
+fi
 
 # ── 3. Que se sepa que esperamos que falle, y por que.
 [ -n "${ANTHROPIC_API_KEY:-}" ] && HAY_IA=1 || HAY_IA=0

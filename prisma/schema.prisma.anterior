@@ -309,6 +309,7 @@ model Organization {
   normasAdoptadas    NormaAdoptada[]
   resguardos         Resguardo[]
   kitsDeHerramientas KitDeHerramientas[]
+  gruposDeEquipo     GrupoDeEquipo[]
   amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
   stockMovements     StockMovement[]
@@ -832,6 +833,7 @@ model Asset {
   resguardos        Resguardo[]
   enKits         PiezaDeKit[]
   enTareas       PlanTaskTool[]
+  grupoManual    GrupoDeEquipo?
   @@unique([organizationId, code])
   @@index([organizationId])
   @@index([siteId])
@@ -4523,4 +4525,32 @@ model PlanTaskTool {
   kit   KitDeHerramientas? @relation(fields: [kitId], references: [id], onDelete: Cascade)
 
   @@index([planTaskId])
+}
+
+/// La correccion a mano del agrupado de equipos iguales del constructor.
+///
+/// Los grupos se DERIVAN —categoria mas fabricante y modelo normalizados— y se
+/// vuelven a calcular en cada carga, para que un equipo nuevo entre solo. Lo
+/// unico que se guarda es lo que el calculo no puede saber: que dos grupos son
+/// en realidad uno, o que un equipo lleva su propio plan aunque sea identico a
+/// sus hermanos.
+///
+/// Por eso la correccion se guarda POR EQUIPO y no por grupo: una clave de
+/// grupo cambia en cuanto alguien corrige el modelo mal escrito, y una
+/// excepcion anclada a esa clave quedaria apuntando a un grupo que ya no
+/// existe. El equipo, en cambio, sigue siendo el mismo.
+model GrupoDeEquipo {
+  id             String @id @default(cuid())
+  organizationId String
+  /// Uno por equipo: la ultima correccion manda.
+  assetId        String @unique
+  /// La clave de grupo donde la persona lo puso.
+  clave          String
+  movidoPorId    String?
+  movidoEl       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }

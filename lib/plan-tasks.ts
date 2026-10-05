@@ -55,9 +55,36 @@ export const esquemaTarea = z.object({
     quantity: z.coerce.number().min(0).default(1),
     nota: z.string().trim().max(200).optional().nullable(),
   })).default([]),
+  /**
+   * Lo que hay que TENER EN LA MANO para hacer la actividad.
+   *
+   * Cuelga de exactamente una de las tres formas en que una herramienta existe
+   * en el sistema: generica del almacen (`partId`), cara y serializada
+   * (`assetId`) o una caja completa (`kitId`). Ver `PlanTaskTool` en el
+   * esquema: no se consume, por eso no entra al costo del plan ni a la
+   * requisicion.
+   */
+  tools: z.array(z.object({
+    partId: z.string().min(1).optional().nullable(),
+    assetId: z.string().min(1).optional().nullable(),
+    kitId: z.string().min(1).optional().nullable(),
+    cantidad: z.coerce.number().min(0).default(1),
+    nota: z.string().trim().max(200).optional().nullable(),
+  }).refine(
+    (t) => [t.partId, t.assetId, t.kitId].filter(Boolean).length === 1,
+    "Cada herramienta cuelga de una sola cosa: del almacén, de un activo o de una caja.",
+  )).default([]),
 });
 
 export type TareaDePlan = z.infer<typeof esquemaTarea>;
+
+/**
+ * Una actividad como la arma quien no pasa por el esquema: las pruebas, los
+ * sembradores de demostracion, la importacion. Las herramientas son opcionales
+ * ahi —se agregaron despues— para no obligar a cinco archivos a escribir
+ * `tools: []` sin tener nada que decir.
+ */
+export type TareaDePlanEntrada = Omit<TareaDePlan, "tools"> & { tools?: TareaDePlan["tools"] };
 
 /** Include estandar para traer un plan con todo lo que cuelga de sus tareas. */
 export const incluirTareas = {
@@ -66,6 +93,13 @@ export const incluirTareas = {
     labor: { include: { specialty: { select: { id: true, code: true, name: true, hourlyRate: true } } } },
     parts: { include: { part: { select: { id: true, code: true, name: true, unit: true, unitCost: true } } } },
     services: { include: { service: { select: { id: true, code: true, name: true, unit: true, unitCost: true } } } },
+    tools: {
+      include: {
+        part: { select: { id: true, code: true, name: true } },
+        asset: { select: { id: true, code: true, name: true } },
+        kit: { select: { id: true, code: true, name: true } },
+      },
+    },
   },
 } as const;
 
@@ -74,10 +108,19 @@ export const incluirTareas = {
  * de la misma organizacion. Sin esto un cliente podria colgar de su plan la
  * refaccion de otro con solo mandar el id.
  */
-export async function validarRecursos(orgId: string, tareas: TareaDePlan[]): Promise<string | null> {
+export async function validarRecursos(orgId: string, tareas: TareaDePlanEntrada[]): Promise<string | null> {
   const especialidades = [...new Set(tareas.flatMap((t) => t.labor.map((l) => l.specialtyId)))];
   const refacciones = [...new Set(tareas.flatMap((t) => t.parts.map((p) => p.partId)))];
   const servicios = [...new Set(tareas.flatMap((t) => t.services.map((s) => s.serviceId)))];
+  // Las herramientas se validan por separado segun de donde cuelgan.
+  const herramientasAlmacen = [...new Set(tareas.flatMap((t) => (t.tools ?? []).map((h) => h.partId).filter((x): x is string => Boolean(x))))];
+  const herramientasActivo = [...new Set(tareas.flatMap((t) => (t.tools ?? []).map((h) => h.assetId).filter((x): x is string => Boolean(x))))];
+  const cajas = [...new Set(tareas.flatMap((t) => (t.tools ?? []).map((h) => h.kitId).filter((x): x is string => Boolean(x))))];
+
+  // El esquema de Zod ya lo cuida en la ruta, pero `altaDePlan` y la
+  // importacion no pasan por el: el limite duro va donde se escribe.
+  const ambigua = tareas.some((t) => (t.tools ?? []).some((h) => [h.partId, h.assetId, h.kitId].filter(Boolean).length !== 1));
+  if (ambigua) return "Cada herramienta cuelga de una sola cosa: del almacén, de un activo o de una caja";
 
   const [ne, nr, ns] = await Promise.all([
     especialidades.length
@@ -91,9 +134,23 @@ export async function validarRecursos(orgId: string, tareas: TareaDePlan[]): Pro
       : 0,
   ]);
 
+  const [nha, nhc, nk] = await Promise.all([
+    herramientasAlmacen.length
+      ? prisma.part.count({ where: { id: { in: herramientasAlmacen }, organizationId: orgId } })
+      : 0,
+    herramientasActivo.length
+      ? prisma.asset.count({ where: { id: { in: herramientasActivo }, organizationId: orgId } })
+      : 0,
+    cajas.length
+      ? prisma.kitDeHerramientas.count({ where: { id: { in: cajas }, organizationId: orgId } })
+      : 0,
+  ]);
+
   if (ne !== especialidades.length) return "Alguna especialidad ya no existe";
   if (nr !== refacciones.length) return "Alguna refacción ya no existe";
   if (ns !== servicios.length) return "Algun servicio externo ya no existe";
+  if (nha !== herramientasAlmacen.length || nhc !== herramientasActivo.length) return "Alguna herramienta ya no existe";
+  if (nk !== cajas.length) return "Alguna caja de herramienta ya no existe";
   return null;
 }
 
@@ -140,7 +197,7 @@ export function esFrecuenciaDiaria(
  * captura mas caro: 365 visitas al ano en el calendario y en el backlog. Por
  * eso se pide confirmarla en vez de adivinar.
  */
-export function diariasSinConfirmar(tareas: TareaDePlan[], intervalDelPlan?: number | null, triggerType = "CALENDAR") {
+export function diariasSinConfirmar(tareas: TareaDePlanEntrada[], intervalDelPlan?: number | null, triggerType = "CALENDAR") {
   if (triggerType !== "CALENDAR") return [];
   return tareas.filter((t) => t.title.trim() && esFrecuenciaDiaria(t, intervalDelPlan) && !t.confirmarDiaria).map((t) => t.title);
 }
@@ -148,7 +205,7 @@ export function diariasSinConfirmar(tareas: TareaDePlan[], intervalDelPlan?: num
 type Confirmador = { userId: string | null; ahora?: Date; intervalDelPlan?: number | null; triggerType?: string };
 
 /** Los campos de confirmacion de una actividad nueva. */
-function confirmacionNueva(t: TareaDePlan, quien?: Confirmador) {
+function confirmacionNueva(t: TareaDePlanEntrada, quien?: Confirmador) {
   const diaria = (quien?.triggerType ?? "CALENDAR") === "CALENDAR" && esFrecuenciaDiaria(t, quien?.intervalDelPlan);
   return diaria && t.confirmarDiaria && quien?.userId
     ? { diariaConfirmadaPorId: quien.userId, diariaConfirmadaEl: quien.ahora ?? new Date() }
@@ -156,7 +213,7 @@ function confirmacionNueva(t: TareaDePlan, quien?: Confirmador) {
 }
 
 /** Traduce las tareas del formulario a un `create` anidado de Prisma. */
-export function crearTareas(tareas: TareaDePlan[], multiplos?: number[], quien?: Confirmador) {
+export function crearTareas(tareas: TareaDePlanEntrada[], multiplos?: number[], quien?: Confirmador) {
   return tareas.map((t, index) => ({
     ...frecuenciaDe(t),
     ...confirmacionNueva(t, quien),
@@ -174,6 +231,7 @@ export function crearTareas(tareas: TareaDePlan[], multiplos?: number[], quien?:
     labor: { create: t.labor.map((l) => ({ specialtyId: l.specialtyId, personas: l.personas, hours: l.hours })) },
     parts: { create: t.parts.map((p) => ({ partId: p.partId, quantity: p.quantity })) },
     services: { create: t.services.map((s) => ({ serviceId: s.serviceId, quantity: s.quantity, nota: s.nota || null })) },
+    tools: { create: (t.tools ?? []).map((h) => ({ partId: h.partId || null, assetId: h.assetId || null, kitId: h.kitId || null, cantidad: h.cantidad, nota: h.nota || null })) },
   }));
 }
 
@@ -202,7 +260,7 @@ const claveDeTitulo = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ")
 
 export async function reemplazarTareas(
   planId: string,
-  tareas: TareaDePlan[],
+  tareas: TareaDePlanEntrada[],
   intervalBase?: number | null,
   quien?: Confirmador & { organizationId: string },
 ) {
@@ -231,7 +289,7 @@ export async function reemplazarTareas(
   const operaciones: Prisma.PrismaPromise<unknown>[] = [];
 
   for (const data of nuevas) {
-    const { labor, parts, services, ...campos } = data;
+    const { labor, parts, services, tools, ...campos } = data;
     const previa = porTitulo.get(claveDeTitulo(campos.title));
 
     if (previa && !conservados.has(previa)) {
@@ -257,6 +315,7 @@ export async function reemplazarTareas(
             labor: { deleteMany: {}, ...labor },
             parts: { deleteMany: {}, ...parts },
             services: { deleteMany: {}, ...services },
+            tools: { deleteMany: {}, ...tools },
           },
         }),
       );

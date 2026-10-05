@@ -70,7 +70,7 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
     // mas proxima de sus equipos, no la del plan, que quedo obsoleta.
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
-  const { activos: assets, medidores: meters, tecnicos: technicians, opcEspecialidades, opcRefacciones, opcServicios } = await catalogosDePlanes(user.organizationId);
+  const { activos: assets, medidores: meters, tecnicos: technicians, opcEspecialidades, opcRefacciones, opcServicios, opcHerramientas, opcHerramientasActivo, opcCajas } = await catalogosDePlanes(user.organizationId);
 
   const usoIa = await consumoIa(user.organizationId);
   const entitlementIa = iaDeLaOrganizacion(user.organization);
@@ -158,6 +158,9 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
                   especialidades={opcEspecialidades}
                   refacciones={opcRefacciones}
                   servicios={opcServicios}
+                  herramientas={opcHerramientas}
+                  herramientasActivo={opcHerramientasActivo}
+                  cajas={opcCajas}
                   moneda={currency}
                   puedeCrearCatalogos={puedeCrearCatalogos}
                   operacionesRestantes={operacionesRestantes}
@@ -170,6 +173,9 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
                 especialidades={opcEspecialidades}
                 refacciones={opcRefacciones}
                 servicios={opcServicios}
+                herramientas={opcHerramientas}
+                herramientasActivo={opcHerramientasActivo}
+                cajas={opcCajas}
                 moneda={currency}
                 puedeCrearCatalogos={puedeCrearCatalogos}
               />
