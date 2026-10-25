@@ -218,7 +218,7 @@ export function PanelIntegracion() {
       <Card padded={false}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Historial de entregas</h3>
+            <h3 className="titulo-seccion">Historial de entregas</h3>
             <p className="text-xs text-slate-500">Cada intento por correo, navegador o webhook. Sin el contenido de los avisos.</p>
           </div>
           <select className="field w-auto py-1 text-xs" value={filtroEntregas} onChange={(e) => setFiltroEntregas(e.target.value)}>

@@ -546,7 +546,7 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
 
       <Card className="mt-4" padded={false}>
         <div className="px-5 py-4">
-          <h3 className="text-sm font-semibold text-slate-900">Historial de mantenimiento</h3>
+          <h3 className="titulo-seccion">Historial de mantenimiento</h3>
           <p className="text-xs text-slate-500">Ultimas {workOrders.length} ordenes de trabajo</p>
         </div>
         {workOrders.length === 0 ? (

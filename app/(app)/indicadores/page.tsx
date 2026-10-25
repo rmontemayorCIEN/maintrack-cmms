@@ -45,7 +45,7 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
           <Link key={ind.clave} href={enlaceDeIndicador(ind, dias)} className="block">
             <Card className="h-full transition-colors hover:border-brand-300">
               <div className="flex items-baseline justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-900">{ind.nombre}</h3>
+                <h3 className="titulo-seccion">{ind.nombre}</h3>
                 <span className="shrink-0 text-lg font-semibold tabular-nums text-slate-900">{valorDeIndicador(ind, user.organization.currency)}</span>
               </div>
               <p className="mt-1 text-xs text-slate-600">{ind.definicion}</p>

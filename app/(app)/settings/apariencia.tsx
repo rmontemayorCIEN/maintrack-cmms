@@ -5,9 +5,46 @@ import { useRouter } from "next/navigation";
 import { Check, Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui";
 import {
-  ACENTOS, CLAVES_ACENTO, CLAVES_DENSIDAD, CLAVES_ESCALA, DENSIDADES, ESCALAS,
-  type ClaveAcento, type ClaveDensidad, type ClaveEscala,
+  ACENTOS, CLAVES_ACENTO, CLAVES_DENSIDAD, CLAVES_ENCABEZADOS, CLAVES_ESCALA, CLAVES_TEMA,
+  DENSIDADES, ENCABEZADOS, ESCALAS, TEMAS,
+  type ClaveAcento, type ClaveDensidad, type ClaveEncabezados, type ClaveEscala, type ClaveTema,
 } from "@/lib/apariencia";
+
+/**
+ * Un grupo de opciones excluyentes, en tarjetas. Lo usan las cuatro
+ * preferencias personales; antes cada una repetia el mismo bloque de treinta
+ * lineas y la quinta lo habria copiado otra vez.
+ */
+function Opciones<K extends string>({
+  claves, actual, catalogo, onElegir,
+}: {
+  claves: K[];
+  actual: K;
+  catalogo: Record<K, { nombre: string; descripcion: string }>;
+  onElegir: (k: K) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-3">
+      {claves.map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onElegir(k)}
+          aria-pressed={actual === k}
+          className={`rounded-lg border p-3 text-left transition-colors ${
+            actual === k ? "border-brand-400 bg-brand-50" : "border-slate-200 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-800">{catalogo[k].nombre}</span>
+            {actual === k ? <Check className="h-4 w-4 text-brand-600" /> : null}
+          </div>
+          <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">{catalogo[k].descripcion}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Apariencia.
@@ -19,12 +56,16 @@ import {
 export function PanelApariencia({
   escala,
   densidad,
+  tema,
+  encabezados,
   acento,
   logoUrl,
   puedeEditarMarca,
 }: {
   escala: ClaveEscala;
   densidad: ClaveDensidad;
+  tema: ClaveTema;
+  encabezados: ClaveEncabezados;
   acento: ClaveAcento;
   logoUrl: string | null;
   puedeEditarMarca: boolean;
@@ -32,14 +73,28 @@ export function PanelApariencia({
   const router = useRouter();
   const [e, setE] = useState(escala);
   const [d, setD] = useState(densidad);
+  const [t, setT] = useState(tema);
+  const [h, setH] = useState(encabezados);
   const [a, setA] = useState(acento);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
 
   /** Se pinta el cambio antes de pedirlo al servidor: elegir a ciegas no sirve. */
-  function aplicarEnVivo(cambios: { escala?: ClaveEscala; densidad?: ClaveDensidad; acento?: ClaveAcento }) {
+  function aplicarEnVivo(cambios: {
+    escala?: ClaveEscala; densidad?: ClaveDensidad; acento?: ClaveAcento;
+    tema?: ClaveTema; encabezados?: ClaveEncabezados;
+  }) {
     const raiz = document.documentElement;
+    if (cambios.tema) {
+      // «Igual que mi aparato» se resuelve aqui con la misma pregunta que hace
+      // el script de app/layout.tsx; el servidor lo hara en la siguiente carga.
+      const oscuro = cambios.tema === "SISTEMA"
+        ? matchMedia("(prefers-color-scheme: dark)").matches
+        : cambios.tema === "OSCURO";
+      raiz.setAttribute("data-tema", oscuro ? "oscuro" : "claro");
+    }
+    if (cambios.encabezados) raiz.setAttribute("data-encabezados", cambios.encabezados.toLowerCase());
     if (cambios.escala) raiz.style.fontSize = ESCALAS[cambios.escala].raiz;
     if (cambios.densidad) {
       raiz.style.setProperty("--celda", DENSIDADES[cambios.densidad].celda);
@@ -47,7 +102,7 @@ export function PanelApariencia({
     }
     if (cambios.acento) {
       for (const [tono, hex] of Object.entries(ACENTOS[cambios.acento].escala)) {
-        raiz.style.setProperty(`--color-brand-${tono}`, hex);
+        raiz.style.setProperty(`--acento-${tono}`, hex);
       }
     }
   }
@@ -109,27 +164,35 @@ export function PanelApariencia({
 
       <Card>
         <CardHeader
+          title="Tema"
+          subtitle="Claro u oscuro. Es su preferencia personal y no afecta a nadie más de su equipo. Al imprimir, el papel siempre sale en claro."
+        />
+        <Opciones
+          claves={CLAVES_TEMA} actual={t} catalogo={TEMAS}
+          onElegir={(k) => { setT(k); aplicarEnVivo({ tema: k }); guardar({ temaUi: k }); }}
+        />
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Títulos"
+          subtitle="Qué tanto se distingue dónde empieza cada pantalla y cada sección."
+        />
+        <Opciones
+          claves={CLAVES_ENCABEZADOS} actual={h} catalogo={ENCABEZADOS}
+          onElegir={(k) => { setH(k); aplicarEnVivo({ encabezados: k }); guardar({ encabezadosUi: k }); }}
+        />
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Tamaño de letra"
           subtitle="Ajusta toda la interfaz, no solo el texto: los espacios y las tablas crecen con el. Es su preferencia personal y no afecta a nadie mas de su equipo."
         />
-        <div className="grid gap-2 sm:grid-cols-3">
-          {CLAVES_ESCALA.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => { setE(k); aplicarEnVivo({ escala: k }); guardar({ escalaUi: k }); }}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                e === k ? "border-brand-400 bg-brand-50" : "border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-800">{ESCALAS[k].nombre}</span>
-                {e === k ? <Check className="h-4 w-4 text-brand-600" /> : null}
-              </div>
-              <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">{ESCALAS[k].descripcion}</p>
-            </button>
-          ))}
-        </div>
+        <Opciones
+          claves={CLAVES_ESCALA} actual={e} catalogo={ESCALAS}
+          onElegir={(k) => { setE(k); aplicarEnVivo({ escala: k }); guardar({ escalaUi: k }); }}
+        />
       </Card>
 
       <Card>
@@ -137,24 +200,10 @@ export function PanelApariencia({
           title="Densidad"
           subtitle="Cuanto aire hay entre renglones. También es personal."
         />
-        <div className="grid gap-2 sm:grid-cols-3">
-          {CLAVES_DENSIDAD.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => { setD(k); aplicarEnVivo({ densidad: k }); guardar({ densidadUi: k }); }}
-              className={`rounded-lg border p-3 text-left transition-colors ${
-                d === k ? "border-brand-400 bg-brand-50" : "border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-800">{DENSIDADES[k].nombre}</span>
-                {d === k ? <Check className="h-4 w-4 text-brand-600" /> : null}
-              </div>
-              <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">{DENSIDADES[k].descripcion}</p>
-            </button>
-          ))}
-        </div>
+        <Opciones
+          claves={CLAVES_DENSIDAD} actual={d} catalogo={DENSIDADES}
+          onElegir={(k) => { setD(k); aplicarEnVivo({ densidad: k }); guardar({ densidadUi: k }); }}
+        />
 
         <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
           <table className="data">

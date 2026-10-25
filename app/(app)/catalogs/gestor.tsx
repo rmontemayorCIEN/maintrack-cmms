@@ -245,7 +245,7 @@ export function GestorCatalogos({
       <Card padded={false}>
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">{def.titulo}</h2>
+            <h2 className="titulo-seccion">{def.titulo}</h2>
             <p className="mt-0.5 max-w-2xl text-xs text-slate-500">{def.descripcion}</p>
           </div>
           {editable ? (

@@ -130,7 +130,7 @@ export default async function CalendarPage({
           el resultado de la IA aparece debajo solo cuando hay algo que mostrar. */}
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Calendario de mantenimiento</h1>
+          <h1 className="titulo-pagina">Calendario de mantenimiento</h1>
           <p className="text-xs text-slate-500">
             Lo programado, lo proyectado y si de verdad cabe en los días que quedan.
           </p>

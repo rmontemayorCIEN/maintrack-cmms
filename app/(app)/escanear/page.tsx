@@ -10,7 +10,7 @@ export const metadata = { title: "Escanear QR" };
 export default function EscanearPage() {
   return (
     <>
-      <h1 className="mb-1 text-xl font-semibold text-slate-900">Escanear QR</h1>
+      <h1 className="mb-1 titulo-pagina">Escanear QR</h1>
       <p className="mb-4 text-sm text-slate-600">Apunte al código del equipo o del punto de reporte. También puede escribir el código del equipo.</p>
       <Escaner />
     </>

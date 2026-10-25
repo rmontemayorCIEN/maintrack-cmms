@@ -120,7 +120,7 @@ export default async function LevantamientoPage() {
 
       {expedientes.length ? (
         <div className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold text-slate-800">Levantamientos anteriores</h2>
+          <h2 className="mb-2 titulo-seccion">Levantamientos anteriores</h2>
           <p className="mb-3 max-w-2xl text-xs text-slate-500">
             El expediente de cada recorrido: que se propuso y las fotos de donde salio. Es lo que
             sostiene el inventario cuando alguien pregunta de donde salieron estos activos.

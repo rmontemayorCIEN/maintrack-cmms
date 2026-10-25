@@ -62,7 +62,7 @@ export default async function ImprimirPage() {
             <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-400">
               {user.organization.name}
             </p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">¿Algo no funciona?</h2>
+            <h2 className="mt-1 titulo-seccion">¿Algo no funciona?</h2>
             <p className="mt-0.5 text-sm text-slate-600">Escanee este código y repórtelo</p>
 
             <div className="mx-auto my-4 w-48 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: p.svg }} />

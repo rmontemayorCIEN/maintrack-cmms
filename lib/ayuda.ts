@@ -1804,7 +1804,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     titulo: "Configuración",
     que: "Su cuenta, la organización, los usuarios, el plan y la bitácora.",
     hacer: [
-      "Cambiar tamaño de letra y densidad —eso es suyo, no de la empresa—",
+      "Elegir el tema claro u oscuro, qué tanto se marcan los títulos, el tamaño de letra y la densidad —eso es suyo, no de la empresa—",
       "Contarle al sistema qué hace su empresa, para que la IA piense mejor",
       "Configurar logotipo, color, proceso de compras y umbral de autorización",
       "Definir la jornada, los días laborables y los días que la empresa no trabaja",
@@ -1818,6 +1818,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Cerrar sus sesiones abiertas, generar ligas de contraseña y exportar su información",
     ],
     flujo: [
+      "El índice de la izquierda agrupa las secciones por de quién es lo que contienen: «Mi cuenta» es suyo y no cambia nada para nadie más; «Mi empresa» lo ve todo el equipo; «Equipo y accesos» y «Plan y cobros» son de quien administra. Cada quien ve solo los grupos y secciones que su rol permite.",
+      "En «Apariencia», el tema «Oscuro» descansa la vista de noche o en un taller con poca luz, y «Igual que mi aparato» sigue solo el modo claro u oscuro de su teléfono o computadora. Lo que se imprime sale siempre en claro, aunque use el oscuro. «Marcado» y «Sobrio» cambian qué tanto se distinguen los títulos de cada pantalla y sección. Los cambios se ven al momento, antes de guardar.",
       "Los permisos van por rol. Cambiar el rol de alguien cambia lo que puede hacer en todas las pantallas.",
       "En «Jornada y calendario» se define de cuántas horas es un día de trabajo. De ahí sale si un día del calendario cabe y en qué fechas puede programar el programador.",
       "La capacidad se define por excepción: la organización fija el número general y solo quien trabaje distinto lleva el suyo.",
@@ -1968,7 +1970,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     flujo: [
       "Lo que hace que esto no sea una hoja de cálculo son las columnas que apuntan a SUS datos. La columna «Equipo» de la bitácora de diésel no es texto que alguien volvió a escribir: es el equipo del padrón. Por eso se puede preguntar cuánto diésel lleva ese generador, y el Excel nunca pudo.",
       "Quién VE una tabla y quién CAPTURA en ella son dos cosas distintas, y cada tabla las declara por separado. El técnico puede consultar una tabla que solo administración llena. Su rol puede no ver ninguna: entonces esta pantalla sale vacía, y eso es lo correcto, no un problema de accesos.",
-      "Armar una tabla y capturar en ella son dos cosas distintas, y por eso viven en dos lugares. Armar es definir esquema —o sea configuración— y está en el menú bajo Configuración, para quien tenga permiso de Ajustes. Capturar es del día a día y está aquí, en «Sus registros», para quien la tabla diga.",
+      "Armar una tabla y capturar en ella son dos cosas distintas, y por eso viven en dos lugares. Armar es definir esquema —o sea configuración— y está en el menú bajo Configuración, para quien tenga permiso de Ajustes. Capturar es del día a día y está aquí, en «Personal y registros», para quien la tabla diga.",
       "Si usa una tabla todos los días, ánclela: en Ajustes, en «Lo que más uso», cada tabla aparece con SU nombre —«Bitácora de diésel»— y se pone hasta arriba del menú. Es personal: no le cambia el menú a nadie más.",
       "Cada tabla pide una explicación de para qué es, y no es un adorno: es lo que lee esta ayuda y lo que le permite a la IA contestar preguntas sobre ella. Una tabla llamada «Control 2» sin explicación queda muda para el sistema y para quien entre el año que viene.",
       "Las columnas se pueden renombrar sin perder nada: por dentro cada columna guarda su propia clave, que se fija al crearla y no cambia. Lo que NO se cambia es el tipo de una columna que ya tiene datos —de número a texto, por ejemplo—: los valores viven en la columna del tipo y cambiarlo los dejaría invisibles sin un solo mensaje de error. Para eso se agrega una columna nueva.",

@@ -79,7 +79,7 @@ export function SensorDialog({ assets }: { assets: Array<{ id: string; code: str
       <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Nuevo punto de monitoreo</h3>
+            <h3 className="titulo-seccion">Nuevo punto de monitoreo</h3>
             <p className="mt-0.5 text-xs text-slate-500">
               Al superar el umbral crítico se genera automaticamente una OT predictiva.
             </p>

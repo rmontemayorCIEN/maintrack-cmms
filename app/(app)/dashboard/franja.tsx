@@ -39,7 +39,7 @@ export function Franja({ franja }: { franja: FranjaDePlanta }) {
   return (
     <section aria-labelledby="t-franja" className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-3">
-        <h2 id="t-franja" className="text-sm font-semibold text-slate-900">
+        <h2 id="t-franja" className="titulo-seccion">
           {esSistema ? "Cómo están sus sistemas" : "Cómo está la planta, por área"}
         </h2>
         <div className="flex items-baseline gap-3 text-xs">

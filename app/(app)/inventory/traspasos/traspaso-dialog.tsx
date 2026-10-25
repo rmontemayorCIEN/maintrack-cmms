@@ -105,7 +105,7 @@ export function TraspasoDialog({
       {abierto ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 text-left">
           <form onSubmit={enviar} className="mt-10 w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-slate-800">Traspaso entre almacenes</h2>
+            <h2 className="titulo-seccion">Traspaso entre almacenes</h2>
 
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div className="min-w-44 flex-1">

@@ -131,7 +131,7 @@ export default async function AlertsPage() {
 
       {history.length ? (
         <>
-          <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-700">Historial</h2>
+          <h2 className="mb-3 mt-8 titulo-seccion">Historial</h2>
           <Card padded={false}>
             <div className="table-wrap">
               <table className="data">

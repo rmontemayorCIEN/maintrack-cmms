@@ -58,7 +58,7 @@ export function Adoptar({ delGiro, otras }: { delGiro: NormaDeCatalogo[]; otras:
 
   return (
     <Card>
-      <h2 className="text-sm font-semibold text-slate-900">Agregar del catálogo</h2>
+      <h2 className="titulo-seccion">Agregar del catálogo</h2>
       {delGiro.length ? (
         <>
           <p className="mt-0.5 text-xs text-slate-500">Las que suelen aplicar a una empresa como la suya.</p>

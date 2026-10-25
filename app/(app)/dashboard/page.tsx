@@ -26,7 +26,7 @@ export default async function InicioPage() {
     <>
       <header className="mb-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Hola, {user.name.split(" ")[0]}</p>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{inicio.titulo}</h1>
+        <h1 className="titulo-pagina">{inicio.titulo}</h1>
       </header>
 
       {/* El mismo criterio que protege la ruta: quien ve el panorama de la
@@ -133,7 +133,7 @@ function TarjetaBloque({ bloque }: { bloque: Bloque }) {
     <section id={bloque.id} aria-labelledby={`t-${bloque.id}`} className="scroll-mt-20 rounded-xl border border-slate-200 bg-white">
       <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="min-w-0">
-          <h2 id={`t-${bloque.id}`} className="text-sm font-semibold text-slate-900">
+          <h2 id={`t-${bloque.id}`} className="titulo-seccion">
             {bloque.titulo} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600">{bloque.total}</span>
           </h2>
           {bloque.descripcion ? <p className="mt-0.5 text-xs text-slate-500">{bloque.descripcion}</p> : null}

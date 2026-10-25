@@ -205,7 +205,7 @@ export function LienzoRejilla<T extends ItemLienzo>({
     <div className="grid gap-2.5">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">{titulo}</h2>
+          <h2 className="titulo-seccion">{titulo}</h2>
           <p className="text-[0.6875rem] leading-relaxed text-slate-500">
             {editando ? ayudaEditando : ayuda}
           </p>

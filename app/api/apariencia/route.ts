@@ -10,7 +10,7 @@ const LARGOS = LARGOS_DE_RESPUESTA.map((l) => l.clave) as unknown as [string, ..
 /**
  * Preferencias de como se ve —y como se oye— el sistema.
  *
- * La escala, la densidad y la voz del parte se guardan en el usuario; el color
+ * La escala, la densidad, el tema, los encabezados y la voz del parte se guardan en el usuario; el color
  * y el logo en la organizacion, y esos si piden permiso de configuracion.
  * Nadie deberia poder cambiarle el tamaño de letra a otro, ni un tecnico
  * cambiar la identidad visual de la empresa.
@@ -18,6 +18,8 @@ const LARGOS = LARGOS_DE_RESPUESTA.map((l) => l.clave) as unknown as [string, ..
 const personal = z.object({
   escalaUi: z.enum(["NORMAL", "GRANDE", "MAYOR"]).optional(),
   densidadUi: z.enum(["COMPACTA", "COMODA", "AMPLIA"]).optional(),
+  temaUi: z.enum(["CLARO", "OSCURO", "SISTEMA"]).optional(),
+  encabezadosUi: z.enum(["SOBRIO", "MARCADO"]).optional(),
   /**
    * Con que voz oye el parte del dia. Tambien es personal: al director le
    * puede gustar una y a su jefe de mantenimiento otra. Se valida contra el

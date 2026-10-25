@@ -25,12 +25,12 @@ export default async function SoportePage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">Soporte</h1>
+        <h1 className="titulo-pagina">Soporte</h1>
         <p className="mt-1 text-sm text-slate-600">Pida ayuda al equipo de MainTrack desde aquí: cada solicitud recibe un folio y aquí mismo ve su avance.</p>
       </header>
 
       <section aria-labelledby="como" className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-        <h2 id="como" className="font-semibold text-slate-900">Cómo funciona</h2>
+        <h2 id="como" className="titulo-seccion">Cómo funciona</h2>
         <p><strong>Horario:</strong> {SOPORTE.horario}</p>
         <p><strong>Si no puede entrar:</strong> {SOPORTE.canalAlterno}</p>
         <div className="overflow-x-auto">
@@ -45,12 +45,12 @@ export default async function SoportePage({ searchParams }: { searchParams: Prom
       </section>
 
       <section aria-labelledby="nueva" className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 id="nueva" className="font-semibold text-slate-900">Nueva solicitud</h2>
+        <h2 id="nueva" className="titulo-seccion">Nueva solicitud</h2>
         <FormularioSoporte pantallaInicial={desde?.slice(0, 200) ?? ""} severidades={SEVERIDADES.map((s) => ({ clave: s.clave, nombre: s.nombre, cuando: s.cuando, respuesta: s.respuesta[plan] }))} />
       </section>
 
       <section aria-labelledby="mias">
-        <h2 id="mias" className="font-semibold text-slate-900">{todas ? "Solicitudes de la empresa" : "Mis solicitudes"}</h2>
+        <h2 id="mias" className="titulo-seccion">{todas ? "Solicitudes de la empresa" : "Mis solicitudes"}</h2>
         {solicitudes.length === 0 ? <p className="mt-2 text-sm text-slate-500">Todavía no hay solicitudes.</p> : (
           <ul className="mt-3 grid gap-3">
             {solicitudes.map((s) => (

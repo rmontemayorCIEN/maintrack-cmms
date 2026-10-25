@@ -158,7 +158,7 @@ export function EquiposDelPlan({
               <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Equipos a los que se aplica</h3>
+                    <h3 className="titulo-seccion">Equipos a los que se aplica</h3>
                     <p className="mt-0.5 text-xs text-slate-500">{nombre}</p>
                   </div>
                   <button type="button" onClick={cerrar} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar">

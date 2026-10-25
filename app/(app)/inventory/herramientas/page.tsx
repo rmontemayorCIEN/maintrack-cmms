@@ -91,7 +91,7 @@ export default async function HerramientasPage() {
           {/* Quién trae qué: la pregunta de todos los días. */}
           <Card className="mb-4">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Quién trae qué</h2>
+              <h2 className="titulo-seccion">Quién trae qué</h2>
               <span className="flex gap-3">
                 <Link href="/inventory/herramientas/cajas" className="text-xs text-slate-500 underline hover:text-slate-700">
                   Cajas
@@ -150,7 +150,7 @@ export default async function HerramientasPage() {
           </Card>
 
           <Card>
-            <h2 className="mb-2 text-sm font-semibold text-slate-900">El catálogo</h2>
+            <h2 className="mb-2 titulo-seccion">El catálogo</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

@@ -50,7 +50,7 @@ export function NuevoPunto({
       {abierto ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 text-left">
           <form onSubmit={crear} className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-slate-800">Nuevo punto de reporte</h2>
+            <h2 className="titulo-seccion">Nuevo punto de reporte</h2>
             <p className="mt-0.5 text-[0.6875rem] text-slate-500">
               Para lugares sin equipo registrado: un salón, un baño, un pasillo. Los equipos ya
               generan su código solo, desde su propia ficha.

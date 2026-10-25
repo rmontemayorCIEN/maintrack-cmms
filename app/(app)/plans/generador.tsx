@@ -127,7 +127,7 @@ export function GeneradorPlan({
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Redactar un plan con IA</h3>
+            <h3 className="titulo-seccion">Redactar un plan con IA</h3>
             <p className="mt-0.5 text-xs text-slate-500">
               Toma los datos del equipo, su historial de fallas y sus catálogos, y propone el plan completo.
               Usted lo revisa antes de crearlo.

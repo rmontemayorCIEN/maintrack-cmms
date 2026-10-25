@@ -135,7 +135,7 @@ export function VistaGlosario({
                 {items.map((t) => (
                   <Card key={t.t} id={`t-${t.t}`}>
                     <div className="flex flex-wrap items-baseline gap-x-2">
-                      <h3 className="text-sm font-semibold text-slate-900">{t.t}</h3>
+                      <h3 className="titulo-seccion">{t.t}</h3>
                       {t.n ? <span className="text-xs text-slate-500">{t.n}</span> : null}
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{t.d}</p>

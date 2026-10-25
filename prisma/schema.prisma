@@ -392,6 +392,12 @@ model User {
   escalaUi          String    @default("NORMAL")
   /// COMPACTA | COMODA | AMPLIA
   densidadUi        String    @default("COMODA")
+  /// CLARO | OSCURO | SISTEMA. Personal: quien trabaja de noche o en un taller
+  /// con poca luz no es quien quiere el fondo blanco. SISTEMA sigue al aparato.
+  temaUi            String    @default("CLARO")
+  /// SOBRIO | MARCADO. Que tanto se distinguen los titulos de pagina y de
+  /// seccion. Personal por la misma razon que la escala de letra.
+  encabezadosUi     String    @default("MARCADO")
   /// Como quiere ver cada tabla del sistema: que columnas, en que orden y con
   /// que agrupacion. Es un objeto por tabla —activos, ordenes, refacciones,
   /// planes— para no agregar una columna cada vez que otra lista se vuelve

@@ -160,7 +160,7 @@ export function PanelVoz({
 
       {/* Cuánto habla al contestar una pregunta hablada. */}
       <div className="mt-5 border-t border-slate-100 pt-4">
-        <h3 className="text-sm font-semibold text-slate-900">Qué tanto le contesta hablando</h3>
+        <h3 className="titulo-seccion">Qué tanto le contesta hablando</h3>
         <p className="mt-0.5 text-xs text-slate-500">
           Cuando le pregunta por sus datos con el micrófono. Lo escrito sale completo en los dos casos:
           esto solo cambia lo que se dice en voz alta.

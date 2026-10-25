@@ -58,7 +58,7 @@ export function Dialogo({
   const encabezado = (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="text-base font-semibold text-slate-900">{titulo}</h3>
+        <h3 className="titulo-seccion">{titulo}</h3>
         {descripcion ? <p className="mt-0.5 text-xs text-slate-500">{descripcion}</p> : null}
       </div>
       {onCerrar ? (

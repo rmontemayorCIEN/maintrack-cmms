@@ -30,7 +30,7 @@ export default async function DemoPage() {
   return (
     <div className="mx-auto grid max-w-4xl gap-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">Guía de la demostración</h1>
+        <h1 className="titulo-pagina">Guía de la demostración</h1>
         <p className="mt-1 text-sm text-slate-600">
           Todo para presentar MainTrack a un cliente: la presentación en diapositivas, las cinco historias sobre el sistema real y cómo dejar la demo como nueva.
         </p>
@@ -55,7 +55,7 @@ export default async function DemoPage() {
       </p>
 
       <section aria-labelledby="cuentas" className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 id="cuentas" className="font-semibold text-slate-900">Cuentas de la demo</h2>
+        <h2 id="cuentas" className="titulo-seccion">Cuentas de la demo</h2>
         <p className="mt-1 text-xs text-slate-500">Todas con la misma contraseña, que tiene quien administra las demostraciones.</p>
         <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
           {PERSONAS.map((p) => <li key={p.clave}><span className="font-medium">{p.nombre}</span> · {p.puesto} · <span className="font-mono text-xs">{p.clave}@{DEMO.dominio}</span></li>)}
@@ -84,12 +84,12 @@ export default async function DemoPage() {
       ))}
 
       <section aria-labelledby="faq" className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 id="faq" className="font-semibold text-slate-900">Preguntas frecuentes de la demo</h2>
+        <h2 id="faq" className="titulo-seccion">Preguntas frecuentes de la demo</h2>
         <dl className="mt-2 grid gap-3 text-sm">{PREGUNTAS_DEMO.map((q) => <div key={q.p}><dt className="font-medium text-slate-900">{q.p}</dt><dd className="text-slate-700">{q.r}</dd></div>)}</dl>
       </section>
 
       <section id="restaurar" aria-labelledby="restaurar-t" className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 id="restaurar-t" className="font-semibold text-slate-900">Restaurar la demo</h2>
+        <h2 id="restaurar-t" className="titulo-seccion">Restaurar la demo</h2>
         {previa ? (
           <>
             <p className="mt-1 text-sm text-slate-600">

@@ -48,7 +48,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <div className="grid gap-4">
             {grupos.map((g) => (
               <section key={g.tipo} aria-labelledby={`g-${g.tipo}`}>
-                <h2 id={`g-${g.tipo}`} className="mb-2 text-sm font-semibold text-slate-900">{g.etiqueta} ({g.resultados.length})</h2>
+                <h2 id={`g-${g.tipo}`} className="mb-2 titulo-seccion">{g.etiqueta} ({g.resultados.length})</h2>
                 <ul className="grid gap-2">
                   {g.resultados.map((r) => {
                     const est = r.estado && ESTADOS[r.tipo];

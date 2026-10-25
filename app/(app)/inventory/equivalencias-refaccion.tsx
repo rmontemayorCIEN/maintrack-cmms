@@ -106,7 +106,7 @@ export function EquivalenciasRefaccion({
               <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">
+                    <h3 className="titulo-seccion">
                       Con qué más se puede resolver
                     </h3>
                     <p className="mt-0.5 text-xs text-slate-500">

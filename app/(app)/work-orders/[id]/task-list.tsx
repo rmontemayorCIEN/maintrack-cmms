@@ -351,7 +351,7 @@ export function TaskList({
               onClick={(e) => e.target === e.currentTarget && setLiberando(null)}
             >
               <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-                <h3 className="text-sm font-semibold text-slate-800">No se pudo hacer</h3>
+                <h3 className="titulo-seccion">No se pudo hacer</h3>
                 <p className="mt-1 text-xs text-slate-500">{liberando.title}</p>
                 <p className="mt-2 text-xs text-slate-500">
                   La actividad sale de esta orden y queda en el backlog del activo, con el motivo,

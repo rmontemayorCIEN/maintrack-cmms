@@ -108,7 +108,7 @@ export async function PanelTendencias() {
     <>
       <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Tendencias y desglose</h2>
+          <h2 className="titulo-seccion">Tendencias y desglose</h2>
           <p className="text-xs text-slate-500">Últimos {DIAS} días de {user.organization.name}: detalle de cada indicador, gráficas y costos por equipo</p>
         </div>
         <LinkButton href="/reports" variant="secondary" size="sm">Ver reportes</LinkButton>
@@ -215,7 +215,7 @@ export async function PanelTendencias() {
         <Card className="lg:col-span-2" padded={false}>
           <div className="flex items-center justify-between px-5 py-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Proximas órdenes</h3>
+              <h3 className="titulo-seccion">Proximas órdenes</h3>
               <p className="text-xs text-slate-500">Backlog ordenado por fecha compromiso</p>
             </div>
             <Link href="/work-orders" className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
