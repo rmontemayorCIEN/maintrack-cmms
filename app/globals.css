@@ -30,6 +30,15 @@
   --tabla-linea: #f1f3f8;
   --tabla-hover: #fafbff;
   --barra: #cbd5e1;
+  /* Gráficas y mapas: colores que no son de una escala de Tailwind. */
+  --g-rejilla: #eef1f6;
+  --g-eje: #94a3b8;
+  --g-creadas: #c7d5fe;
+  --g-apagado: #dfe4ea;
+  --g-linea-suave: #cbd5e1;
+  --g-area-preventivo: #bae6fd;
+  --g-area-predictivo: #ddd6fe;
+  --g-area-correctivo: #fed7aa;
 }
 
 /*
@@ -70,6 +79,14 @@ html:root {
     --tabla-linea: #1e2840;
     --tabla-hover: #18213a;
     --barra: #3a4766;
+    --g-rejilla: #26304a;
+    --g-eje: #94a0bb;
+    --g-creadas: #4b5b94;
+    --g-apagado: #2b3652;
+    --g-linea-suave: #3a4766;
+    --g-area-preventivo: #0c4a6e;
+    --g-area-predictivo: #4c3a8f;
+    --g-area-correctivo: #8a4313;
     /* Los tintes claros de la marca se vuelven tintes oscuros de la marca. */
     --color-brand-50: color-mix(in srgb, var(--acento-600, #1f3eee) 16%, #131a2b);
     --color-brand-100: color-mix(in srgb, var(--acento-600, #1f3eee) 26%, #131a2b);

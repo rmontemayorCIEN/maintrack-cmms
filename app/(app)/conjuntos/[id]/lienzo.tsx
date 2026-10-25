@@ -202,7 +202,7 @@ export function Lienzo({
           nombreDe={(e) => `${e.code} ${e.name}`}
           color={(e) =>
             !coincide(e)
-              ? "#dfe4ea"
+              ? "var(--g-apagado)"
               : lente === "AHORA"
                 ? tonoEstado(e.status)
                 : lente === "COSTO"

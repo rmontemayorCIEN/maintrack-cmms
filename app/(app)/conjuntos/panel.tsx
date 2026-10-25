@@ -44,7 +44,7 @@ function MiniMapa({ plano, sinColocar, lente, maxHoras, categoria }: { plano: Fi
   // Con una categoría elegida, lo demás se apaga pero no se quita: igual que
   // en el mapa, quitarlo destruiría la geografía.
   const color = (p: Fila["plano"][number]) =>
-    categoria && p.categoriaId !== categoria ? "#dfe4ea" : lente === "AHORA" ? tonoEstado(p.status) : lente === "COSTO" ? rampa(p.horas / maxHoras) : tonoPendiente(p.planesVencidos, p.ordenesAbiertas);
+    categoria && p.categoriaId !== categoria ? "var(--g-apagado)" : lente === "AHORA" ? tonoEstado(p.status) : lente === "COSTO" ? rampa(p.horas / maxHoras) : tonoPendiente(p.planesVencidos, p.ordenesAbiertas);
   return (
     <svg viewBox={`${minX - 0.5} ${minY - 0.5} ${ancho + 1} ${alto + 1}`} preserveAspectRatio="xMidYMid meet"
       className="h-24 w-full rounded-lg bg-slate-50" role="img" aria-label="Miniatura del mapa">

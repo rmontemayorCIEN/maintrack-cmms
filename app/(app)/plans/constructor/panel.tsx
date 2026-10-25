@@ -445,7 +445,7 @@ function Historia({ historia, meta }: { historia: Semana[]; meta: number }) {
       />
       <svg viewBox={`0 0 ${ancho} ${alto}`} className="h-24 w-full" preserveAspectRatio="none" role="img"
         aria-label={`De ${primera.listos} a ${ultima.listos} planes listos en ${historia.length} semanas`}>
-        <polyline points={linea("planes")} fill="none" stroke="#cbd5e1" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <polyline points={linea("planes")} fill="none" stroke="var(--g-linea-suave)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         <polyline points={linea("listos")} fill="none" stroke="#059669" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
       </svg>
       <p className="mt-2 text-xs text-slate-500" data-historia={historia.length}>

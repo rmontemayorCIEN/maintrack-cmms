@@ -92,6 +92,21 @@ const globales = readFileSync(join(RAIZ, "app", "globals.css"), "utf8");
 revisar("existe el estilo SOBRIO para los dos tipos de título",
   /data-encabezados="sobrio"\] \.titulo-pagina/.test(globales) && /data-encabezados="sobrio"\] \.titulo-seccion/.test(globales));
 
+console.log("\nLas gráficas y mapas usan variables, no grises en hex");
+// Un hex fijo en una gráfica no sabe si la persona eligió el modo oscuro: la
+// rejilla de #eef1f6 salía casi blanca sobre fondo oscuro y las barras
+// «Creadas» brillaban más que las de interés.
+const GRISES_FIJOS = ["#eef1f6", "#c7d5fe", "#dfe4ea", "#e6e8ef", "#94a3b8", "#bae6fd", "#ddd6fe", "#fed7aa"];
+const conGris: string[] = [];
+for (const f of ["components/charts/dashboard-charts.tsx", "app/(app)/conjuntos/panel.tsx", "app/(app)/conjuntos/[id]/lienzo.tsx"]) {
+  const t = readFileSync(join(RAIZ, f), "utf8");
+  for (const g of GRISES_FIJOS) if (t.includes(g)) conGris.push(`${f}: ${g}`);
+}
+revisar("ninguna gráfica ni mapa trae un gris fijo en hex", conGris.length === 0, conGris);
+revisar("las variables --g-* existen en claro y en oscuro",
+  ["rejilla", "eje", "creadas", "apagado", "linea-suave", "area-preventivo", "area-predictivo", "area-correctivo"]
+    .every((v) => (globales.match(new RegExp(`--g-${v}:`, "g")) ?? []).length === 2));
+
 console.log("\nEsquema, migración y ruta están de acuerdo");
 const esquema = readFileSync(join(RAIZ, "prisma", "schema.prisma"), "utf8");
 revisar("User.temaUi existe y arranca en CLARO", /temaUi\s+String\s+@default\("CLARO"\)/.test(esquema));

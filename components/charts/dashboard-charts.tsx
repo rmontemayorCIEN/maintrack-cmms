@@ -18,12 +18,16 @@ import {
   YAxis,
 } from "recharts";
 
-const AXIS = { fontSize: 11, fill: "#94a3b8" };
-const GRID = "#eef1f6";
+// Los colores de ejes, rejilla y rellenos salen de variables CSS (app/globals.css)
+// y no de hex: un hex no sabe si la persona eligió el modo oscuro.
+const AXIS = { fontSize: 11, fill: "var(--g-eje)" };
+const GRID = "var(--g-rejilla)";
 
 const TOOLTIP_STYLE = {
   borderRadius: 10,
-  border: "1px solid #e6e8ef",
+  border: "1px solid var(--border)",
+  backgroundColor: "var(--panel)",
+  color: "var(--ink)",
   fontSize: 12,
   boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
 };
@@ -50,7 +54,7 @@ export function TrendChart({
         />
         <Tooltip contentStyle={TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Bar isAnimationActive={false} yAxisId="left" dataKey="creadas" name="Creadas" fill="#c7d5fe" radius={[4, 4, 0, 0]} barSize={18} />
+        <Bar isAnimationActive={false} yAxisId="left" dataKey="creadas" name="Creadas" fill="var(--g-creadas)" radius={[4, 4, 0, 0]} barSize={18} />
         <Bar isAnimationActive={false} yAxisId="left" dataKey="completadas" name="Completadas" fill="#345df9" radius={[4, 4, 0, 0]} barSize={18} />
         <Line isAnimationActive={false} yAxisId="right" type="monotone" dataKey="costo" name="Costo" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
       </ComposedChart>
@@ -67,9 +71,9 @@ export function MixChart({ data }: { data: Array<{ month: string; preventivo: nu
         <YAxis tick={AXIS} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
         <Tooltip contentStyle={TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Area isAnimationActive={false} type="monotone" dataKey="preventivo" name="Preventivo" stackId="1" stroke="#0ea5e9" fill="#bae6fd" />
-        <Area isAnimationActive={false} type="monotone" dataKey="predictivo" name="Predictivo" stackId="1" stroke="#8b5cf6" fill="#ddd6fe" />
-        <Area isAnimationActive={false} type="monotone" dataKey="correctivo" name="Correctivo" stackId="1" stroke="#f97316" fill="#fed7aa" />
+        <Area isAnimationActive={false} type="monotone" dataKey="preventivo" name="Preventivo" stackId="1" stroke="#0ea5e9" fill="var(--g-area-preventivo)" />
+        <Area isAnimationActive={false} type="monotone" dataKey="predictivo" name="Predictivo" stackId="1" stroke="#8b5cf6" fill="var(--g-area-predictivo)" />
+        <Area isAnimationActive={false} type="monotone" dataKey="correctivo" name="Correctivo" stackId="1" stroke="#f97316" fill="var(--g-area-correctivo)" />
       </AreaChart>
     </ResponsiveContainer>
   );
