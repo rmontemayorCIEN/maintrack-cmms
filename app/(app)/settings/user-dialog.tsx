@@ -58,7 +58,7 @@ export function UserDialog() {
       <form onSubmit={submit} className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Nuevo usuario</h3>
+            <h3 className="titulo-seccion">Nuevo usuario</h3>
             <p className="mt-0.5 text-xs text-slate-500">
               La tarifa por hora se usa para costear la mano de obra en las órdenes.
             </p>

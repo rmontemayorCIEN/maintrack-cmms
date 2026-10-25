@@ -173,7 +173,7 @@ export function Sidebar({
 
       <nav className={cn("flex-1 overflow-y-auto py-4", compacto ? "px-2" : "px-3")}>
         {menu.map((group) => (
-          <div key={group.clave} className="mb-3">
+          <div key={group.clave} className="mb-4">
             {/* El grupo que contiene la pagina actual se muestra abierto
                 aunque este cerrado: esconder donde esta parado el usuario
                 seria desorientarlo. */}
@@ -191,16 +191,18 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => alternarGrupo(group.clave)}
-                      className="mb-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[0.8125rem] font-bold uppercase tracking-wide text-slate-800 hover:bg-slate-100"
+                      className="group/titulo mb-1 flex w-full items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-left text-[0.75rem] font-bold uppercase tracking-[0.08em] text-slate-900 hover:bg-slate-100"
                       aria-expanded={abierto}
                     >
+                      {/* La misma marca de color que llevan los títulos de pantalla y de sección. */}
+                      <span className="h-3.5 w-[3px] shrink-0 rounded-sm bg-brand-600" aria-hidden />
+                      <span className="flex-1">{group.seccion}</span>
                       <ChevronRight
                         className={cn(
                           "h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform",
                           abierto && "rotate-90",
                         )}
                       />
-                      {group.seccion}
                     </button>
                   )}
                   <ul className={cn("grid gap-0.5", !compacto && !abierto && "hidden")}>

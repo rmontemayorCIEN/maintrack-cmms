@@ -136,7 +136,7 @@ export default async function NormaPage({ params }: { params: Promise<{ clave: s
       />
 
       <Card>
-        <h2 className="text-sm font-semibold text-slate-900">Lo que exige, y con qué se cumple</h2>
+        <h2 className="titulo-seccion">Lo que exige, y con qué se cumple</h2>
         <div className="mt-1">
           {norma.obligaciones.map((o) => (
             <Obligacion

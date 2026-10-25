@@ -82,7 +82,7 @@ export default async function RondinesPage() {
       )}
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-800">Recorridos anteriores</h2>
+        <h2 className="mb-2 titulo-seccion">Recorridos anteriores</h2>
         {anteriores.length === 0 ? (
           <EmptyState
             icon={<Footprints className="h-6 w-6" aria-hidden />}

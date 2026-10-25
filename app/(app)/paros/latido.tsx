@@ -134,7 +134,7 @@ export function Latido({
     <div className="grid gap-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">El latido de la planta</h2>
+          <h2 className="titulo-seccion">El latido de la planta</h2>
           <p className="text-[0.6875rem] leading-relaxed text-slate-500">
             Cada marca es un paro: dónde está dice cuándo, qué tan alta dice cuánto duró.
             Arrastre sobre la línea de arriba para escoger cualquier tramo, o toque una

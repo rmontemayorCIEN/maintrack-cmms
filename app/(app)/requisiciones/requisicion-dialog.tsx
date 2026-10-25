@@ -174,7 +174,7 @@ export function RequisicionDialog({
       {abierto ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 text-left">
           <form onSubmit={enviar} className="mt-8 w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-slate-800">Requisición de material</h2>
+            <h2 className="titulo-seccion">Requisición de material</h2>
             <p className="mt-0.5 text-[0.6875rem] text-slate-500">
               Lo que mantenimiento le pide al almacén. Pedir no descuenta existencia: eso pasa al surtir.
             </p>

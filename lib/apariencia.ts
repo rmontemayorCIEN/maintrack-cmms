@@ -17,6 +17,24 @@
 
 export type ClaveEscala = "NORMAL" | "GRANDE" | "MAYOR";
 export type ClaveDensidad = "COMPACTA" | "COMODA" | "AMPLIA";
+export type ClaveTema = "CLARO" | "OSCURO" | "SISTEMA";
+export type ClaveEncabezados = "SOBRIO" | "MARCADO";
+
+/**
+ * Tema y encabezados tambien son de la PERSONA: es comodidad de quien mira la
+ * pantalla, no identidad de la empresa. El color de acento sigue siendo de la
+ * empresa y en el modo oscuro se adapta solo (ver `app/globals.css`).
+ */
+export const TEMAS: Record<ClaveTema, { nombre: string; descripcion: string; atributo: "claro" | "oscuro" | "sistema" }> = {
+  CLARO: { nombre: "Claro", descripcion: "Fondo blanco. El de siempre y el que sale en papel.", atributo: "claro" },
+  OSCURO: { nombre: "Oscuro", descripcion: "Fondo oscuro. Descansa la vista de noche o en un taller con poca luz.", atributo: "oscuro" },
+  SISTEMA: { nombre: "Igual que mi aparato", descripcion: "Sigue el modo claro u oscuro de su teléfono o computadora, y cambia solo.", atributo: "sistema" },
+};
+
+export const ENCABEZADOS: Record<ClaveEncabezados, { nombre: string; descripcion: string }> = {
+  MARCADO: { nombre: "Marcado", descripcion: "Títulos más grandes y con una marca de color. Se ve de un vistazo dónde empieza cada sección." },
+  SOBRIO: { nombre: "Sobrio", descripcion: "Títulos discretos, del tamaño del texto. Más contenido en pantalla." },
+};
 
 export const ESCALAS: Record<ClaveEscala, { nombre: string; descripcion: string; raiz: string }> = {
   NORMAL: { nombre: "Normal", descripcion: "El tamaño estandar del sistema.", raiz: "100%" },
@@ -83,6 +101,8 @@ export const ACENTOS: Record<ClaveAcento, { nombre: string; muestra: string; esc
   },
 };
 
+export const CLAVES_TEMA = Object.keys(TEMAS) as ClaveTema[];
+export const CLAVES_ENCABEZADOS = Object.keys(ENCABEZADOS) as ClaveEncabezados[];
 export const CLAVES_ESCALA = Object.keys(ESCALAS) as ClaveEscala[];
 export const CLAVES_DENSIDAD = Object.keys(DENSIDADES) as ClaveDensidad[];
 export const CLAVES_ACENTO = Object.keys(ACENTOS) as ClaveAcento[];
@@ -92,6 +112,12 @@ export function escalaDe(v: string | null | undefined) {
 }
 export function densidadDe(v: string | null | undefined) {
   return DENSIDADES[(v ?? "COMODA") as ClaveDensidad] ?? DENSIDADES.COMODA;
+}
+export function temaDe(v: string | null | undefined) {
+  return TEMAS[(v ?? "CLARO") as ClaveTema] ?? TEMAS.CLARO;
+}
+export function encabezadosDe(v: string | null | undefined): ClaveEncabezados {
+  return v && v in ENCABEZADOS ? (v as ClaveEncabezados) : "MARCADO";
 }
 export function acentoDe(v: string | null | undefined) {
   return ACENTOS[(v ?? "AZUL") as ClaveAcento] ?? ACENTOS.AZUL;
@@ -117,7 +143,10 @@ export function estiloDeApariencia(prefs: {
     "--tarjeta": d.tarjeta,
   };
   for (const [tono, hex] of Object.entries(a.escala)) {
-    vars[`--color-brand-${tono}`] = hex;
+    // `--acento-*` y no `--color-brand-*`: en el modo oscuro la hoja de estilos
+    // deriva los tonos de brand a partir de estos, y un estilo en linea le
+    // ganaria a cualquier regla de la hoja.
+    vars[`--acento-${tono}`] = hex;
   }
   return vars;
 }

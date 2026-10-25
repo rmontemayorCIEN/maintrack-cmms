@@ -68,7 +68,7 @@ export function BotonAyuda() {
                 <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                   <div>
                     <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-slate-400">Ayuda</p>
-                    <h2 className="text-lg font-semibold text-slate-900">{ficha.titulo}</h2>
+                    <h2 className="titulo-seccion">{ficha.titulo}</h2>
                   </div>
                   <button
                     type="button" onClick={() => setAbierto(false)} aria-label="Cerrar ayuda"

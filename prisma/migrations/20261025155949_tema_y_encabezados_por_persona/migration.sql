@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "encabezadosUi" TEXT NOT NULL DEFAULT 'MARCADO',
+ADD COLUMN     "temaUi" TEXT NOT NULL DEFAULT 'CLARO';
+

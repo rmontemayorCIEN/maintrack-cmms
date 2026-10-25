@@ -43,7 +43,7 @@ export function NuevoConteo({
       {abierto ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 text-left">
           <form onSubmit={crear} className="mt-16 w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-sm font-semibold text-slate-800">Abrir conteo cíclico</h2>
+            <h2 className="titulo-seccion">Abrir conteo cíclico</h2>
             <p className="mt-0.5 text-[0.6875rem] text-slate-500">
               Se toma una foto de lo que el sistema cree que hay. Contar por familias, unas pocas
               cada semana, funciona mejor que parar el almacén una vez al año.

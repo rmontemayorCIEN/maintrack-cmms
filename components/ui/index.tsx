@@ -29,10 +29,10 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-4">
+    <div className="cabecera-tarjeta mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        {subtitle ? <p className="mt-0.5 text-xs text-slate-500"><Glosa>{subtitle}</Glosa></p> : null}
+        <h3 className="titulo-seccion">{title}</h3>
+        {subtitle ? <p className="mt-1 text-xs text-slate-500"><Glosa>{subtitle}</Glosa></p> : null}
       </div>
       {action}
     </div>
@@ -166,7 +166,7 @@ export function PageHeader({
     <div className="mb-6 flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
       <div>
         {breadcrumb ? <div className="mb-1 text-xs text-slate-500">{breadcrumb}</div> : null}
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        <h1 className="titulo-pagina">{title}</h1>
         {description ? (
           <p className="mt-1 text-sm text-slate-500"><Glosa>{description}</Glosa></p>
         ) : null}

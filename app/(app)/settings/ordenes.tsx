@@ -89,7 +89,7 @@ export function ConfiguracionOrdenes({
     <Card>
       <div className="grid gap-5">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Como se arman las órdenes</h2>
+          <h2 className="titulo-seccion">Como se arman las órdenes</h2>
           <p className="mt-0.5 text-xs text-slate-500">
             De aquí sale que puede juntar el generador de órdenes y que tanto se puede
             adelantar un preventivo.
@@ -252,7 +252,7 @@ export function ConfiguracionOrdenes({
           de cumplimiento.
         */}
         <div className="border-t border-slate-200 pt-5">
-          <h2 className="text-sm font-semibold text-slate-900">La orden impresa, como formato de su sistema de calidad</h2>
+          <h2 className="titulo-seccion">La orden impresa, como formato de su sistema de calidad</h2>
           <p className="mt-0.5 text-xs text-slate-500">
             Si su empresa está certificada, la hoja impresa lleva el código del formato y su revisión al pie.
             Déjelo vacío si no lo usa.

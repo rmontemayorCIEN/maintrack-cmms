@@ -56,7 +56,7 @@ export function AyudaConIa({
     <section className={compacto ? "mt-3 border-t border-slate-100 pt-3" : "mt-6 rounded-lg border border-brand-200 bg-brand-50/40 p-4"}>
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-brand-600" />
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="titulo-seccion">
           {titulo ?? "Pregunte lo que sea de esta pantalla"}
         </h3>
       </div>

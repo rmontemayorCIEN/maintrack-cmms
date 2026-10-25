@@ -18,7 +18,7 @@ import { PanelApariencia } from "./apariencia";
 import { PanelVoz } from "./voz";
 import { VOCES, VOZ_POR_OMISION } from "@/lib/voz";
 import { LARGOS_DE_RESPUESTA, LARGO_POR_OMISION } from "@/lib/respuestas-voz";
-import type { ClaveAcento, ClaveDensidad, ClaveEscala } from "@/lib/apariencia";
+import { encabezadosDe, type ClaveAcento, type ClaveDensidad, type ClaveEscala, type ClaveTema } from "@/lib/apariencia";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
 import { FichasPlanes } from "./planes";
 import { EstadoDeCuenta } from "./estado-cuenta";
@@ -51,7 +51,7 @@ type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
   cuenta: "Sus datos de acceso al sistema.",
-  apariencia: "Tamaño de letra, densidad y la identidad visual de la empresa.",
+  apariencia: "Tema claro u oscuro, títulos, tamaño de letra, densidad y la identidad visual de la empresa.",
   atajos: "Las pantallas que usa a diario, hasta arriba de su menú. Es suyo: no cambia el de nadie más.",
   organizacion: "Identidad de la empresa y estructura fisica de la planta.",
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
@@ -103,19 +103,19 @@ export default async function SettingsPage({
     : "cuenta";
 
   const todas: Pestana[] = [
-    { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" /> },
-    { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" /> },
-    { clave: "atajos", titulo: "Lo que más uso", icono: <Star className="h-4 w-4" /> },
-    { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" /> },
-    { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" /> },
-    { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" /> },
-    { clave: "avisos", titulo: "Avisos", icono: <BellRing className="h-4 w-4" /> },
-    { clave: "seguridad", titulo: "Seguridad y sesiones", icono: <ShieldCheck className="h-4 w-4" /> },
-    { clave: "suscripcion", titulo: "Suscripción", icono: <CreditCard className="h-4 w-4" /> },
-    { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" /> },
-    { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" /> },
-    { clave: "integracion", titulo: "Integración", icono: <Plug className="h-4 w-4" /> },
-    { clave: "auditoria", titulo: "Auditoría", icono: <History className="h-4 w-4" /> },
+    { clave: "cuenta", titulo: "Mi cuenta", icono: <UserCog className="h-4 w-4" />, grupo: "Mi cuenta" },
+    { clave: "apariencia", titulo: "Apariencia", icono: <Palette className="h-4 w-4" />, grupo: "Mi cuenta" },
+    { clave: "atajos", titulo: "Lo que más uso", icono: <Star className="h-4 w-4" />, grupo: "Mi cuenta" },
+    { clave: "avisos", titulo: "Avisos", icono: <BellRing className="h-4 w-4" />, grupo: "Mi cuenta" },
+    { clave: "seguridad", titulo: "Seguridad y sesiones", icono: <ShieldCheck className="h-4 w-4" />, grupo: "Mi cuenta" },
+    { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" />, grupo: "Mi empresa" },
+    { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" />, grupo: "Mi empresa" },
+    { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" />, grupo: "Mi empresa" },
+    { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" />, grupo: "Equipo y accesos" },
+    { clave: "integracion", titulo: "Integración", icono: <Plug className="h-4 w-4" />, grupo: "Equipo y accesos" },
+    { clave: "auditoria", titulo: "Auditoría", icono: <History className="h-4 w-4" />, grupo: "Equipo y accesos" },
+    { clave: "suscripcion", titulo: "Suscripción", icono: <CreditCard className="h-4 w-4" />, grupo: "Plan y cobros" },
+    { clave: "cobranza", titulo: "Estado de cuenta", icono: <Receipt className="h-4 w-4" />, grupo: "Plan y cobros" },
   ];
   const pestanas = todas.filter((p) => PERMITIDAS[p.clave as Seccion]);
 
@@ -207,8 +207,10 @@ export default async function SettingsPage({
 
   return (
     <>
-      <PageHeader title="Configuracion" description={DESCRIPCIONES[activa]} />
+      <PageHeader title="Configuración" description={DESCRIPCIONES[activa]} />
+      <div className="lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:items-start lg:gap-8">
       <Pestanas activa={activa} pestanas={pestanas} />
+      <div className="min-w-0">
 
       {activa === "atajos" ? (
         <PanelAtajos
@@ -226,6 +228,8 @@ export default async function SettingsPage({
         <PanelApariencia
           escala={(user.escalaUi ?? "NORMAL") as ClaveEscala}
           densidad={(user.densidadUi ?? "COMODA") as ClaveDensidad}
+          tema={(user.temaUi ?? "CLARO") as ClaveTema}
+          encabezados={encabezadosDe(user.encabezadosUi)}
           acento={(org.colorAcento ?? "AZUL") as ClaveAcento}
           logoUrl={org.logoUrl}
           puedeEditarMarca={can(user.role, "settings:write")}
@@ -466,7 +470,7 @@ export default async function SettingsPage({
         <Card padded={false}>
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Usuarios y roles</h3>
+              <h3 className="titulo-seccion">Usuarios y roles</h3>
               <p className="text-xs text-slate-500">
                 {usuarios.filter((u) => u.active).length} activos de {usuarios.length} registrados
               </p>
@@ -527,7 +531,7 @@ export default async function SettingsPage({
       {activa === "auditoria" && bitacora ? (
         <Card padded={false}>
           <div className="px-5 py-4">
-            <h3 className="text-sm font-semibold text-slate-900">Bitácora de auditoría</h3>
+            <h3 className="titulo-seccion">Bitácora de auditoría</h3>
             <p className="text-xs text-slate-500">
               {filtrada ? "Con los filtros aplicados: " : "Últimas "}
               {bitacora.length}
@@ -566,6 +570,8 @@ export default async function SettingsPage({
           )}
         </Card>
       ) : null}
+      </div>
+      </div>
     </>
   );
 }

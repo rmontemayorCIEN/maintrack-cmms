@@ -118,7 +118,7 @@ export function DocumentosDeNorma({
 
   return (
     <Card className="mb-4">
-      <h2 className="text-sm font-semibold text-slate-900">Documentos de la norma</h2>
+      <h2 className="titulo-seccion">Documentos de la norma</h2>
       <p className="mt-0.5 text-xs text-slate-500">
         La publicación oficial, la guía, el manual del que depende. Es lo que contesta
         «¿de dónde salió esto?» cuando alguien lo pregunta.

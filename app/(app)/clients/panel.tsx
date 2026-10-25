@@ -201,7 +201,7 @@ export function PanelClientes({
           <form onSubmit={crear}>
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Nueva empresa cliente</h3>
+                <h3 className="titulo-seccion">Nueva empresa cliente</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
                   El responsable entrara con el correo y la contraseña que defina aquí, y podra cambiarlos después desde Configuración.
                 </p>

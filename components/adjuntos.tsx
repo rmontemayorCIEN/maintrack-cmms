@@ -94,7 +94,7 @@ export function Adjuntos({
     <div className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
+          <h3 className="titulo-seccion">{titulo}</h3>
           <p className="text-xs text-slate-500">
             {ayuda ?? "Fotos, videos y documentos. Máximo 200 MB por archivo."}
           </p>

@@ -66,7 +66,7 @@ export default async function ArmarOrdenPage({
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Órdenes de trabajo
         </Link>
-        <h1 className="mt-1 text-xl font-semibold text-slate-900">Armar una orden</h1>
+        <h1 className="mt-1 titulo-pagina">Armar una orden</h1>
         <p className="text-xs text-slate-500">
           Elija el equipo y vea todo lo que se le debe. Marque actividad por actividad lo que
           va en esta orden: lo que no marque queda disponible para otra.

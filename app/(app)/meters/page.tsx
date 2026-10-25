@@ -102,7 +102,7 @@ export default async function MetersPage() {
               <Card key={meter.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-slate-900">{meter.name}</h3>
+                    <h3 className="titulo-seccion">{meter.name}</h3>
                     <Link href={`/assets/${meter.asset.id}`} className="text-xs text-slate-500 hover:text-brand-600">
                       {meter.asset.code} · {meter.asset.name}
                     </Link>

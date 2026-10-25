@@ -54,7 +54,7 @@ export function FranjaAlmacen({ franja, moneda = "MXN" }: { franja: FranjaDeAlma
   return (
     <section aria-labelledby="t-franja-almacen" className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-slate-100 px-4 py-3">
-        <h2 id="t-franja-almacen" className="text-sm font-semibold text-slate-900">{TITULO[franja.agrupadoPor]}</h2>
+        <h2 id="t-franja-almacen" className="titulo-seccion">{TITULO[franja.agrupadoPor]}</h2>
         <div className="flex items-baseline gap-3 text-xs">
           <span className="text-slate-500">
             {franja.refacciones} {franja.refacciones === 1 ? "refacción" : "refacciones"}

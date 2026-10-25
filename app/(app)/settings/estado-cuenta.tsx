@@ -52,7 +52,7 @@ export function EstadoDeCuenta({
       ) : (
         <Card padded={false}>
           <div className="px-5 py-4">
-            <h3 className="text-sm font-semibold text-slate-900">Cargos del servicio</h3>
+            <h3 className="titulo-seccion">Cargos del servicio</h3>
             <p className="text-xs text-slate-500">
               Estas notas de cobro no son comprobantes fiscales. El CFDI se emite por separado.
             </p>

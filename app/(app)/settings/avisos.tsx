@@ -316,7 +316,7 @@ export function PanelAvisos({
         <Card>
           <div className="grid gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Avisos al celular</h2>
+              <h2 className="titulo-seccion">Avisos al celular</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
                 Lo que hoy aparece en la campana puede llegar además al teléfono, aunque
                 MainTrack esté cerrado. No cuesta nada por mensaje.
@@ -366,7 +366,7 @@ export function PanelAvisos({
           <div className="grid gap-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Este aparato</h2>
+                <h2 className="titulo-seccion">Este aparato</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {instructivo.titulo}
                   {instalada ? " · instalada" : " · en el navegador"}
@@ -455,7 +455,7 @@ export function PanelAvisos({
           <Card>
             <div className="grid gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="titulo-seccion">
                   Sus aparatos ({dispositivos.length})
                 </h2>
                 <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">
@@ -510,7 +510,7 @@ export function PanelAvisos({
       <Card>
         <div className="grid gap-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">
+            <h2 className="titulo-seccion">
               Cómo activarlo en {instructivo.titulo}
             </h2>
             <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-600">

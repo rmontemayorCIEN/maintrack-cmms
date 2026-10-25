@@ -274,7 +274,7 @@ export function MapaDeParos({
             {area ? (
               <div className="grid gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{area.area}</h3>
+                  <h3 className="titulo-seccion">{area.area}</h3>
                   <p className="text-[0.6875rem] text-slate-500">
                     {area.margenPorHora > 0
                       ? `${formatCurrency(area.margenPorHora, moneda)} por hora detenida`

@@ -67,7 +67,7 @@ export function ContextoDelNegocio({
       <div className="grid gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-2xl">
-            <h2 className="text-sm font-semibold text-slate-900">Su negocio, en sus palabras</h2>
+            <h2 className="titulo-seccion">Su negocio, en sus palabras</h2>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
               El giro dice la categoría —«manufactura metalmecánica»—. Esto dice lo suyo: que
               trabaja tres turnos, que sin la grúa no se mueve material, que este año quiere

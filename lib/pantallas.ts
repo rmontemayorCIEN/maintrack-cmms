@@ -186,54 +186,54 @@ export type ItemMenu = {
 export type GrupoMenu = { seccion: string; clave: string; items: ItemMenu[] };
 
 /**
- * El menú, ordenado por el día de quien lo usa: cómo voy, qué me llegó, qué
- * tengo que hacer, sobre qué equipos, con qué material, cómo me fue. La
- * configuración al final: se toca las primeras semanas y casi nunca después.
+ * El menú, en ocho cajones que se leen como el día de quien lo usa: el
+ * panorama, el trabajo que hay que hacer hoy, las personas y sus registros,
+ * los equipos, el material, los resultados y, al final, la configuración, que
+ * se toca las primeras semanas y casi nunca después.
+ *
+ * Eran nueve. «Lo que llega» (solicitudes, alertas, rondines) y «El trabajo»
+ * (órdenes, pendientes) eran el mismo recorrido: algo llega, se vuelve orden,
+ * se cierra. Partirlos obligaba a saltar de cajón para seguir un solo
+ * pendiente. Y «Sus registros» era un cajón de un solo renglón.
  */
 const MENU: GrupoMenu[] = [
   {
-    seccion: "Cómo voy", clave: "inicio", items: [
+    seccion: "Panorama", clave: "inicio", items: [
       { href: "/dashboard", etiqueta: "Inicio", icono: "inicio" },
       { href: "/board", etiqueta: "Tablero", icono: "tablero" },
       { href: "/calendar", etiqueta: "Calendario", icono: "calendario" },
     ],
   },
   {
-    seccion: "Lo que llega", clave: "entradas", items: [
+    seccion: "Trabajo del día", clave: "trabajo", items: [
       { href: "/requests", etiqueta: "Solicitudes de servicio", icono: "solicitudes" },
       { href: "/requests/puntos", etiqueta: "Puntos de reporte QR", icono: "qr" },
-      // El rondin va junto a las solicitudes y los puntos QR porque es lo
-      // mismo por otro camino: una fuente de hallazgos. Y comparte con los
-      // puntos el codigo pegado en la pared.
-      { href: "/rondines", etiqueta: "Rondines", icono: "rondin" },
       { href: "/alerts", etiqueta: "Alertas", icono: "alertas" },
-    ],
-  },
-  {
-    seccion: "El trabajo", clave: "trabajo", items: [
+      // El rondin es otra fuente de hallazgos, como las solicitudes y los
+      // puntos QR: comparte con estos el codigo pegado en la pared.
+      { href: "/rondines", etiqueta: "Rondines", icono: "rondin" },
       { href: "/work-orders", etiqueta: "Órdenes de trabajo", icono: "ordenes" },
       { href: "/work-orders/armar", etiqueta: "Armar una orden", icono: "armar" },
       { href: "/work-orders/cierre", etiqueta: "Qué falta para cerrar", icono: "ordenes" },
       { href: "/backlog", etiqueta: "Trabajo pendiente", icono: "backlog" },
-      // «Personal» y no «Equipo»: en el mismo menú, «equipos» son las máquinas.
-      { href: "/equipo", etiqueta: "Personal", icono: "personal" },
     ],
   },
   {
     /*
-     * Un cajon propio, y no dentro de «El trabajo».
+     * Personal y registros propios, juntos: los dos son «lo que lleva la
+     * empresa de su gente y de su operación», y ninguno cabe en el ciclo de la
+     * orden. Lo que se captura en un registro propio es transversal —la
+     * bitacora del diesel es de equipos, la entrega de proteccion es de
+     * personal, los contratos son de administracion—, asi que no pertenece a
+     * Equipos ni a Almacen.
      *
-     * Ahi estaba mal por dos razones: ese grupo es el ciclo de la orden
-     * —abrirla, armarla, cerrarla, lo pendiente— y un registro propio no
-     * participa en el; y lo que se lleva aqui es transversal, asi que no cabe
-     * en ningun grupo existente: la bitacora del diesel es de equipos, la
-     * entrega de proteccion es de personal y los contratos son de
-     * administracion.
+     * «Personal» y no «Equipo»: en el mismo menu, «equipos» son las maquinas.
      *
-     * El grupo entero desaparece si la empresa no contrato el modulo, porque
-     * `menuDe` quita los grupos que se quedan sin items.
+     * El renglon de registros desaparece si la empresa no contrato el modulo,
+     * porque `menuDe` quita lo que no se ofrece; el cajon sigue con Personal.
      */
-    seccion: "Sus registros", clave: "registros", items: [
+    seccion: "Personal y registros", clave: "personas", items: [
+      { href: "/equipo", etiqueta: "Personal", icono: "personal" },
       { href: "/registros", etiqueta: "Registros propios", icono: "registros", requiereRegistros: true },
     ],
   },
@@ -260,7 +260,7 @@ const MENU: GrupoMenu[] = [
     ],
   },
   {
-    seccion: "Cómo me fue", clave: "analisis", items: [
+    seccion: "Resultados", clave: "analisis", items: [
       { href: "/indicadores", etiqueta: "Indicadores", icono: "indicadores" },
       { href: "/presupuestos", etiqueta: "Presupuestos", icono: "reportes" },
       { href: "/normas", etiqueta: "Cumplimiento normativo", icono: "normas", requiereNormas: true },

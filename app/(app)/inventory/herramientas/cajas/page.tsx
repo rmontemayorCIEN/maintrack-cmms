@@ -93,7 +93,7 @@ export default async function CajasPage() {
 
       {fuera.length ? (
         <Card className="mb-4">
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">Lo que está fuera</h2>
+          <h2 className="mb-2 titulo-seccion">Lo que está fuera</h2>
           <div className="space-y-3">
             {fuera.map((c) => (
               <div key={c.grupo} className="rounded-lg bg-slate-50 px-3 py-2">
@@ -124,7 +124,7 @@ export default async function CajasPage() {
         />
       ) : (
         <Card>
-          <h2 className="mb-2 text-sm font-semibold text-slate-900">Las cajas</h2>
+          <h2 className="mb-2 titulo-seccion">Las cajas</h2>
           <div className="space-y-3">
             {cajas.map((c) => (
               <div key={c.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">

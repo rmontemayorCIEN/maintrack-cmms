@@ -145,7 +145,7 @@ export default async function ReportsPage({
       </p>
 
       <section className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Confiabilidad</h2>
+        <h2 className="mb-3 titulo-seccion">Confiabilidad</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <TarjetaIndicador indicador={ind.mttr} dias={days} etiqueta="MTTR" decimales={2} pista="Tiempo medio de reparación" />
           <TarjetaIndicador indicador={ind.mtbf} dias={days} etiqueta="MTBF" decimales={0} pista="Tiempo medio entre fallas" />
@@ -187,7 +187,7 @@ export default async function ReportsPage({
       </section>
 
       <section className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Costos</h2>
+        <h2 className="mb-3 titulo-seccion">Costos</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <TarjetaIndicador indicador={ind.costoMantenimiento} dias={days} moneda={currency} etiqueta="Costo total" pista="Órdenes terminadas en el periodo" />
           <Stat label="Mano de obra" value={formatCurrency(kpis.costos.mano, currency)} />
@@ -394,7 +394,7 @@ export default async function ReportsPage({
 
           <Card padded={false}>
             <div className="px-5 py-4">
-              <h3 className="text-sm font-semibold text-slate-900">Productividad por técnico</h3>
+              <h3 className="titulo-seccion">Productividad por técnico</h3>
               <p className="text-xs text-slate-500">Horas cargadas en el periodo</p>
             </div>
             {byTechnician.length === 0 ? (
@@ -434,7 +434,7 @@ export default async function ReportsPage({
 
           <Card padded={false}>
             <div className="px-5 py-4">
-              <h3 className="text-sm font-semibold text-slate-900">Análisis de modos de falla</h3>
+              <h3 className="titulo-seccion">Análisis de modos de falla</h3>
               <p className="text-xs text-slate-500">Códigos de falla registrados al cierre</p>
             </div>
             {failureCodes.length === 0 ? (

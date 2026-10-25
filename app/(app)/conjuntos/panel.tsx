@@ -467,7 +467,7 @@ function Residuo({
   return (
     <div className="card grid gap-3 p-4">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">Equipos fuera de todo</h2>
+        <h2 className="titulo-seccion">Equipos fuera de todo</h2>
         <p className="text-[0.6875rem] leading-relaxed text-slate-500">
           No están en {termino.ningun} {termino.singular.toLowerCase()}. Esta lista se calcula sola: un equipo
           nuevo aparece aquí sin que nadie lo ponga. Si alguno va solo a propósito, márquelo como
