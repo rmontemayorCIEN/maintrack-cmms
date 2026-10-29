@@ -32,3 +32,12 @@ tsconfig.tsbuildinfo
 # Borrador personal de Rafael: apuntes y prompts de trabajo, no del producto.
 # Cambiaba en cada sesion y ensuciaba el estado del repositorio.
 Cambios y prompts.docx
+
+# Documentos personales sueltos en la raíz (Word, Excel, PDF): no son del
+# producto y uno con claves no debe llegar nunca a GitHub. El 29 oct 2026 había
+# dos en esta carpeta; se movieron a Documentos. Los del sistema viven en docs/.
+/*.docx
+/*.doc
+/*.xlsx
+/*.xls
+/*.pdf

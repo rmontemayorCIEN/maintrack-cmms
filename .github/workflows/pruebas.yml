@@ -49,6 +49,12 @@ jobs:
       - name: Tipos
         run: npx tsc --noEmit
 
+      # Ninguna dependencia de producción con vulnerabilidad alta o crítica sin
+      # aceptar (seguridad/excepciones-dependencias.json, con fecha). El 29 oct
+      # 2026 había un Next.js con ejecución remota de código sin sesión.
+      - name: Dependencias sin vulnerabilidades graves
+        run: node scripts/revisar-dependencias.mjs
+
       # Sin paso de lint A PROPOSITO: este proyecto no tiene ESLint configurado
       # —`npm run lint` abre el asistente de Next y en un servidor se colgaria
       # esperando una respuesta que nadie va a dar—. Configurarlo es una tarea
