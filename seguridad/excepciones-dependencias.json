@@ -1,0 +1,9 @@
+{
+  "_": "Vulnerabilidades altas o críticas aceptadas a sabiendas. Cada una con por qué y hasta cuándo: pasada la fecha, el guardián vuelve a detener las pruebas.",
+  "zod": {
+    "por": "Agotamiento de memoria al validar colecciones muy grandes con límites (DoS). El arreglo solo existe en zod 4 y Maintrack usa zod 3 en 162 archivos: es una migración aparte. Mientras, lo que llega al servidor está limitado a 5 MB (serverActions.bodySizeLimit), que acota el tamaño de lo que se valida.",
+    "aceptadaPor": "Rafael Montemayor",
+    "aceptadaEl": "2026-10-29",
+    "revisarAntesDe": "2026-11-30"
+  }
+}
