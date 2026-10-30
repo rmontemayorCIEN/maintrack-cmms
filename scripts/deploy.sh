@@ -147,6 +147,16 @@ else
   AVISOS="no configurados (faltan las llaves VAPID)"
 fi
 
+# El token con que la Torre de Control lee el reporte de salud
+# (/api/salud/detalle). Opcional: sin el, la ruta contesta 404 y la Torre ve a
+# MainTrack en gris. Va aqui por lo mismo que las llaves VAPID.
+if hay_secreto cmms-torre-salud-token; then
+  SECRETOS="$SECRETOS,TORRE_SALUD_TOKEN=cmms-torre-salud-token:latest"
+  TORRE="habilitada"
+else
+  TORRE="no configurada (falta el secreto cmms-torre-salud-token)"
+fi
+
 # Una vista previa nace con su propia liga y sin trafico. Sin --no-traffic la
 # revision de una propuesta sin revisar se llevaria a los clientes de golpe.
 EXTRA=""
@@ -162,6 +172,7 @@ echo "Cloud SQL : $INSTANCIA"
 echo "Archivos  : gs://$BUCKET_ARCHIVOS"
 echo "IA        : $IA"
 echo "Avisos    : $AVISOS"
+echo "Torre     : $TORRE"
 echo "Publicando $SERVICIO en $REGION..."
 echo ""
 
