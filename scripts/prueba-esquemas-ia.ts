@@ -6,10 +6,9 @@
  * TODAS las restricciones que Zod puede producir, no solo contra la que fallo.
  */
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { depurarEsquema, textoIa } from "../lib/ia/cliente";
+import { esquemaParaIa, textoIa } from "../lib/ia/cliente";
 
 let fallas = 0;
 function revisar(e: string, real: unknown, esp: unknown) {
@@ -18,10 +17,7 @@ function revisar(e: string, real: unknown, esp: unknown) {
   console.log(`  ${bien ? "ok   " : "FALLA"} ${e.padEnd(56)} ${JSON.stringify(real)}`);
 }
 
-const armar = (e: z.ZodType) => {
-  const { $schema, ...crudo } = zodToJsonSchema(e, { $refStrategy: "none" }) as Record<string, unknown>;
-  return JSON.stringify(depurarEsquema(crudo));
-};
+const armar = (e: z.ZodType) => JSON.stringify(esquemaParaIa(e));
 const tiene = (json: string, clave: string) => new RegExp(`"${clave}"`).test(json);
 
 console.log("\nLO QUE HAY QUE QUITAR\n");
