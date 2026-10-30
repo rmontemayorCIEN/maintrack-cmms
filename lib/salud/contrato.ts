@@ -97,7 +97,7 @@ export async function revisar(
     const r = await Promise.race([fn(), limite]);
     return { ...base, ...r, detalle: recortar(r.detalle, LIMITES.detalle) };
   } catch (error) {
-    console.error(`[salud] ${base.clave}:`, error instanceof Error ? error.message : error);
+    console.error(`[salud] ${base.clave}:`, mensajeSeguro(error));
     return { ...base, estado: "desconocido", detalle: "No se pudo revisar; el detalle quedó en el registro de la app." };
   } finally {
     if (reloj) clearTimeout(reloj);
@@ -136,6 +136,13 @@ export function estadoPorVencimiento(vence: Date, ahora: Date, diasAviso = 14): 
   if (dias < 0) return "falla";
   if (dias < diasAviso) return "atencion";
   return "ok";
+}
+
+/// El mensaje de un error, sin credenciales: un error de base de datos puede
+/// traer «postgres://usuario:clave@host», y los secretos nunca van a un registro.
+export function mensajeSeguro(error: unknown): string {
+  const m = error instanceof Error ? error.message : String(error);
+  return m.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s@/]+@/gi, "$1***@").slice(0, 300);
 }
 
 function recortar(texto: string, maximo: number): string {
