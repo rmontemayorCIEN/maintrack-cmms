@@ -5,7 +5,7 @@
  * usuario aprieta el boton en produccion. Por eso se prueba aqui, y contra
  * TODAS las restricciones que Zod puede producir, no solo contra la que fallo.
  */
-import { z } from "zod";
+import { z } from "../lib/zod";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { esquemaParaIa, textoIa } from "../lib/ia/cliente";

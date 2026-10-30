@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
+import { z } from "../zod";
 import { aJsonSchema } from "../esquema-json";
 import { registrarConsumo } from "./consumo";
 import type { ClaveFuncionIA } from "./funciones";

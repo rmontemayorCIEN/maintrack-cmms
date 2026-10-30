@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 
 /**
  * Zod -> JSON Schema, igual para la IA y para el MCP.

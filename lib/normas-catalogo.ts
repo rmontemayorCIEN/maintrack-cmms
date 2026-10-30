@@ -18,7 +18,7 @@
  * `scripts/revisar-catalogo-normativo.ts` corre en el despliegue y bloquea
  * antes de que llegue a producción.
  */
-import { z } from "zod";
+import { z } from "./zod";
 import paquete from "../catalogo-normativo/normas.json";
 import { ORDEN_TIPOS_OBLIGACION, type TipoObligacion } from "./normas-tipos";
 

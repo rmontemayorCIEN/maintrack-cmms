@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, sinCostos, withAuth, withVista } from "@/lib/api";
 import { nextWorkOrderNumber } from "@/lib/numbering";

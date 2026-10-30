@@ -1,5 +1,5 @@
 import { periodoDeLaEmpresa } from "../indicadores";
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { saludDeDatos } from "../salud-datos";
 import { analizarConIa } from "./cliente";

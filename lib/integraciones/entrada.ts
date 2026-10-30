@@ -18,7 +18,7 @@
  *  - Nada externo toca una orden o un plan directamente: las reglas del
  *    sistema deciden (el plan por uso se adelanta, la alerta predictiva se abre).
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { nextRequestNumber } from "../numbering";
 import { LecturaRechazada, registrarLectura } from "../medidores";

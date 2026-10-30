@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { prisma } from "./db";
 import { notify } from "./audit";
 import { siguienteFolio } from "./numbering";

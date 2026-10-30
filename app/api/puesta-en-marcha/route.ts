@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { puestaEnMarcha } from "@/lib/puesta-en-marcha";
 import { modoDeInicio } from "@/lib/modos-inicio";

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { z } from "./zod";
 import { prisma } from "./db";
 import { consumirLimite } from "./integraciones/limites";
 import { notify } from "./audit";

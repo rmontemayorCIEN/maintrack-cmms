@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { armarOrden } from "@/lib/armar-ot";
 

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { resolverCadenciaDelPlan } from "./frecuencias";

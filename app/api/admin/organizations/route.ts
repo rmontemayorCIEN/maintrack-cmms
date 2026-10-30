@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
 import { MODOS_DE_INICIO } from "@/lib/modos-inicio";
 import { fail, ok } from "@/lib/api";

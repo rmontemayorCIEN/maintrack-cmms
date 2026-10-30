@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { avisarCambiosDeOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";

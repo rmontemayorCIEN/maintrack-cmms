@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth, withVista } from "@/lib/api";
 import {
   ErrorDeEquivalencia, equivalentesDe, esTipoValido,

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { fail, ok } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/superadmin";

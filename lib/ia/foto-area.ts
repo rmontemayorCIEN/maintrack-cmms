@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { contextoDeLaEmpresa, type OrgConContexto } from "../contexto-negocio";

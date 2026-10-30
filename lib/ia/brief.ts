@@ -27,7 +27,7 @@
  * igual. La IA lo mejora; no lo sostiene.
  */
 import { createHash } from "crypto";
-import { z } from "zod";
+import { z } from "../zod";
 import { analizarConIa, textoIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";
 import { cifrasDe, type GuionDelDia } from "../brief";

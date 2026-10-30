@@ -14,7 +14,7 @@
  * No hay `Mcp-Session-Id`, y Cloud Run puede atender cada llamada en cualquier
  * instancia.
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { buscarHerramienta, ErrorDeHerramienta, listarHerramientas, type Contexto } from "./herramientas";
 import { EscrituraRechazada } from "./lectura";
 

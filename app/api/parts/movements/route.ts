@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAlmacen, almacenPorOmision, aplicarMovimiento } from "@/lib/almacen";
 import { motivoValido, motivosDe, nombreDeMotivo, pideNota, TIPOS_CON_MOTIVO } from "@/lib/motivos-movimiento";
