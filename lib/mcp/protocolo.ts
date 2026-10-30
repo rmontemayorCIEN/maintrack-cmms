@@ -54,7 +54,7 @@ function error(id: unknown, code: number, message: string): Respuesta {
   return { jsonrpc: "2.0", id: idValido(id) ? id : null, error: { code, message } };
 }
 
-const llamadaSchema = z.object({ name: z.string().min(1).max(100), arguments: z.record(z.unknown()).optional() });
+const llamadaSchema = z.object({ name: z.string().min(1).max(100), arguments: z.record(z.string(), z.unknown()).optional() });
 
 /**
  * Atiende UN mensaje. Devuelve null para las notificaciones (sin id), que no

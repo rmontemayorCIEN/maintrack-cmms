@@ -13,7 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { error, user } = await requireSuperAdmin();
   if (error) return error;
   const parsed = esquema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return fail(parsed.error.errors[0]?.message ?? "Datos inválidos", 422);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos", 422);
   const r = await responderSoporte({ id: (await params).id, operadorId: user.id, ...parsed.data });
   return r ? ok({ solicitud: { id: r.id, estado: r.estado } }) : fail("Solicitud no encontrada", 404);
 }

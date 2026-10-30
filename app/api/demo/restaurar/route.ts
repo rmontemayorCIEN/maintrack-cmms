@@ -14,7 +14,7 @@ export async function GET() {
   }, { esLectura: true });
 }
 
-const esquema = z.object({ confirmacion: z.literal("RESTAURAR", { errorMap: () => ({ message: "Escriba RESTAURAR para confirmar." }) }) });
+const esquema = z.object({ confirmacion: z.literal("RESTAURAR", { error: "Escriba RESTAURAR para confirmar." }) });
 
 export async function POST(request: Request) {
   return withAuth("settings:write", async ({ user, orgId }) => {

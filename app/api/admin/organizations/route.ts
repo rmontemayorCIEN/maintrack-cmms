@@ -34,7 +34,7 @@ const schema = z.object({
   ownerPassword: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
   // Sin valor por omisión: quien da de alta tiene que elegir, habiendo leído
   // qué trae cada opción.
-  modo: z.enum(["VACIA", "RECOMENDADA", "DEMO"], { required_error: "Elija cómo empieza la empresa" }),
+  modo: z.enum(["VACIA", "RECOMENDADA", "DEMO"], { error: "Elija cómo empieza la empresa" }),
 });
 
 /** Alta de una empresa cliente con su usuario propietario y catalogos base. */
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     input = schema.parse(await request.json());
   } catch (e) {
     const zerr = e as z.ZodError;
-    return fail(zerr.errors?.[0]?.message ?? "Datos invalidos", 422);
+    return fail(zerr.issues?.[0]?.message ?? "Datos invalidos", 422);
   }
 
   let org: { id: string; name: string; slug: string };

@@ -41,8 +41,7 @@
     "react-dom": "19.0.0",
     "recharts": "^3.0.0",
     "web-push": "^3.6.7",
-    "zod": "^3.24.1",
-    "zod-to-json-schema": "^3.25.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

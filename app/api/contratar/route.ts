@@ -20,7 +20,7 @@ const esquema = z.object({
   giro: z.string().trim().max(60).optional(),
   modo: z.enum(["VACIA", "RECOMENDADA", "DEMO"]).default("RECOMENDADA"),
   contrasena: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").max(200).optional(),
-  aceptaDocumentos: z.literal(true, { errorMap: () => ({ message: "Para continuar hay que aceptar los términos, el contrato y el aviso de privacidad" }) }),
+  aceptaDocumentos: z.literal(true, { error: "Para continuar hay que aceptar los términos, el contrato y el aviso de privacidad" }),
 });
 
 export async function POST(request: Request) {
@@ -31,9 +31,9 @@ export async function POST(request: Request) {
   if (await demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
 
   const persona = esquemaProspecto.safeParse({ ...cuerpo, tipo: "CONTRATACION", aceptaPrivacidad: (cuerpo as { aceptaDocumentos?: boolean }).aceptaDocumentos === true });
-  if (!persona.success) return fail(persona.error.errors[0]?.message ?? "Revise los datos", 422, { campo: persona.error.errors[0]?.path[0] });
+  if (!persona.success) return fail(persona.error.issues[0]?.message ?? "Revise los datos", 422, { campo: persona.error.issues[0]?.path[0] });
   const contrato = esquema.safeParse(cuerpo);
-  if (!contrato.success) return fail(contrato.error.errors[0]?.message ?? "Revise los datos", 422, { campo: contrato.error.errors[0]?.path[0] });
+  if (!contrato.success) return fail(contrato.error.issues[0]?.message ?? "Revise los datos", 422, { campo: contrato.error.issues[0]?.path[0] });
   const p = persona.data, c = contrato.data;
   const nota = [c.complementoIa ? "Le interesa el complemento IA Avanzada." : null, `Quiere empezar: ${c.modo}.`, p.problema || null].filter(Boolean).join(" ");
 

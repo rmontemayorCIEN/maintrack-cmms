@@ -56,6 +56,22 @@ revisar("los campos de cada elemento siguen",
   Object.keys(salida.properties?.pasos?.items?.properties ?? {}), ["titulo", "tipo"]);
 revisar("required se conserva", Array.isArray(salida.required), true);
 
+console.log("\nLOS OBJETOS VAN CERRADOS\n");
+// La salida estructurada exige additionalProperties: false en cada objeto, y
+// zod 4 no lo pone al describir la entrada: si se pierde, la API contesta 400.
+const cerrados = JSON.parse(armar(z.object({
+  a: z.object({ b: z.array(z.object({ c: z.string() })) }),
+  d: z.object({ e: z.string() }).nullable(),
+  t: textoIa(10, "x").nullable(),
+})));
+revisar("la raiz va cerrada", cerrados.additionalProperties, false);
+revisar("un objeto anidado va cerrado", cerrados.properties?.a?.additionalProperties, false);
+revisar("el objeto dentro de un arreglo va cerrado", cerrados.properties?.a?.properties?.b?.items?.additionalProperties, false);
+revisar("el objeto que acepta null va cerrado",
+  (cerrados.properties?.d?.anyOf ?? []).find((x: { type?: string }) => x.type === "object")?.additionalProperties, false);
+revisar("textoIa con null sigue llevando su limite",
+  /Maximo 10 caracteres/.test(JSON.stringify(cerrados.properties?.t)), true);
+
 console.log("\nEL RECORTE SUAVE (textoIa)\n");
 const conTexto = armar(z.object({ t: textoIa(180, "Una accion.") }));
 revisar("textoIa no emite maxLength", tiene(conTexto, "maxLength"), false);

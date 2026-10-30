@@ -28,7 +28,7 @@ import type { Identidad } from "./credenciales";
 import { avisarSolicitudNueva } from "../avisos/detectores";
 import { emitirAviso } from "../avisos/emitir";
 
-const fechaExterna = z.string().datetime({ offset: true, message: "Use ISO 8601 con zona, por ejemplo 2026-09-18T08:30:00-06:00" });
+const fechaExterna = z.string().datetime({ offset: true, error: "Use ISO 8601 con zona, por ejemplo 2026-09-18T08:30:00-06:00" });
 
 function validar<T>(esquema: z.ZodType<T>, cuerpo: unknown): T {
   const r = esquema.safeParse(cuerpo);
@@ -93,7 +93,7 @@ export const esquemaLectura = z.object({
   unidad: z.string().trim().max(20).optional(),
   fecha: fechaExterna.optional(),
   nota: z.string().trim().max(300).optional(),
-}).refine((d) => d.medidor || (d.activo && d.nombre), { message: "Indique el medidor, o el activo y el nombre del medidor" });
+}).refine((d) => d.medidor || (d.activo && d.nombre), { error: "Indique el medidor, o el activo y el nombre del medidor" });
 
 export async function registrarLecturaExterna(quien: Identidad, cuerpo: unknown): Promise<RespuestaApi> {
   const d = validar(esquemaLectura, cuerpo);

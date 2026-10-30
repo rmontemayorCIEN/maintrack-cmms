@@ -39,7 +39,7 @@ const patchSchema = z.object({
    * captura: texto, fecha del día, sí/no). Si ya no coincide con lo guardado,
    * otra persona lo cambió en el inter: 409, en vez de pisarlo en silencio.
    */
-  base: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  base: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };

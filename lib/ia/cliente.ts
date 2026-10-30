@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { aJsonSchema } from "../esquema-json";
 import { registrarConsumo } from "./consumo";
 import type { ClaveFuncionIA } from "./funciones";
 import { MODELO_PREDETERMINADO } from "./precios";
@@ -144,9 +144,7 @@ export function depurarEsquema(nodo: unknown): unknown {
  * asi que lo que se prueba es exactamente lo que se manda.
  */
 export function esquemaParaIa(esquema: z.ZodType): Record<string, unknown> {
-  const { $schema, ...crudo } = zodToJsonSchema(esquema, {
-    $refStrategy: "none",
-  }) as Record<string, unknown>;
+  const { $schema, ...crudo } = aJsonSchema(esquema);
   return depurarEsquema(crudo) as Record<string, unknown>;
 }
 
