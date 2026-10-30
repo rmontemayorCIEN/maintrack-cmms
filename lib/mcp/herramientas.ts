@@ -15,11 +15,11 @@
  * Y la regla de la casa: lo que no se puede saber se dice. Cada respuesta que
  * mide algo trae `loQueNoSeVe`.
  */
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "../zod";
 import type { ClienteLectura } from "./lectura";
 import { actividadPorModulo, DIAS_EN_USO, MODULOS, nivelDeAdopcion, NIVELES_ADOPCION, SIN_AUTOR } from "./adopcion";
 import { buscarEnAyuda } from "./documentacion";
+import { aJsonSchema } from "../esquema-json";
 import { claveDiaEnZona, diaEnZona, medianocheEnZona } from "../periodos";
 import { FUNCIONES_IA } from "../ia/funciones";
 import { planDe } from "../planes";
@@ -598,7 +598,7 @@ export const HERRAMIENTAS = [
 /** Lo que se anuncia en tools/list. */
 export function listarHerramientas() {
   return HERRAMIENTAS.map((h) => {
-    const esquema = zodToJsonSchema(h.entrada, { target: "jsonSchema7", $refStrategy: "none" }) as Record<string, unknown>;
+    const esquema = aJsonSchema(h.entrada);
     delete esquema.$schema;
     return {
       name: h.nombre,

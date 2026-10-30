@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { ok, fail, withAuth } from "@/lib/api";
 import { constructorDePlanes } from "@/lib/constructor-planes";
 import { aplicarPlanDelGrupo, clonarPlan, corregirGrupo, ErrorDeAccion } from "@/lib/constructor-acciones";

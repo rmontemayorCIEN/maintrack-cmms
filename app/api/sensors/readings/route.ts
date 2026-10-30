@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { ok, withAuth } from "@/lib/api";
 import { ingestSensorReading } from "@/lib/predictive";
 

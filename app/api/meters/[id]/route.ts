@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { fail, ok, withAuth } from "@/lib/api";

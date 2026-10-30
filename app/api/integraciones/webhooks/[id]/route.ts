@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeWebhook, modificarWebhook, probarWebhook, rotarSecretoWebhook, vistaDeWebhook } from "@/lib/integraciones/webhooks";
 

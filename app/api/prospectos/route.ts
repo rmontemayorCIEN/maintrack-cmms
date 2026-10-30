@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (await demasiadas(ip)) return fail("Se recibieron demasiadas solicitudes desde esta conexión. Intente de nuevo en una hora.", 429);
   const parsed = esquemaProspecto.safeParse({ ...cuerpo, tipo: "DEMO" });
-  if (!parsed.success) return fail(parsed.error.errors[0]?.message ?? "Revise los datos", 422, { campo: parsed.error.errors[0]?.path[0] });
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Revise los datos", 422, { campo: parsed.error.issues[0]?.path[0] });
   const { duplicado } = await registrarProspecto(parsed.data);
   return ok({ recibido: true, duplicado }, duplicado ? 200 : 201);
 }

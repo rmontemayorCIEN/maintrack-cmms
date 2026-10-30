@@ -5,11 +5,10 @@
  * usuario aprieta el boton en produccion. Por eso se prueba aqui, y contra
  * TODAS las restricciones que Zod puede producir, no solo contra la que fallo.
  */
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "../lib/zod";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { depurarEsquema, textoIa } from "../lib/ia/cliente";
+import { esquemaParaIa, textoIa } from "../lib/ia/cliente";
 
 let fallas = 0;
 function revisar(e: string, real: unknown, esp: unknown) {
@@ -18,10 +17,7 @@ function revisar(e: string, real: unknown, esp: unknown) {
   console.log(`  ${bien ? "ok   " : "FALLA"} ${e.padEnd(56)} ${JSON.stringify(real)}`);
 }
 
-const armar = (e: z.ZodType) => {
-  const { $schema, ...crudo } = zodToJsonSchema(e, { $refStrategy: "none" }) as Record<string, unknown>;
-  return JSON.stringify(depurarEsquema(crudo));
-};
+const armar = (e: z.ZodType) => JSON.stringify(esquemaParaIa(e));
 const tiene = (json: string, clave: string) => new RegExp(`"${clave}"`).test(json);
 
 console.log("\nLO QUE HAY QUE QUITAR\n");
@@ -59,6 +55,22 @@ revisar("el tipo del arreglo se conserva", salida.properties?.pasos?.type, "arra
 revisar("los campos de cada elemento siguen",
   Object.keys(salida.properties?.pasos?.items?.properties ?? {}), ["titulo", "tipo"]);
 revisar("required se conserva", Array.isArray(salida.required), true);
+
+console.log("\nLOS OBJETOS VAN CERRADOS\n");
+// La salida estructurada exige additionalProperties: false en cada objeto, y
+// zod 4 no lo pone al describir la entrada: si se pierde, la API contesta 400.
+const cerrados = JSON.parse(armar(z.object({
+  a: z.object({ b: z.array(z.object({ c: z.string() })) }),
+  d: z.object({ e: z.string() }).nullable(),
+  t: textoIa(10, "x").nullable(),
+})));
+revisar("la raiz va cerrada", cerrados.additionalProperties, false);
+revisar("un objeto anidado va cerrado", cerrados.properties?.a?.additionalProperties, false);
+revisar("el objeto dentro de un arreglo va cerrado", cerrados.properties?.a?.properties?.b?.items?.additionalProperties, false);
+revisar("el objeto que acepta null va cerrado",
+  (cerrados.properties?.d?.anyOf ?? []).find((x: { type?: string }) => x.type === "object")?.additionalProperties, false);
+revisar("textoIa con null sigue llevando su limite",
+  /Maximo 10 caracteres/.test(JSON.stringify(cerrados.properties?.t)), true);
 
 console.log("\nEL RECORTE SUAVE (textoIa)\n");
 const conTexto = armar(z.object({ t: textoIa(180, "Una accion.") }));

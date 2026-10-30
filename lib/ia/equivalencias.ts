@@ -14,7 +14,7 @@
  *  2. El modelo solo juzga pares que ya existen en el catalogo del cliente.
  *  3. Nada se escribe. Todo pasa por la aprobacion del usuario, una por una.
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { normalizar, parecido } from "../dedupe-refacciones";
 import { analizarConIa, textoIa } from "./cliente";

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { IaNoConfigurada, iaConfigurada } from "@/lib/ia/cliente";
 import { juzgarDuplicados } from "@/lib/ia/dedupe";

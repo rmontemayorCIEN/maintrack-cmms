@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../../lib/zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { MOTIVOS_LIBERACION, esMotivoValido } from "@/lib/backlog";
@@ -14,7 +14,7 @@ import { logAudit } from "@/lib/audit";
 const schema = z.object({
   taskId: z.string().min(1),
   motivo: z.string().refine(esMotivoValido, {
-    message: `Motivo invalido. Use uno de: ${Object.keys(MOTIVOS_LIBERACION).join(", ")}`,
+    error: `Motivo invalido. Use uno de: ${Object.keys(MOTIVOS_LIBERACION).join(", ")}`,
   }),
   detalle: z.string().trim().max(400).nullable().optional(),
   /// Cuando se libera por falta de refaccion, cual. Es lo que despues permite

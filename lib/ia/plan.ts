@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { analizarConIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";

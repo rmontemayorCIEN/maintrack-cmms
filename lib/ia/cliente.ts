@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "../zod";
+import { aJsonSchema } from "../esquema-json";
 import { registrarConsumo } from "./consumo";
 import type { ClaveFuncionIA } from "./funciones";
 import { MODELO_PREDETERMINADO } from "./precios";
@@ -137,6 +137,17 @@ export function depurarEsquema(nodo: unknown): unknown {
   return salida;
 }
 
+/**
+ * El JSON Schema que viaja a la API, sacado del esquema de Zod.
+ *
+ * Vive aqui y solo aqui: la prueba de esquemas llama a esta misma funcion,
+ * asi que lo que se prueba es exactamente lo que se manda.
+ */
+export function esquemaParaIa(esquema: z.ZodType): Record<string, unknown> {
+  const { $schema, ...crudo } = aJsonSchema(esquema);
+  return depurarEsquema(crudo) as Record<string, unknown>;
+}
+
 export async function analizarConIa<T extends z.ZodType>(params: {
   organizationId: string;
   userId?: string | null;
@@ -191,10 +202,7 @@ export async function analizarConIa<T extends z.ZodType>(params: {
 
   // La API restringe la generacion al esquema, y ademas se valida al recibir:
   // el esquema de Zod es la unica definicion, de ahi sale el JSON Schema.
-  const { $schema, ...crudo } = zodToJsonSchema(params.esquema, {
-    $refStrategy: "none",
-  }) as Record<string, unknown>;
-  const esquemaJson = depurarEsquema(crudo) as Record<string, unknown>;
+  const esquemaJson = esquemaParaIa(params.esquema);
 
   try {
     const respuesta = await client.messages.create({

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 
 export const maxDuration = 300;
 import { prisma } from "@/lib/db";
