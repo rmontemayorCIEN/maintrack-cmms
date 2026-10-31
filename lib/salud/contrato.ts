@@ -4,7 +4,8 @@
 // (o donde viva su `lib`) y la Torre valida la respuesta con zod en
 // `lib/contrato.ts`. Si cambia algo aquí, sube `CONTRATO_VERSION` y se lleva a
 // todas: la Torre acepta solo las versiones que conoce y marca las demás como
-// «no se sabe», nunca como sanas.
+// «no se sabe», nunca como sanas. Un campo OPCIONAL nuevo no sube la versión:
+// la Torre vieja lo ignora y la nueva entiende los reportes que no lo traen.
 //
 // La ruta es GET /api/salud/detalle con `Authorization: Bearer <token>`:
 //
@@ -58,6 +59,11 @@ export type Revision = {
   vence?: string | null;
   /// Ruta DENTRO de la app donde se arregla («/ajustes/whatsapp»).
   arreglarEn?: string | null;
+  /// La app SABE que este dato no lo registra (todavía): no es una falla ni un
+  /// tropiezo al revisar. Va siempre con estado «desconocido». La Torre lo
+  /// muestra como «sin medir» y no deja que pinte de gris a toda la app; un
+  /// «desconocido» sin esta marca (la revisión tronó o tardó) sí la pinta.
+  sinMedir?: boolean;
 };
 
 export type ReporteSalud = {
@@ -127,6 +133,11 @@ export function autorizadoTorre(req: Request): boolean {
 /// Un secreto configurado o no, sin tocar su valor.
 export function configurado(nombreVariable: string): boolean {
   return Boolean(process.env[nombreVariable]);
+}
+
+/// Lo que la app no registra: «sin medir», con el porqué en una frase.
+export function sinMedir(detalle: string): Omit<Revision, "clave" | "nombre" | "grupo"> {
+  return { estado: "desconocido", detalle, sinMedir: true };
 }
 
 /// El estado de algo que vence: falla si ya venció, atención si faltan menos de
