@@ -14,6 +14,16 @@
 //   GET /api/torre/admin/catalogo        → Catalogo
 //   GET /api/torre/admin/cuentas         → ListaCuentas
 //   GET /api/torre/admin/cuentas/<id>    → DetalleCuenta
+//   POST /api/torre/admin/cuentas/<id>/acciones  (PeticionAccion) → ResultadoAccion
+//
+// Acciones (fase A2, aditiva: no sube la versión). La app las ejecuta con las
+// MISMAS funciones que su panel del operador y:
+//   - no ejecuta dos veces la misma firma (guarda su `id` en su bitácora y lo
+//     busca antes de ejecutar);
+//   - no pisa cambios ajenos: si la `version` que manda la Torre ya no es la de
+//     la cuenta, no ejecuta y contesta el conflicto con la cuenta actual;
+//   - exige motivo y lo deja en su bitácora a nombre de quien firmó.
+// Una app sin acciones contesta 404 en esta ruta y declara `acciones: []`.
 //
 // Firma: `Authorization: TorreAdmin <carga>.<firma>`. La carga dice para qué
 // app, quién (la persona de la Torre), qué método y ruta, el resumen del cuerpo
@@ -41,6 +51,7 @@ export const LIMITES = {
   filas: 30,
   texto: 200,
   acciones: 20,
+  motivo: 300,
 } as const;
 
 /// Normalizado entre apps: cada una traduce el suyo (ACTIVO, TRIAL…).
@@ -49,8 +60,8 @@ export const ESTADOS_CUENTA: EstadoCuenta[] = ["ACTIVA", "PRUEBA", "SUSPENDIDA",
 
 export type TipoCampo = "texto" | "numero" | "dinero" | "fecha" | "si-no";
 
-/// Una acción que la app ofrece (versión 1: se declaran, se ejecutan en la
-/// fase siguiente). `delicada` pide confirmar escribiendo el nombre de la cuenta.
+/// Una acción que la app ofrece y ejecuta con POST …/acciones. `delicada`
+/// hace que la Torre pida confirmar escribiendo el nombre de la cuenta.
 export type AccionDeclarada = {
   clave: string;
   nombre: string;
@@ -213,3 +224,80 @@ export function responder(datos: unknown, status = 200): Response {
 }
 
 export const fecha = (d: Date | null | undefined) => (d ? d.toISOString() : null);
+
+// ---------- Acciones ----------
+
+export type ValorCampo = string | number | null;
+
+export type PeticionAccion = {
+  /// La clave de una acción del catálogo: «suspender».
+  accion: string;
+  /// La `version` de la cuenta que vio la persona al decidir.
+  version: string;
+  /// Por qué. Obligatorio: queda en la bitácora de la app.
+  motivo: string;
+  datos: Record<string, ValorCampo>;
+};
+
+export type ResultadoAccion =
+  | { contrato: typeof ADMIN_VERSION; app: string; ok: true; mensaje: string; cuenta: Cuenta }
+  | {
+      contrato: typeof ADMIN_VERSION;
+      app: string;
+      ok: false;
+      motivo: string;
+      /// Alguien cambió la cuenta después de que la persona la vio: no se ejecutó.
+      conflicto?: { cuenta: Cuenta };
+      /// Esta misma firma ya se había ejecutado: no se repitió.
+      yaHecha?: boolean;
+    };
+
+/// Lo usa la app: lee y valida el cuerpo contra lo que ella misma declaró en su
+/// catálogo. Los errores de captura salen todos juntos.
+export function leerPeticionAccion(cuerpo: string, catalogo: Catalogo): { ok: true; peticion: PeticionAccion; declarada: AccionDeclarada } | { ok: false; motivo: string } {
+  let p: Partial<PeticionAccion>;
+  try { p = JSON.parse(cuerpo); } catch { return { ok: false, motivo: "El cuerpo no es JSON." }; }
+  const declarada = catalogo.acciones.find((a) => a.clave === p.accion);
+  if (!declarada) return { ok: false, motivo: "Esa acción no existe en esta app." };
+  const errores: string[] = [];
+  if (typeof p.version !== "string" || !p.version) errores.push("Falta la versión de la cuenta.");
+  const motivo = typeof p.motivo === "string" ? p.motivo.trim() : "";
+  if (motivo.length < 5) errores.push("Di el motivo (al menos 5 letras).");
+  if (motivo.length > LIMITES.motivo) errores.push(`El motivo pasa de ${LIMITES.motivo} caracteres.`);
+  const datos: Record<string, ValorCampo> = {};
+  const dados = p.datos && typeof p.datos === "object" ? p.datos : {};
+  for (const k of declarada.campos) {
+    const v = (dados as Record<string, unknown>)[k.clave];
+    if (v === undefined || v === null || v === "") {
+      if (k.requerido) errores.push(`Falta «${k.nombre}».`);
+      datos[k.clave] = null;
+      continue;
+    }
+    if (k.tipo === "numero") {
+      if (typeof v !== "number" || !Number.isFinite(v)) { errores.push(`«${k.nombre}» debe ser un número.`); continue; }
+      if (k.min !== undefined && v < k.min) errores.push(`«${k.nombre}» es al menos ${k.min}.`);
+      if (k.max !== undefined && v > k.max) errores.push(`«${k.nombre}» es a lo más ${k.max}.`);
+      datos[k.clave] = v;
+      continue;
+    }
+    if (typeof v !== "string") { errores.push(`«${k.nombre}» debe ser texto.`); continue; }
+    if (k.tipo === "opcion" && !k.opciones?.some((o) => o.valor === v)) errores.push(`«${k.nombre}» no es una opción válida.`);
+    if (k.tipo === "fecha" && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)))) errores.push(`«${k.nombre}» debe ser una fecha AAAA-MM-DD.`);
+    if (v.length > (k.largoMax ?? LIMITES.texto)) errores.push(`«${k.nombre}» es demasiado largo.`);
+    datos[k.clave] = v;
+  }
+  if (errores.length) return { ok: false, motivo: errores.join(" ") };
+  return { ok: true, peticion: { accion: declarada.clave, version: p.version!, motivo, datos }, declarada };
+}
+
+/// La marca que la app deja en su bitácora para no ejecutar dos veces la misma firma.
+export const marcaDeFirma = (carga: CargaFirma) => `[firma ${carga.id}]`;
+
+export function resultadoAccion(app: string, r: { ok: true; mensaje: string; cuenta: Cuenta } | { ok: false; motivo: string; conflicto?: { cuenta: Cuenta }; yaHecha?: boolean }): ResultadoAccion {
+  if (r.ok) return { contrato: ADMIN_VERSION, app, ok: true, mensaje: recortar(r.mensaje), cuenta: limpiarCuenta(r.cuenta) };
+  return {
+    contrato: ADMIN_VERSION, app, ok: false, motivo: recortar(r.motivo, LIMITES.motivo),
+    ...(r.conflicto ? { conflicto: { cuenta: limpiarCuenta(r.conflicto.cuenta) } } : {}),
+    ...(r.yaHecha ? { yaHecha: true } : {}),
+  };
+}
