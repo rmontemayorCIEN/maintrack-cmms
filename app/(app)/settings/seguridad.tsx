@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui";
+import { SegundoFactorOperador } from "./segundo-factor";
 
 /**
  * Seguridad y sesiones, en un solo lugar.
@@ -16,9 +17,12 @@ import { Card } from "@/components/ui";
 export function PanelSeguridad({
   puedeExportar,
   ultimoAcceso,
+  segundoFactor = null,
 }: {
   puedeExportar: boolean;
   ultimoAcceso: string | null;
+  /** Solo para quien se le exige (el operador de la plataforma). */
+  segundoFactor?: { activo: boolean; respaldos: number } | null;
 }) {
   const router = useRouter();
   const [cerrando, setCerrando] = useState(false);
@@ -46,6 +50,7 @@ export function PanelSeguridad({
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {segundoFactor ? <SegundoFactorOperador activo={segundoFactor.activo} respaldos={segundoFactor.respaldos} /> : null}
       <Card>
         <p className="text-xs font-semibold text-slate-800">Sus sesiones</p>
         <p className="mt-1 text-xs text-slate-500">

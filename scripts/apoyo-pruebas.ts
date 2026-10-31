@@ -85,13 +85,54 @@ export async function pedir(
  * sin sesion reporta «sin permiso» en todo y manda a buscar el problema donde
  * no esta.
  */
+/** Las claves de segundo factor de las cuentas de prueba, para dar el codigo al entrar. */
+const clavesDePrueba = new Map<string, string>();
+/** El ultimo paso de 30 s usado por cada cuenta: el servidor no acepta el mismo dos veces. */
+const ultimoPaso = new Map<string, number>();
+
+/**
+ * Activa el segundo factor de una cuenta de prueba (el operador lo necesita
+ * para operar). Cifra igual que el servidor, con el AUTH_SECRET de .env.
+ */
+export async function activarSegundoFactorDePrueba(usuario: { id: string; email: string }) {
+  if (!process.env.AUTH_SECRET) {
+    try { process.loadEnvFile(".env"); } catch { /* sin .env: el cifrado lo dira */ }
+  }
+  const { cifrar } = await import("../lib/segundo-factor");
+  const { secretoNuevo } = await import("../lib/totp");
+  const secreto = secretoNuevo();
+  await prisma.user.update({ where: { id: usuario.id }, data: { totpSecreto: cifrar(secreto), totpActivoEn: new Date(), totpUltimoPaso: null, totpRespaldos: "[]" } });
+  clavesDePrueba.set(usuario.email.toLowerCase(), secreto);
+}
+
 export async function entrar(base: string, correo: string, contrasena: string): Promise<Record<string, string>> {
-  const r = await fetch(`${base}/api/auth/login`, {
+  let r = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email: correo, password: contrasena }),
     redirect: "manual",
   });
+  // Con segundo factor, el segundo paso con el codigo del momento.
+  const clave = clavesDePrueba.get(correo.toLowerCase());
+  if (r.ok && clave) {
+    const datos = await r.clone().json().catch(() => null) as { segundoFactor?: boolean; desafio?: string } | null;
+    if (datos?.segundoFactor && datos.desafio) {
+      const { codigoDelPaso, deBase32, pasoDe } = await import("../lib/totp");
+      // Si ya se uso el codigo de este paso, se espera al siguiente (hasta 30 s).
+      const previo = ultimoPaso.get(correo.toLowerCase());
+      if (previo !== undefined && pasoDe(new Date()) <= previo) {
+        await new Promise((res) => setTimeout(res, (previo + 1) * 30_000 - Date.now() + 300));
+      }
+      const paso = pasoDe(new Date());
+      r = await fetch(`${base}/api/auth/segundo-factor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ desafio: datos.desafio, codigo: codigoDelPaso(deBase32(clave)!, paso) }),
+        redirect: "manual",
+      });
+      if (r.ok) ultimoPaso.set(correo.toLowerCase(), paso);
+    }
+  }
   const cookie = r.headers.get("set-cookie");
   if (!r.ok || !cookie) {
     throw new Error(`No se pudo entrar como ${correo}: ${r.status} ${(await r.text()).slice(0, 120)}`);

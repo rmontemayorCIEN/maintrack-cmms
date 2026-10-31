@@ -230,7 +230,7 @@ async function main() {
     await esperarServidor(base, 240_000);
     const secreto = new TextEncoder().encode(llaveDeSesion());
     const operador = await prisma.user.create({
-      data: { organizationId: parcial.id, email: `op-${sello}@t.mx`, name: "Operador", role: "OWNER", isSuperAdmin: true, passwordHash: "x" },
+      data: { organizationId: parcial.id, email: `op-${sello}@t.mx`, name: "Operador", role: "OWNER", isSuperAdmin: true, passwordHash: "x", totpActivoEn: new Date() /* opera con segundo factor */ },
     });
     const cookie = `mt_session=${await new SignJWT({ userId: operador.id, organizationId: parcial.id, email: operador.email, name: operador.name, role: "OWNER" })
       .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("1h").sign(secreto)}`;

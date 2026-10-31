@@ -60,9 +60,9 @@ async function main() {
     const l = await lista(pedir("/api/torre/admin/cuentas"));
     const texto = await l.text();
     revisar("la lista contesta", l.status === 200, texto.slice(0, 200));
-    const mia = JSON.parse(texto).cuentas?.find((x: { id: string }) => x.id === org.id);
-    revisar("trae la empresa en prueba, con su fin de prueba", mia?.estado === "PRUEBA" && Boolean(mia?.pruebaHasta), mia);
-    revisar("con su saldo pendiente en pesos", mia?.saldo === 4500 && mia?.moneda === "MXN", mia);
+    const listaJson = JSON.parse(texto);
+    const clientesReales = await prisma.organization.count({ where: { esDemo: false, cuentaInterna: false } });
+    revisar("la lista dice el total real aunque traiga a lo más 200", listaJson.total === clientesReales && listaJson.cuentas.length === Math.min(200, clientesReales), { total: listaJson.total, real: clientesReales, n: listaJson.cuentas.length });
     revisar("no viajan correos ni nombres de personas", !texto.includes(persona1.email) && !texto.includes("Nombre Privado Cliente"));
     revisar("ver la lista queda en la bitácora", (await prisma.auditLog.count({ where: { action: "TORRE_ACCESS" } })) === antes + 1);
 
@@ -70,6 +70,9 @@ async function main() {
     const d = await detalle(pedir(`/api/torre/admin/cuentas/${org.id}`), { params: Promise.resolve({ id: org.id }) });
     const textoD = await d.text();
     revisar("el detalle contesta con adopción y cobranza", d.status === 200 && textoD.includes("Adopción") && textoD.includes("Cobranza"), textoD.slice(0, 200));
+    const mia = d.status === 200 ? JSON.parse(textoD).cuenta : null;
+    revisar("trae la empresa en prueba, con su fin de prueba (aunque haya más de 200)", mia?.estado === "PRUEBA" && Boolean(mia?.pruebaHasta), mia);
+    revisar("con su saldo pendiente en pesos", mia?.saldo === 4500 && mia?.moneda === "MXN", mia);
     revisar("sin correos ni nombres de personas", !textoD.includes(persona1.email) && !textoD.includes("Nombre Privado Cliente"));
     const ultimo = await prisma.auditLog.findFirst({ where: { action: "TORRE_ACCESS" }, orderBy: { createdAt: "desc" } });
     revisar("queda en la bitácora del operador, a nombre de quien firmó", ultimo?.entityId === org.id && (ultimo?.changes ?? "").includes("rafael@torre.test"), ultimo);

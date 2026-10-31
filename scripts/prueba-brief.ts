@@ -11,7 +11,7 @@
 import { prisma } from "../lib/db";
 import { guionDelDia, MAX_PUNTOS } from "../lib/brief";
 import { cifrasInventadas, guionPlano } from "../lib/ia/brief";
-import { entrar, esperarServidor, levantarServidor, pedir } from "./apoyo-pruebas";
+import { activarSegundoFactorDePrueba, entrar, esperarServidor, levantarServidor, pedir } from "./apoyo-pruebas";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3216";
 const CLAVE_OPERADOR = "Operador-Brief-2026";
@@ -171,6 +171,8 @@ async function main() {
           role: "OWNER", isSuperAdmin: true, passwordHash: await bcrypt.hash(CLAVE_OPERADOR, 10),
         },
       });
+      // El operador opera con segundo factor; entrar() da el codigo.
+      await activarSegundoFactorDePrueba(operador);
       await esperarServidor(BASE);
       const cab = await entrar(BASE, operador.email, CLAVE_OPERADOR);
 

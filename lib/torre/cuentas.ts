@@ -94,17 +94,23 @@ async function registrar(carga: CargaFirma, organizacionId: string | null, resum
   });
 }
 
-async function cuentas(ahora: Date): Promise<Cuenta[]> {
+/// La herramienta del MCP trae a lo mas 200 empresas: la lista dice el total
+/// real y el detalle NO depende de ella (se arma con la empresa pedida).
+async function cuentas(ahora: Date): Promise<{ total: number; cuentas: Cuenta[] }> {
   const ctx = contexto(ahora);
   const hoy = claveDiaEnZona(ahora, ZONA);
   const [lista, consumo, saldos] = await Promise.all([
-    herramienta<{ clientes: FilaCliente[] }>("listar_clientes", { orden: "nombre", limite: 200 }, ctx),
+    herramienta<{ total: number; clientes: FilaCliente[] }>("listar_clientes", { orden: "ultima_actividad", limite: 200 }, ctx),
     herramienta<{ organizaciones: { organizacion_id: string; costoUsd: number }[] }>("consumo_ia", { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy, limite: 200 }, ctx),
     lectura.invoice.groupBy({ by: ["organizationId"], where: { status: "PENDING" }, _sum: { importe: true } }),
   ]);
   const ia = new Map(consumo.organizaciones.map((o) => [o.organizacion_id, o.costoUsd]));
   const saldo = new Map(saldos.map((s) => [s.organizationId, s._sum.importe ?? 0]));
-  return lista.clientes.map((c) => ({
+  return { total: lista.total, cuentas: lista.clientes.map((c) => aCuenta(c, ia.get(c.organizacion_id) ?? 0, saldo.get(c.organizacion_id) ?? 0)) };
+}
+
+function aCuenta(c: FilaCliente, iaUsd: number, saldo: number): Cuenta {
+  return {
     id: c.organizacion_id,
     nombre: c.nombre,
     estado: ESTADOS[c.estado] ?? "ACTIVA",
@@ -113,8 +119,8 @@ async function cuentas(ahora: Date): Promise<Cuenta[]> {
     creadaEn: c.fechaAlta ?? new Date(0).toISOString(),
     usuarios: c.usuarios.activos,
     ultimoUso: c.ultimaActividad,
-    iaMesUsd: Math.round((ia.get(c.organizacion_id) ?? 0) * 100) / 100,
-    saldo: Math.round((saldo.get(c.organizacion_id) ?? 0) * 100) / 100,
+    iaMesUsd: Math.round(iaUsd * 100) / 100,
+    saldo: Math.round(saldo * 100) / 100,
     moneda: "MXN",
     extra: {
       complementos: c.complementos.length ? c.complementos.join(", ") : "Ninguno",
@@ -124,16 +130,18 @@ async function cuentas(ahora: Date): Promise<Cuenta[]> {
       operandoDesde: c.operandoDesde,
     },
     version: createHash("sha256").update(JSON.stringify([c.nombre, c.plan, c.estado, c.pruebaVence ?? null, c.complementos])).digest("hex").slice(0, 16),
-  }));
+  };
 }
 
 export async function listaParaTorre(carga: CargaFirma, ahora = new Date()) {
-  const cs = await cuentas(ahora);
-  await registrar(carga, null, `vio la lista de ${cs.length} empresas`);
-  return armarLista(CLAVE_APP, cs, cs.length, ahora);
+  const { total, cuentas: cs } = await cuentas(ahora);
+  await registrar(carga, null, `vio la lista de ${cs.length} de ${total} empresas`);
+  return armarLista(CLAVE_APP, cs, total, ahora);
 }
 
 type Detalle = {
+  organizacion_id: string; nombre: string; plan: string; complementos: string[]; estado: string; pruebaVence?: string | null;
+  fechaAlta: string | null; operandoDesde: string | null;
   adopcion: { nivel: string; modulosEnUso: number; personasDelClienteCon30DiasDeActividad: number; modulos: { modulo: string; enUso: boolean; registros30Dias: number; registrosTotales: number }[] };
   tendencia: { direccion: string; movimientosUltimas4Semanas: number; movimientos4SemanasPrevias: number };
   usuariosActivosPorRol: Record<string, number>;
@@ -143,16 +151,25 @@ const DIRECCION: Record<string, string> = { SUBE: "Sube", BAJA: "Baja", ESTABLE:
 
 export async function detalleParaTorre(carga: CargaFirma, id: string, ahora = new Date()) {
   if (!/^[A-Za-z0-9_-]{10,40}$/.test(id)) return null;
-  const c = (await cuentas(ahora)).find((x) => x.id === id);
-  if (!c) return null;
-  await registrar(carga, id, `vio el resumen de la empresa ${c.nombre.slice(0, 80)}`);
+  const existe = await lectura.organization.findUnique({ where: { id }, select: { name: true } });
+  if (!existe) return null;
+  await registrar(carga, id, `vio el resumen de la empresa ${existe.name.slice(0, 80)}`);
   const ctx = contexto(ahora);
   const hoy = claveDiaEnZona(ahora, ZONA);
-  const [d, consumo, cuenta] = await Promise.all([
+  const [d, consumo, cuenta, ultima] = await Promise.all([
     herramienta<Detalle>("detalle_cliente", { organizacion_id: id }, ctx),
-    herramienta<{ organizaciones: { organizacion_id: string; funciones: { nombre: string; llamadas: number; costoUsd: number }[] }[] }>("consumo_ia", { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy, organizacion_id: id, limite: 1 }, ctx),
+    herramienta<{ organizaciones: { organizacion_id: string; costoUsd: number; funciones: { nombre: string; llamadas: number; costoUsd: number }[] }[] }>("consumo_ia", { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy, organizacion_id: id, limite: 1 }, ctx),
     estadoDeCuenta(id),
+    lectura.user.aggregate({ where: { organizationId: id, isSuperAdmin: false }, _max: { lastLoginAt: true } }),
   ]);
+  const c = aCuenta({
+    organizacion_id: d.organizacion_id, nombre: d.nombre, fechaAlta: d.fechaAlta, plan: d.plan, complementos: d.complementos,
+    estado: d.estado, pruebaVence: d.pruebaVence ?? null, operandoDesde: d.operandoDesde,
+    // En el detalle, la ultima entrada de la gente del cliente (la lista combina ademas su bitacora).
+    ultimaActividad: ultima._max.lastLoginAt ? ultima._max.lastLoginAt.toISOString() : null,
+    usuarios: { activos: Object.values(d.usuariosActivosPorRol).reduce((a, b) => a + b, 0), conActividad30Dias: d.adopcion.personasDelClienteCon30DiasDeActividad },
+    modulosEnUso: d.adopcion.modulos.filter((m) => m.enUso).map((m) => m.modulo), nivelAdopcion: d.adopcion.nivel,
+  }, consumo.organizaciones[0]?.costoUsd ?? 0, cuenta.saldo);
   const pesos = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
   const funciones = consumo.organizaciones[0]?.funciones ?? [];
   return armarDetalle(CLAVE_APP, c, [

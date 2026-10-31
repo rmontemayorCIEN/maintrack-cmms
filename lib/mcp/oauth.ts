@@ -328,10 +328,12 @@ async function emitirPar(d: { clienteId: string; userId: string; recurso: string
 export async function operadorVigente(userId: string, autorizadoEl: Date) {
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, active: true, isSuperAdmin: true, sessionsValidFrom: true, organizationId: true, name: true, email: true },
+    select: { id: true, active: true, isSuperAdmin: true, totpActivoEn: true, sessionsValidFrom: true, organizationId: true, name: true, email: true },
   });
   if (!u || !u.active) return { ok: false as const, status: 403 as const, motivo: "La cuenta ya no está activa.", usuario: u };
   if (!u.isSuperAdmin) return { ok: false as const, status: 403 as const, motivo: "Solo el operador de la plataforma puede usar este servidor.", usuario: u };
+  // Como su panel: sin segundo factor activo, el operador no lee los datos de todas las empresas.
+  if (!u.totpActivoEn) return { ok: false as const, status: 403 as const, motivo: "Active su segundo factor en Configuración → Seguridad y sesiones.", usuario: u };
   // Misma resolucion que la sesion del navegador: al segundo.
   if (u.sessionsValidFrom && Math.floor(autorizadoEl.getTime() / 1000) < Math.floor(u.sessionsValidFrom.getTime() / 1000)) {
     // 401 y no 403: la persona sigue siendo operador, solo tiene que volver a
