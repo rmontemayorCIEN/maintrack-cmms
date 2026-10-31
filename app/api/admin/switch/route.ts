@@ -1,6 +1,6 @@
 import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
-import { fail, ok } from "@/lib/api";
+import { fail, leerCuerpo, ok } from "@/lib/api";
 import { createSession, readSession } from "@/lib/auth";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { logAudit } from "@/lib/audit";
@@ -12,7 +12,9 @@ export async function POST(request: Request) {
   const { error, user } = await requireSuperAdmin();
   if (error) return error;
 
-  const input = schema.parse(await request.json());
+  const cuerpo = await leerCuerpo(request, schema);
+  if (!cuerpo.ok) return cuerpo.respuesta;
+  const input = cuerpo.datos;
   const destino = await prisma.organization.findUnique({
     where: { id: input.organizationId },
     select: { id: true, name: true },
@@ -48,6 +50,17 @@ export async function DELETE() {
   if (error) return error;
 
   const sesion = await readSession();
+  // Salir tambien queda en la bitacora: sin esto, la entrada no tenia final.
+  if (sesion?.actingOrganizationId) {
+    await logAudit({
+      organizationId: user.organizacionPropia.id,
+      userId: user.id,
+      entity: "Organization",
+      entityId: sesion.actingOrganizationId,
+      action: "CLIENT_LEFT",
+      summary: "Salida de la empresa cliente",
+    });
+  }
   await createSession({
     userId: user.id,
     organizationId: user.organizacionPropia.id,

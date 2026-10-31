@@ -1,6 +1,6 @@
 import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
-import { fail, ok } from "@/lib/api";
+import { fail, leerCuerpo, ok } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { logAudit, notify } from "@/lib/audit";
 
@@ -23,7 +23,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
   if (!cargo) return fail("Cargo no encontrado", 404);
 
-  const input = schema.parse(await request.json());
+  const cuerpo = await leerCuerpo(request, schema);
+  if (!cuerpo.ok) return cuerpo.respuesta;
+  const input = cuerpo.datos;
 
   if (input.accion === "PAGAR" && cargo.status === "PAID") {
     return fail("El cargo ya esta marcado como pagado", 409);

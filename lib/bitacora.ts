@@ -37,6 +37,9 @@ export const MODULOS_BITACORA: Record<string, { titulo: string; entidades: strin
   // Lo que consultan los agentes de IA del operador por el servidor MCP
   // (lib/mcp). Cada llamada deja su renglon con herramienta y parametros.
   AGENTES: { titulo: "Agentes de IA (MCP)", entidades: ["AgenteMcp"] },
+  // Lo que hace el operador de la plataforma fuera de una empresa: soporte,
+  // prospectos y lo que consulta la Torre de Control (lib/torre).
+  PLATAFORMA: { titulo: "Operación de la plataforma", entidades: ["SolicitudSoporte", "Prospecto", "TorreDeControl"] },
 };
 
 /** Acciones que vale la pena poder aislar de un vistazo. */
@@ -46,7 +49,7 @@ export const ACCIONES_SENSIBLES = [
   "PASSWORD_CHANGED", "PASSWORD_RESET", "PASSWORD_RESET_ISSUED", "PASSWORD_RESET_USED",
   "EXPORTED", "FILE_ACCESSED", "CLIENT_UPDATED",
   "MCP_ACCESS", "MCP_RECHAZADO", "MCP_AUTORIZADO",
-  "TORRE_ACCESS",
+  "TORRE_ACCESS", "CLIENT_ACCESSED", "CLIENT_LEFT",
 ];
 
 export type FiltroBitacora = {
