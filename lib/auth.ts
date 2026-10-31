@@ -62,6 +62,34 @@ export async function createSession(payload: SessionPayload) {
   return token;
 }
 
+/**
+ * El paso intermedio de la entrada con segundo factor: la contrasena ya paso,
+ * falta el codigo. Es un token de cinco minutos firmado con OTRA llave (derivada
+ * de AUTH_SECRET con su propia etiqueta): aunque alguien lo pusiera como cookie
+ * de sesion, `readSession` no lo aceptaria.
+ */
+function llaveDesafio() {
+  return new TextEncoder().encode(`${process.env.AUTH_SECRET ?? ""}|desafio-segundo-factor`);
+}
+
+export async function crearDesafio(userId: string) {
+  if (!process.env.AUTH_SECRET) throw new Error("AUTH_SECRET no esta configurado");
+  return new SignJWT({ userId, proposito: "segundo-factor" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(llaveDesafio());
+}
+
+export async function leerDesafio(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, llaveDesafio());
+    return payload.proposito === "segundo-factor" && typeof payload.userId === "string" ? payload.userId : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function destroySession() {
   const jar = await cookies();
   jar.delete(COOKIE);

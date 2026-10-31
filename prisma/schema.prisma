@@ -388,6 +388,16 @@ model User {
   /// o al cerrar sesion en todos lados se pone «ahora», y toda sesion emitida
   /// antes deja de servir en la siguiente peticion. Nula = valen todas.
   sessionsValidFrom DateTime?
+  /// Segundo factor (TOTP), obligatorio para el operador de la plataforma
+  /// (ISO 27001, 8.5). El secreto va CIFRADO (lib/segundo-factor.ts); nulo
+  /// hasta que se empieza a dar de alta.
+  totpSecreto       String?
+  /// Cuando se confirmo con un codigo. Nulo = no esta activo.
+  totpActivoEn      DateTime?
+  /// El ultimo paso de 30 s aceptado: el mismo codigo no sirve dos veces.
+  totpUltimoPaso    Int?
+  /// Huellas SHA-256 de los codigos de respaldo sin usar, en JSON.
+  totpRespaldos     String?
   /// NORMAL | GRANDE | MAYOR
   escalaUi          String    @default("NORMAL")
   /// COMPACTA | COMODA | AMPLIA

@@ -1,6 +1,6 @@
 import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
-import { fail, ok, withAuth } from "@/lib/api";
+import { fail, leerCuerpo, ok, withAuth } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { COMPLEMENTO_IA, nombreSolicitado, planDe } from "@/lib/planes";
 import { logAudit, notify } from "@/lib/audit";
@@ -45,7 +45,9 @@ export async function POST(request: Request, { params }: Params) {
   if (!solicitud) return fail("Solicitud no encontrada", 404);
   if (solicitud.status !== "PENDING") return fail("La solicitud ya fue resuelta", 409);
 
-  const { accion } = resolver.parse(await request.json());
+  const cuerpo = await leerCuerpo(request, resolver);
+  if (!cuerpo.ok) return cuerpo.respuesta;
+  const { accion } = cuerpo.datos;
 
   const esComplemento = solicitud.planSolicitado === COMPLEMENTO_IA.clave;
 

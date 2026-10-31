@@ -9,6 +9,8 @@ import { INSTALACIONES, type ClaveInstalacion } from "@/lib/instalaciones";
 import { planDe } from "@/lib/planes";
 import { formatDateTime } from "@/lib/utils";
 import { SeguimientoProspecto } from "./seguimiento";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
+import { FaltaSegundoFactor } from "@/components/falta-segundo-factor";
 
 export const metadata = { title: "Prospectos" };
 export const dynamic = "force-dynamic";
@@ -20,6 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function ProspectosPage() {
   const user = await requireUser();
   if (!user.isSuperAdmin) redirect("/dashboard");
+  if (!tieneSegundoFactor(user)) return <FaltaSegundoFactor />;
   const prospectos = await prisma.prospecto.findMany({ orderBy: { createdAt: "desc" }, take: 300 });
   const cuenta = (e: string) => prospectos.filter((p) => p.estado === e).length;
   const cerrados = cuenta("GANADA") + cuenta("PERDIDA");

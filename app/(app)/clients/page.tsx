@@ -12,6 +12,8 @@ import { iaDeLaOrganizacion } from "@/lib/planes";
 import { formatoUsd } from "@/lib/ia/precios";
 import { avancePuestaEnMarcha } from "@/lib/puesta-en-marcha";
 import { formatDateTime } from "@/lib/utils";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
+import { FaltaSegundoFactor } from "@/components/falta-segundo-factor";
 
 export const metadata = { title: "Empresas cliente" };
 export const dynamic = "force-dynamic";
@@ -19,6 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function ClientsPage() {
   const user = await requireUser();
   if (!user.isSuperAdmin) redirect("/dashboard");
+  if (!tieneSegundoFactor(user)) return <FaltaSegundoFactor />;
 
   const solicitudes = await prisma.planRequest.findMany({
     where: { status: "PENDING" },

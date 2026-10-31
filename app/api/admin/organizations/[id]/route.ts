@@ -1,6 +1,6 @@
 import { z } from "../../../../../lib/zod";
 import { prisma } from "@/lib/db";
-import { fail, ok } from "@/lib/api";
+import { fail, leerCuerpo, ok } from "@/lib/api";
 import { requireSuperAdmin } from "@/lib/superadmin";
 import { logAudit } from "@/lib/audit";
 
@@ -18,7 +18,7 @@ const schema = z.object({
   registrosPropios: z.boolean().optional(),
   /// «Cumplimiento normativo»: el otro que se cobra aparte.
   cumplimientoNormas: z.boolean().optional(),
-});
+}).refine((x) => Object.values(x).some((v) => v !== undefined), "No hay cambios que aplicar");
 
 /** Cambio de plan o suspension de una empresa cliente. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,7 +33,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return fail("No puede suspender ni degradar su propia organización desde aquí", 403);
   }
 
-  const input = schema.parse(await request.json());
+  const cuerpo = await leerCuerpo(request, schema);
+  if (!cuerpo.ok) return cuerpo.respuesta;
+  const input = cuerpo.datos;
   // La demo no se suspende ni se cancela por cobranza: no tiene cargos (Bloque 7).
   if (org.esDemo && (input.status === "SUSPENDED" || input.status === "CANCELLED")) {
     return fail("La empresa demostrativa no se suspende ni se cancela; si ya no se usa, avísele a quien administra la plataforma.", 409);

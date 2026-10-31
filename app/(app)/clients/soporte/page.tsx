@@ -8,6 +8,8 @@ import { SEVERIDADES } from "@/lib/comercial";
 import { ESTADOS_SOPORTE, respuestaObjetivo, type EstadoSoporte } from "@/lib/soporte";
 import { formatDateTime } from "@/lib/utils";
 import { ResponderSoporte } from "./responder";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
+import { FaltaSegundoFactor } from "@/components/falta-segundo-factor";
 
 export const metadata = { title: "Soporte a clientes" };
 export const dynamic = "force-dynamic";
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function SoporteOperadorPage() {
   const user = await requireUser();
   if (!user.isSuperAdmin) redirect("/dashboard");
+  if (!tieneSegundoFactor(user)) return <FaltaSegundoFactor />;
   const orden = SEVERIDADES.map((s) => s.clave as string);
   const todas = await prisma.solicitudSoporte.findMany({
     orderBy: { createdAt: "desc" }, take: 300,
