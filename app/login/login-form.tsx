@@ -101,7 +101,7 @@ export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { per
             {MARCA}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h1>
-          <p className="mt-1 text-sm text-slate-500">Entre con el correo y la contraseña que le dio su empresa.</p>
+          <p className="mt-1 text-sm text-slate-500">{desafio ? "Su contraseña es correcta. Falta el código de su aplicación autenticadora." : "Entre con el correo y la contraseña que le dio su empresa."}</p>
 
           {desafio ? (
             <form onSubmit={enviarCodigo} className="mt-6 grid gap-4">
