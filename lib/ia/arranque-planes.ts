@@ -15,7 +15,7 @@
  * que no es una formula: una planta no empieza por lo que mas equipos tiene
  * sino por lo que mas duele.
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { analizarConIa, textoIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";

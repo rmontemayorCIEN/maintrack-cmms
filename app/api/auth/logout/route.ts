@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { destroySession, getCurrentUser, revocarSesiones } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { ok } from "@/lib/api";

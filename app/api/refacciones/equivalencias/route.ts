@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth, withVista } from "@/lib/api";
 import {
   ErrorDeEquivalencia, equivalentesDe, esTipoValido,
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 const crear = z.object({
   partId: z.string().min(1),
   equivalenteId: z.string().min(1),
-  tipo: z.string().refine(esTipoValido, { message: "Tipo invalido" }),
+  tipo: z.string().refine(esTipoValido, { error: "Tipo invalido" }),
   nota: z.string().trim().max(240).nullable().optional(),
 });
 

@@ -25,6 +25,8 @@ import { iaConfigurada } from "@/lib/ia/cliente";
 import { fallasRecientes } from "@/lib/ia/fallas";
 import { formatDateTime } from "@/lib/utils";
 import { AlertTriangle, Info } from "lucide-react";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
+import { FaltaSegundoFactor } from "@/components/falta-segundo-factor";
 
 export const metadata = { title: "Consumo de IA" };
 export const dynamic = "force-dynamic";
@@ -43,6 +45,7 @@ export default async function ConsumoIaPage({
 }) {
   const user = await requireUser();
   if (!user.isSuperAdmin) redirect("/dashboard");
+  if (!tieneSegundoFactor(user)) return <FaltaSegundoFactor />;
 
   const params = await searchParams;
   const periodo = /^\d{4}-\d{2}$/.test(params.periodo ?? "") ? params.periodo! : periodoActual();

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { diaLocal } from "@/lib/utils";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth, withVista } from "@/lib/api";

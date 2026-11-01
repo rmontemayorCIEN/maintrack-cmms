@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { centroDeCostoDelActivo } from "@/lib/centro-de-costo";
 import { avisarNuevaOrden } from "@/lib/avisos/ordenes";
 import { prisma } from "@/lib/db";

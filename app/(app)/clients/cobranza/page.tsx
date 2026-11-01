@@ -7,6 +7,8 @@ import { periodoDe } from "@/lib/cobranza";
 import { PageHeader, Stat } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import { PanelCobranza } from "./panel";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
+import { FaltaSegundoFactor } from "@/components/falta-segundo-factor";
 
 export const metadata = { title: "Cobranza" };
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ export default async function CobranzaPage({
 }) {
   const user = await requireUser();
   if (!user.isSuperAdmin) redirect("/dashboard");
+  if (!tieneSegundoFactor(user)) return <FaltaSegundoFactor />;
   const params = await searchParams;
 
   const cargos = await prisma.invoice.findMany({

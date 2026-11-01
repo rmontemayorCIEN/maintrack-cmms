@@ -11,7 +11,7 @@
  * estimaciones esten mal hechas, que le toquen siempre los equipos peores, o
  * que le falte una herramienta. Elegir entre esas lecturas no es una formula.
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { cargaDelEquipo, rangoPorOmision } from "../personal";
 import { analizarConIa, textoIa } from "./cliente";

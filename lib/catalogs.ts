@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { OPCIONES_DE_FAMILIA } from "./causas";
 import { prisma } from "./db";
 

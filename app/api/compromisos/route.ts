@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { MAXIMO_TEXTO_COMPROMISO, crearCompromiso, listarCompromisos } from "@/lib/compromisos";
 import { genteMencionable } from "@/lib/comentarios";

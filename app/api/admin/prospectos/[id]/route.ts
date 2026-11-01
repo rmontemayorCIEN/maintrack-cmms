@@ -1,7 +1,8 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { fail, ok } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/superadmin";
+import { logAudit } from "@/lib/audit";
 import { ESTADOS_PROSPECTO, MOTIVOS_PERDIDA } from "@/lib/prospectos";
 
 const esquema = z.object({
@@ -14,10 +15,10 @@ const esquema = z.object({
 
 /** Seguimiento de un prospecto: estado, demostración realizada, resultado y motivo de pérdida. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireSuperAdmin();
+  const { error, user } = await requireSuperAdmin();
   if (error) return error;
   const parsed = esquema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return fail(parsed.error.errors[0]?.message ?? "Datos inválidos", 422);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos", 422);
   const d = parsed.data;
   if (d.estado === "PERDIDA" && !d.motivoPerdida) return fail("Indique el motivo de la pérdida", 422);
   const actual = await prisma.prospecto.findUnique({ where: { id: (await params).id } });
@@ -30,5 +31,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ...(d.estado === "DEMO_REALIZADA" && !actual.demoRealizadaAt ? { demoRealizadaAt: new Date() } : {}),
     },
   });
+  await logAudit({ organizationId: user.organizacionPropia.id, userId: user.id, entity: "Prospecto", entityId: p.id, action: "PROSPECT_UPDATED", summary: `Actualizó el seguimiento de un prospecto a ${d.estado}` });
   return ok({ prospecto: p });
 }

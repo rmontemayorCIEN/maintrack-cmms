@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { withVista } from "@/lib/api";
 import { FRASES, sintetizar } from "@/lib/voz";
 

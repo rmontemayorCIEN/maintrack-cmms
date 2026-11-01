@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { ErrorDeVigencia, cambiarActivaVigencia, guardarVigencia } from "@/lib/vigencias";
 

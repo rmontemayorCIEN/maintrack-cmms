@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { prisma } from "./db";
 import { notify } from "./audit";
 import { siguienteFolio } from "./numbering";
@@ -27,7 +27,7 @@ export const esquemaSolicitudSoporte = z.object({
   severidad: z.enum(SEVERIDADES.map((s) => s.clave) as [ClaveSeveridad, ...ClaveSeveridad[]]).default("MEDIA"),
   pantalla: z.string().trim().max(200).optional().nullable(),
   /** Solo si la persona aceptó adjuntarlos. */
-  datosTecnicos: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().nullable(),
+  datosTecnicos: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().nullable(),
 });
 
 /** El tiempo objetivo de respuesta que aplica, según severidad y plan. */
