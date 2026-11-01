@@ -51,6 +51,7 @@ export const ACCIONES_POR_ROL: AccionDeRol[] = [
   { grupo: "Almacén y compras", accion: "Recibir material de una compra", permiso: "purchase:receive" },
 
   { grupo: "Información", accion: "Exportar información a CSV", permiso: "data:export" },
+  { grupo: "Información", accion: "Preguntarle al Consultor del Sistema y guardarle notas", permiso: "consultor:use" },
 
   { grupo: "Administración", accion: "Proveedores, catálogos y configuración de la empresa", permiso: "settings:write" },
   { grupo: "Administración", accion: "Dar de alta usuarios, cambiar roles y contraseñas", permiso: "user:manage" },

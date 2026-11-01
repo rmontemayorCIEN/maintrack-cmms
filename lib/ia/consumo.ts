@@ -103,6 +103,8 @@ const AL_AGOTARSE: Record<ClaveConBolsa, (cupo: number) => string> = {
     `Se agotaron los partes del dia de este mes (${cupo}). Se renuevan el dia 1. Lo que dice el parte sigue en el inicio, escrito.`,
   NAVEGAR: (cupo) =>
     `Se agotaron los comandos de voz de este mes (${cupo}). Se renuevan el dia 1. El menu y la busqueda siguen igual.`,
+  CONSULTOR: () =>
+    "Se agotó la bolsa del Consultor de este mes. Se renueva el dia 1. El plan de la puesta en marcha y la ayuda escrita de cada pantalla siguen disponibles.",
   DICTADO: (cupo) =>
     `Se agotaron los dictados de este mes (${cupo}). Se renuevan el dia 1. Puede escribir el cierre a mano, y la codificacion con IA sigue funcionando igual.`,
 };

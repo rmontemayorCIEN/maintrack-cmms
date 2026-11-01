@@ -196,7 +196,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
     ],
     // Suficiente para el diagnostico semanal y para que prueben el resto: la
     // bolsa chica es deliberada, es lo que hace que el complemento se venda.
-    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200, NAVEGAR: 1200 } },
+    ia: { operaciones: 20, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR", "CONSULTOR"], bolsas: { AYUDA: 60, BRIEF: 90, DICTADO: 1200, NAVEGAR: 1200, CONSULTOR: 300 } },
   },
   ENTERPRISE: {
     nombre: "Enterprise",
@@ -212,7 +212,7 @@ export const PLANES: Record<ClavePlan, DefinicionPlan> = {
       "Consulta en lenguaje natural, y preguntarle hablando con respuesta en voz",
       "Soporte con tiempos de respuesta prioritarios",
     ],
-    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR", "RONDIN"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000 } },
+    ia: { operaciones: 80, funciones: ["BRIEF", "DIAGNOSTICO", "CIERRE_OT", "PLAN", "REFACCIONES", "BUSQUEDA", "LEVANTAMIENTO", "PLACA", "FOTO_AREA", "REVISION", "AYUDA", "TRIAGE", "RECURRENCIA", "DEDUPE", "PROCEDIMIENTO", "DICTADO", "NAVEGAR", "RONDIN", "CONSULTOR"], bolsas: { AYUDA: 200, BRIEF: 90, DICTADO: 5000, NAVEGAR: 5000, CONSULTOR: 800 } },
   },
 };
 

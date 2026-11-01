@@ -1,0 +1,17 @@
+# Copia del Consultor del Sistema. NO SE EDITA AQUÍ: los cambios van en ~/Proyectos/consultor-sistema
+# y se traen con: npm run copiar -- <esta app>   (desde consultor-sistema)
+# commit 385c750 · 2026-11-01 10:58
+43cbba8a44c34a89069adface1a8c7857a8e89a6a7d097b234469ef23e9b3b2c  componentes/PanelConsultor.tsx
+052e7b8bdbac228b34916a4d49ca2e73141a2e22681bf313044093544201b173  consultar.ts
+02ac0c1e88d5c1a977c070f8ce5a8cc7fc0b3586d37d5579313f79f293b07ab4  consultor.css
+6dc2ba5f421f224c811ae54dd12ffce3029dad99d37b1348912148c1ee2008b6  esquema.ts
+1e95dfd691f87a129d4eeaaa0571deb244e2307e9ee2536eb759d617b665b2b4  huella.mjs
+2b75e48f0b95cdddcf183de2433f3ce59e46385a98b296af5c133110f094e661  reglas/avance.ts
+2b44cedcbcdb0e440ba08ed4161e84778e761c1b87340ae6c4414362e0e42e24  reglas/contexto.ts
+929bb1ea21c62e02af6604dbcd43448f35f2e4855399cc481642fcd466a50664  reglas/guardas.ts
+c99f93634e1717404ca4608f05789f1317925361980cea7468a1fbfc0ca3c4b5  reglas/memoria.ts
+e46a38ae139a2899cedc30a6b96b44f43a4f5a1bdcb1ec78914356ff4df1890a  reglas/privacidad.ts
+50fce90a9c4494e2c4e4b98410fd012edb0b9cc718d37168bb18f72811028454  reglas/tema.ts
+13e9c992f2ea0047b29d7694fc041f58cf2f7af734a79b985868f38717cc4dbe  reglas/texto.ts
+cfd298981b255e4630fbb38a392dcf6941f743906e554a485aa9ffe5d7ec5359  textos.ts
+49e8e457026e634e34e10b36f829e2acce0885f440e6b91c15e0600cfd4b83b5  tipos.ts
