@@ -9,7 +9,7 @@
 
 export type ClaveFuncionIA =
   | "DIAGNOSTICO" | "CIERRE_OT" | "PLAN" | "REFACCIONES" | "BUSQUEDA"
-  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN" | "NORMA_DOCUMENTO";
+  | "LEVANTAMIENTO" | "PLACA" | "FOTO_AREA" | "REVISION" | "AYUDA" | "TRIAGE" | "RECURRENCIA" | "DEDUPE" | "PROCEDIMIENTO" | "AGENDA" | "EQUIVALENCIAS" | "EQUIPO" | "ARRANQUE_PLANES" | "PARO_AREA" | "BRIEF" | "DICTADO" | "NAVEGAR" | "RONDIN" | "NORMA_DOCUMENTO" | "CONSULTOR";
 
 export type DefinicionFuncionIA = {
   nombre: string;
@@ -31,7 +31,7 @@ export type DefinicionFuncionIA = {
  * Quien agregue una funcion aqui tiene que darle su cupo en los dos planes
  * (`lib/planes.ts`) y su caso en `puedeUsarIa`, o se quedara sin limite.
  */
-export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO", "NAVEGAR"] as const;
+export const CON_BOLSA_PROPIA = ["AYUDA", "BRIEF", "DICTADO", "NAVEGAR", "CONSULTOR"] as const;
 
 /**
  * Las funciones con bolsa propia, como tipo.
@@ -204,6 +204,13 @@ export const FUNCIONES_IA: Record<ClaveFuncionIA, DefinicionFuncionIA> = {
     nombre: "Triage de solicitudes",
     descripcion:
       "Lee lo que reporto alguien que no es de mantenimiento —con su foto— y propone título, prioridad, tipo y posibles duplicados.",
+    operaciones: 1,
+    disponible: true,
+  },
+  CONSULTOR: {
+    nombre: "Consultor del Sistema",
+    descripcion:
+      "Acompaña la puesta en marcha y la operación: dice qué sigue y por qué, explica cómo se hace cada cosa y recuerda dónde se quedó cada quien. Solo habla del sistema. Cada pregunta son dos llamadas (clasificar y redactar); una fuera de tema se queda en la primera.",
     operaciones: 1,
     disponible: true,
   },

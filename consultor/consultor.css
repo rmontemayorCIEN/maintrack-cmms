@@ -1,0 +1,63 @@
+/* El Consultor del Sistema. Solo tokens --cs-*: cada app los traduce a los
+ * suyos una vez (en Agente 360, app/propios.css), y con eso hereda su tema
+ * claro y oscuro. Nunca colores literales. Celular primero. */
+
+.cs { display: grid; gap: 14px; min-width: 0; }
+.cs-tarjeta { background: var(--cs-superficie); border: 1px solid var(--cs-linea); border-radius: var(--cs-radio, 12px); padding: 16px; min-width: 0; }
+.cs h3 { font-weight: 700; line-height: 1.3; }
+.cs-titulo { margin: 0 0 10px; font-size: 1rem; }
+.cs-tenue { color: var(--cs-tenue); }
+.cs-etiqueta { color: var(--cs-tenue); text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; font-weight: 700; }
+.cs-num { font-variant-numeric: tabular-nums; font-size: 1.8rem; }
+.cs-fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cs-entre { justify-content: space-between; }
+.cs-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.cs-avance-cifra { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cs-barra { height: 10px; border-radius: 99px; background: var(--cs-linea); overflow: hidden; margin: 10px 0 6px; }
+.cs-barra i { display: block; height: 100%; background: var(--cs-ok); border-radius: 99px; }
+
+.cs-siguiente h3 { margin: 4px 0 6px; font-size: 1.15rem; }
+.cs-siguiente p { margin: 0 0 8px; }
+.cs-nota-admin { background: var(--cs-info-suave); color: var(--cs-texto); border-radius: var(--cs-radio, 12px); padding: 10px 14px; }
+
+.cs-columnas { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 960px) { .cs-columnas { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; } }
+.cs-col { display: grid; gap: 14px; min-width: 0; }
+
+.cs-boton { appearance: none; border: 1px solid var(--cs-linea); background: var(--cs-superficie); color: var(--cs-texto); border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; min-height: 40px; }
+.cs-boton:disabled { opacity: .55; cursor: default; }
+.cs-principal { background: var(--cs-acento); border-color: var(--cs-acento); color: var(--cs-sobre-acento); }
+.cs-chico { padding: 4px 10px; min-height: 32px; font-size: .85rem; }
+.cs-chip { appearance: none; border: 1px solid var(--cs-linea); background: var(--cs-superficie-2); color: var(--cs-texto); border-radius: 99px; padding: 6px 12px; font: inherit; font-size: .85rem; cursor: pointer; }
+.cs-enlace { color: var(--cs-acento-texto); font-weight: 600; font-size: .9rem; }
+
+.cs-mensajes { display: grid; gap: 10px; max-height: 52vh; overflow-y: auto; padding: 2px; margin-bottom: 10px; }
+.cs-msg { display: grid; gap: 6px; justify-items: start; }
+.cs-yo { justify-items: end; }
+.cs-burbuja { white-space: pre-wrap; padding: 10px 12px; border-radius: 12px; max-width: 92%; background: var(--cs-superficie-2); border: 1px solid var(--cs-linea); overflow-wrap: anywhere; }
+.cs-yo .cs-burbuja { background: var(--cs-acento-suave); }
+
+.cs-preguntar, .cs-entrevista, .cs-nueva { display: grid; gap: 10px; }
+.cs-rapidas { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-campo { display: grid; gap: 4px; }
+.cs-campo span { font-weight: 600; font-size: .9rem; }
+.cs-campo input, .cs-campo textarea, .cs-campo select { width: 100%; font: inherit; color: var(--cs-texto); background: var(--cs-superficie); border: 1px solid var(--cs-linea); border-radius: 8px; padding: 8px 10px; }
+.cs-aviso { background: var(--cs-info-suave); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.cs-error { color: var(--cs-alerta); margin: 10px 0 0; font-weight: 600; }
+
+.cs-propuestas { display: grid; gap: 6px; margin-bottom: 10px; padding: 10px; border: 1px dashed var(--cs-linea); border-radius: 8px; }
+.cs-propuesta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
+
+.cs-plan { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cs-paso { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--cs-linea); }
+.cs-hecho, .cs-no_aplica { opacity: .75; }
+.cs-estado { font-size: .78rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cs-estado-hecho { background: var(--cs-ok-suave); color: var(--cs-texto); }
+.cs-estado-en_proceso { background: var(--cs-info-suave); color: var(--cs-texto); }
+.cs-estado-falta { background: var(--cs-alerta-suave); color: var(--cs-texto); }
+.cs-estado-no_aplica { background: var(--cs-superficie-2); color: var(--cs-tenue); }
+
+.cs-notas { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.cs-notas li { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cs-apagada { color: var(--cs-tenue); }

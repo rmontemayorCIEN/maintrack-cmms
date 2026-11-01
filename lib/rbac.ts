@@ -19,7 +19,8 @@ export type Permission =
   | "settings:write"
   | "user:manage"
   | "billing:manage"
-  | "data:export";
+  | "data:export"
+  | "consultor:use";
 
 const MATRIX: Record<Permission, string[]> = {
   "asset:write": ["OWNER", "ADMIN", "SUPERVISOR"],
@@ -57,6 +58,9 @@ const MATRIX: Record<Permission, string[]> = {
   // padron de equipos, los costos y el inventario. Lo hace quien responde por
   // esos datos, no cualquiera con sesion.
   "data:export": ["OWNER", "ADMIN", "SUPERVISOR"],
+  // Conversar con el Consultor y guardarle notas: todos los que trabajan en la
+  // empresa. Consulta (VIEWER) ve el plan pero no escribe, como en todo lo demas.
+  "consultor:use": ["OWNER", "ADMIN", "SUPERVISOR", "TECHNICIAN", "COMPRAS", "REQUESTER"],
 };
 
 export function can(role: string | undefined, permission: Permission) {

@@ -34,6 +34,8 @@ const REGLAS: Array<{ ruta: string; roles: Rol[] }> = [
   { ruta: "/glossary", roles: TODOS },
   // Bloque 7: pedir ayuda a MainTrack es de todos; la guía de demostración, solo en la empresa demostrativa.
   { ruta: "/soporte", roles: TODOS },
+  // El Consultor del Sistema: verlo es de todos; conversar pide consultor:use.
+  { ruta: "/consultor", roles: TODOS },
   { ruta: "/demo", roles: TODOS },
   // Ajustes: cada quien ve lo suyo (preferencias de avisos, su contraseña); las
   // pestañas de la empresa las filtra la propia pantalla con settings:write.
@@ -182,6 +184,8 @@ export type ItemMenu = {
   requiereRegistros?: boolean;
   /** Igual que `requiereRegistros`, para «Cumplimiento normativo». */
   requiereNormas?: boolean;
+  /** Solo si la empresa encendio el Consultor del Sistema (Ajustes). No es contrato: es su decision. */
+  requiereConsultor?: boolean;
 };
 export type GrupoMenu = { seccion: string; clave: string; items: ItemMenu[] };
 
@@ -281,6 +285,7 @@ const MENU: GrupoMenu[] = [
   },
   {
     seccion: "Ayuda", clave: "ayuda", items: [
+      { href: "/consultor", etiqueta: "Consultor", icono: "consultor", requiereConsultor: true },
       { href: "/soporte", etiqueta: "Soporte", icono: "soporte" },
       { href: "/glossary", etiqueta: "Glosario", icono: "glosario" },
     ],
@@ -398,7 +403,7 @@ export const SIN_VOZ: Record<string, string> = {
 
 export function menuDe(
   rol: string | undefined,
-  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean } = {},
+  opciones: { esSuperAdmin?: boolean; esDemo?: boolean; registrosPropios?: boolean; cumplimientoNormas?: boolean; consultorActivo?: boolean } = {},
 ): GrupoMenu[] {
   const grupos = MENU
     .map((g) => ({
@@ -406,7 +411,8 @@ export function menuDe(
       items: g.items.filter(
         (i) => puedeVerRuta(rol, i.href, opciones)
           && (!i.requiereRegistros || opciones.registrosPropios)
-          && (!i.requiereNormas || opciones.cumplimientoNormas),
+          && (!i.requiereNormas || opciones.cumplimientoNormas)
+          && (!i.requiereConsultor || opciones.consultorActivo),
       ),
     }))
     .filter((g) => g.items.length);
