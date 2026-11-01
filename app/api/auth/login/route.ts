@@ -1,6 +1,8 @@
 import { z } from "../../../../lib/zod";
 import { prisma } from "@/lib/db";
-import { createSession, verifyPassword } from "@/lib/auth";
+import { crearDesafio, verifyPassword } from "@/lib/auth";
+import { completarEntrada } from "@/lib/entrada";
+import { exigeSegundoFactor, tieneSegundoFactor } from "@/lib/segundo-factor";
 import { estaFrenado, registrarIntento } from "@/lib/acceso";
 import { logAudit } from "@/lib/audit";
 import { fail, ok } from "@/lib/api";
@@ -49,20 +51,11 @@ export async function POST(request: Request) {
     return fail("La organización esta suspendida", 403);
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-  await registrarIntento({ email, ip, exito: true, motivo: "OK" });
-  await logAudit({
-    organizationId: user.organizationId, userId: user.id,
-    entity: "User", entityId: user.id, action: "LOGIN",
-    summary: `${user.name} inició sesión`,
-  });
-  await createSession({
-    userId: user.id,
-    organizationId: user.organizationId,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  });
+  // Con segundo factor activo, la contrasena sola no da sesion: falta el codigo.
+  if (exigeSegundoFactor(user) && tieneSegundoFactor(user)) {
+    return ok({ segundoFactor: true, desafio: await crearDesafio(user.id) });
+  }
 
+  await completarEntrada(user, ip);
   return ok({ user: { id: user.id, name: user.name, role: user.role } });
 }

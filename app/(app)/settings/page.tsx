@@ -42,6 +42,7 @@ import { ReferenciaDeRoles } from "./referencia-roles";
 import { FiltrosBitacora } from "./filtros-bitacora";
 import { consultarBitacora, hayFiltro, TOPE_BITACORA } from "@/lib/bitacora";
 import { ZONA_POR_OMISION } from "@/lib/periodos";
+import { exigeSegundoFactor, respaldosRestantes, tieneSegundoFactor } from "@/lib/segundo-factor";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
@@ -292,6 +293,7 @@ export default async function SettingsPage({
 
       {activa === "seguridad" ? (
         <PanelSeguridad
+          segundoFactor={exigeSegundoFactor(user) ? { activo: tieneSegundoFactor(user), respaldos: respaldosRestantes(user) } : null}
           puedeExportar={can(user.role, "data:export")}
           ultimoAcceso={user.lastLoginAt ? formatDateTime(user.lastLoginAt, zona) : null}
         />

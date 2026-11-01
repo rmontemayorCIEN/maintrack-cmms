@@ -63,6 +63,22 @@ export function fail(message: string, status = 400, extra?: unknown) {
   return NextResponse.json({ error: message, details: extra }, { status });
 }
 
+/**
+ * Lee y valida el cuerpo de una peticion. Un cuerpo que no es JSON o no pasa
+ * el esquema es un 422 con el primer motivo, nunca un 500: `schema.parse` sin
+ * atrapar convertia un dato mal escrito en «error inesperado».
+ */
+export async function leerCuerpo<S extends z.ZodTypeAny>(
+  request: Request,
+  schema: S,
+): Promise<{ ok: true; datos: z.infer<S> } | { ok: false; respuesta: NextResponse }> {
+  const crudo = await request.json().catch(() => undefined);
+  if (crudo === undefined) return { ok: false, respuesta: fail("El cuerpo de la petición no es JSON válido", 422) };
+  const r = schema.safeParse(crudo);
+  if (!r.success) return { ok: false, respuesta: fail(r.error.issues[0]?.message ?? "Datos inválidos", 422) };
+  return { ok: true, datos: r.data };
+}
+
 /** Envuelve un handler resolviendo sesion, tenant y permiso requerido. */
 export const NO_EN_DEMO = "Esto no está disponible en la empresa demostrativa.";
 export const EN_RESTAURACION = "La empresa demostrativa se está restaurando. Intente de nuevo en un minuto.";

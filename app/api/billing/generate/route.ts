@@ -15,8 +15,10 @@ export async function POST(request: Request) {
   const { error, user } = await requireSuperAdmin();
   if (error) return error;
 
-  const body = await request.json().catch(() => ({}));
-  const input = schema.parse(body);
+  // Sin cuerpo es valido (emite el periodo en curso para todas).
+  const r = schema.safeParse(await request.json().catch(() => ({})));
+  if (!r.success) return fail(r.error.issues[0]?.message ?? "Datos inválidos", 422);
+  const input = r.data;
   const periodo = input.periodo ?? periodoDe(new Date());
 
   const resultado = await emitirCargosDelPeriodo(periodo, {

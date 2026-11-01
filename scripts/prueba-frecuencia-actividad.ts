@@ -197,10 +197,17 @@ async function main() {
   const desdeCierre = await avanzarActividad({
     organizationId: org.id, planTaskId: tarde.id, assetId: equipo.id, completadaEl: HOY,
   });
+  // «Un mes desde hoy» es el mismo día del mes siguiente o, si ese mes no lo
+  // tiene, su último día: el 31 de octubre va al 30 de noviembre. Comparar solo
+  // el día del mes hacía tronar la prueba los días 29 a 31.
+  const unMesDespues = (d: Date) => {
+    const ultimo = new Date(d.getFullYear(), d.getMonth() + 2, 0).getDate();
+    return new Date(d.getFullYear(), d.getMonth() + 1, Math.min(d.getDate(), ultimo));
+  };
   revisar(
     "CIERRE: cuenta desde que se hizo de verdad — un mes desde hoy",
-    !!desdeCierre && desdeCierre.getDate() === HOY.getDate(),
-    `cerrada el ${iso(HOY)}, siguiente ${iso(desdeCierre)}`,
+    !!desdeCierre && iso(desdeCierre) === iso(unMesDespues(HOY)),
+    `cerrada el ${iso(HOY)}, siguiente ${iso(desdeCierre)}, esperaba ${iso(unMesDespues(HOY))}`,
   );
 
   await prisma.planTaskAsset.update({

@@ -23,6 +23,9 @@ export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { per
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Con segundo factor: la contraseña ya pasó y falta el código.
+  const [desafio, setDesafio] = useState<string | null>(null);
+  const [codigo, setCodigo] = useState("");
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -37,6 +40,31 @@ export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { per
     setLoading(false);
     if (!res.ok) {
       setError(data.error ?? "No fue posible iniciar sesión");
+      return;
+    }
+    if (data.segundoFactor) {
+      setDesafio(data.desafio);
+      return;
+    }
+    router.push(destino);
+    router.refresh();
+  }
+
+  async function enviarCodigo(event: React.FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    const res = await fetch("/api/auth/segundo-factor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ desafio, codigo }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "No fue posible iniciar sesión");
+      // El desafío dura cinco minutos: vencido, se vuelve a empezar.
+      if (res.status === 401 && /tiempo/.test(data.error ?? "")) { setDesafio(null); setCodigo(""); }
       return;
     }
     router.push(destino);
@@ -73,8 +101,36 @@ export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { per
             {MARCA}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h1>
-          <p className="mt-1 text-sm text-slate-500">Entre con el correo y la contraseña que le dio su empresa.</p>
+          <p className="mt-1 text-sm text-slate-500">{desafio ? "Su contraseña es correcta. Falta el código de su aplicación autenticadora." : "Entre con el correo y la contraseña que le dio su empresa."}</p>
 
+          {desafio ? (
+            <form onSubmit={enviarCodigo} className="mt-6 grid gap-4">
+              <div>
+                <label className="label" htmlFor="codigo">Código de su aplicación autenticadora</label>
+                <input
+                  id="codigo"
+                  className="field"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  required
+                />
+                <p className="mt-1 text-xs text-slate-500">Si perdió el teléfono, escriba uno de sus códigos de respaldo (cada uno sirve una vez).</p>
+              </div>
+              {error ? (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
+              ) : null}
+              <Button type="submit" disabled={loading || !codigo.trim()}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Entrar
+              </Button>
+              <button type="button" className="text-xs text-slate-500 hover:underline" onClick={() => { setDesafio(null); setCodigo(""); setError(null); }}>
+                Volver a empezar
+              </button>
+            </form>
+          ) : (
           <form onSubmit={submit} className="mt-6 grid gap-4">
             <div>
               <label className="label" htmlFor="email">Correo</label>
@@ -108,6 +164,7 @@ export function LoginForm({ permiteAlta = false, destino = "/dashboard" }: { per
               Entrar
             </Button>
           </form>
+          )}
 
           {/*
             El alta publica esta apagada salvo que la instancia la habilite.

@@ -147,6 +147,16 @@ else
   AVISOS="no configurados (faltan las llaves VAPID)"
 fi
 
+# La administracion desde la Torre de Control (/api/torre/admin/*). Opcional:
+# sin el secreto las rutas contestan 404. Es OTRO valor que el token de salud:
+# este abre las cuentas de las empresas. En la Torre va en torre-admin-maintrack.
+if hay_secreto cmms-torre-admin-secreto; then
+  SECRETOS="$SECRETOS,TORRE_ADMIN_SECRETO=cmms-torre-admin-secreto:latest"
+  TORRE_ADMIN="habilitada"
+else
+  TORRE_ADMIN="no configurada (falta el secreto cmms-torre-admin-secreto)"
+fi
+
 # Una vista previa nace con su propia liga y sin trafico. Sin --no-traffic la
 # revision de una propuesta sin revisar se llevaria a los clientes de golpe.
 EXTRA=""
@@ -162,6 +172,7 @@ echo "Cloud SQL : $INSTANCIA"
 echo "Archivos  : gs://$BUCKET_ARCHIVOS"
 echo "IA        : $IA"
 echo "Avisos    : $AVISOS"
+echo "Torre adm.: $TORRE_ADMIN"
 echo "Publicando $SERVICIO en $REGION..."
 echo ""
 

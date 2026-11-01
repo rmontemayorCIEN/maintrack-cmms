@@ -112,7 +112,7 @@ async function main() {
     // El operador de la plataforma vive en su propia empresa, como en producción.
     const C = await prisma.organization.create({ data: { name: `${sello} Plataforma`, slug: `${sello}-c`, plan: "ENTERPRISE", status: "ACTIVE" } });
     creadas.push(C.id);
-    const operador = await prisma.user.create({ data: { organizationId: C.id, email: `operador@${dominio}b`, name: "Operador", role: "OWNER", passwordHash: "x", isSuperAdmin: true } });
+    const operador = await prisma.user.create({ data: { organizationId: C.id, email: `operador@${dominio}b`, name: "Operador", role: "OWNER", passwordHash: "x", isSuperAdmin: true, totpActivoEn: new Date() /* opera con segundo factor */ } });
     const sitioB = await prisma.site.create({ data: { organizationId: B.id, code: "B1", name: "Planta B" } });
     const activoB = await prisma.asset.create({ data: { organizationId: B.id, siteId: sitioB.id, code: `SECRETO-${sello}`, name: "Equipo de la otra empresa" } });
     const otB = await prisma.workOrder.create({ data: { organizationId: B.id, number: `OTB-${sello}`, title: "Orden de la otra empresa", status: "OPEN" } });

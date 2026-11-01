@@ -5,6 +5,7 @@ import { nombrePeriodo } from "@/lib/cobranza";
 import { planDe } from "@/lib/planes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { PrintButton } from "@/app/(app)/work-orders/[id]/print/print-button";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nota de cobro" };
@@ -24,7 +25,8 @@ export default async function NotaDeCobro({ params }: { params: Promise<{ id: st
     where: {
       id,
       // Un cliente solo ve las suyas; el operador de plataforma, cualquiera.
-      ...(user.isSuperAdmin ? {} : { organizationId: user.organizationId }),
+      // (y solo con su segundo factor activo: ve cargos de todas las empresas).
+      ...(user.isSuperAdmin && tieneSegundoFactor(user) ? {} : { organizationId: user.organizationId }),
     },
     include: { organization: { select: { name: true, slug: true, industry: true } } },
   });
