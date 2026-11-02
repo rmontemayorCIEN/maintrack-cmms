@@ -108,6 +108,10 @@ async function main() {
 
     // ── 3. Las cifras cuentan lo que hay ────────────────────────────────
     console.log("\n3. Las cifras cuentan lo sembrado (diferencia antes/despues)");
+    // Llaves de mentira: el reporte solo pregunta si estan, no envia nada. Asi
+    // la prueba no depende del .env de quien la corre (en CI no hay VAPID).
+    process.env.VAPID_PUBLIC_KEY = "llave-publica-de-prueba";
+    process.env.VAPID_PRIVATE_KEY = "llave-privada-de-prueba";
     const org = await prisma.organization.create({
       data: { name: `Empresa ${sello}`, slug: sello, plan: "ENTERPRISE", status: "ACTIVE" },
     });
@@ -140,11 +144,7 @@ async function main() {
 
     const despues = await reporte();
     const delta = (clave: string) => (de(despues.json, clave)?.valor ?? 0) - (de(antes.json, clave)?.valor ?? 0);
-    if (de(despues.json, "push-envios")?.detalle.startsWith("Sin llaves")) {
-      revisar("push sin llaves VAPID en este entorno: no se puede medir la diferencia", false, "configure VAPID en .env");
-    } else {
-      revisar("push: cuenta las 6 fallas propias, ni la ajena ni la de hace 30 h", delta("push-envios") === 6, delta("push-envios"));
-    }
+    revisar("push: cuenta las 6 fallas propias, ni la ajena ni la de hace 30 h", delta("push-envios") === 6, delta("push-envios"));
     revisar("cola: solo la atorada hace 2 h (no la de hace 5 min ni la futura)", delta("avisos-atorados") === 1, delta("avisos-atorados"));
     revisar("IA: una llamada fallida mas", delta("ia-errores") === 1, delta("ia-errores"));
     revisar("IA: el gasto del mes sube 1.75 USD", Math.abs(delta("ia-presupuesto") - 1.75) < 0.011, delta("ia-presupuesto"));
@@ -176,6 +176,10 @@ async function main() {
     process.env.IA_PRESUPUESTO_MENSUAL_USD = "0.01";
     const pasado = await reporte();
     revisar("gasto por encima del presupuesto: falla", de(pasado.json, "ia-presupuesto")?.estado === "falla", de(pasado.json, "ia-presupuesto"));
+    delete process.env.VAPID_PUBLIC_KEY;
+    delete process.env.VAPID_PRIVATE_KEY;
+    const sinPush = de((await reporte()).json, "push-envios");
+    revisar("sin llaves VAPID: falla y lo dice", sinPush?.estado === "falla" && sinPush.detalle.startsWith("Sin llaves"), sinPush);
 
     // ── 6. Una revision que truena no tumba el reporte ──────────────────
     console.log("\n6. Una revision que truena o se tarda");
