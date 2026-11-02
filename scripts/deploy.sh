@@ -85,6 +85,17 @@ if [ -z "$INSTANCIA" ]; then
   exit 1
 fi
 
+# El tope mensual de gasto en IA de toda la plataforma, en USD. Lo decidio
+# Rafael (2-nov-2026: 20). La Torre de Control lo usa para juzgar «Gasto de IA
+# del mes»: atencion desde el 80 %, falla al llegar al tope. Sin el, esa
+# revision sale en gris. Se cambia aqui, o al publicar:
+#   IA_PRESUPUESTO_MENSUAL_USD=30 npm run deploy
+IA_PRESUPUESTO_MENSUAL_USD="${IA_PRESUPUESTO_MENSUAL_USD:-20}"
+if ! awk -v v="$IA_PRESUPUESTO_MENSUAL_USD" 'BEGIN { exit !(v ~ /^[0-9]+(\.[0-9]+)?$/ && v + 0 > 0) }'; then
+  echo "ERROR: IA_PRESUPUESTO_MENSUAL_USD debe ser un numero mayor que cero (dolares al mes)."
+  exit 1
+fi
+
 # --update-env-vars y no --set-env-vars: el segundo reemplaza TODA la lista, y
 # un despliegue hecho sin ANTHROPIC_WORKSPACE_ID en el ambiente borraria el
 # valor ya configurado en el servicio. Aditivo, lo que se configura una vez se
@@ -181,6 +192,7 @@ echo "Base      : $SECRETO_DB"
 echo "Cloud SQL : $INSTANCIA"
 echo "Archivos  : gs://$BUCKET_ARCHIVOS"
 echo "IA        : $IA"
+echo "Tope IA   : $IA_PRESUPUESTO_MENSUAL_USD USD al mes"
 echo "Avisos    : $AVISOS"
 echo "Torre     : $TORRE"
 echo "Torre adm.: $TORRE_ADMIN"
@@ -205,7 +217,7 @@ if ! gcloud run deploy "$SERVICIO" \
   --min-instances 0 \
   --max-instances 10 \
   --add-cloudsql-instances="$INSTANCIA" \
-  --update-env-vars="GCS_BUCKET=$BUCKET_ARCHIVOS${ANTHROPIC_WORKSPACE_ID:+,ANTHROPIC_WORKSPACE_ID=$ANTHROPIC_WORKSPACE_ID}" \
+  --update-env-vars="GCS_BUCKET=$BUCKET_ARCHIVOS,IA_PRESUPUESTO_MENSUAL_USD=$IA_PRESUPUESTO_MENSUAL_USD${ANTHROPIC_WORKSPACE_ID:+,ANTHROPIC_WORKSPACE_ID=$ANTHROPIC_WORKSPACE_ID}" \
   --set-secrets="$SECRETOS"; then
 
   echo ""
