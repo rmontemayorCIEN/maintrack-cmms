@@ -244,6 +244,7 @@ const MENU: GrupoMenu[] = [
   {
     seccion: "Equipos y planes", clave: "activos", items: [
       { href: "/assets", etiqueta: "Activos / Equipos", icono: "activos" },
+      { href: "/assets/mapa", etiqueta: "Mapa de activos", icono: "mapa" },
       { href: "/escanear", etiqueta: "Escanear QR", icono: "escanear" },
       { href: "/meters", etiqueta: "Medidores", icono: "medidores" },
       { href: "/plans", etiqueta: "Planes preventivos", icono: "planes" },
@@ -358,7 +359,6 @@ const SUBPANTALLAS: ItemMenu[] = [
 
   // Dentro de Activos y de Planes.
   { href: "/assets/levantamiento", etiqueta: "Levantamiento de inventario", icono: "levantamiento" },
-  { href: "/assets/mapa", etiqueta: "Mapa de activos", icono: "activos" },
   { href: "/plans/cobertura", etiqueta: "Equipos y sus planes", icono: "cobertura" },
 
   // Dentro de Puntos de reporte.

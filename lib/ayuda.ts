@@ -119,11 +119,14 @@ export const AYUDA: Record<string, FichaAyuda> = {
     que: "Ver dónde está cada equipo en un mapa y en qué estado se encuentra.",
     hacer: [
       "Mover y acercar el mapa; los activos de la zona visible se cargan solos",
+      "Elegir qué colorea el mapa: el estado de este momento, la cantidad de fallas, el costo de mantenimiento o las horas de paro, en los últimos 30, 90 o 365 días",
       "Filtrar por sitio, categoría o estado",
       "Tocar un punto para abrir la ficha del activo",
+      "Usar «Pantalla completa» para ver el mapa más grande; Esc (o «Salir») regresa a la vista normal",
     ],
     flujo: [
-      "El color del punto es el estado del activo: operativo, degradado, fuera de servicio o en reserva.",
+      "Por omisión el color es el estado de este momento: el más grave entre el estado registrado y lo que pasa ahora. Un paro abierto lo marca fuera de servicio y una orden de falla abierta, degradado; el globo del punto dice por qué.",
+      "En las capas de fallas, costo y paros, el color y el tamaño van de menos a más sobre el valor más alto de toda la empresa; los activos sin nada salen en gris. La capa de costo solo la ve quien ya ve costos.",
       "Cuando hay muchos activos en la zona se agrupan en círculos con su cantidad; el aro del círculo marca el estado más grave que contiene (rojo si hay alguno fuera de servicio). Tocarlo acerca el mapa.",
       "Solo aparecen los activos que tienen coordenadas. Debajo del mapa se dice cuántos no las tienen.",
       "Las coordenadas se capturan en la ficha del activo, o con las columnas latitud y longitud al importar.",

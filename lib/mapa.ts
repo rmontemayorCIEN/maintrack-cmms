@@ -29,16 +29,52 @@ export const TOPE_LECTURA = 100_000;
 
 export type Limites = { norte: number; sur: number; este: number; oeste: number };
 
+/**
+ * Por qué se colorea el mapa. ESTADO es el estado de este momento; las demás son
+ * números por activo en un período, y se pintan con una escala de una sola tinta.
+ */
+export const CAPAS = ["ESTADO", "FALLAS", "COSTO", "PAROS"] as const;
+export type Capa = (typeof CAPAS)[number];
+export const ETIQUETA_DE_CAPA: Record<Capa, string> = {
+  ESTADO: "Estado de este momento",
+  FALLAS: "Cantidad de fallas",
+  COSTO: "Costo de mantenimiento",
+  PAROS: "Horas de paro",
+};
+/** Los períodos que se ofrecen, en días. */
+export const PERIODOS_DIAS = [30, 90, 365] as const;
+export const PERIODO_POR_OMISION = 365;
+
+/** La escala numérica tiene este número de tonos (además del «sin nada»). */
+export const TONOS = 4;
+
+/**
+ * En qué tono cae un valor: 0 es «sin nada» y de ahí, cuartos del máximo. Las
+ * capas numéricas casi siempre tienen muchísimos ceros y unos pocos muy altos:
+ * por eso el cero se separa y el resto se reparte parejo hasta el máximo.
+ */
+export function tonoDe(valor: number, maximo: number): number {
+  if (!(valor > 0) || !(maximo > 0)) return 0;
+  return Math.min(TONOS, Math.max(1, Math.ceil((valor / maximo) * TONOS)));
+}
+
 export type PuntoMapa = {
   id: string; code: string; name: string;
   latitud: number; longitud: number;
+  /** En la capa ESTADO es el estado EFECTIVO (el más grave entre el registrado y lo que pasa ahora). */
   status: string; criticality: string;
+  /** La cifra de la capa para este activo (0 en ESTADO). */
+  valor: number;
+  /** Por qué el estado efectivo no es el registrado (paro abierto, orden correctiva abierta). Nulo si coincide. */
+  motivo: string | null;
 };
 
 export type GrupoMapa = {
   latitud: number; longitud: number; cantidad: number;
   /** El estado más grave dentro del grupo: un grupo con una luminaria apagada no se ve «todo bien». */
   peor: string;
+  /** El valor más alto de la capa dentro del grupo, y la suma de todos. */
+  maxValor: number; sumaValor: number;
 };
 
 /** De más a menos grave. Un estado desconocido cuenta como el menos grave. */
@@ -55,14 +91,14 @@ export const estadoMasGrave = (a: string, b: string) => (gravedad(a) <= gravedad
  * círculo caiga donde está la gente y no en una esquina vacía.
  */
 export function agruparEnCeldas(
-  puntos: Array<{ latitud: number; longitud: number; status: string }>,
+  puntos: Array<{ latitud: number; longitud: number; status: string; valor?: number }>,
   limites: Limites,
   columnas = 10,
   filas = 8,
 ): GrupoMapa[] {
   const alto = (limites.norte - limites.sur) / filas;
   const ancho = (limites.este - limites.oeste) / columnas;
-  const celdas = new Map<string, { sumaLat: number; sumaLon: number; n: number; peor: string }>();
+  const celdas = new Map<string, { sumaLat: number; sumaLon: number; n: number; peor: string; max: number; suma: number }>();
   for (const p of puntos) {
     // Un punto sobre el borde exacto cae en la última celda, no en una inexistente.
     const f = Math.min(filas - 1, Math.max(0, Math.floor((p.latitud - limites.sur) / alto)));
@@ -72,12 +108,14 @@ export function agruparEnCeldas(
     if (celda) {
       celda.sumaLat += p.latitud; celda.sumaLon += p.longitud; celda.n += 1;
       celda.peor = estadoMasGrave(celda.peor, p.status);
+      celda.max = Math.max(celda.max, p.valor ?? 0);
+      celda.suma += p.valor ?? 0;
     } else {
-      celdas.set(clave, { sumaLat: p.latitud, sumaLon: p.longitud, n: 1, peor: p.status });
+      celdas.set(clave, { sumaLat: p.latitud, sumaLon: p.longitud, n: 1, peor: p.status, max: p.valor ?? 0, suma: p.valor ?? 0 });
     }
   }
   return [...celdas.values()].map((c) => ({
-    latitud: c.sumaLat / c.n, longitud: c.sumaLon / c.n, cantidad: c.n, peor: c.peor,
+    latitud: c.sumaLat / c.n, longitud: c.sumaLon / c.n, cantidad: c.n, peor: c.peor, maxValor: c.max, sumaValor: c.suma,
   }));
 }
 
@@ -88,6 +126,15 @@ export type RespuestaMapa = {
   total: number;
   /** En modo «grupos», true si había más de TOPE_LECTURA y lo mostrado es una muestra. */
   incompleto: boolean;
+  capa: Capa;
+  dias: number;
+  /**
+   * El valor más alto de un activo en TODA la empresa (no solo en pantalla): la
+   * escala no cambia al mover el mapa, y un tono siempre significa lo mismo.
+   */
+  maximo: number;
+  /** La suma de la capa en la zona visible (0 en ESTADO). */
+  suma: number;
   puntos: PuntoMapa[];
   grupos: GrupoMapa[];
 };

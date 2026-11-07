@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
+import { verCostos } from "@/lib/pantallas";
 import { MapaActivos } from "./mapa-activos";
 
 export const metadata = { title: "Mapa de activos" };
@@ -46,6 +47,8 @@ export default async function MapaDeActivosPage() {
           conCoordenadas={conteo}
           sinCoordenadas={sinCoordenadas}
           encuadre={encuadre}
+          puedeVerCostos={verCostos(user.role)}
+          moneda={user.organization.currency}
         />
       </Card>
     </>
