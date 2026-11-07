@@ -40,6 +40,12 @@
   --g-area-preventivo: #bae6fd;
   --g-area-predictivo: #ddd6fe;
   --g-area-correctivo: #fed7aa;
+  /* Mapa de activos: un color por estado, y su versión oscura más abajo. */
+  --mapa-operativo: #059669;
+  --mapa-degradado: #d97706;
+  --mapa-fuera: #dc2626;
+  --mapa-reserva: #64748b;
+  --mapa-grupo: #1d4ed8;
 }
 
 /*
@@ -88,6 +94,11 @@ html:root {
     --g-area-preventivo: #0c4a6e;
     --g-area-predictivo: #4c3a8f;
     --g-area-correctivo: #8a4313;
+    --mapa-operativo: #34d399;
+    --mapa-degradado: #fbbf24;
+    --mapa-fuera: #f87171;
+    --mapa-reserva: #94a0bb;
+    --mapa-grupo: #3b82f6;
     /* Los tintes claros de la marca se vuelven tintes oscuros de la marca. */
     --color-brand-50: color-mix(in srgb, var(--acento-600, #1f3eee) 16%, #131a2b);
     --color-brand-100: color-mix(in srgb, var(--acento-600, #1f3eee) 26%, #131a2b);
@@ -407,3 +418,12 @@ html[data-tema="oscuro"] {
   --cs-acento-suave: var(--color-slate-100);
   --cs-acento-texto: var(--color-brand-300);
 }
+
+/* Mapa de activos (Leaflet): el globo de cada punto y el número de un grupo siguen el tema. */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--ink); }
+.leaflet-popup-content a { color: inherit; }
+.leaflet-tooltip.mapa-grupo {
+  background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 700; font-size: 0.75rem;
+  text-shadow: 0 0 3px rgba(0,0,0,0.6);
+}
+.leaflet-tooltip.mapa-grupo::before { display: none; }
