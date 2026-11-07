@@ -120,6 +120,8 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Mover y acercar el mapa; los activos de la zona visible se cargan solos",
       "Elegir qué colorea el mapa: el estado de este momento, la cantidad de fallas, el costo de mantenimiento o las horas de paro, en los últimos 30, 90 o 365 días",
+      "Cambiar el fondo del mapa (calles, claro, oscuro o satélite) con «Fondo»",
+      "Elegir cómo se ve con «Ver como»: puntos, mapa de calor (zonas con más fallas, costo, paros o equipos parados), lista (tabla con los mismos filtros) o por circuito (une los equipos de cada circuito y resume cada uno)",
       "Filtrar por sitio, categoría o estado",
       "Tocar un punto para abrir la ficha del activo",
       "Usar «Pantalla completa» para ver el mapa más grande; Esc (o «Salir») regresa a la vista normal",
@@ -128,15 +130,18 @@ export const AYUDA: Record<string, FichaAyuda> = {
       "Por omisión el color es el estado de este momento: el más grave entre el estado registrado y lo que pasa ahora. Un paro abierto lo marca fuera de servicio y una orden de falla abierta, degradado; el globo del punto dice por qué.",
       "En las capas de fallas, costo y paros, el color y el tamaño van de menos a más sobre el valor más alto de toda la empresa; los activos sin nada salen en gris. La capa de costo solo la ve quien ya ve costos.",
       "Cuando hay muchos activos en la zona se agrupan en círculos con su cantidad; el aro del círculo marca el estado más grave que contiene (rojo si hay alguno fuera de servicio). Tocarlo acerca el mapa.",
+      "La vista y el fondo que elija se recuerdan en ese navegador. La lista y la vista por circuito necesitan ver los equipos uno por uno: con demasiados en la zona piden acercar o filtrar.",
+      "«Por circuito» usa el equipo padre del catálogo (el circuito o el tablero del que cuelga cada luminaria). Un equipo sin padre sale como «Sin equipo padre». La lista muestra los equipos de la zona que miraba el mapa.",
       "Solo aparecen los activos que tienen coordenadas. Debajo del mapa se dice cuántos no las tienen.",
       "Las coordenadas se capturan en la ficha del activo, o con las columnas latitud y longitud al importar.",
     ],
     noPuedo: [
       { sintoma: "Un activo no aparece en el mapa", porque: "No tiene coordenadas, o está dado de baja. Abra su ficha y capture latitud y longitud." },
+      { sintoma: "La vista «Lista» o «Por circuito» dice que hay demasiados equipos", porque: "Se listan solo cuando caben en la zona (hasta 1,500). Acerque el mapa o filtre por sitio, categoría o estado." },
       { sintoma: "Los puntos caen en otro país", porque: "Latitud y longitud suelen ir invertidas, o la longitud sin su signo negativo. En México la longitud es negativa (por ejemplo -100.25)." },
     ],
     preguntas: [
-      { pregunta: "¿Qué ve quien provee el mapa de fondo?", respuesta: "La dirección de red de quien abre el mapa y la zona que mira. Nunca los datos de los activos." },
+      { pregunta: "¿Qué ve quien provee el mapa de fondo?", respuesta: "La dirección de red de quien abre el mapa y la zona que mira. Nunca los datos de los activos. Cada fondo (calles, claro, oscuro, satélite) es de un proveedor distinto, y solo se le pide al que se elige." },
     ],
   },
 
