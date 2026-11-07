@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { referenciaInicial, registrarLectura, tipoPorUnidad, validarLectura } from "./medidores";
 import { medianocheEnZona } from "./periodos";
 import * as N from "./normalizar";
+import { dentroDeMexico } from "./geografia";
 
 /**
  * Qué se puede importar desde CSV y cómo se convierte cada renglón.
@@ -365,6 +366,8 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       { nombre: "costo_adquisicion", ejemplo: "95000" },
       { nombre: "costo_reposicion", ejemplo: "130000" },
       { nombre: "fin_garantia", ejemplo: "29/04/2026", ayuda: "dd/mm/aaaa" },
+      { nombre: "latitud", ejemplo: "25.6772", ayuda: "Grados decimales con punto. Va junto con la longitud" },
+      { nombre: "longitud", ejemplo: "-100.2594", ayuda: "Grados decimales con punto; en México es negativa" },
     ],
     contexto: async (orgId) => {
       const ubicaciones = await prisma.location.findMany({
@@ -401,8 +404,19 @@ export const IMPORTACIONES: Record<ClaveImportacion, DefinicionImportacion> = {
       if (!locationId) r.aviso("ubicacion", "Sin ubicación: el técnico no sabrá dónde encontrarlo, y la puesta en marcha lo marcará incompleto", "Agregue la columna «ubicacion» con el código del área");
 
       const serieNum = N.serie(f.numero_serie) || null;
+      const vLat = N.numero(f.latitud, { campo: "La latitud" });
+      const vLon = N.numero(f.longitud, { campo: "La longitud" });
+      const latitud = r.valor("latitud", vLat, null);
+      const longitud = r.valor("longitud", vLon, null);
+      if (latitud !== null && Math.abs(latitud) > 90) r.falla("latitud", `Latitud «${f.latitud}» fuera de rango`, "Va entre -90 y 90");
+      if (longitud !== null && Math.abs(longitud) > 180) r.falla("longitud", `Longitud «${f.longitud}» fuera de rango`, "Va entre -180 y 180");
+      // Si una no se pudo leer, ya se dijo por que; no se repite como «falta una».
+      if (vLat.ok && vLon.ok && (latitud === null) !== (longitud === null)) r.falla(latitud === null ? "latitud" : "longitud", "Falta una de las dos coordenadas", "Capture latitud y longitud juntas, o ninguna");
+      if (latitud !== null && longitud !== null && Math.abs(latitud) <= 90 && Math.abs(longitud) <= 180 && !dentroDeMexico(latitud, longitud)) {
+        r.aviso("longitud", "Las coordenadas caen fuera de México; ¿están invertidas (longitud primero)?", "Latitud ≈ 25, longitud ≈ -100 para Monterrey");
+      }
       return r.resultado(code, nombre || code, {
-        code, name: nombre, siteId, locationId, categoryId, centroDeCostoId,
+        code, name: nombre, siteId, locationId, categoryId, centroDeCostoId, latitud, longitud,
         criticality: criticidad, status: estado,
         manufacturer: r.opcional("fabricante", 80),
         model: r.opcional("modelo", 80),

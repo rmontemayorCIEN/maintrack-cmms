@@ -15,6 +15,7 @@ export type ActivoEditable = {
   detieneLinea: boolean | null;
   purchaseDate: string | null; warrantyExpiry: string | null;
   purchaseCost: number; replacementCost: number;
+  latitud: number | null; longitud: number | null;
 };
 
 export function AssetDialog({
@@ -75,6 +76,8 @@ export function AssetDialog({
     purchaseCost: String(activo?.purchaseCost ?? 0),
     replacementCost: String(activo?.replacementCost ?? 0),
     warrantyExpiry: activo?.warrantyExpiry?.slice(0, 10) ?? "",
+    latitud: activo?.latitud != null ? String(activo.latitud) : "",
+    longitud: activo?.longitud != null ? String(activo.longitud) : "",
   });
 
   const siteLocations = useMemo(
@@ -99,6 +102,9 @@ export function AssetDialog({
         replacementCost: Number(form.replacementCost),
         purchaseDate: form.purchaseDate || null,
         warrantyExpiry: form.warrantyExpiry || null,
+        // Vacio es «nadie la ha capturado», no 0: viaja como null.
+        latitud: form.latitud.trim() ? Number(form.latitud.trim()) : null,
+        longitud: form.longitud.trim() ? Number(form.longitud.trim()) : null,
         locationId: form.locationId || null,
         categoryId: form.categoryId || null,
         centroDeCostoId: form.centroDeCostoId || null,
@@ -279,6 +285,19 @@ export function AssetDialog({
           <div>
             <label className="label">Número de serie</label>
             <input className="field" value={form.serialNumber} onChange={(e) => set("serialNumber", e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Coordenadas en el mapa (opcional)</label>
+            <div className="grid grid-cols-2 gap-3">
+              <input className="field" inputMode="decimal" placeholder="Latitud, ej. 25.6772" aria-label="Latitud"
+                value={form.latitud} onChange={(e) => set("latitud", e.target.value)} />
+              <input className="field" inputMode="decimal" placeholder="Longitud, ej. -100.2594" aria-label="Longitud"
+                value={form.longitud} onChange={(e) => set("longitud", e.target.value)} />
+            </div>
+            <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
+              Con punto decimal. En México la longitud es negativa. Útil para lo que está en la calle y se cuenta por
+              miles, como luminarias o hidrantes. Van las dos o ninguna.
+            </p>
           </div>
           <div>
             <label className="label">Estado</label>

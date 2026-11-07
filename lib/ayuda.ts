@@ -114,6 +114,29 @@ export const AYUDA: Record<string, FichaAyuda> = {
     ],
   },
 
+  "/assets/mapa": {
+    titulo: "Mapa de activos",
+    que: "Ver dónde está cada equipo en un mapa y en qué estado se encuentra.",
+    hacer: [
+      "Mover y acercar el mapa; los activos de la zona visible se cargan solos",
+      "Filtrar por sitio, categoría o estado",
+      "Tocar un punto para abrir la ficha del activo",
+    ],
+    flujo: [
+      "El color del punto es el estado del activo: operativo, degradado, fuera de servicio o en reserva.",
+      "Cuando hay muchos activos en la zona se agrupan en círculos con su cantidad; el aro del círculo marca el estado más grave que contiene (rojo si hay alguno fuera de servicio). Tocarlo acerca el mapa.",
+      "Solo aparecen los activos que tienen coordenadas. Debajo del mapa se dice cuántos no las tienen.",
+      "Las coordenadas se capturan en la ficha del activo, o con las columnas latitud y longitud al importar.",
+    ],
+    noPuedo: [
+      { sintoma: "Un activo no aparece en el mapa", porque: "No tiene coordenadas, o está dado de baja. Abra su ficha y capture latitud y longitud." },
+      { sintoma: "Los puntos caen en otro país", porque: "Latitud y longitud suelen ir invertidas, o la longitud sin su signo negativo. En México la longitud es negativa (por ejemplo -100.25)." },
+    ],
+    preguntas: [
+      { pregunta: "¿Qué ve quien provee el mapa de fondo?", respuesta: "La dirección de red de quien abre el mapa y la zona que mira. Nunca los datos de los activos." },
+    ],
+  },
+
   "/assets/levantamiento": {
     titulo: "Levantamiento de inventario asistido",
     que: "Levantar el inventario de equipos a partir de una descripción de la instalación y fotos de las áreas.",

@@ -358,6 +358,7 @@ const SUBPANTALLAS: ItemMenu[] = [
 
   // Dentro de Activos y de Planes.
   { href: "/assets/levantamiento", etiqueta: "Levantamiento de inventario", icono: "levantamiento" },
+  { href: "/assets/mapa", etiqueta: "Mapa de activos", icono: "activos" },
   { href: "/plans/cobertura", etiqueta: "Equipos y sus planes", icono: "cobertura" },
 
   // Dentro de Puntos de reporte.

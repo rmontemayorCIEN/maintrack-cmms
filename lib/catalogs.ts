@@ -1,5 +1,6 @@
 import { z } from "./zod";
 import { OPCIONES_DE_FAMILIA } from "./causas";
+import { latitudZod, longitudZod } from "./geografia";
 import { prisma } from "./db";
 
 /**
@@ -95,8 +96,8 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       name: texto(2),
       city: texto(0, 80).optional().nullable(),
       address: texto(0, 200).optional().nullable(),
-      latitud: z.coerce.number().min(-90).max(90).optional().nullable(),
-      longitud: z.coerce.number().min(-180).max(180).optional().nullable(),
+      latitud: latitudZod.optional().nullable(),
+      longitud: longitudZod.optional().nullable(),
       notasAcceso: texto(0, 600).optional().nullable(),
     }),
     editar: z.object({
@@ -104,8 +105,8 @@ export const CATALOGOS: Record<ClaveCatalogo, DefinicionCatalogo> = {
       name: texto(2).optional(),
       city: texto(0, 80).nullable().optional(),
       address: texto(0, 200).nullable().optional(),
-      latitud: z.coerce.number().min(-90).max(90).nullable().optional(),
-      longitud: z.coerce.number().min(-180).max(180).nullable().optional(),
+      latitud: latitudZod.nullable().optional(),
+      longitud: longitudZod.nullable().optional(),
       notasAcceso: texto(0, 600).nullable().optional(),
     }),
     listar: (orgId) =>

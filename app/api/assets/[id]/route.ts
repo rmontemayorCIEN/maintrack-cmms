@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fail, ok, parseDate, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { validarFechasDeActivo } from "@/lib/calidad-datos";
+import { errorDeParDeCoordenadas, latitudZod, longitudZod } from "@/lib/geografia";
 
 const schema = z.object({
   name: z.string().min(2).optional(),
@@ -13,6 +14,8 @@ const schema = z.object({
   manufacturer: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   serialNumber: z.string().nullable().optional(),
+  latitud: latitudZod.nullable().optional(),
+  longitud: longitudZod.nullable().optional(),
   criticality: z.enum(["A", "B", "C"]).optional(),
   detieneLinea: z.boolean().nullable().optional(),
   // "Este equipo va solo" es una DECISION, no un pendiente. Sin ella, un
@@ -44,6 +47,12 @@ export async function PATCH(request: Request, { params }: Params) {
       commissionedAt: existing.commissionedAt,
     });
     if (errorDeFechas) return fail(errorDeFechas, 422);
+    // Igual que las fechas: se valida lo que quedaria guardado, no solo lo que llega.
+    const errorDeCoordenadas = errorDeParDeCoordenadas(
+      input.latitud !== undefined ? input.latitud : existing.latitud,
+      input.longitud !== undefined ? input.longitud : existing.longitud,
+    );
+    if (errorDeCoordenadas) return fail(errorDeCoordenadas, 422);
     const asset = await prisma.asset.update({ where: { id }, data });
     await logAudit({
       organizationId: orgId,

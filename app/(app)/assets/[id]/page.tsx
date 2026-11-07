@@ -8,7 +8,7 @@ import { filtroDeFalla } from "@/lib/fallas";
 import Link from "next/link";
 import { LectorPlaca } from "./lector-placa";
 import { iaConfigurada } from "@/lib/ia/cliente";
-import { enlaceMapa } from "@/lib/geografia";
+import { enlaceDePunto, enlaceMapa } from "@/lib/geografia";
 import { iaDeLaOrganizacion } from "@/lib/planes";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin } from "lucide-react";
@@ -240,6 +240,8 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                   purchaseCost: asset.purchaseCost,
                   replacementCost: asset.replacementCost,
                   detieneLinea: asset.detieneLinea,
+                  latitud: asset.latitud,
+                  longitud: asset.longitud,
                 }}
               />
             ) : null}
@@ -364,6 +366,18 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
                 ) : null;
               })()}
             </Row>
+            {(() => {
+              const punto = enlaceDePunto(asset.latitud, asset.longitud);
+              return punto ? (
+                <Row label="Coordenadas">
+                  {asset.latitud}, {asset.longitud}
+                  <a href={punto} target="_blank" rel="noreferrer"
+                    className="ml-1.5 inline-flex items-center gap-0.5 text-[0.6875rem] font-medium text-brand-600 hover:underline">
+                    <MapPin className="h-3 w-3" /> ver en el mapa
+                  </a>
+                </Row>
+              ) : null;
+            })()}
             <Row label="Fabricante">{asset.manufacturer ?? "—"}</Row>
             <Row label="Modelo">{asset.model ?? "—"}</Row>
             <Row label="Número de serie">{asset.serialNumber ?? "—"}</Row>
