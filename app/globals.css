@@ -46,6 +46,11 @@
   --mapa-fuera: #dc2626;
   --mapa-reserva: #64748b;
   --mapa-grupo: #1d4ed8;
+  /* Capas numéricas del mapa: una sola tinta, de poco a mucho. */
+  --mapa-escala-1: #c4b5fd;
+  --mapa-escala-2: #8b5cf6;
+  --mapa-escala-3: #6d28d9;
+  --mapa-escala-4: #3b0764;
 }
 
 /*
@@ -99,6 +104,10 @@ html:root {
     --mapa-fuera: #f87171;
     --mapa-reserva: #94a0bb;
     --mapa-grupo: #3b82f6;
+    --mapa-escala-1: #ddd6fe;
+    --mapa-escala-2: #a78bfa;
+    --mapa-escala-3: #8b5cf6;
+    --mapa-escala-4: #6d28d9;
     /* Los tintes claros de la marca se vuelven tintes oscuros de la marca. */
     --color-brand-50: color-mix(in srgb, var(--acento-600, #1f3eee) 16%, #131a2b);
     --color-brand-100: color-mix(in srgb, var(--acento-600, #1f3eee) 26%, #131a2b);

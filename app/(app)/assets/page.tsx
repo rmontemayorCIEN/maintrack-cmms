@@ -1,4 +1,4 @@
-import { MapPin, Wand2 } from "lucide-react";
+import { Wand2 } from "lucide-react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -130,14 +130,7 @@ export default async function AssetsPage({
           ? `Equipos de ${areaFiltrada.name}. Criticidad, estado operativo y valor de reposición.`
           : "Jerarquia de equipos con criticidad, estado operativo y valor de reposición."}
         actions={
-          <>
-            <Link
-              href="/assets/mapa"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <MapPin className="h-3.5 w-3.5" /> Ver mapa
-            </Link>
-            {can(user.role, "asset:write") ? (
+          can(user.role, "asset:write") ? (
             <>
               <Link
                 href="/assets/levantamiento"
@@ -154,8 +147,7 @@ export default async function AssetsPage({
                 puedeGestionarCatalogos={can(user.role, "settings:write")}
               />
             </>
-            ) : null}
-          </>
+          ) : null
         }
       />
 
