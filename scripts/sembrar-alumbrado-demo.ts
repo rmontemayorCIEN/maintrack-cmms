@@ -129,7 +129,9 @@ async function main() {
 
   const contrasena = process.env.DEMO_CONTRASENA || `Demo-${randomBytes(4).toString("hex")}`;
   const org = await prisma.organization.create({
-    data: { name: "Alumbrado Público (ejemplo)", slug: SLUG, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey" },
+    // cuentaInterna: sale de la cobranza y de las cifras del negocio, y funciona igual que cualquier otra.
+    // No esDemo: eso ofrece «Restaurar», que borraría las luminarias.
+    data: { name: "Alumbrado Público (ejemplo)", slug: SLUG, plan: "ENTERPRISE", status: "ACTIVE", timezone: "America/Monterrey", cuentaInterna: true },
   });
   const correo = `director@${SLUG}.mx`;
   const usuario = await prisma.user.create({
