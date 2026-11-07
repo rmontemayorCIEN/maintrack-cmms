@@ -5,6 +5,7 @@ import { verificarCupo } from "@/lib/planes";
 import { validarFechasDeActivo } from "@/lib/calidad-datos";
 import { logAudit } from "@/lib/audit";
 import { contiene } from "@/lib/busqueda-texto";
+import { errorDeParDeCoordenadas, latitudZod, longitudZod } from "@/lib/geografia";
 
 const schema = z.object({
   code: z.string().min(1),
@@ -18,6 +19,8 @@ const schema = z.object({
   manufacturer: z.string().optional().nullable(),
   model: z.string().optional().nullable(),
   serialNumber: z.string().optional().nullable(),
+  latitud: latitudZod.optional().nullable(),
+  longitud: longitudZod.optional().nullable(),
   criticality: z.enum(["A", "B", "C"]).default("B"),
   /** Nulo = nadie lo ha dicho. Ver el comentario del campo en el esquema. */
   detieneLinea: z.boolean().nullable().optional(),
@@ -64,6 +67,8 @@ export async function POST(request: Request) {
       warrantyExpiry: parseDate(input.warrantyExpiry),
     });
     if (errorDeFechas) return fail(errorDeFechas, 422);
+    const errorDeCoordenadas = errorDeParDeCoordenadas(input.latitud, input.longitud);
+    if (errorDeCoordenadas) return fail(errorDeCoordenadas, 422);
     const asset = await prisma.asset.create({
       data: {
         ...input,

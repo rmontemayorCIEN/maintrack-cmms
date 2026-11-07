@@ -805,6 +805,12 @@ model Asset {
   iaRecurrencia   String?
   iaRecurrenciaEl DateTime?
   imageUrl        String?
+  /// Donde esta el equipo en el mapa. Para lo que se cuenta por miles y vive
+  /// en la calle —luminarias, hidrantes, semaforos— la ubicacion es lo que lo
+  /// distingue de su vecino. Ambas o ninguna. Nulas significa que nadie las
+  /// ha capturado, no que este en 0,0.
+  latitud         Float?
+  longitud        Float?
   qrToken         String    @unique @default(cuid())
   specsJson       String    @default("{}")
   active          Boolean   @default(true)

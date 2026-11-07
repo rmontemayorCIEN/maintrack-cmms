@@ -18,6 +18,8 @@
  * no sabe no debe adivinarlo.
  */
 
+import { z } from "zod";
+
 export type SitioUbicado = {
   name: string;
   city?: string | null;
@@ -35,6 +37,27 @@ export function enlaceMapa(sitio: SitioUbicado): string | null {
   }
   const texto = [sitio.address, sitio.city, sitio.country].filter(Boolean).join(", ");
   return texto ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(texto)}` : null;
+}
+
+/** Rango geografico de Mexico, holgado. Fuera de el, casi siempre es un dato mal capturado. */
+const MEXICO = { latMin: 14, latMax: 33, lonMin: -119, lonMax: -86 };
+
+export function dentroDeMexico(latitud: number, longitud: number) {
+  return latitud >= MEXICO.latMin && latitud <= MEXICO.latMax && longitud >= MEXICO.lonMin && longitud <= MEXICO.lonMax;
+}
+
+/** Latitud y longitud validas. Un solo lugar para que activos, sitios y la importacion digan lo mismo. */
+export const latitudZod = z.coerce.number().min(-90).max(90);
+export const longitudZod = z.coerce.number().min(-180).max(180);
+
+/** Latitud y longitud van juntas o no van. Devuelve el motivo si una sola viene capturada. */
+export function errorDeParDeCoordenadas(latitud: number | null | undefined, longitud: number | null | undefined): string | null {
+  return (latitud == null) !== (longitud == null) ? "Capture latitud y longitud juntas, o ninguna" : null;
+}
+
+/** Enlace al mapa de un punto exacto (un activo), sin caer a la direccion como hace el de un sitio. */
+export function enlaceDePunto(latitud: number | null | undefined, longitud: number | null | undefined): string | null {
+  return latitud != null && longitud != null ? `https://www.google.com/maps/search/?api=1&query=${latitud},${longitud}` : null;
 }
 
 export function tieneUbicacion(sitio: SitioUbicado) {
