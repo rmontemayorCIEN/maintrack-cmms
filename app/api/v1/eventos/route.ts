@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { conCredencial, ErrorApi } from "@/lib/integraciones/api";
 import { crearSolicitudExterna, registrarCondicionExterna, registrarLecturaExterna } from "@/lib/integraciones/entrada";
 

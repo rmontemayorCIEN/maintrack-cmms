@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";
 import { COMPLEMENTO_IA, PLANES, nombreSolicitado, planDe, type ClavePlan, ORDEN_PLANES } from "@/lib/planes";

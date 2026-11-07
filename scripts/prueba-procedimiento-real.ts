@@ -6,7 +6,7 @@
  * aplicador, que es donde murieron los cuatro intentos anteriores. No escribe
  * nada en la orden; solo genera y valida.
  */
-import { z } from "zod";
+import { z } from "../lib/zod";
 import { prisma } from "../lib/db";
 import { generarProcedimiento } from "../lib/ia/procedimiento";
 

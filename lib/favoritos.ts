@@ -40,6 +40,7 @@ export type OpcionesDeAcceso = {
   esDemo?: boolean;
   registrosPropios?: boolean;
   cumplimientoNormas?: boolean;
+  consultorActivo?: boolean;
 };
 
 /** Las pantallas FIJAS que esta persona puede anclar. */
@@ -50,7 +51,8 @@ export function pantallasAnclables(rol: string | undefined, opciones: OpcionesDe
   return pantallasDelMenu().filter(
     (i) => puedeVerRuta(rol, i.href, opciones)
       && (!i.requiereRegistros || opciones.registrosPropios)
-      && (!i.requiereNormas || opciones.cumplimientoNormas),
+      && (!i.requiereNormas || opciones.cumplimientoNormas)
+      && (!i.requiereConsultor || opciones.consultorActivo),
   );
 }
 

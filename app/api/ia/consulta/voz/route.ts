@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { withVista } from "@/lib/api";
 import { paraDecir, sintetizar } from "@/lib/voz";
 

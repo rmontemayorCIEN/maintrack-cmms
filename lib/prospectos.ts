@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { z } from "./zod";
 import { prisma } from "./db";
 import { consumirLimite } from "./integraciones/limites";
 import { notify } from "./audit";
@@ -30,7 +30,7 @@ export const esquemaProspecto = z.object({
   problema: z.string().trim().max(1000, "Máximo 1000 caracteres").optional().or(z.literal("")),
   planInteres: z.enum(["PROFESSIONAL", "ENTERPRISE"]).optional().or(z.literal("")),
   origen: z.string().trim().max(40).regex(/^[\w.-]*$/).optional().or(z.literal("")),
-  aceptaPrivacidad: z.literal(true, { errorMap: () => ({ message: "Para enviar hay que aceptar el aviso de privacidad" }) }),
+  aceptaPrivacidad: z.literal(true, { error: "Para enviar hay que aceptar el aviso de privacidad" }),
   /** Campo trampa: invisible para una persona; los robots lo llenan. */
   sitioWeb: z.string().max(0).optional().or(z.literal("")),
 });

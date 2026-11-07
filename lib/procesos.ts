@@ -110,13 +110,14 @@ export const PROCESOS_VIGILADOS: Array<{ clave: string; nombre: string; cadaMinu
  * si lleva tanto sin correr que algo debe estar roto.
  *
  * El margen es de tres veces su periodo antes de darlo por callado: un
- * reintento o un arranque en frio no deben encender una alarma.
+ * reintento o un arranque en frio no deben encender una alarma. *
+ * `momento` es el «ahora» contra el que se mide; las pruebas lo fijan.
  */
-export async function estadoDeProcesos() {
+export async function estadoDeProcesos(momento: Date = new Date()) {
   const filas = await prisma.procesoProgramado.findMany({
     where: { clave: { in: PROCESOS_VIGILADOS.map((p) => p.clave) } },
   });
-  const ahora = Date.now();
+  const ahora = momento.getTime();
   return PROCESOS_VIGILADOS.map((p) => {
     const fila = filas.find((f) => f.clave === p.clave);
     const desdeMinutos = fila?.ultimoFin ? Math.round((ahora - fila.ultimoFin.getTime()) / 60_000) : null;

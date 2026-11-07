@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../../lib/zod";
 import { diaLocal } from "@/lib/utils";
 import { fail, ok, withAuth, withVista } from "@/lib/api";
 import { ErrorDeFechas, corregirFechas, fechasDeAsignacion } from "@/lib/calendario-actividad";

@@ -492,7 +492,7 @@ async function main() {
     revisar("la plantilla de Excel se descarga como .xlsx", plantilla.ok && /spreadsheetml/.test(plantilla.headers.get("content-type") ?? "") && bytes.subarray(0, 2).toString() === "PK");
 
     const operador = await prisma.user.create({
-      data: { organizationId: org.id, email: `op-${sello}@t.mx`, name: "Operador", role: "OWNER", isSuperAdmin: true, passwordHash: "x" },
+      data: { organizationId: org.id, email: `op-${sello}@t.mx`, name: "Operador", role: "OWNER", isSuperAdmin: true, passwordHash: "x", totpActivoEn: new Date() /* opera con segundo factor */ },
     });
     const cOp = await firmar(operador);
     const sinModo = await pedir("POST", "/api/admin/organizations", cOp, {

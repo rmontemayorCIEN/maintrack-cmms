@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeCompra, elegirCotizacion, emitirOrdenDeCompra, registrarCotizacion } from "@/lib/compras";
 import { logAudit } from "@/lib/audit";

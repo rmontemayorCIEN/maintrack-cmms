@@ -21,7 +21,7 @@ import bcrypt from "bcryptjs";
 import type { ChildProcess } from "node:child_process";
 import { prisma } from "../lib/db";
 import { apagarServidor, colaDelLog, levantarServidor } from "./servidor-de-prueba";
-import { entrar, esperarServidor, fotoDeLasDemas } from "./apoyo-pruebas";
+import { activarSegundoFactorDePrueba, entrar, esperarServidor, fotoDeLasDemas } from "./apoyo-pruebas";
 import { lectura, EscrituraRechazada } from "../lib/mcp/lectura";
 import { destinoSeguro } from "../lib/mcp/destino";
 import { buscarEnAyuda } from "../lib/mcp/documentacion";
@@ -97,6 +97,8 @@ async function main() {
   // Una cuenta interna del operador: activa y pagando en apariencia, pero no es cliente.
   const interna = await prisma.organization.create({ data: { name: `Interna ${sello}`, slug: `in-${sello}`, status: "ACTIVE", cuentaInterna: true } });
   const operador = await prisma.user.create({ data: { organizationId: propia.id, email: `op-${sello}@prueba.mx`, name: "Operador", role: "OWNER", passwordHash: hash, isSuperAdmin: true } });
+  // El operador opera con segundo factor (ISO 27001, 8.5); entrar() da el codigo.
+  await activarSegundoFactorDePrueba(operador);
   const dueno = await prisma.user.create({ data: { organizationId: cliente.id, email: `dueno-${sello}@prueba.mx`, name: "Dueño", role: "OWNER", passwordHash: hash } });
   // Uso de IA con las tres unidades que conviven en la tabla.
   await prisma.aiUsage.createMany({ data: [

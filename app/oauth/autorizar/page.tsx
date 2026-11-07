@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { MARCA } from "@/lib/comercial";
 import { CAMPOS_AUTORIZACION, leerAutorizacion, origenDe, validarAutorizacion } from "@/lib/mcp/oauth";
 import { HERRAMIENTAS } from "@/lib/mcp/herramientas";
+import { tieneSegundoFactor } from "@/lib/segundo-factor";
 
 export const metadata = { title: "Autorizar agente de IA" };
 export const dynamic = "force-dynamic";
@@ -39,6 +40,16 @@ export default async function AutorizarPage({ searchParams }: { searchParams: Pr
   const user = await getCurrentUser();
   if (!user) redirect(`/login?siguiente=${encodeURIComponent(`/oauth/autorizar?${params.toString()}`)}`);
 
+  if (user.isSuperAdmin && !tieneSegundoFactor(user)) {
+    return (
+      <Marco>
+        <Aviso
+          titulo="Active su segundo factor antes de conectar"
+          texto="El conector entra a las cifras de todas las empresas. Active su segundo factor en Configuración → Seguridad y sesiones y vuelva a intentar desde Claude."
+        />
+      </Marco>
+    );
+  }
   if (!user.isSuperAdmin) {
     return (
       <Marco>

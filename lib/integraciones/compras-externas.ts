@@ -30,7 +30,7 @@
  * integración que solo confirma folios de orden de compra no tiene por qué ver
  * los precios de nadie.
  */
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { ESTADOS_COMPRA, type EstadoCompra } from "../estados-compra";
 import { ErrorDeCompra, enCompra, recibir } from "../compras";

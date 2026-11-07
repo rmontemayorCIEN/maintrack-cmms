@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { avisarCambioDeUsuario } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";
 import { fail, ok, withAuth } from "@/lib/api";

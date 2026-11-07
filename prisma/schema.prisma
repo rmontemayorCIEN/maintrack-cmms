@@ -195,6 +195,9 @@ model Organization {
   /// si se enciende otra vez. Quien se dio de baja no tiene por que volver a
   /// hacer el tramite en el telefono por una decision de la empresa.
   avisosPush         Boolean   @default(false)
+  /// El Consultor del Sistema (consultor/ y lib/consultor/): lo enciende quien
+  /// administra. Apagado de fabrica: gasta IA. Apagarlo no borra sus notas.
+  consultorActivo    Boolean   @default(false)
   /// Complemento "IA Avanzada" contratado sobre el plan.
   iaComplemento      Boolean   @default(false)
   /// Operaciones de IA sueltas compradas fuera del plan, del periodo en curso.
@@ -313,6 +316,9 @@ model Organization {
   fotosDeConstruccion FotoDeConstruccion[]
   amarresCumplimiento AmarreDeCumplimiento[]
   favoritos          PantallaFavorita[]
+  consultorEstados   ConsultorEstado[]
+  consultorNotas     ConsultorNota[]
+  consultorMensajes  ConsultorMensaje[]
   stockMovements     StockMovement[]
   suppliers          Supplier[]
   teams              Team[]
@@ -388,6 +394,16 @@ model User {
   /// o al cerrar sesion en todos lados se pone «ahora», y toda sesion emitida
   /// antes deja de servir en la siguiente peticion. Nula = valen todas.
   sessionsValidFrom DateTime?
+  /// Segundo factor (TOTP), obligatorio para el operador de la plataforma
+  /// (ISO 27001, 8.5). El secreto va CIFRADO (lib/segundo-factor.ts); nulo
+  /// hasta que se empieza a dar de alta.
+  totpSecreto       String?
+  /// Cuando se confirmo con un codigo. Nulo = no esta activo.
+  totpActivoEn      DateTime?
+  /// El ultimo paso de 30 s aceptado: el mismo codigo no sirve dos veces.
+  totpUltimoPaso    Int?
+  /// Huellas SHA-256 de los codigos de respaldo sin usar, en JSON.
+  totpRespaldos     String?
   /// NORMAL | GRANDE | MAYOR
   escalaUi          String    @default("NORMAL")
   /// COMPACTA | COMODA | AMPLIA
@@ -4599,4 +4615,62 @@ model FotoDeConstruccion {
 
   @@unique([organizationId, semana])
   @@index([organizationId])
+}
+
+/// El Consultor del Sistema: donde se quedo cada persona. El avance NO se
+/// guarda: es el de la puesta en marcha, calculado cada vez.
+model ConsultorEstado {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  /// La clave del ultimo paso del plan que se trabajo con el Consultor.
+  pasoActual     String?
+  /// Resumen corto de la ultima conversacion, para retomarla.
+  resumen        String    @default("")
+  ultimaVez      DateTime?
+  actualizadoEn  DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+/// Lo que el Consultor recuerda de la empresa (metas, fecha meta, quien lo
+/// usa). Lo propone la IA y lo confirma la persona. Se apaga, no se borra; se
+/// va con la empresa. Nunca datos personales.
+model ConsultorNota {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  /// META | FECHA | NECESIDAD | EQUIPO | COMPROMISO
+  tipo           String
+  texto          String
+  activa         Boolean   @default(true)
+  creadaEn       DateTime  @default(now())
+  apagadaEn      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, activa])
+}
+
+/// La conversacion con el Consultor, ya sin datos personales. Es de cada
+/// persona y se borra a los 180 dias (/api/cron/consultor, Cloud Scheduler).
+model ConsultorMensaje {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  /// USUARIO | CONSULTOR
+  de             String
+  texto          String
+  /// La clase que le dio el Consultor a la pregunta (en la respuesta).
+  clase          String?
+  /// JSON {href, texto} del enlace de la respuesta, si trae.
+  enlace         String?
+  creadoEn       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, creadoEn])
+  @@index([creadoEn])
 }

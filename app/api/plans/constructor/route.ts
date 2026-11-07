@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { ok, fail, withAuth } from "@/lib/api";
 import { logAudit } from "@/lib/audit";
 import { constructorDePlanes, fijarMetaDePlanes, ErrorDeMeta } from "@/lib/constructor-planes";

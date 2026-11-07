@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { ROLES_ASIGNABLES } from "@/lib/constants";
 import { avisarAltaDeUsuario } from "@/lib/avisos/cuenta";
 import { prisma } from "@/lib/db";

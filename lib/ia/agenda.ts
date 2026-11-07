@@ -8,7 +8,7 @@
  * orden conviene atacarlo.
  */
 import { createHash } from "node:crypto";
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { cargaPorDia, esHabil, jornada } from "../agenda";
 import { analizarConIa, textoIa } from "./cliente";

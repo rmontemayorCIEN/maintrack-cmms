@@ -136,6 +136,13 @@ Registradas en `lib/ia/funciones.ts`. Todas entran por `analizarConIa()` o
 `conversarConIa()` en `lib/ia/cliente.ts`, que resuelve modelo, salida
 estructurada, y **registra el consumo** (tokens y costo, exito o fallo).
 
+El **Consultor del Sistema** (`/consultor`) vive en `consultor/`, copia de
+`~/Proyectos/consultor-sistema`: los cambios se hacen alla y se traen con
+`npm run copiar -- <esta carpeta>` desde ese repositorio; `scripts/prueba-consultor.ts`
+detiene la suite si la copia se edito a mano. Aqui va su adaptador
+(`lib/consultor/`): el plan es la puesta en marcha con su mismo porcentaje, y
+su funcion de IA es `CONSULTOR`, con bolsa propia.
+
 Cuando algo de IA falle, el detalle esta en la tabla `AiUsage`, columna `error`.
 `scripts/ultimo-error-ia.ts` lo saca. **Leelo antes de suponer la causa.**
 

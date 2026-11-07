@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok } from "@/lib/api";
 import { ErrorDeAcceso, revisarRestablecimiento, usarRestablecimiento } from "@/lib/acceso";
 

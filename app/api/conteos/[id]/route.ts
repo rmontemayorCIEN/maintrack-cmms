@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { ErrorDeAlmacen } from "@/lib/almacen";
 import { ErrorDeConteo, cancelarConteo, capturarConteo, cerrarConteo } from "@/lib/conteos";

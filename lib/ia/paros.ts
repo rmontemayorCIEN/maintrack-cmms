@@ -1,6 +1,6 @@
 import { zonaDeLaEmpresa } from "../indicadores";
 import { claveDiaEnZona } from "../periodos";
-import { z } from "zod";
+import { z } from "../zod";
 import { prisma } from "../db";
 import { analizarConIa, textoIa } from "./cliente";
 import { puedeUsarIa, type OrgConIa } from "./consumo";

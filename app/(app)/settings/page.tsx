@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PanelAtajos } from "./atajos";
 import { nombreDelMapa, terminoConjunto } from "@/lib/instalaciones";
 import { favoritosDe, gruposParaAnclar } from "@/lib/favoritos";
-import { BellRing, Building2, CalendarClock, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
+import { BellRing, Building2, CalendarClock, Compass, CreditCard, History, Library, Palette, Plug, Receipt, ShieldCheck, Star, UserCog, Users, ClipboardList } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/rbac";
@@ -35,6 +35,8 @@ import { ConfiguracionOrdenes } from "./ordenes";
 import { ContextoDelNegocio } from "./contexto";
 import { contextoEnvejecido, PREGUNTAS, type ClavePregunta } from "@/lib/contexto-negocio";
 import { PanelAvisos } from "./avisos";
+import { PanelConsultorAjustes } from "./consultor";
+import { iaConfigurada } from "@/lib/ia/cliente";
 import { ConfigDeAvisos } from "./avisos-config";
 import { PanelIntegracion } from "./integracion";
 import { PanelSeguridad } from "./seguridad";
@@ -42,11 +44,12 @@ import { ReferenciaDeRoles } from "./referencia-roles";
 import { FiltrosBitacora } from "./filtros-bitacora";
 import { consultarBitacora, hayFiltro, TOPE_BITACORA } from "@/lib/bitacora";
 import { ZONA_POR_OMISION } from "@/lib/periodos";
+import { exigeSegundoFactor, respaldosRestantes, tieneSegundoFactor } from "@/lib/segundo-factor";
 
 export const metadata = { title: "Configuración" };
 export const dynamic = "force-dynamic";
 
-const SECCIONES = ["cuenta", "apariencia", "atajos", "organizacion", "jornada", "ordenes", "avisos", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
+const SECCIONES = ["cuenta", "apariencia", "atajos", "organizacion", "jornada", "ordenes", "avisos", "consultor", "seguridad", "suscripcion", "cobranza", "usuarios", "integracion", "auditoria"] as const;
 type Seccion = (typeof SECCIONES)[number];
 
 const DESCRIPCIONES: Record<Seccion, string> = {
@@ -57,6 +60,7 @@ const DESCRIPCIONES: Record<Seccion, string> = {
   ordenes: "Como se arman las ordenes de trabajo: que puede juntarse y cuanto se adelanta.",
   jornada: "Horas de trabajo, días laborables y capacidad de cada persona. De aquí sale si un dia del calendario cabe.",
   avisos: "Avisos al teléfono: si la empresa los manda y cómo activar cada aparato.",
+  consultor: "El Consultor del Sistema: quién lo usa y si está encendido para la empresa.",
   seguridad: "Sus sesiones, las contraseñas del equipo y la exportación de su información.",
   suscripcion: "Plan contratado, consumo y carga inicial de información.",
   cobranza: "Cargos del servicio, su estado de pago y las notas de cobro.",
@@ -91,6 +95,7 @@ export default async function SettingsPage({
     // Personales, de todos: cada quien decide los suyos.
     cuenta: true, apariencia: true, atajos: true, avisos: true, seguridad: true,
     organizacion: can(user.role, "settings:write"),
+    consultor: can(user.role, "settings:write"),
     jornada: MANDO, ordenes: MANDO,
     suscripcion: can(user.role, "settings:write"),
     cobranza: can(user.role, "billing:manage"),
@@ -111,6 +116,7 @@ export default async function SettingsPage({
     { clave: "organizacion", titulo: "Organización", icono: <Building2 className="h-4 w-4" />, grupo: "Mi empresa" },
     { clave: "jornada", titulo: "Jornada y calendario", icono: <CalendarClock className="h-4 w-4" />, grupo: "Mi empresa" },
     { clave: "ordenes", titulo: "Órdenes de trabajo", icono: <ClipboardList className="h-4 w-4" />, grupo: "Mi empresa" },
+    { clave: "consultor", titulo: "Consultor del Sistema", icono: <Compass className="h-4 w-4" />, grupo: "Mi empresa" },
     { clave: "usuarios", titulo: "Usuarios", icono: <Users className="h-4 w-4" />, grupo: "Equipo y accesos" },
     { clave: "integracion", titulo: "Integración", icono: <Plug className="h-4 w-4" />, grupo: "Equipo y accesos" },
     { clave: "auditoria", titulo: "Auditoría", icono: <History className="h-4 w-4" />, grupo: "Equipo y accesos" },
@@ -290,8 +296,18 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
+      {activa === "consultor" ? (
+        <PanelConsultorAjustes
+          encendidoInicial={org.consultorActivo}
+          puedeEditar={can(user.role, "settings:write")}
+          iaConfigurada={iaConfigurada()}
+          cupo={iaDeLaOrganizacion(org).bolsas.CONSULTOR}
+        />
+      ) : null}
+
       {activa === "seguridad" ? (
         <PanelSeguridad
+          segundoFactor={exigeSegundoFactor(user) ? { activo: tieneSegundoFactor(user), respaldos: respaldosRestantes(user) } : null}
           puedeExportar={can(user.role, "data:export")}
           ultimoAcceso={user.lastLoginAt ? formatDateTime(user.lastLoginAt, zona) : null}
         />

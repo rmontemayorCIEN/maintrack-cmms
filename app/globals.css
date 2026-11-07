@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./tema-oscuro.css";
+@import "../consultor/consultor.css";
 
 @theme {
   --color-brand-50: #eef4ff;
@@ -378,4 +379,31 @@ table.data tbody tr:hover {
   html[data-encabezados="sobrio"] .titulo-seccion::before { display: none; }
   html[data-encabezados="sobrio"] .titulo-seccion { font-size: 0.9375rem; font-weight: 600; }
   html[data-encabezados="sobrio"] .cabecera-tarjeta { padding-bottom: 0; border-bottom: 0; }
+}
+
+/*
+ * Consultor del Sistema (consultor/consultor.css): sus tokens, traducidos a
+ * los de MainTrack. Apuntan a tokens que el tema oscuro ya cambia; los dos que
+ * no cambian solos (el fondo de su burbuja y el texto de enlace) se cambian aqui.
+ */
+:root {
+  --cs-superficie: var(--panel);
+  --cs-superficie-2: var(--surface);
+  --cs-linea: var(--border);
+  --cs-texto: var(--ink);
+  --cs-tenue: var(--muted);
+  --cs-radio: 0.75rem;
+  --cs-acento: var(--color-brand-600);
+  --cs-sobre-acento: var(--color-white);
+  --cs-acento-suave: var(--color-brand-50);
+  --cs-acento-texto: var(--color-brand-700);
+  --cs-ok: var(--color-emerald-600);
+  --cs-ok-suave: var(--color-emerald-50);
+  --cs-info-suave: var(--color-sky-50);
+  --cs-alerta: var(--color-red-600);
+  --cs-alerta-suave: var(--color-red-50);
+}
+html[data-tema="oscuro"] {
+  --cs-acento-suave: var(--color-slate-100);
+  --cs-acento-texto: var(--color-brand-300);
 }

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../../lib/zod";
 import { fail, ok, withAuth } from "@/lib/api";
 import { esImportacionValida } from "@/lib/importacion";
 import { ErrorDeImportacion, ejecutarImportacion, formatoDe, validarImportacion } from "@/lib/importacion-motor";
