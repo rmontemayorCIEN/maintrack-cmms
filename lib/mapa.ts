@@ -58,23 +58,29 @@ export const ETIQUETA_DE_VISTA: Record<Vista, string> = {
 };
 
 /**
+ * Satélite: solo se ofrece si hay una fuente CON LICENCIA configurada. El servicio
+ * gratuito de Esri sin llave no trae un permiso comercial claro para un SaaS, así
+ * que no se usa por omisión. Para encenderlo se ponen estas dos variables (un
+ * proveedor con llave: MapTiler, Mapbox, ArcGIS Location Platform…); la llave viaja
+ * en la URL y se restringe por dominio con el proveedor. El proveedor recibe la IP
+ * de quien abre el mapa y la zona que mira, nunca datos de los activos.
+ */
+const SATELITE_URL = process.env.NEXT_PUBLIC_MAPA_SATELITE_URL || "";
+const SATELITE_ATRIBUCION = process.env.NEXT_PUBLIC_MAPA_SATELITE_ATRIBUCION || "Imágenes satelitales de su proveedor";
+
+/**
  * Los fondos del mapa. «Calles» es el ajuste de siempre (OpenStreetMap, o el que
  * ponga NEXT_PUBLIC_MAPA_MOSAICOS). «Claro» y «Oscuro» son LA MISMA fuente con un
  * filtro de color en el navegador: no suman proveedor (los de CARTO piden llave y
- * pintan «API KEY REQUIRED» encima). «Satélite» es de Esri y sí es otro proveedor:
- * recibe la IP de quien abre el mapa y la zona que mira, nunca datos de los activos.
+ * pintan «API KEY REQUIRED» encima).
  */
 export const FONDOS = [
   { id: "calles", nombre: "Calles", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "" },
   { id: "claro", nombre: "Claro", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "grayscale(1) brightness(1.1) contrast(0.85)" },
   { id: "oscuro", nombre: "Oscuro", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "invert(1) hue-rotate(180deg) grayscale(0.6) brightness(0.9) contrast(0.9)" },
-  {
-    id: "satelite", nombre: "Satélite", subdominios: "abc", filtro: "",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    atribucion: "Imágenes © Esri, Maxar, Earthstar Geographics y la comunidad de usuarios de GIS",
-  },
-] as const;
-export type FondoId = (typeof FONDOS)[number]["id"];
+  ...(SATELITE_URL ? [{ id: "satelite" as const, nombre: "Satélite", url: SATELITE_URL, atribucion: SATELITE_ATRIBUCION, subdominios: "abc", filtro: "" }] : []),
+];
+export type FondoId = "calles" | "claro" | "oscuro" | "satelite";
 
 /** La escala numérica tiene este número de tonos (además del «sin nada»). */
 export const TONOS = 4;

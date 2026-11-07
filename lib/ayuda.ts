@@ -120,7 +120,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
     hacer: [
       "Mover y acercar el mapa; los activos de la zona visible se cargan solos",
       "Elegir qué colorea el mapa: el estado de este momento, la cantidad de fallas, el costo de mantenimiento o las horas de paro, en los últimos 30, 90 o 365 días",
-      "Cambiar el fondo del mapa (calles, claro, oscuro o satélite) con «Fondo»",
+      "Cambiar el fondo del mapa (calles, claro u oscuro; satélite solo si la empresa que administra el sistema configuró una fuente con licencia) con «Fondo»",
       "Elegir cómo se ve con «Ver como»: puntos, mapa de calor (zonas con más fallas, costo, paros o equipos parados), lista (tabla con los mismos filtros) o por circuito (une los equipos de cada circuito y resume cada uno)",
       "Filtrar por sitio, categoría o estado",
       "Tocar un punto para abrir la ficha del activo",
@@ -141,7 +141,7 @@ export const AYUDA: Record<string, FichaAyuda> = {
       { sintoma: "Los puntos caen en otro país", porque: "Latitud y longitud suelen ir invertidas, o la longitud sin su signo negativo. En México la longitud es negativa (por ejemplo -100.25)." },
     ],
     preguntas: [
-      { pregunta: "¿Qué ve quien provee el mapa de fondo?", respuesta: "La dirección de red de quien abre el mapa y la zona que mira. Nunca los datos de los activos. Cada fondo (calles, claro, oscuro, satélite) es de un proveedor distinto, y solo se le pide al que se elige." },
+      { pregunta: "¿Qué ve quien provee el mapa de fondo?", respuesta: "La dirección de red de quien abre el mapa y la zona que mira. Nunca los datos de los activos. Calles, claro y oscuro vienen del mismo proveedor de calles; el satélite, si está disponible, es de otro y solo se le pide si se elige." },
     ],
   },
 
