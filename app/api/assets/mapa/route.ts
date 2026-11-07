@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { ok, withVista } from "@/lib/api";
 import { latitudZod, longitudZod } from "@/lib/geografia";
 import { consultarMapa } from "@/lib/mapa-consulta";

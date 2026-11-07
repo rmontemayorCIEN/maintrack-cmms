@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MapaLeaflet, LayerGroup } from "leaflet";
 import { ASSET_STATUS_LABELS } from "@/lib/constants";
+import { formatNumber } from "@/lib/utils";
 import { MOSAICOS_ATRIBUCION, MOSAICOS_URL, type Limites, type RespuestaMapa } from "@/lib/mapa";
 
 /** Variable de color (definida en globals.css, con su versión oscura) por estado. */
@@ -192,15 +193,15 @@ export function MapaActivos({
             : cargando ? "Cargando…"
             : resumen ? (
               resumen.modo === "grupos"
-                ? `${resumen.total.toLocaleString("es-MX")} activos en esta zona, agrupados${resumen.incompleto ? " (muestra: hay más de los que se leen de una vez)" : ""}. Acérquese para verlos uno por uno.`
-                : `${resumen.total.toLocaleString("es-MX")} activo${resumen.total === 1 ? "" : "s"} en esta zona.`
+                ? `${formatNumber(resumen.total, 0)} activos en esta zona, agrupados${resumen.incompleto ? " (muestra: hay más de los que se leen de una vez)" : ""}. Acérquese para verlos uno por uno.`
+                : `${formatNumber(resumen.total, 0)} activo${resumen.total === 1 ? "" : "s"} en esta zona.`
             ) : null}
         </span>
       </div>
 
       {sinCoordenadas > 0 ? (
         <p className="text-xs text-slate-500">
-          {sinCoordenadas.toLocaleString("es-MX")} activo{sinCoordenadas === 1 ? "" : "s"} sin coordenadas no se
+          {formatNumber(sinCoordenadas, 0)} activo{sinCoordenadas === 1 ? "" : "s"} sin coordenadas no se
           muestra{sinCoordenadas === 1 ? "" : "n"} aquí. {" "}
           <Link href="/assets" className="underline">Ver el catálogo</Link>
         </p>

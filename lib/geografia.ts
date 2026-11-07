@@ -18,7 +18,7 @@
  * no sabe no debe adivinarlo.
  */
 
-import { z } from "zod";
+import { z } from "./zod";
 
 export type SitioUbicado = {
   name: string;
