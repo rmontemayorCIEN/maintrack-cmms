@@ -45,6 +45,37 @@ export const ETIQUETA_DE_CAPA: Record<Capa, string> = {
 export const PERIODOS_DIAS = [30, 90, 365] as const;
 export const PERIODO_POR_OMISION = 365;
 
+/**
+ * Cómo se ve el mapa: la misma consulta, dibujada de cuatro maneras.
+ * PUNTOS es la de siempre; CALOR muestra zonas en vez de equipos; LISTA es una
+ * tabla con los mismos filtros; CIRCUITO une cada equipo con el que cuelga del
+ * mismo equipo padre (circuito, tablero) y resume cada grupo.
+ */
+export const VISTAS = ["PUNTOS", "CALOR", "LISTA", "CIRCUITO"] as const;
+export type Vista = (typeof VISTAS)[number];
+export const ETIQUETA_DE_VISTA: Record<Vista, string> = {
+  PUNTOS: "Puntos", CALOR: "Mapa de calor", LISTA: "Lista", CIRCUITO: "Por circuito",
+};
+
+/**
+ * Los fondos del mapa. «Calles» es el ajuste de siempre (OpenStreetMap, o el que
+ * ponga NEXT_PUBLIC_MAPA_MOSAICOS). «Claro» y «Oscuro» son LA MISMA fuente con un
+ * filtro de color en el navegador: no suman proveedor (los de CARTO piden llave y
+ * pintan «API KEY REQUIRED» encima). «Satélite» es de Esri y sí es otro proveedor:
+ * recibe la IP de quien abre el mapa y la zona que mira, nunca datos de los activos.
+ */
+export const FONDOS = [
+  { id: "calles", nombre: "Calles", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "" },
+  { id: "claro", nombre: "Claro", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "grayscale(1) brightness(1.1) contrast(0.85)" },
+  { id: "oscuro", nombre: "Oscuro", url: MOSAICOS_URL, atribucion: MOSAICOS_ATRIBUCION, subdominios: "abc", filtro: "invert(1) hue-rotate(180deg) grayscale(0.6) brightness(0.9) contrast(0.9)" },
+  {
+    id: "satelite", nombre: "Satélite", subdominios: "abc", filtro: "",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    atribucion: "Imágenes © Esri, Maxar, Earthstar Geographics y la comunidad de usuarios de GIS",
+  },
+] as const;
+export type FondoId = (typeof FONDOS)[number]["id"];
+
 /** La escala numérica tiene este número de tonos (además del «sin nada»). */
 export const TONOS = 4;
 
@@ -65,6 +96,8 @@ export type PuntoMapa = {
   status: string; criticality: string;
   /** La cifra de la capa para este activo (0 en ESTADO). */
   valor: number;
+  /** El equipo del que cuelga (circuito, tablero), para la vista «Por circuito». Nulo si no tiene padre. */
+  padreId: string | null; padreNombre: string | null;
   /** Por qué el estado efectivo no es el registrado (paro abierto, orden correctiva abierta). Nulo si coincide. */
   motivo: string | null;
 };

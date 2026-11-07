@@ -50,6 +50,17 @@ async function main() {
     revisar("NO trae el activo de otra empresa, aunque esté en el mismo punto", !codigos.includes("AJENA"));
     const rB = await consultarMapa(b.id, GUADALUPE);
     revisar("la otra empresa ve solo lo suyo", rB.puntos.length === 1 && rB.puntos[0].code === "AJENA");
+    console.log("\n1b. Circuito (equipo padre) para la vista «Por circuito»");
+    const circuito = await prisma.asset.create({ data: base(a.id, sitioA.id, "CIR-X", { name: "Circuito X", status: "OPERATIONAL" }) });
+    const ajena = await prisma.asset.findFirstOrThrow({ where: { organizationId: b.id, code: "AJENA" } });
+    await prisma.asset.updateMany({ where: { organizationId: a.id, code: { in: ["L-1", "L-2"] } }, data: { parentId: circuito.id } });
+    await prisma.asset.updateMany({ where: { organizationId: a.id, code: "L-3" }, data: { parentId: ajena.id } }); // padre de OTRA empresa
+    const rP = await consultarMapa(a.id, GUADALUPE);
+    const padre = (c: string) => rP.puntos.find((p) => p.code === c);
+    revisar("los hijos traen el id y el nombre de su circuito", padre("L-1")?.padreId === circuito.id && padre("L-2")?.padreNombre === "Circuito X");
+    revisar("un equipo sin padre trae nulos", padre("L-2") !== undefined && rP.puntos.every((p) => p.padreId === null || p.padreNombre !== null));
+    revisar("un padre de otra empresa NO se cree ni se nombra", padre("L-3")?.padreId === null && padre("L-3")?.padreNombre === null, padre("L-3"));
+    revisar("el circuito mismo no aparece (no tiene coordenadas)", !rP.puntos.some((p) => p.code === "CIR-X"));
     const rCdmx = await consultarMapa(a.id, { norte: 19.6, sur: 19.3, este: -99.0, oeste: -99.3 });
     revisar("otra zona trae lo que hay en ella", rCdmx.puntos.map((p) => p.code).join() === "L-FUERA");
     const rVacio = await consultarMapa(a.id, { norte: 10, sur: 9, este: -90, oeste: -91 });

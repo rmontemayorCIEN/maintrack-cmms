@@ -134,13 +134,13 @@ export async function consultarMapa(
     ...(filtros.categoryId ? { categoryId: filtros.categoryId } : {}),
   };
   const leidos = await prisma.asset.findMany({
-    where, select: { id: true, latitud: true, longitud: true, status: true }, take: TOPE_LECTURA,
+    where, select: { id: true, latitud: true, longitud: true, status: true, parentId: true }, take: TOPE_LECTURA,
   });
   // El filtro de estado es sobre el estado EFECTIVO: «fuera de servicio» incluye lo que está parado ahora.
   const filas = leidos
     .map((a) => {
       const e = estadoEfectivo(a.status, vivo.paro.get(a.id), vivo.orden.get(a.id));
-      return { id: a.id, latitud: a.latitud as number, longitud: a.longitud as number, status: e.status, motivo: e.motivo, valor: valores.get(a.id) ?? 0 };
+      return { id: a.id, padreId: a.parentId, latitud: a.latitud as number, longitud: a.longitud as number, status: e.status, motivo: e.motivo, valor: valores.get(a.id) ?? 0 };
     })
     .filter((f) => !filtros.status || f.status === filtros.status);
 
@@ -156,8 +156,17 @@ export async function consultarMapa(
         select: { id: true, code: true, name: true, criticality: true },
       })).map((a) => [a.id, a]),
     );
+    // Los nombres de los padres, acotados a la empresa: lo que viene en parentId no se cree.
+    const idsPadre = [...new Set(filas.map((f) => f.padreId).filter((x): x is string => !!x))];
+    const padres = new Map(
+      (idsPadre.length ? await prisma.asset.findMany({ where: { organizationId: orgId, id: { in: idsPadre } }, select: { id: true, name: true } }) : [])
+        .map((a) => [a.id, a.name]),
+    );
     const puntos: PuntoMapa[] = filas
-      .map((f) => ({ ...f, code: ficha.get(f.id)?.code ?? "", name: ficha.get(f.id)?.name ?? "", criticality: ficha.get(f.id)?.criticality ?? "B" }))
+      .map(({ padreId, ...f }) => ({
+        ...f, code: ficha.get(f.id)?.code ?? "", name: ficha.get(f.id)?.name ?? "", criticality: ficha.get(f.id)?.criticality ?? "B",
+        padreId: padreId && padres.has(padreId) ? padreId : null, padreNombre: padreId ? padres.get(padreId) ?? null : null,
+      }))
       .sort((a, b) => a.code.localeCompare(b.code));
     return { ...base, modo: "puntos", incompleto: false, puntos, grupos: [] };
   }
