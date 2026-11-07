@@ -214,7 +214,7 @@ export function MapaActivos({
 
   // Lo que esta persona eligió la última vez. Se lee antes de crear el mapa para no pintar dos veces.
   useEffect(() => {
-    const f = recordado<FondoId>(LLAVE_FONDO, FONDOS.map((x) => x.id), "calles");
+    const f = recordado<FondoId>(LLAVE_FONDO, FONDOS.map((x) => x.id as FondoId), "calles");
     const v = recordado<Vista>(LLAVE_VISTA, VISTAS, "PUNTOS");
     fondoRef.current = f; vistaRef.current = v;
     setFondo(f); setVista(v);
