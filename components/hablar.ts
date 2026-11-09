@@ -108,6 +108,35 @@ export function reproducir(
 }
 
 /**
+ * Un WAV diminuto y silencioso: valido para que el navegador lo acepte, sin
+ * nada que oir.
+ */
+const CLIP_MUDO =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+/**
+ * Desbloquear el audio DENTRO del gesto de la persona.
+ *
+ * El navegador solo deja sonar audio si el play() nace de un gesto. Cuando el
+ * play() de verdad ocurre DESPUES de un fetch —ya fuera del gesto— queda
+ * bloqueado, y en un dominio sin historial de audio no se oye nada, sin un solo
+ * error. Tocar un clip mudo en el MISMO elemento, aqui en el gesto, lo deja
+ * activado y el play() posterior ya se permite.
+ *
+ * Las otras pantallas de voz (modo-voz, brief, panel, navegacion) ya nacian con
+ * un `new Audio().play()` dentro del gesto y por eso no fallaban; la de ajustes
+ * creaba el elemento DESPUES del fetch y era la unica que se quedaba muda.
+ */
+export function desbloquear(pista: HTMLAudioElement): void {
+  try {
+    pista.src = CLIP_MUDO;
+    void pista.play().catch(() => undefined);
+  } catch {
+    /* sin audio en este navegador; no es un fallo */
+  }
+}
+
+/**
  * El audio de una frase fija del sistema.
  *
  * `null` cuando no hay voz —sin credenciales, sin complemento, o fallo la
