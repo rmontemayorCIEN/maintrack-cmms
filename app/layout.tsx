@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
-import { encabezadosDe, estiloDeApariencia, temaDe } from "@/lib/apariencia";
+import { DISENOS, disenoDe, encabezadosDe, estiloDeApariencia, temaDe } from "@/lib/apariencia";
 import { TextosQueCrecen } from "@/components/textos-que-crecen";
 import { DESCRIPCION, MARCA } from "@/lib/comercial";
 
@@ -89,6 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       style={estilo as React.CSSProperties}
       data-tema={tema.atributo === "sistema" ? "claro" : tema.atributo}
       data-encabezados={encabezadosDe(user?.encabezadosUi).toLowerCase()}
+      data-diseno={DISENOS[disenoDe(user?.disenoUi)].atributo}
       suppressHydrationWarning
     >
       {tema.atributo === "sistema" ? (

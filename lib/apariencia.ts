@@ -19,6 +19,7 @@ export type ClaveEscala = "NORMAL" | "GRANDE" | "MAYOR";
 export type ClaveDensidad = "COMPACTA" | "COMODA" | "AMPLIA";
 export type ClaveTema = "CLARO" | "OSCURO" | "SISTEMA";
 export type ClaveEncabezados = "SOBRIO" | "MARCADO";
+export type ClaveDiseno = "CLASICO" | "MESA" | "PAPEL";
 
 /**
  * Tema y encabezados tambien son de la PERSONA: es comodidad de quien mira la
@@ -29,6 +30,21 @@ export const TEMAS: Record<ClaveTema, { nombre: string; descripcion: string; atr
   CLARO: { nombre: "Claro", descripcion: "Fondo blanco. El de siempre y el que sale en papel.", atributo: "claro" },
   OSCURO: { nombre: "Oscuro", descripcion: "Fondo oscuro. Descansa la vista de noche o en un taller con poca luz.", atributo: "oscuro" },
   SISTEMA: { nombre: "Igual que mi aparato", descripcion: "Sigue el modo claro u oscuro de su teléfono o computadora, y cambia solo.", atributo: "sistema" },
+};
+
+/**
+ * Diseños visuales. Es un eje APARTE del tema (claro/oscuro) y del acento: cada diseño
+ * trae su versión clara y oscura y se adapta a las seis paletas de la empresa.
+ *
+ * `disponible` es la puerta: un diseño que todavía no se construyó no se ofrece en Ajustes
+ * (un selector con opciones que no cambian nada es peor que no tenerlo). Se prende cuando
+ * su hoja de estilos ya está publicada. «Clásico» es el de siempre y el que ven todos
+ * mientras nadie elija otro.
+ */
+export const DISENOS: Record<ClaveDiseno, { nombre: string; descripcion: string; atributo: "clasico" | "mesa" | "papel"; disponible: boolean }> = {
+  CLASICO: { nombre: "Clásico", descripcion: "El diseño de siempre.", atributo: "clasico", disponible: true },
+  MESA: { nombre: "Mesa de control", descripcion: "Denso y sobrio, hecho para trabajar todo el día: más renglones a la vista y estados en una sola línea.", atributo: "mesa", disponible: false },
+  PAPEL: { nombre: "Papel", descripcion: "Papel cálido, azul marino y filetes finos. Se lee como un expediente impreso.", atributo: "papel", disponible: false },
 };
 
 export const ENCABEZADOS: Record<ClaveEncabezados, { nombre: string; descripcion: string }> = {
@@ -102,6 +118,9 @@ export const ACENTOS: Record<ClaveAcento, { nombre: string; muestra: string; esc
 };
 
 export const CLAVES_TEMA = Object.keys(TEMAS) as ClaveTema[];
+export const CLAVES_DISENO = Object.keys(DISENOS) as ClaveDiseno[];
+/** Los que ya se pueden elegir. */
+export const CLAVES_DISENO_DISPONIBLES = CLAVES_DISENO.filter((k) => DISENOS[k].disponible);
 export const CLAVES_ENCABEZADOS = Object.keys(ENCABEZADOS) as ClaveEncabezados[];
 export const CLAVES_ESCALA = Object.keys(ESCALAS) as ClaveEscala[];
 export const CLAVES_DENSIDAD = Object.keys(DENSIDADES) as ClaveDensidad[];
@@ -118,6 +137,10 @@ export function temaDe(v: string | null | undefined) {
 }
 export function encabezadosDe(v: string | null | undefined): ClaveEncabezados {
   return v && v in ENCABEZADOS ? (v as ClaveEncabezados) : "MARCADO";
+}
+/** Un diseño desconocido, o uno que aún no está disponible, cae en «Clásico»: nunca una pantalla rota. */
+export function disenoDe(v: string | null | undefined): ClaveDiseno {
+  return v && v in DISENOS && DISENOS[v as ClaveDiseno].disponible ? (v as ClaveDiseno) : "CLASICO";
 }
 export function acentoDe(v: string | null | undefined) {
   return ACENTOS[(v ?? "AZUL") as ClaveAcento] ?? ACENTOS.AZUL;

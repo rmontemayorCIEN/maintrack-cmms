@@ -18,7 +18,7 @@ import { PanelApariencia } from "./apariencia";
 import { PanelVoz } from "./voz";
 import { VOCES, VOZ_POR_OMISION } from "@/lib/voz";
 import { LARGOS_DE_RESPUESTA, LARGO_POR_OMISION } from "@/lib/respuestas-voz";
-import { encabezadosDe, type ClaveAcento, type ClaveDensidad, type ClaveEscala, type ClaveTema } from "@/lib/apariencia";
+import { encabezadosDe, type ClaveAcento, type ClaveDensidad, type ClaveEscala, type ClaveTema, disenoDe } from "@/lib/apariencia";
 import { FUNCIONES_IA, type ClaveFuncionIA } from "@/lib/ia/funciones";
 import { FichasPlanes } from "./planes";
 import { EstadoDeCuenta } from "./estado-cuenta";
@@ -236,6 +236,7 @@ export default async function SettingsPage({
           densidad={(user.densidadUi ?? "COMODA") as ClaveDensidad}
           tema={(user.temaUi ?? "CLARO") as ClaveTema}
           encabezados={encabezadosDe(user.encabezadosUi)}
+          diseno={disenoDe(user.disenoUi)}
           acento={(org.colorAcento ?? "AZUL") as ClaveAcento}
           logoUrl={org.logoUrl}
           puedeEditarMarca={can(user.role, "settings:write")}

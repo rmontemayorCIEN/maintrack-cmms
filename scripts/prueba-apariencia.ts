@@ -18,8 +18,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
-  CLAVES_ENCABEZADOS, CLAVES_TEMA, ENCABEZADOS, TEMAS,
-  encabezadosDe, estiloDeApariencia, temaDe,
+  CLAVES_DISENO, CLAVES_DISENO_DISPONIBLES, CLAVES_ENCABEZADOS, CLAVES_TEMA, DISENOS, ENCABEZADOS, TEMAS,
+  disenoDe, encabezadosDe, estiloDeApariencia, temaDe,
 } from "../lib/apariencia";
 
 let fallos = 0;
@@ -125,6 +125,44 @@ revisar("la ruta acepta exactamente los temas del catálogo",
 revisar("la ruta acepta exactamente los estilos del catálogo",
   /encabezadosUi: z\.enum\(\["SOBRIO", "MARCADO"\]\)/.test(ruta) && CLAVES_ENCABEZADOS.every((k) => ruta.includes(`"${k}"`)));
 revisar("tema y títulos son personales: no piden permiso de empresa", !/empresa = z\.object\(\{[^}]*(temaUi|encabezadosUi)/s.test(ruta));
+
+console.log("\nDiseño visual (Clásico, Mesa de control, Papel)");
+revisar("disenoDe(undefined) es CLASICO", disenoDe(undefined) === "CLASICO");
+revisar("disenoDe(null) y disenoDe('') son CLASICO", disenoDe(null) === "CLASICO" && disenoDe("") === "CLASICO");
+revisar("disenoDe('basura') es CLASICO", disenoDe("basura") === "CLASICO");
+revisar("un diseño aún no disponible cae en CLASICO (nunca una pantalla sin hoja de estilos)",
+  CLAVES_DISENO.filter((k) => !DISENOS[k].disponible).every((k) => disenoDe(k) === "CLASICO"));
+revisar("un diseño disponible se respeta", CLAVES_DISENO_DISPONIBLES.every((k) => disenoDe(k) === k));
+revisar("CLASICO siempre está disponible", DISENOS.CLASICO.disponible);
+revisar("todos los diseños traen nombre y descripción", CLAVES_DISENO.every((k) => DISENOS[k].nombre && DISENOS[k].descripcion));
+revisar("cada atributo es único y en minúsculas",
+  new Set(CLAVES_DISENO.map((k) => DISENOS[k].atributo)).size === CLAVES_DISENO.length
+  && CLAVES_DISENO.every((k) => DISENOS[k].atributo === DISENOS[k].atributo.toLowerCase()));
+// Un diseño «disponible» sin su hoja se ofrecería en Ajustes y no cambiaría nada: peor que no tenerlo.
+for (const k of CLAVES_DISENO_DISPONIBLES.filter((x) => x !== "CLASICO")) {
+  const at = DISENOS[k].atributo;
+  let hoja = "";
+  try { hoja = readFileSync(join(RAIZ, "app", "disenos", `${at}.css`), "utf8"); } catch { /* se reporta abajo */ }
+  revisar(`«${k}» tiene su hoja app/disenos/${at}.css`, hoja.length > 0);
+  revisar(`«${k}» se importa desde globals.css`, new RegExp(`@import "\\./disenos/${at}\\.css"`).test(globales));
+  revisar(`«${k}» solo se aplica bajo html[data-diseno="${at}"]`, hoja.includes(`html[data-diseno="${at}"]`) && !/^\s*:root\s*\{/m.test(hoja));
+}
+revisar("User.disenoUi existe y arranca en CLASICO", /disenoUi\s+String\s+@default\("CLASICO"\)/.test(esquema));
+const migDiseno = readdirSync(join(RAIZ, "prisma", "migrations")).filter((n) => /diseno_visual/.test(n));
+revisar("hay una migración del diseño", migDiseno.length === 1, migDiseno);
+if (migDiseno.length === 1) {
+  const sql = readFileSync(join(RAIZ, "prisma", "migrations", migDiseno[0], "migration.sql"), "utf8");
+  revisar("la migración del diseño es aditiva y sin sintaxis de SQLite",
+    /ADD COLUMN\s+"disenoUi" TEXT NOT NULL DEFAULT 'CLASICO'/.test(sql) && !/DROP|ALTER COLUMN|AUTOINCREMENT|PRAGMA/.test(sql));
+}
+revisar("la ruta acepta exactamente los diseños del catálogo",
+  /disenoUi: z\.enum\(\[([^\]]*)\]\)/.test(ruta)
+  && [...(ruta.match(/disenoUi: z\.enum\(\[([^\]]*)\]\)/)?.[1].matchAll(/"([A-Z]+)"/g) ?? [])].map((m) => m[1]).sort().join() === [...CLAVES_DISENO].sort().join());
+revisar("el diseño es personal: no pide permiso de empresa", !/empresa = z\.object\(\{[^}]*disenoUi/s.test(ruta));
+const layout = readFileSync(join(RAIZ, "app", "layout.tsx"), "utf8");
+revisar("el layout pone data-diseno en la raíz desde disenoDe()", /data-diseno=\{DISENOS\[disenoDe\(user\?\.disenoUi\)\]\.atributo\}/.test(layout));
+revisar("Ajustes pinta el diseño en vivo antes de guardar",
+  /setAttribute\("data-diseno"/.test(readFileSync(join(RAIZ, "app", "(app)", "settings", "apariencia.tsx"), "utf8")));
 
 console.log(fallos ? `\n${fallos} fallas.` : "\nTodo en orden.");
 process.exit(fallos ? 1 : 0);
