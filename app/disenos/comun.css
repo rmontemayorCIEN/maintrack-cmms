@@ -1,0 +1,78 @@
+/*
+ * Lo que comparten los diseños nuevos («Mesa de control» y «Papel»): se escribe UNA vez aquí y cada
+ * diseño pone solo sus colores y su forma. Va bajo html:is([data-diseno=…]); «Clásico» no lo toca.
+ *
+ * Los ganchos son clases que los componentes compartidos ya traen y que en «Clásico» no cambian nada:
+ * .etiqueta (Badge), .barra-lateral (menú), .barra-superior (encabezado).
+ */
+
+/* Los fondos de color suave (avisos, tarjetas, leyendas) se apagan: menos pastel, el mismo
+   significado. El borde y el texto conservan su color, así que nada depende solo del fondo.
+   Cada diseño puede fijar --base-suave (el «blanco» de su papel). Solo en claro: el oscuro trae los suyos. */
+html:is([data-diseno="mesa"], [data-diseno="papel"]):not([data-tema="oscuro"]) {
+  --color-red-50: color-mix(in srgb, #fef2f2 55%, var(--base-suave, #ffffff));
+  --color-red-100: color-mix(in srgb, #fee2e2 60%, var(--base-suave, #ffffff));
+  --color-amber-50: color-mix(in srgb, #fffbeb 55%, var(--base-suave, #ffffff));
+  --color-amber-100: color-mix(in srgb, #fef3c7 60%, var(--base-suave, #ffffff));
+  --color-emerald-50: color-mix(in srgb, #ecfdf5 55%, var(--base-suave, #ffffff));
+  --color-emerald-100: color-mix(in srgb, #d1fae5 60%, var(--base-suave, #ffffff));
+  --color-blue-50: color-mix(in srgb, #eff6ff 55%, var(--base-suave, #ffffff));
+  --color-blue-100: color-mix(in srgb, #dbeafe 60%, var(--base-suave, #ffffff));
+  --color-sky-50: color-mix(in srgb, #f0f9ff 55%, var(--base-suave, #ffffff));
+  --color-sky-100: color-mix(in srgb, #e0f2fe 60%, var(--base-suave, #ffffff));
+  --color-violet-50: color-mix(in srgb, #f5f3ff 55%, var(--base-suave, #ffffff));
+  --color-violet-100: color-mix(in srgb, #ede9fe 60%, var(--base-suave, #ffffff));
+  --color-orange-50: color-mix(in srgb, #fff7ed 55%, var(--base-suave, #ffffff));
+  --color-orange-100: color-mix(in srgb, #ffedd5 60%, var(--base-suave, #ffffff));
+  --color-teal-50: color-mix(in srgb, #f0fdfa 55%, var(--base-suave, #ffffff));
+  --color-teal-100: color-mix(in srgb, #ccfbf1 60%, var(--base-suave, #ffffff));
+  --color-indigo-50: color-mix(in srgb, #eef2ff 55%, var(--base-suave, #ffffff));
+  --color-indigo-100: color-mix(in srgb, #e0e7ff 60%, var(--base-suave, #ffffff));
+  --color-purple-50: color-mix(in srgb, #faf5ff 55%, var(--base-suave, #ffffff));
+  --color-purple-100: color-mix(in srgb, #f3e8ff 60%, var(--base-suave, #ffffff));
+  --color-green-50: color-mix(in srgb, #f0fdf4 55%, var(--base-suave, #ffffff));
+  --color-green-100: color-mix(in srgb, #dcfce7 60%, var(--base-suave, #ffffff));
+  --color-yellow-50: color-mix(in srgb, #fefce8 55%, var(--base-suave, #ffffff));
+  --color-yellow-100: color-mix(in srgb, #fef9c3 60%, var(--base-suave, #ffffff));
+  --color-rose-50: color-mix(in srgb, #fff1f2 55%, var(--base-suave, #ffffff));
+  --color-rose-100: color-mix(in srgb, #ffe4e6 60%, var(--base-suave, #ffffff));
+  --color-cyan-50: color-mix(in srgb, #ecfeff 55%, var(--base-suave, #ffffff));
+  --color-cyan-100: color-mix(in srgb, #cffafe 60%, var(--base-suave, #ffffff));
+  --color-pink-50: color-mix(in srgb, #fdf2f8 55%, var(--base-suave, #ffffff));
+  --color-pink-100: color-mix(in srgb, #fce7f3 60%, var(--base-suave, #ffffff));
+  --color-lime-50: color-mix(in srgb, #f7fee7 55%, var(--base-suave, #ffffff));
+  --color-lime-100: color-mix(in srgb, #ecfccb 60%, var(--base-suave, #ffffff));
+}
+
+/* Menú lateral: los colores de la escala y el fondo (--lat-fondo) los pone cada diseño. */
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral {
+  background: var(--lat-fondo);
+  color: var(--color-slate-800);
+}
+/* Los títulos de grupo: texto chico y tenue, sin chip ni barra de color. */
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral [class*="group/titulo"] {
+  background: transparent;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: var(--color-slate-400);
+}
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral [class*="w-[3px]"] { display: none; }
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral a { border-radius: 4px; }
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral a:hover {
+  background: var(--color-slate-100);
+  color: var(--color-slate-900);
+}
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral a[aria-current="page"] {
+  background: color-mix(in srgb, var(--acento-500, #345df9) 26%, transparent);
+  color: #ffffff;
+  box-shadow: inset 2px 0 0 var(--acento-300, #8eb0ff);
+}
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-lateral a[aria-current="page"] > span:first-child {
+  color: var(--acento-200, #bcd0ff);
+}
+
+/* Encabezado: sin vidrio esmerilado, sobre el papel del diseño. */
+html:is([data-diseno="mesa"], [data-diseno="papel"]) .barra-superior {
+  background: var(--panel);
+  backdrop-filter: none;
+}

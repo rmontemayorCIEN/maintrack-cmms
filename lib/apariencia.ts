@@ -43,8 +43,8 @@ export const TEMAS: Record<ClaveTema, { nombre: string; descripcion: string; atr
  */
 export const DISENOS: Record<ClaveDiseno, { nombre: string; descripcion: string; atributo: "clasico" | "mesa" | "papel"; disponible: boolean }> = {
   CLASICO: { nombre: "Clásico", descripcion: "El diseño de siempre.", atributo: "clasico", disponible: true },
-  MESA: { nombre: "Mesa de control", descripcion: "Denso y sobrio, hecho para trabajar todo el día: más renglones a la vista y estados en una sola línea.", atributo: "mesa", disponible: false },
-  PAPEL: { nombre: "Papel", descripcion: "Papel cálido, azul marino y filetes finos. Se lee como un expediente impreso.", atributo: "papel", disponible: false },
+  MESA: { nombre: "Mesa de control", descripcion: "Denso y sobrio, hecho para trabajar todo el día: más renglones a la vista y estados en una sola línea.", atributo: "mesa", disponible: true },
+  PAPEL: { nombre: "Papel", descripcion: "Papel cálido, azul marino y filetes finos. Se lee como un expediente impreso.", atributo: "papel", disponible: true },
 };
 
 export const ENCABEZADOS: Record<ClaveEncabezados, { nombre: string; descripcion: string }> = {

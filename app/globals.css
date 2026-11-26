@@ -1,5 +1,8 @@
 @import "tailwindcss";
 @import "./tema-oscuro.css";
+@import "./disenos/comun.css";
+@import "./disenos/mesa.css";
+@import "./disenos/papel.css";
 @import "../consultor/consultor.css";
 
 @theme {

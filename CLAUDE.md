@@ -118,6 +118,23 @@ volver a activar su telefono a mano.
 **Permisos**: matriz en `lib/rbac.ts` — 7 roles. VIEWER no tiene ninguno, o sea
 que es de solo lectura por construccion, no por revisar cada pantalla.
 
+### Los diseños visuales (Clásico, Mesa de control, Papel)
+
+Cada persona elige su diseño en Ajustes → Apariencia (`User.disenoUi`, atributo `data-diseno` en
+la raíz). Es un eje aparte del tema claro/oscuro y del color de la empresa.
+
+- **No se reescribe una pantalla para un diseño.** Cada hoja (`app/disenos/mesa.css`,
+  `papel.css`) reasigna las variables que ya usan las clases de Tailwind (`--color-slate-*`,
+  `--radius-*`, `--surface`…), igual que el tema oscuro. Lo común va en `comun.css`.
+- **Los ganchos son clases** que los componentes compartidos ya traen: `.etiqueta` (`Badge`),
+  `.barra-lateral`, `.barra-superior`. Un componente nuevo que deba verse distinto en un diseño
+  trae su gancho; no se copia un estilo suelto en una pantalla.
+- **Todo bajo `html[data-diseno="…"]`**, y el bloque oscuro con `:root` al final del selector:
+  sin él, los colores base de Clásico le ganan por orden de carga. Lo cuida
+  `scripts/prueba-apariencia.ts`, que también exige contraste 4.5:1 con las seis paletas.
+- **Un diseño nuevo:** su hoja, su `@import` en `globals.css` y `disponible: true` en
+  `DISENOS` de `lib/apariencia.ts`. Mientras no esté disponible, Ajustes no lo ofrece.
+
 ### El servidor MCP del operador
 
 `/api/mcp` deja que un agente de IA en claude.ai consulte cifras agregadas del

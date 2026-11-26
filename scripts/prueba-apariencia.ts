@@ -18,7 +18,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
-  CLAVES_DISENO, CLAVES_DISENO_DISPONIBLES, CLAVES_ENCABEZADOS, CLAVES_TEMA, DISENOS, ENCABEZADOS, TEMAS,
+  ACENTOS, CLAVES_ACENTO, CLAVES_DISENO, CLAVES_DISENO_DISPONIBLES, CLAVES_ENCABEZADOS, CLAVES_TEMA, DISENOS, ENCABEZADOS, TEMAS,
   disenoDe, encabezadosDe, estiloDeApariencia, temaDe,
 } from "../lib/apariencia";
 
@@ -147,6 +147,46 @@ for (const k of CLAVES_DISENO_DISPONIBLES.filter((x) => x !== "CLASICO")) {
   revisar(`«${k}» se importa desde globals.css`, new RegExp(`@import "\\./disenos/${at}\\.css"`).test(globales));
   revisar(`«${k}» solo se aplica bajo html[data-diseno="${at}"]`, hoja.includes(`html[data-diseno="${at}"]`) && !/^\s*:root\s*\{/m.test(hoja));
 }
+// Contraste mínimo 4.5:1 (WCAG AA) de cada diseño nuevo, leyendo los tokens del propio CSS: si alguien
+// aclara un gris o cambia el fondo del menú, esto lo atrapa. El acento de la empresa entra con sus seis paletas.
+const hexDe = (bloque: string, nombre: string) => bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6})`))?.[1] ?? "";
+const rgbDe = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const luminancia = (h: string) => {
+  const [r, g, b] = rgbDe(h).map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const razonDe = (a: string, b: string) => { const [x, y] = [luminancia(a), luminancia(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const mezclaDe = (frente: string, alfa: number, fondo: string) =>
+  "#" + rgbDe(frente).map((v, i) => Math.round(v * alfa + rgbDe(fondo)[i] * (1 - alfa)).toString(16).padStart(2, "0")).join("");
+const parDe = (nombre: string, a: string, b: string) =>
+  revisar(`contraste ≥ 4.5 — ${nombre} (${a} sobre ${b})`, !!a && !!b && razonDe(a, b) >= 4.5, a && b ? razonDe(a, b).toFixed(2) : "no se encontró el token");
+
+for (const k of CLAVES_DISENO_DISPONIBLES.filter((x) => x !== "CLASICO")) {
+  const at = DISENOS[k].atributo;
+  let hoja = "";
+  try { hoja = readFileSync(join(RAIZ, "app", "disenos", `${at}.css`), "utf8"); } catch { /* ya se reportó arriba */ }
+  // Cada bloque va de su selector a la primera llave de cierre: no tienen bloques anidados.
+  const bloque = (selector: string) => { const i = hoja.indexOf(selector); return i < 0 ? "" : hoja.slice(i, hoja.indexOf("}", i)); };
+  const claro = bloque(`html[data-diseno="${at}"]:not([data-tema="oscuro"]) {`);
+  const oscuro = bloque(`html[data-diseno="${at}"][data-tema="oscuro"]:root {`);
+  const menu = bloque(`html[data-diseno="${at}"] .barra-lateral {`);
+  revisar(`«${k}» define su versión clara, su versión oscura y los colores de su menú`, !!claro && !!oscuro && !!menu);
+  for (const [tema, bl] of [["claro", claro], ["oscuro", oscuro]] as const) {
+    for (const [txt, fondo] of [["--muted", "--panel"], ["--muted", "--surface"], ["--color-slate-500", "--panel"], ["--color-slate-500", "--surface"], ["--color-slate-600", "--panel"], ["--ink", "--panel"]] as const) {
+      parDe(`${k} ${tema}: ${txt} sobre ${fondo}`, hexDe(bl, txt), hexDe(bl, fondo));
+    }
+    const fondoMenu = hexDe(bl, "--lat-fondo");
+    parDe(`${k} menú ${tema}: texto de opciones`, hexDe(menu, "--color-slate-600"), fondoMenu);
+    parDe(`${k} menú ${tema}: título de grupo`, hexDe(menu, "--color-slate-400"), fondoMenu);
+    for (const c of CLAVES_ACENTO) {
+      parDe(`${k} menú ${tema}, ${ACENTOS[c].nombre}: opción activa`, "#ffffff", fondoMenu ? mezclaDe(ACENTOS[c].escala[500], 0.26, fondoMenu) : "");
+    }
+  }
+}
+const comun = (() => { try { return readFileSync(join(RAIZ, "app", "disenos", "comun.css"), "utf8"); } catch { return ""; } })();
+revisar("comun.css existe, se importa y todo va acotado a los diseños nuevos",
+  comun.length > 0 && /@import "\.\/disenos\/comun\.css"/.test(globales)
+  && !(comun.replace(/\/\*[\s\S]*?\*\//g, "").match(/^[^\s}@][^{]*\{/gm) ?? []).some((sel) => !sel.startsWith("html:is([data-diseno=")));
 revisar("User.disenoUi existe y arranca en CLASICO", /disenoUi\s+String\s+@default\("CLASICO"\)/.test(esquema));
 const migDiseno = readdirSync(join(RAIZ, "prisma", "migrations")).filter((n) => /diseno_visual/.test(n));
 revisar("hay una migración del diseño", migDiseno.length === 1, migDiseno);
