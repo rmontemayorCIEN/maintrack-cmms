@@ -20,6 +20,7 @@ const personal = z.object({
   densidadUi: z.enum(["COMPACTA", "COMODA", "AMPLIA"]).optional(),
   temaUi: z.enum(["CLARO", "OSCURO", "SISTEMA"]).optional(),
   encabezadosUi: z.enum(["SOBRIO", "MARCADO"]).optional(),
+  disenoUi: z.enum(["CLASICO", "MESA", "PAPEL"]).optional(),
   /**
    * Con que voz oye el parte del dia. Tambien es personal: al director le
    * puede gustar una y a su jefe de mantenimiento otra. Se valida contra el

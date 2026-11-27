@@ -414,6 +414,9 @@ model User {
   /// SOBRIO | MARCADO. Que tanto se distinguen los titulos de pagina y de
   /// seccion. Personal por la misma razon que la escala de letra.
   encabezadosUi     String    @default("MARCADO")
+  /// CLASICO | MESA | PAPEL. El diseno visual del sistema (ver lib/apariencia.ts).
+  /// Personal, como el tema: es comodidad de quien mira, no identidad de la empresa.
+  disenoUi          String    @default("CLASICO")
   /// Como quiere ver cada tabla del sistema: que columnas, en que orden y con
   /// que agrupacion. Es un objeto por tabla —activos, ordenes, refacciones,
   /// planes— para no agregar una columna cada vez que otra lista se vuelve

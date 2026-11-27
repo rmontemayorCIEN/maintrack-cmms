@@ -1,0 +1,163 @@
+/*
+ * Diseño «Papel» (nov 2026): la dirección «Carátula» de Agente 360, con su paleta «Marino y arena».
+ *
+ * Papel cálido, tinta marino, filetes finos, doble raya arriba de cada hoja, títulos en Fraunces y
+ * texto en Figtree (alojadas en public/fonts, con su licencia). Los estados van como sello:
+ * contorno, mayúsculas y letra chica. A diferencia de Agente 360, el sello NO va inclinado: en las
+ * tablas densas de un CMMS varios por renglón se leen mal torcidos.
+ *
+ * Reglas del archivo:
+ *  - TODO va bajo html[data-diseno="papel"]; sin ese atributo nada de aquí aplica (lo cuida
+ *    scripts/prueba-apariencia.ts). Lo común con «Mesa de control» vive en comun.css.
+ *  - No se reescribe ninguna pantalla: se reasignan las variables que ya usan las clases de Tailwind.
+ *  - Claro y oscuro son bloques aparte; el oscuro solo en pantalla (al imprimir sale claro).
+ *  - Contraste mínimo 4.5:1, comprobado por la prueba con las seis paletas de la empresa.
+ */
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/figtree-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/fraunces-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------ Claro --- */
+html[data-diseno="papel"]:not([data-tema="oscuro"]) {
+  --color-slate-50: #f8f5ef;
+  --color-slate-100: #efeae1;
+  --color-slate-200: #e0d9cc;
+  --color-slate-300: #c9c0b0;
+  --color-slate-400: #8a8374;
+  --color-slate-500: #5e6572;
+  --color-slate-600: #475162;
+  --color-slate-700: #34404f;
+  --color-slate-800: #252f3d;
+  --color-slate-900: #1e2a38;
+  --color-slate-950: #141c26;
+  --surface: #f5f2ec;
+  --panel: #fffdf9;
+  --border: #e0d9cc;
+  --ink: #1e2a38;
+  --muted: #566070;
+  --campo: #fffdf9;
+  --campo-off: #f1ede4;
+  --tabla-cab: #efeae1;
+  --tabla-linea: #e8e2d6;
+  --tabla-hover: #f7f3ea;
+  --barra: #c9c0b0;
+  --base-suave: #fffdf9;
+  --lat-fondo: #1e2f45;
+}
+
+/* ---------------------------------------------------------- Oscuro ---- */
+@media screen {
+  html[data-diseno="papel"][data-tema="oscuro"]:root {
+    --color-slate-50: #1b222b;
+    --color-slate-100: #1f2630;
+    --color-slate-200: #2e3744;
+    --color-slate-300: #46505f;
+    --color-slate-400: #7f8896;
+    --color-slate-500: #a9b0ba;
+    --color-slate-600: #bec4cc;
+    --color-slate-700: #d3d7dd;
+    --color-slate-800: #e4e6ea;
+    --color-slate-900: #ece8e0;
+    --color-slate-950: #f7f4ee;
+    --surface: #12161c;
+    --panel: #181e26;
+    --border: #2e3744;
+    --ink: #ece8e0;
+    --muted: #a9b0ba;
+    --campo: #141a21;
+    --campo-off: #161c24;
+    --tabla-cab: #1f2630;
+    --tabla-linea: #232b36;
+    --tabla-hover: #1c232d;
+    --barra: #46505f;
+    --lat-fondo: #1b2738;
+  }
+}
+
+/* ---------------------------------------- Letra, esquinas y sombras --- */
+html[data-diseno="papel"] {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-titulos: "Fraunces", Georgia, "Times New Roman", serif;
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 16px rgba(30, 42, 56, 0.14);
+  --shadow-xl: 0 6px 20px rgba(30, 42, 56, 0.16);
+  font-feature-settings: "tnum" 1;
+}
+/* La doble raya arriba de cada hoja: la seña del diseño. */
+html[data-diseno="papel"] .card { border-radius: 4px; border-top: 3px double var(--ink); }
+html[data-diseno="papel"] .field { border-radius: 3px; }
+html[data-diseno="papel"] .field:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-500) 25%, transparent); }
+
+/* ------------------------------------------------------------ Títulos --- */
+html[data-diseno="papel"] .titulo-pagina,
+html[data-diseno="papel"] .titulo-seccion {
+  font-family: var(--font-titulos);
+  font-optical-sizing: auto;
+  color: var(--ink);
+}
+html[data-diseno="papel"] .titulo-pagina {
+  padding-left: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+html[data-diseno="papel"] .titulo-pagina::before,
+html[data-diseno="papel"] .titulo-seccion::before { display: none; }
+html[data-diseno="papel"] .titulo-seccion { font-size: 1.0625rem; font-weight: 600; letter-spacing: 0; }
+html[data-diseno="papel"] .cabecera-tarjeta { border-bottom-color: var(--border); }
+
+/* ------------------------------------------------------------- Tablas --- */
+html[data-diseno="papel"] table.data { font-variant-numeric: tabular-nums; }
+html[data-diseno="papel"] table.data th {
+  border-bottom: 1px solid var(--ink);
+  letter-spacing: 0.06em;
+}
+html[data-diseno="papel"] table.data td:first-child > a { white-space: nowrap; }
+
+/* ------------------------------------------------ Estados como sello --- */
+/* Contorno, mayúsculas y letra chica; el color sigue viniendo de cada Badge (currentColor), así que
+   claro y oscuro salen solos, y el texto siempre acompaña al color. */
+html[data-diseno="papel"] .etiqueta {
+  padding: 1px 7px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+  font-size: 0.65625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------ Menú lateral marino --- */
+/* Solo los colores del menú: su estructura es de comun.css. */
+html[data-diseno="papel"] .barra-lateral {
+  --color-slate-50: #243850;
+  --color-slate-100: #2a4059;
+  --color-slate-200: #34495f;
+  --color-slate-300: #475b74;
+  --color-slate-400: #a9b7cb;
+  --color-slate-500: #bcc7d6;
+  --color-slate-600: #cbd4e0;
+  --color-slate-700: #dde3eb;
+  --color-slate-800: #eaeef3;
+  --color-slate-900: #f5f2ec;
+}

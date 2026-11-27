@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Check, Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui";
 import {
-  ACENTOS, CLAVES_ACENTO, CLAVES_DENSIDAD, CLAVES_ENCABEZADOS, CLAVES_ESCALA, CLAVES_TEMA,
-  DENSIDADES, ENCABEZADOS, ESCALAS, TEMAS,
-  type ClaveAcento, type ClaveDensidad, type ClaveEncabezados, type ClaveEscala, type ClaveTema,
+  ACENTOS, CLAVES_ACENTO, CLAVES_DENSIDAD, CLAVES_DISENO_DISPONIBLES, CLAVES_ENCABEZADOS, CLAVES_ESCALA, CLAVES_TEMA,
+  DENSIDADES, DISENOS, ENCABEZADOS, ESCALAS, TEMAS,
+  type ClaveAcento, type ClaveDensidad, type ClaveDiseno, type ClaveEncabezados, type ClaveEscala, type ClaveTema,
 } from "@/lib/apariencia";
 
 /**
@@ -58,6 +58,7 @@ export function PanelApariencia({
   densidad,
   tema,
   encabezados,
+  diseno,
   acento,
   logoUrl,
   puedeEditarMarca,
@@ -66,6 +67,7 @@ export function PanelApariencia({
   densidad: ClaveDensidad;
   tema: ClaveTema;
   encabezados: ClaveEncabezados;
+  diseno: ClaveDiseno;
   acento: ClaveAcento;
   logoUrl: string | null;
   puedeEditarMarca: boolean;
@@ -75,6 +77,7 @@ export function PanelApariencia({
   const [d, setD] = useState(densidad);
   const [t, setT] = useState(tema);
   const [h, setH] = useState(encabezados);
+  const [di, setDi] = useState(diseno);
   const [a, setA] = useState(acento);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export function PanelApariencia({
   /** Se pinta el cambio antes de pedirlo al servidor: elegir a ciegas no sirve. */
   function aplicarEnVivo(cambios: {
     escala?: ClaveEscala; densidad?: ClaveDensidad; acento?: ClaveAcento;
-    tema?: ClaveTema; encabezados?: ClaveEncabezados;
+    tema?: ClaveTema; encabezados?: ClaveEncabezados; diseno?: ClaveDiseno;
   }) {
     const raiz = document.documentElement;
     if (cambios.tema) {
@@ -95,6 +98,7 @@ export function PanelApariencia({
       raiz.setAttribute("data-tema", oscuro ? "oscuro" : "claro");
     }
     if (cambios.encabezados) raiz.setAttribute("data-encabezados", cambios.encabezados.toLowerCase());
+    if (cambios.diseno) raiz.setAttribute("data-diseno", DISENOS[cambios.diseno].atributo);
     if (cambios.escala) raiz.style.fontSize = ESCALAS[cambios.escala].raiz;
     if (cambios.densidad) {
       raiz.style.setProperty("--celda", DENSIDADES[cambios.densidad].celda);
@@ -161,6 +165,21 @@ export function PanelApariencia({
   return (
     <div className="grid gap-4">
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p> : null}
+
+      {/* Con un solo diseño disponible no hay nada que elegir: la tarjeta aparece
+          cuando se publica el segundo. */}
+      {CLAVES_DISENO_DISPONIBLES.length > 1 ? (
+        <Card>
+          <CardHeader
+            title="Diseño"
+            subtitle="Cómo se ve todo el sistema. Es su preferencia personal y no afecta a nadie más de su equipo. Funciona igual en claro y en oscuro, con el color de su empresa."
+          />
+          <Opciones
+            claves={CLAVES_DISENO_DISPONIBLES} actual={di} catalogo={DISENOS}
+            onElegir={(k) => { setDi(k); aplicarEnVivo({ diseno: k }); guardar({ disenoUi: k }); }}
+          />
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader

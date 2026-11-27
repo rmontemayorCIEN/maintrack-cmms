@@ -146,7 +146,7 @@ export function Sidebar({
    * ahí ya se cierra entero.
    */
   const contenido = (compacto: boolean) => (
-    <div className="flex h-full flex-col">
+    <div className="barra-lateral flex h-full flex-col">
       <div className={cn("flex items-center gap-2 border-b border-slate-200 py-4", compacto ? "justify-center px-2" : "px-4")}>
         {tieneLogo ? (
           // eslint-disable-next-line @next/next/no-img-element

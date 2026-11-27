@@ -101,7 +101,7 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur no-print lg:px-6">
+    <header className="barra-superior sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur no-print lg:px-6">
       <div className="w-10 shrink-0 lg:hidden" />
       <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 md:hidden" title={empresa}>{empresa}</p>
       <form onSubmit={search} role="search" className="relative hidden max-w-sm flex-1 md:block">
