@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Check, Loader2, Volume2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui";
+import { desbloquear } from "@/components/hablar";
 import { pedir } from "@/lib/cliente/pedir";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,14 @@ export function PanelVoz({
 
   async function probar(id: string) {
     if (probando) return;
+    // Dentro del gesto, antes del fetch: reusar UN solo elemento y desbloquearlo
+    // tocando un clip mudo, para que el play() de despues del fetch no lo bloquee
+    // el navegador. Era la unica pantalla de voz que creaba el Audio DESPUES del
+    // fetch y por eso se quedaba muda en un dominio sin historial de audio.
+    if (!audio.current) audio.current = new Audio();
+    const pista = audio.current;
+    pista.pause();
+    desbloquear(pista);
     setProbando(id);
     setError(null);
     try {
@@ -47,11 +56,11 @@ export function PanelVoz({
       if (r.status === 204) { setSinVoz(true); return; }
       if (!r.ok) { setError("No se pudo generar la muestra. Intente de nuevo."); return; }
       const blob = await r.blob();
-      if (audio.current) audio.current.pause();
-      const pista = new Audio(URL.createObjectURL(blob));
       pista.onended = () => setProbando(null);
       pista.onerror = () => setProbando(null);
-      audio.current = pista;
+      pista.pause();
+      pista.src = URL.createObjectURL(blob);
+      pista.currentTime = 0;
       await pista.play();
       return;
     } catch {
